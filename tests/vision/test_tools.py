@@ -99,7 +99,8 @@ def test_each_reading_tool_returns_panel_locators():
     assert fig["classification"]["class"] == "experimental_scattering" and len(fig["classification_units"]) == 2
 
 
-def test_missing_text_layer_is_unavailable_retryable_for_figure_required_and_partial_when_waived():
+def test_missing_text_layer_is_unavailable_retryable_for_figure_required_and_partial_when_waived(monkeypatch):
+    monkeypatch.setenv("F2W_FIGURE_OCR_ENGINE", "none")   # no engine, whatever weights the environment has
     cap = "Figure 1. (a) 2D GIWAXS pattern. (b) 2D GIWAXS pattern."
     ts = toolset(parsed(cap), raster_figure_pdf(cap))
     ex = executor(ts)

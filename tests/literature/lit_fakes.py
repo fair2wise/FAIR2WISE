@@ -96,9 +96,9 @@ def make_paper_pdf(path: Path, *, title: str, doi: str = "", sections: Iterable[
     height = 792
     ops: list[list[Callable[[Any], None]]] = []
 
-    def text(page: int, x: float, y: float, value: str, size: float) -> None:
+    def text(page: int, x: float, y: float, value: str, size: float, bold: bool = False) -> None:
         def draw(c: Any) -> None:
-            c.setFont("Helvetica", size)
+            c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
             c.setFillColorRGB(0, 0, 0)
             c.drawString(x, height - y, value)
         ops[page].append(draw)
@@ -106,7 +106,7 @@ def make_paper_pdf(path: Path, *, title: str, doi: str = "", sections: Iterable[
     ops.append([])
     cur = 0
     y = 72
-    text(cur, 72, y, title, 18)
+    text(cur, 72, y, title, 18, bold=True)
     y += 28
     if doi:
         text(cur, 72, y, f"https://doi.org/{doi}", 9)
@@ -116,8 +116,9 @@ def make_paper_pdf(path: Path, *, title: str, doi: str = "", sections: Iterable[
             ops.append([])
             cur += 1
             y = 72
-        text(cur, 72, y, heading, 14)
-        y += 20
+        y += 20   # a clear gap above a heading, and bold type: the layout model needs both to call it a heading
+        text(cur, 72, y, heading, 14, bold=True)
+        y += 22
         for line in body.split("\n"):
             text(cur, 72, y, line, 10)
             y += 14

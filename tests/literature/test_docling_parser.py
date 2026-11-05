@@ -198,8 +198,23 @@ def test_real_conversion_of_a_generated_pdf(tmp_path):
     pdf.setFont("Helvetica-Bold", 18)
     pdf.drawString(72, PAGE_H - 100, "1. Introduction")
     pdf.setFont("Helvetica", 11)
-    for i in range(12):
-        pdf.drawString(72, PAGE_H - 130 - 14 * i, "Thin films of polymer semiconductors were measured by scattering.")
+    # Varied, paragraph-like prose: twelve identical lines make the layout model call the block a picture.
+    prose = [
+        "Thin films of polymer semiconductors were measured by scattering.",
+        "The samples were cast from chlorobenzene solution onto silicon substrates",
+        "and annealed at 150 degrees Celsius for ten minutes before measurement.",
+        "Grazing incidence geometry at the incident angle of 0.12 degrees gave",
+        "sufficient footprint to probe the full thickness of each specimen.",
+        "Two dimensional detector images were reduced to radial and azimuthal",
+        "profiles, from which crystalline coherence lengths were then estimated.",
+        "Edge-on and face-on populations differ markedly between the two blends,",
+        "suggesting that the processing history controls the molecular orientation.",
+        "We discuss how these orientation distributions relate to charge transport,",
+        "which is known to depend strongly on the in-plane packing of backbones.",
+        "Further work will extend the analysis to additional casting conditions.",
+    ]
+    for i, line in enumerate(prose):
+        pdf.drawString(72, PAGE_H - 130 - 14 * i, line)
     pdf.showPage()
     pdf.save()
     parsed = DoclingParser().parse(path, tmp_path / "work", source_ref=SOURCE)
