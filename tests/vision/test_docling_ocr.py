@@ -40,8 +40,10 @@ class FakeConverter:
         self.sources.append(source)
         if self.error:
             raise self.error
-        page = NS(size=NS(width=self.size[0], height=self.size[1]), cells=self.cells)
-        return NS(pages=[page])
+        # Shaped like docling 2.145: Page.cells is empty for images; OCR lines sit on assembled-element clusters.
+        page = NS(size=NS(width=self.size[0], height=self.size[1]), cells=[])
+        elements = [NS(cluster=NS(cells=[c])) for c in self.cells]
+        return NS(pages=[page], assembled=NS(elements=elements), document=NS(texts=[]))
 
 
 def engine(conv):
@@ -77,6 +79,21 @@ def test_real_docling_core_rectangles_map_the_same_way():
 def test_unreadable_cells_are_dropped_not_guessed():
     conv = FakeConverter([cell("   ", 0, 0, 5, 5, 0.9), cell("x", 0, 0, 5, 5, None), cell("ok", 0, 0, 5, 5, 0.7)])
     assert [d.text for d in engine(conv).detect(IMG)] == ["ok"]
+
+
+def test_page_cells_are_not_consulted_and_cluster_cells_are_read_once():
+    shared = cell("a", 0, 0, 5, 5, 0.9)
+    conv = FakeConverter()
+    page = NS(size=NS(width=200.0, height=100.0), cells=[cell("stale", 0, 0, 5, 5, 0.9)])
+    result = NS(pages=[page], assembled=NS(elements=[NS(cluster=NS(cells=[shared])), NS(cluster=NS(cells=[shared]))]))
+    conv.convert = lambda source: result
+    assert [d.text for d in engine(conv).detect(IMG)] == ["a"]
+
+
+def test_result_without_assembled_elements_yields_no_detections():
+    conv = FakeConverter()
+    conv.convert = lambda source: NS(pages=[NS(size=NS(width=200.0, height=100.0), cells=[])])
+    assert engine(conv).detect(IMG) == []
 
 
 def test_converter_failure_is_retryable_unavailable_not_a_crash():

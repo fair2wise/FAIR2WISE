@@ -99,6 +99,25 @@ def _top_left_box(rect: Any, page_height: float) -> tuple[float, float, float, f
     return min(xs), min(ys), max(xs), max(ys)
 
 
+def _ocr_cells(result: Any) -> list[Any]:  # noqa: ANN401  # Any: docling ConversionResult (untyped)
+    """The per-line OCR cells of a Docling result, each with its own box and RapidOCR confidence.
+
+    Docling 2.145's ``Page.cells`` is a view of ``page.parsed_page.textline_cells``, which the image
+    pipeline leaves unset, so it is always empty for OCR'd images. The OCR lines live on the clusters
+    that layout assembly keeps (``result.assembled.elements[*].cluster.cells``); ``result.document.texts``
+    holds the same text but merges lines and carries no confidence, so it is not used. Lines that layout
+    assigned to no kept cluster (e.g. text inside a region classified as a picture) are not returned.
+    """
+    cells: list[Any] = []
+    seen: set[int] = set()
+    for element in getattr(getattr(result, "assembled", None), "elements", None) or []:
+        for cell in getattr(getattr(element, "cluster", None), "cells", None) or []:
+            if id(cell) not in seen:
+                seen.add(id(cell))
+                cells.append(cell)
+    return cells
+
+
 class DoclingOcrEngine:
     """:class:`~.ocr.OcrEngine` over Docling's RapidOCR stage.
 
@@ -145,7 +164,7 @@ class DoclingOcrEngine:
             pw = float(size.width) if size is not None and size.width else float(width)
             ph = float(size.height) if size is not None and size.height else float(height)
             sx, sy = width / pw, height / ph
-            for cell in page.cells:
+            for cell in _ocr_cells(result):
                 text = str(cell.text or "").strip()
                 conf = getattr(cell, "confidence", None)
                 if not text or conf is None:
