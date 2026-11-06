@@ -604,7 +604,8 @@
       "gate": "H5",
       "status": "merged",
       "merge_commit": "317411bcbd911177a368b987aa064330b1c523db",
-      "merge_commit_subject": "Merge T18D UI: Edit/Save controls hidden when the server reports can_save false"
+      "merge_commit_subject": "Merge T18D UI: Edit/Save controls hidden when the server reports can_save false",
+      "note": "T-savetarget merged at 7c2a84d (owner decision 2026-11-04, tenth set): the :local UI Save target is resolved lazily per request from the active publication pointer (corpus of the pointer; base = that release's graph.json, hash-checked; per-corpus edit journal; typed 501 and can_save=false before the first publication; the publication step reads the Save journals, so an edited corpus is refused CONFLICT until reconciled). Owner-gated follow-ups: image default --kg-mode json, multi-corpus Save target choice."
     },
     {
       "id": "T18E",
