@@ -1,0 +1,617 @@
+{
+ "ALS_PAGE_URL": "https://als.lbl.gov/beamlines/11-0-1-2/",
+ "ALS_SOURCE": "als.lbl.gov/beamlines/11-0-1-2",
+ "BCS2SIM_PATH_GLOBS": {
+  "__tuple__": [
+   "**/bl11012_knowledge.md",
+   "**/*knowledge*.md",
+   "**/blueprint*.html",
+   "**/*beamline*.html"
+  ]
+ },
+ "BEAMLINE_ID": "beamline:BL-11-0-1-2",
+ "BEAM_PATH_CHAMBER_TAIL": {
+  "__tuple__": [
+   "Sample stage",
+   "Detector"
+  ]
+ },
+ "BEAM_PATH_PREFIX": {
+  "__tuple__": [
+   "Storage ring",
+   "EPU",
+   "M101"
+  ]
+ },
+ "BEAM_PATH_RELATIONS": {
+  "__tuple__": [
+   "beam_path_next",
+   "upstream_of",
+   "feeds",
+   "connected_to"
+  ]
+ },
+ "BLUEPRINT_PERSON_RE": {
+  "__re__": [
+   "(?:reviewed with|review with|beamline scientist\\s*[:\\(])\\s*([A-Z][a-z]+(?:\\s+[A-Z]\\.)?\\s+[A-Z][a-z]+)",
+   34
+  ]
+ },
+ "BlueprintDevice": {
+  "__class__": [
+   "dev_id",
+   "name",
+   "kind",
+   "category",
+   "pv",
+   "handle",
+   "ophyd_name",
+   "ophyd_class",
+   "ioc_record",
+   "mapping_file",
+   "drawn",
+   "meaning",
+   "collection"
+  ],
+  "defaults": {
+   "category": null,
+   "collection": "",
+   "dev_id": null,
+   "drawn": null,
+   "handle": null,
+   "ioc_record": null,
+   "kind": null,
+   "mapping_file": null,
+   "meaning": null,
+   "name": null,
+   "ophyd_class": null,
+   "ophyd_name": null,
+   "pv": null
+  },
+  "frozen": false
+ },
+ "BlueprintStage": {
+  "__class__": [
+   "name",
+   "section",
+   "what",
+   "does",
+   "range_text",
+   "device_ids"
+  ],
+  "defaults": {
+   "device_ids": null,
+   "does": null,
+   "name": null,
+   "range_text": null,
+   "section": null,
+   "what": null
+  },
+  "frozen": false
+ },
+ "DEVICE_BASE_HINTS": {
+  "__tuple__": [
+   "Device",
+   "Motor",
+   "Detector",
+   "Readable",
+   "StandardDetector",
+   "StandardReadable",
+   "SimMotor",
+   "SynAxis",
+   "SynSignal",
+   "PatternGenerator",
+   "SignalRW"
+  ]
+ },
+ "EMAIL_RE": {
+  "__re__": [
+   "[\\w.+-]+@[\\w.-]+\\.[A-Za-z]{2,}",
+   32
+  ]
+ },
+ "INGEST_VERSION": "1.2.0",
+ "KIND_CATEGORY": {
+  "__dict__": [
+   [
+    "motor",
+    "Motor"
+   ],
+   [
+    "analog input",
+    "AnalogInput"
+   ],
+   [
+    "digital i/o",
+    "DigitalIO"
+   ],
+   [
+    "digital io",
+    "DigitalIO"
+   ],
+   [
+    "detector",
+    "Detector"
+   ]
+  ]
+ },
+ "MAX_SNIPPET_LINES": 80,
+ "NAMESPACE": "beamline",
+ "PERSON_NAME_RE": {
+  "__re__": [
+   "\\b([A-Z][a-z]+(?:\\s+[A-Z]\\.)?(?:\\s+[A-Z][a-z]+)+)\\b",
+   32
+  ]
+ },
+ "PERSON_NAME_STOPWORDS": {
+  "__set__": [
+   "and",
+   "does",
+   "every",
+   "for",
+   "from",
+   "of",
+   "on",
+   "order",
+   "pair",
+   "the",
+   "time",
+   "with"
+  ]
+ },
+ "PUBLIC_FUNCTIONS": {
+  "__set__": [
+   "aload_sim_devices",
+   "load_beamline_config",
+   "load_sim_config",
+   "load_sim_devices"
+  ]
+ },
+ "REPO_SPECS": {
+  "__tuple__": [
+   {
+    "__dc__": "RepoSpec",
+    "compose_globs": {
+     "__tuple__": []
+    },
+    "md_globs": {
+     "__tuple__": [
+      "README.md",
+      "info/*.md"
+     ]
+    },
+    "mode": "full",
+    "name": "bcs2sim-ophyd",
+    "python_globs": {
+     "__tuple__": [
+      "sim_ophyd/devices/**/*.py",
+      "sim_ophyd/_loader.py",
+      "sim_ophyd/_config.py",
+      "queue-server/startup_bl11012_sim/15_plans.py"
+     ]
+    },
+    "readme_only": false,
+    "url": "https://github.com/als-computing/bcs2sim-ophyd",
+    "yaml_globs": {
+     "__tuple__": [
+      "sim-config.yaml"
+     ]
+    }
+   },
+   {
+    "__dc__": "RepoSpec",
+    "compose_globs": {
+     "__tuple__": []
+    },
+    "md_globs": {
+     "__tuple__": [
+      "README.md",
+      "RELEASE.md",
+      "info/camera/*.md",
+      "info/README.md"
+     ]
+    },
+    "mode": "docs",
+    "name": "ADAxisSXR40",
+    "python_globs": {
+     "__tuple__": []
+    },
+    "readme_only": false,
+    "url": "https://github.com/als-computing/ADAxisSXR40",
+    "yaml_globs": {
+     "__tuple__": []
+    }
+   },
+   {
+    "__dc__": "RepoSpec",
+    "compose_globs": {
+     "__tuple__": [
+      "docker-compose.yml",
+      "docker-compose-bl531.yml",
+      "docker-compose-bl531.sim.yml"
+     ]
+    },
+    "md_globs": {
+     "__tuple__": [
+      "README.md",
+      "queue-server/README.md",
+      "tiled/README.md"
+     ]
+    },
+    "mode": "stack",
+    "name": "bl11012-bluesky",
+    "python_globs": {
+     "__tuple__": [
+      "queue-server/startup_sim/15_plans.py"
+     ]
+    },
+    "readme_only": false,
+    "url": "https://github.com/als-computing/bl11012-bluesky",
+    "yaml_globs": {
+     "__tuple__": []
+    }
+   },
+   {
+    "__dc__": "RepoSpec",
+    "compose_globs": {
+     "__tuple__": []
+    },
+    "md_globs": {
+     "__tuple__": [
+      "README.md",
+      "qs_startup/README.md"
+     ]
+    },
+    "mode": "docs",
+    "name": "bl11012-scan-replay",
+    "python_globs": {
+     "__tuple__": [
+      "labview_sim/replay_plan.py",
+      "labview_sim/sim_plans.py",
+      "labview_sim/als_ccd_sim_devices.py"
+     ]
+    },
+    "readme_only": false,
+    "url": "https://github.com/als-computing/bl11012-scan-replay",
+    "yaml_globs": {
+     "__tuple__": []
+    }
+   },
+   {
+    "__dc__": "RepoSpec",
+    "compose_globs": {
+     "__tuple__": []
+    },
+    "md_globs": {
+     "__tuple__": [
+      "README.md",
+      "src/stories/*.md",
+      "src/components/Experiment/*.md",
+      "src/lib/ophyd-sim/*.md"
+     ]
+    },
+    "mode": "docs",
+    "name": "bl11012-finch",
+    "python_globs": {
+     "__tuple__": []
+    },
+    "readme_only": false,
+    "url": "https://github.com/als-computing/bl11012-finch",
+    "yaml_globs": {
+     "__tuple__": []
+    }
+   },
+   {
+    "__dc__": "RepoSpec",
+    "compose_globs": {
+     "__tuple__": []
+    },
+    "md_globs": {
+     "__tuple__": [
+      "README.md"
+     ]
+    },
+    "mode": "readme",
+    "name": "splash_tiled",
+    "python_globs": {
+     "__tuple__": []
+    },
+    "readme_only": true,
+    "url": "https://github.com/als-computing/splash_tiled",
+    "yaml_globs": {
+     "__tuple__": []
+    }
+   },
+   {
+    "__dc__": "RepoSpec",
+    "compose_globs": {
+     "__tuple__": []
+    },
+    "md_globs": {
+     "__tuple__": [
+      "README.md"
+     ]
+    },
+    "mode": "readme",
+    "name": "tiled",
+    "python_globs": {
+     "__tuple__": []
+    },
+    "readme_only": true,
+    "url": "https://github.com/als-computing/tiled",
+    "yaml_globs": {
+     "__tuple__": []
+    }
+   },
+   {
+    "__dc__": "RepoSpec",
+    "compose_globs": {
+     "__tuple__": []
+    },
+    "md_globs": {
+     "__tuple__": [
+      "README.md"
+     ]
+    },
+    "mode": "readme",
+    "name": "als_computing_hub",
+    "python_globs": {
+     "__tuple__": []
+    },
+    "readme_only": true,
+    "url": "https://github.com/als-computing/als_computing_hub",
+    "yaml_globs": {
+     "__tuple__": []
+    }
+   }
+  ]
+ },
+ "RepoSpec": {
+  "__class__": [
+   "name",
+   "url",
+   "mode",
+   "python_globs",
+   "md_globs",
+   "yaml_globs",
+   "compose_globs",
+   "readme_only"
+  ],
+  "defaults": {
+   "compose_globs": [],
+   "md_globs": [
+    "README.md"
+   ],
+   "mode": null,
+   "name": null,
+   "python_globs": [],
+   "readme_only": false,
+   "url": null,
+   "yaml_globs": []
+  },
+  "frozen": true
+ },
+ "SCHEMA_VERSION": "bl1101_v2",
+ "SECRET_NAMES": {
+  "__set__": [
+   "credentials.json",
+   "id_rsa",
+   "priv_key.pem",
+   "secrets.yaml",
+   "secrets.yml"
+  ]
+ },
+ "SECRET_PREFIXES": {
+  "__tuple__": [
+   ".env"
+  ]
+ },
+ "SKIP_DIR_NAMES": {
+  "__set__": [
+   ".git",
+   ".mypy_cache",
+   ".tox",
+   ".venv",
+   "__pycache__",
+   "node_modules",
+   "venv"
+  ]
+ },
+ "SKIP_DIR_PREFIXES": {
+  "__tuple__": [
+   "ExampleData"
+  ]
+ },
+ "SKIP_PERSON_NAMES": {
+  "__set__": [
+   "additional notes",
+   "beam current",
+   "beam dumped",
+   "beamline energy",
+   "current status",
+   "device blueprint",
+   "exit slits",
+   "gold mesh",
+   "higher order",
+   "kirkpatrick baez",
+   "magnetic scattering",
+   "maximum energy",
+   "minimum energy",
+   "primary contact",
+   "resonant scattering",
+   "sample stage",
+   "scatter slits",
+   "soft x",
+   "storage ring",
+   "technique category"
+  ]
+ },
+ "SKIP_SUFFIXES": {
+  "__set__": [
+   ".env",
+   ".fits",
+   ".h5",
+   ".hdf5",
+   ".npy",
+   ".npz",
+   ".pickle",
+   ".pkl",
+   ".pt"
+  ]
+ },
+ "SNAPSHOT_RE": {
+  "__re__": [
+   "^matkg_bl1101_v(\\d+)\\.json$",
+   32
+  ]
+ },
+ "SOFTWARE_ALIAS": {
+  "__dict__": [
+   [
+    "bcs2sim-ophyd",
+    "ophyd-async"
+   ],
+   [
+    "ADAxisSXR40",
+    "ADAxisSXR40"
+   ],
+   [
+    "bl11012-bluesky",
+    "Bluesky"
+   ],
+   [
+    "bl11012-scan-replay",
+    "Bluesky"
+   ],
+   [
+    "bl11012-finch",
+    "Finch"
+   ],
+   [
+    "splash_tiled",
+    "splash_tiled"
+   ],
+   [
+    "tiled",
+    "Tiled"
+   ],
+   [
+    "als_computing_hub",
+    "als_computing_hub"
+   ]
+  ]
+ },
+ "STAGE_NAME_ALIASES": {
+  "__dict__": [
+   [
+    "storage ring",
+    "Storage ring"
+   ],
+   [
+    "epu",
+    "EPU"
+   ],
+   [
+    "m101",
+    "M101"
+   ],
+   [
+    "mono",
+    "Mono 101"
+   ],
+   [
+    "mono 101",
+    "Mono 101"
+   ],
+   [
+    "m103",
+    "M103"
+   ],
+   [
+    "kb pair",
+    "M103"
+   ],
+   [
+    "exit slits",
+    "Exit slits"
+   ],
+   [
+    "exit slit",
+    "Exit slits"
+   ],
+   [
+    "pzt shutter",
+    "PZT shutter"
+   ],
+   [
+    "piezoshutter",
+    "PZT shutter"
+   ],
+   [
+    "m121",
+    "M121"
+   ],
+   [
+    "diag 106",
+    "Diag 106"
+   ],
+   [
+    "hos",
+    "Higher Order Suppressor"
+   ],
+   [
+    "higher order suppressor",
+    "Higher Order Suppressor"
+   ],
+   [
+    "gold mesh",
+    "Gold mesh"
+   ],
+   [
+    "shutters",
+    "Shutters"
+   ],
+   [
+    "scatter slits (jj)",
+    "Scatter slits (JJ)"
+   ],
+   [
+    "scatter slits",
+    "Scatter slits (JJ)"
+   ],
+   [
+    "upstream slits (jj)",
+    "Upstream slits (JJ)"
+   ],
+   [
+    "middle slits (jj)",
+    "Middle slits (JJ)"
+   ],
+   [
+    "in-chamber slits (jj)",
+    "Scatter slits (JJ)"
+   ],
+   [
+    "chamber",
+    "Chamber"
+   ],
+   [
+    "sample stage",
+    "Sample stage"
+   ],
+   [
+    "sample",
+    "Sample stage"
+   ],
+   [
+    "detector",
+    "Detector"
+   ],
+   [
+    "axis-sxr-40",
+    "Detector"
+   ]
+  ]
+ },
+ "USER_AGENT": "FAIR2WISE-bl1101-ingest/1.0 (+https://github.com/matesuu/FAIRtoWISE-FORUM-AI)"
+}

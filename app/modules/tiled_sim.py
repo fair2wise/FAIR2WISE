@@ -26,9 +26,7 @@ import yaml
 
 from . import json2kg
 from .bl1101_ingest import (
-    BEAMLINE_ID,
     KG_DIR,
-    NAMESPACE,
     REPO_ROOT,
     SCHEMA_PATH,
     TERMS_DIR,
@@ -43,6 +41,7 @@ from .bl1101_ingest import (
     write_kg_snapshot,
 )
 from .cli_output import output
+from .graph.imports.bl1101.specs import BEAMLINE_ID, NAMESPACE
 
 LOGGER = logging.getLogger("tiled_sim")
 

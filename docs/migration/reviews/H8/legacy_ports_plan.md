@@ -50,6 +50,17 @@ so it is proposed below rather than half-done. Added `tests/literature/test_down
 the current state: no private HTTP code in the agent, `hardened_download_pdf` the only PDF fetch, and the three
 metadata hops by name (a new hop fails the test until this plan is updated).
 
+### 4. `bl1101_ingest.py` slice a: `specs.py` -> `app/modules/graph/imports/bl1101/specs.py` (P3 slice a, done)
+
+| | |
+|---|---|
+| What | Data-definition slice only: identity constants (`SCHEMA_VERSION`, `INGEST_VERSION`, `NAMESPACE`, `BEAMLINE_ID`, `ALS_*`), `RepoSpec` and `REPO_SPECS` (eight upstream repos), `BlueprintDevice`/`BlueprintStage`, `STAGE_NAME_ALIASES`, `KIND_CATEGORY`, `SOFTWARE_ALIAS`, beam-path constants, person/email patterns and skip lists, `USER_AGENT`. Imports only `dataclasses` and `re`; no paths, no I/O. Paths (`REPO_ROOT`, `KG_DIR`, `CACHE_DIR`, ...) stay with the code that touches files. |
+| Wiring | `bl1101_ingest` imports every name from `specs` and re-exports it (`X as X`), so the legacy path exposes the same objects (the T27 tests that `monkeypatch.setattr(bi, "REPO_SPECS", ...)` keep working). `tiled_sim` now imports `BEAMLINE_ID`/`NAMESPACE` from `specs`. `hybrid_rag/sources.py` still reads `REPO_SPECS` through `bl1101_ingest`: `tests/coverage_t27/test_hybrid_rag_pipeline_extra.py` patches it there, so repointing waits for slice b/an owner-approved test edit. |
+| Wire behaviour | None. `matkg_bl1101_v*.json` frozen history untouched; nothing regenerated. |
+| Tests added | `tests/graph/test_bl1101_specs.py` with `tests/graph/fixtures/bl1101_specs_golden.json`, captured from the pre-port module at `forge_merge` (every definition compared, including regex flags and dict order), re-export identity, frozen `RepoSpec`, independent dataclass defaults, alias helper through the legacy path, no-side-effect import (fresh interpreter) and an imports-only-`dataclasses`/`re` check. |
+
+**Remaining P3 (not started):** `fetch.py` (hardened fetch, `git` sync behind subprocess guards), `parse_als.py`, `parse_blueprint.py`, `symbols.py`, `terms.py` (`make_term`, `merge_terms`, `attach_repo_terms`, motor-stage linking), `snapshot.py` (via `graph.snapshot.create_snapshot`), `cli.py`, then the old path becomes the `sys.modules` alias shim, `hybrid_rag` repointed, and the v7 -> v8 `--from-graph` golden replay plus HTML fixture parser tests. Estimate now 3-4.5 days.
+
 ## Proposals (not started; owner scheduling needed)
 
 ### P1. `download_agent` metadata hops onto `hardened_get_json`
@@ -84,10 +95,10 @@ metadata hops by name (a new hop fails the test until this plan is updated).
 | Wire behaviour | None on class (r) routes; the produced `matkg_bl1101_vN.json` must be byte-identical for the same inputs (sorted by `sort_graph`). The `--from-graph` JSON-first path is the regression oracle: replay v7 -> v8 from the checked-in snapshot and compare. |
 | Tests | Golden replay from `storage/kg/matkg_bl1101_v7.json` with the motor map; parser unit tests on checked-in HTML fixtures (no network); a static test that nothing under `graph/imports/bl1101` imports `urllib.request`; `tiled_sim` and `hybrid_rag` import tests. |
 | Risks | `fetch_url` uses `urllib.request.urlopen` with any scheme and no size cap (move onto the hardened fetcher is a behaviour change for redirects); `git` subprocess use must stay out of the request path (the snapshot module forbids subprocess). The ALS page and blueprint HTML are live documents: fixtures must be frozen from the current cache (`.cache/bl1101`). |
-| Size | 3-5 days (multi-day, as the audit said); `specs.py` alone (unblocking `hybrid_rag`/`tiled_sim`) is 0.5 day and could go first. |
+| Size | 3-5 days (multi-day, as the audit said); slice a (`specs.py`) is done, 3-4.5 days remain. |
 
 ## Order proposed
 
-P1 (download_agent hops) is independent and smallest. P3's `specs.py` slice is cheap and removes the last
-`hybrid_rag` -> flat-module import. P2 needs the owner's design answer (Academy wrappers vs. LangGraph; LLM calls
+P1 (download_agent hops) is independent and smallest. P3's `specs.py` slice is done (see 4); the
+`hybrid_rag` -> flat-module import remains until a later slice. P2 needs the owner's design answer (Academy wrappers vs. LangGraph; LLM calls
 through admission) before any code.
