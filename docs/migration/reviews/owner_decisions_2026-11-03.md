@@ -97,3 +97,16 @@ Interpretation notes (agent, for the owner to correct):
 | E3 spec errata | "Explain it to me first" (not decided; the agent explains the draft in plain words, then asks again) |
 | Caption assertions dropped from the real-weights parsing test | "Restore with a real PDF fixture" |
 | Retire list of 16 legacy files | "Not now" (the list stays held, nothing is deleted) |
+
+## Twelfth set (2026-11-06)
+
+The owner reported the E2E plan `job-9166b202380119cedfdf1dbc` approved ("ok its done and approved"); it published `e2e_demo/v1` (269 entities, 126 links read back from the container's Tiled).
+
+| Question | Owner answer |
+|---|---|
+| Second Tiled route | "let's import another existing graph to test the second tiled route" |
+| UI graph sources | "in the UI we need to support reading both json KGs and Tiled KGs. Follow best practices and do what needs to be done" |
+| Rollback rehearsal | "we can test the rollback rehearsal on the results from the end-to-end test after we promote and existing KG into Tiled. Then we can check to make sure that the rollback only touches one KG not the other" |
+| E3 spec errata | "E3 errata. Change what you need to in order to allow KGs to ship with the image" (read as approval to apply the E3 draft entries to the frozen documents and to change the build context so KGs ship, per D3.24: flat `storage/kg/matkg_*.json` copies in, nested `<corpus>/v<N>/graph.json` copies out; papers, `storage/source_index/`, secrets stay out) |
+
+Approvals of plans stay with the owner (each import/rollback plan is approved by the owner; the agent never submits an approval).
