@@ -68,6 +68,28 @@ switch Settings -> graph source to the editable mode; the session graph is then 
 
 Tests: `tests/api_wiring/test_local_save.py` (memory double and a real disposable Tiled).
 
+## E2E rollback rehearsal finding (T13, 2026-11-06): no-op rollback with several corpora on one target
+
+With `e2e_demo/v1` (pointer v1) and then `bl1101/v4` (pointer v2) published into the same `:local` Tiled, the owner's
+`POST /v1/publications/rollback-replacement` planned a replacement of scope `e2e_demo` back to v1 with zero
+operations (nothing of `e2e_demo` had been retired; its marker still named v1). The job imported as `noop` but
+quarantined at `verify`: the importer returned the *old* receipt (plan `0c4fd3fe…`) while the step looked receipts
+up by the *new* rollback plan's hash. Tiled was not changed at all; the pointer stayed at v2 (`bl1101/v4`).
+
+Fixed on `forge_merge-T-nooprollback`: the step writes a thin `noop` receipt under the rollback plan's hash that
+rests on the covering replacement receipt, verification of it also requires that covering receipt to be valid for
+the current scope revision, and the TIL-14 marker check accepts exactly the covering plan and receipt the marker
+names. Semantics to keep in mind with one pointer per target and several corpora: **a rollback moves the pointer; it
+never removes a corpus** (that is `corpus_retire`). Details and the owner question (approval policy for a no-op
+rollback) are in `docs/migration/api/README.md` section 3.1.
+
+Operator note: the `pub_quarantine` row of the failed job is informational (it drives `ui_state = quarantined` of
+that job only) and does not block later submissions, approvals or activations on the target. Re-submitting the
+rollback with the same reason returns the same failed job (idempotent job identity), and resuming the failed job does
+not heal it (its completed `import` stage is reused, so `verify` fails again; checked with the fix in place): after the
+fix is deployed, submit the rollback again with another reason. That new job plans the same zero-operation plan, waits
+for approval, writes the thin receipt and activates `e2e_demo/v1` as pointer version 3 without touching Tiled.
+
 ## Not done / follow-ups for the owner
 
 - The vocabulary revision on `:local` is the fixed label `local-unversioned` (no separately versioned vocabulary
