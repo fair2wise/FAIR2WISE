@@ -10,6 +10,9 @@ import pytest
 from app.modules import dotenv_entry
 
 REPO = Path(__file__).resolve().parents[2]
+# Hang guard only: a cold interpreter importing the app costs ~10 s of CPU and took 30 s+ on a
+# machine at load 100, so a tight limit tests the runner, not the product. Returns as soon as the child exits.
+SUBPROCESS_TIMEOUT = 900
 
 # Modules that called load_dotenv() at import (directly or through kg_rag_api) before T04.
 FORMER_IMPORT_LOADERS = [
@@ -87,7 +90,7 @@ def test_legacy_entry_point_import_loads_no_dotenv(tmp_path, script):
         "                  'base': getattr(mod, 'DEFAULT_CBORG_BASE', None)}))\n"
     )
     out = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True, cwd=tmp_path,
-                         env=_clean_env(F2W_DOTENV=str(tmp_path / ".env")), timeout=180)
+                         env=_clean_env(F2W_DOTENV=str(tmp_path / ".env")), timeout=SUBPROCESS_TIMEOUT)
     assert out.returncode == 0, out.stderr[-2000:]
     seen = json.loads(out.stdout.strip().splitlines()[-1])
     assert seen["calls"] == []
@@ -98,7 +101,7 @@ def test_legacy_entry_point_import_loads_no_dotenv(tmp_path, script):
 def _run_legacy(script, tmp_path, args, **env):
     # As documented (README): plain ``python <script>``, so the script directory is sys.path[0].
     return subprocess.run([sys.executable, str(REPO / script), *args], capture_output=True, text=True,
-                          cwd=tmp_path, env=_clean_env(**env), timeout=180)
+                          cwd=tmp_path, env=_clean_env(**env), timeout=SUBPROCESS_TIMEOUT)
 
 
 def test_scripts_run_main_reads_dotenv_under_f2w_dotenv(tmp_path):
@@ -203,7 +206,7 @@ _LAUNCH = (
 
 def _launch(tmp_path, **env):
     out = subprocess.run([sys.executable, "-I", "-c", _LAUNCH], capture_output=True, text=True,
-                         cwd=tmp_path, env=_clean_env(**env), timeout=180)
+                         cwd=tmp_path, env=_clean_env(**env), timeout=SUBPROCESS_TIMEOUT)
     assert out.returncode == 0, out.stderr[-2000:]
     return json.loads(out.stdout.strip().splitlines()[-1])
 

@@ -8,6 +8,9 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
+# Hang guard only: a cold interpreter importing the app costs ~10 s of CPU and took 30 s+ on a
+# machine at load 100, so a tight limit tests the runner, not the product. Returns as soon as the child exits.
+SUBPROCESS_TIMEOUT = 900
 
 
 def _env(**extra):
@@ -36,6 +39,6 @@ def test_importing_f2w_agent_does_not_touch_sys_path():
 def test_documented_direct_script_launch_still_works(script, tmp_path):
     """README documents `python3 app/modules/<module>.py`; it re-dispatches to the package module."""
     out = subprocess.run([sys.executable, str(REPO / script), "--help"], capture_output=True, text=True,
-                         cwd=tmp_path, env=_env(), timeout=120)
+                         cwd=tmp_path, env=_env(), timeout=SUBPROCESS_TIMEOUT)
     assert out.returncode == 0, out.stderr[-2000:]
     assert "usage:" in out.stdout
