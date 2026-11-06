@@ -13,7 +13,7 @@ import pytest
 
 from app.modules.contracts.errors import ContractError, ErrorCode
 from app.modules.contracts.jobs import JobState
-from app.modules.f2w_agent import kg_update
+from app.modules.graph import kg_update
 from app.modules.jobs import JobService, JobStore
 from app.modules.library import LIBRARY_EXTRACT_KIND, library_inputs, register_library_jobs
 from app.modules.library import bundles as B

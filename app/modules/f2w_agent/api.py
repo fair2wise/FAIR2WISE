@@ -23,7 +23,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from . import kg_update
 from .. import kg_rag_api as krag
 from ...api.auth import undeclared_routes, warn_if_exposed
 from ...api.legacy_ui import build_guard, ui_context, ui_optional_context
@@ -34,6 +33,7 @@ from ...api.upload_limits import LEGACY_MAX_BODY_BYTES, MaxBodySizeMiddleware
 from ..contracts.context import DeploymentProfile, RequestContext
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.json_types import Untyped
+from ..graph import kg_update
 from ..graph.backends.tiled_lookup import (
     CITE_FOCUS_HOPS,
     TILED_GRAPH_ID,

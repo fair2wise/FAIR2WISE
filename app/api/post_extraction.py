@@ -20,7 +20,7 @@ corpus, is part of the approved plan and is done by the importer under the plan'
 The result is a plain dict the legacy SSE phases ``splash_reimport_started`` / ``splash_reimport_result``
 report (names kept for the frozen UI): ``status`` is ``success`` (published), ``awaiting_review`` or ``error``.
 Each result also carries ``publish_state`` (``tiled_published``, ``awaiting_review`` or ``error``). When no
-publisher is configured at all, :func:`~app.modules.f2w_agent.kg_update.publish_extraction` does not call this
+publisher is configured at all, :func:`~app.modules.graph.kg_update.publish_extraction` does not call this
 module: it reports ``status = skipped`` (kept for compatibility) with the explicit
 ``publish_state = json_available_tiled_unavailable`` and ``indicator = "JSON available, Tiled unavailable"``.
 """
@@ -58,7 +58,7 @@ STATUS_PUBLISHED = "success"
 STATUS_REVIEW = "awaiting_review"
 STATUS_ERROR = "error"
 
-#: ``status`` -> ``publish_state`` (see :mod:`app.modules.f2w_agent.kg_update`).
+#: ``status`` -> ``publish_state`` (see :mod:`app.modules.graph.kg_update`).
 PUBLISH_STATE_BY_STATUS = {STATUS_PUBLISHED: "tiled_published", STATUS_REVIEW: "awaiting_review",
                            STATUS_ERROR: "error"}
 
