@@ -128,3 +128,5 @@ not the other": confirmed (the plan's scope was e2e_demo only and bl1101's recor
 | T13 / H5 remaining steps | explained (owner sign-off in `reviews/H5/decision.json`; real-target T26C rehearsal needs the owner to name the target); no answer yet |
 | T07B canonicalization apply adapters (previously "Not yet") | "go on this: T07B: canonicalization apply adapters" (read as: wire the apply adapters now, behind the existing approval gate; the C4 paid real-model rerun is still the owner's own run, no paid model is used by agents) |
 | Parallel work | "finish T27's read-through, T17B's clean ports, T19E's loose ends" and "also work on T16B splash_links retirement" (read as: prepare the retirement, inventory and deletion list, safe code-side removals; no production cutover, which stays H8-gated) |
+
+| Paid CBORG model run (C4 rerun, B4 labelling) | "for the paid cborg run, let's just use the best cborg model available that is free" (2026-11-06) |
