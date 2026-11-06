@@ -115,6 +115,8 @@ RUNTIME_STOP_KEY = "f2w_runtime_stop"
 APPROVAL_OUTCOME_KEY = "f2w_approval_outcome"
 APPROVAL_PLACEHOLDER_PREFIX = "f2w_approval_pending:"
 EXPIRED_KEY = "f2w_expired"
+#: Max evidence ids / artifact refs echoed in a ToolMessage body (the full result rides in ``artifact``).
+TOOL_MESSAGE_MAX_REFS = 50
 
 #: ``PlanResolver(ctx, tool_name, args) -> ChangePlan | None``: looks up the plan a write would apply.
 PlanResolver = Callable[[RequestContext, str, Mapping[str, Any]], ChangePlan | None]
@@ -152,7 +154,8 @@ def tool_message(call: Mapping[str, Any], outcome: ToolOutcome) -> ToolMessage:
     content = {
         "tool": r.tool, "status": r.status.value, "data": r.data, "warnings": list(r.warnings),
         "error_code": r.error_code.value if r.error_code else None, "retryable": r.retryable,
-        "evidence_ids": r.evidence_ids[:50], "artifact_refs": list(r.artifact_refs)[:50],
+        "evidence_ids": r.evidence_ids[:TOOL_MESSAGE_MAX_REFS],
+        "artifact_refs": list(r.artifact_refs)[:TOOL_MESSAGE_MAX_REFS],
     }
     if outcome.repeated:
         content["repeated_call"] = True
@@ -207,19 +210,20 @@ def build_literature_supervisor(
             ``bind_tools``/``invoke``/``ainvoke``. Never constructed here.
         checkpointer: LangGraph checkpoint saver (required for approvals and resume).
         event_sink: Durable audit sink; without one, write tools are refused.
-        limits: :class:`RuntimeLimits`.
+        limits: :class:`RuntimeLimits`; ``None`` means ``RuntimeLimits()`` defaults.
         system_prompt: Injected system prompt (default is a T03 placeholder).
         skills: Optional skill registry over ``registry``; its visible skills are
             appended to the system prompt per turn.
         admission: Object with ``slot``/``aslot``; model calls hold ``provider``'s slot.
         provider: Provider/account key passed to admission (for example ``"cborg"``).
-        approval_check: Approval policy for graph-write/destructive tools.
+        approval_check: Approval policy for graph-write/destructive tools (default ``PlanApprovalCheck()``).
         plan_resolver: Looks up the ``ChangePlan`` a write call would apply.
         artifact_store: Optional ``DocumentStore`` for oversized tool outputs.
         clock: Aware-UTC clock.
 
     Returns:
-        A compiled ``StateGraph``. Invoke with ``context=RunContext(ctx)``.
+        A compiled ``StateGraph``. Invoke with ``context=RunContext(ctx)``. At invoke time the graph nodes
+        raise ``ContractError(DENIED)`` when the thread's ``owner`` belongs to another principal/session.
 
     Raises:
         ValueError: If the registry is not frozen or ``skills`` is bound to another registry.

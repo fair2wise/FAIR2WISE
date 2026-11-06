@@ -131,11 +131,12 @@ jobs:
           echo "isort files needing changes: $(grep -c '^ERROR' quality/isort.txt || true)"
       - name: Types (mypy --strict)
         run: mypy 2>&1 | tee quality/mypy.txt | tail -n 3 || true
-      - name: Gate (ruff, isort and mypy --strict are at 0 findings)
+      - name: Gate (ruff, isort and mypy --strict are at 0 findings; no module mixes docstring styles)
         run: |
           ruff check app
           isort --check-only app
           mypy
+          python scripts/ci/docstring_style.py --check
       - name: Docling model weights (pinned commits, scripts/fetch_docling_models.py)
         # Not in the repo or the lock: the parser tests that run real Docling conversions read them from here.
         run: python scripts/fetch_docling_models.py --dest "$RUNNER_TEMP/docling"

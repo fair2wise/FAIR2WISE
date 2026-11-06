@@ -193,6 +193,33 @@ PRP_W_SEM, PRP_W_DEPTH, PRP_W_LEX, PRP_W_EVID = (
 GENERIC_PENALTY = float(os.environ.get("KG_RAG_GENERIC_PENALTY", "0.8"))
 CTX_VOLUME_TRIPLES = int(os.environ.get("KG_RAG_CONTEXT_VOLUME", "150"))
 STRUCT_CTX = bool(int(os.environ.get("KG_RAG_STRUCT_CTX", "1")))
+# Tokens / lexical scoring: shortest token that counts as a query term; name-match boost per token.
+MIN_TOKEN_CHARS = 3
+LEXICAL_NAME_HIT_BOOST = 0.5
+# PRP score: evidence count is squashed with tanh(ct / SCALE); recency adds up to MAX_BONUS at
+# age 0, decaying linearly to zero at DECAY_YEARS.
+PRP_EVIDENCE_TANH_SCALE = 5.0
+PRP_RECENCY_MAX_BONUS = 0.1
+PRP_RECENCY_DECAY_YEARS = 10.0
+# Weighted BFS edge weights: specific predicates vs *RELATED_TO (plus a fuzzy-similarity term).
+RELATED_TO_PREDICATE_SUFFIX = "RELATED_TO"
+BFS_EDGE_W_SPECIFIC = 1.5
+BFS_EDGE_W_RELATED = 1.2
+# Cap on CodeSnippet nodes kept by retrieve_nodes (each renders its full code body).
+MAX_CODE_SNIPPETS = 6
+# Category rendered when a node has none.
+UNKNOWN_CATEGORY = "?"
+# Semantic index build: encode batch sizes per device; FAISS IVF nlist floor and nprobe ceiling.
+ENCODE_BATCH_CUDA = 16
+ENCODE_BATCH_CPU = 32
+FAISS_MIN_NLIST = 64
+FAISS_MAX_NPROBE = 32
+# splash-links GraphQL request timeout (seconds).
+SPLASH_GRAPHQL_TIMEOUT_S = 30
+# Extra seconds call_llm waits beyond LLM_TIMEOUT before giving up on the client.
+LLM_TIMEOUT_GRACE_S = 5
+# Hex characters of the sha256 digest that version a PDF snippet in ModelTurnSources.
+SNIPPET_DIGEST_HEX_CHARS = 16
 
 #  Misc
 DEBUG = bool(int(os.environ.get("KG_RAG_DEBUG", "0")))
@@ -269,7 +296,7 @@ class ModelTurnSources:
         if not text:
             return
         name = Path(str(pdf)).name
-        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:SNIPPET_DIGEST_HEX_CHARS]
         self._text[(name, f"{self.VERSION_PREFIX}:sha256:{digest}")] = text
 
     def __bool__(self) -> bool:
@@ -335,7 +362,8 @@ def create_fastapi_app(
             read-only.
 
     Returns:
-        Configured FastAPI application with /v1/chat/completions endpoint.
+        Configured FastAPI application with the ``/api/chat`` and ``/v1/chat/completions`` chat
+        routes and the ``/api/tags``, ``/api/version``, ``/v1/models`` and ``/api/ps`` stubs.
 
     Raises:
         StartupConfigError: Refused startup configuration, or an undeclared route.
@@ -620,10 +648,10 @@ def _noun_phrases(text: str) -> list[str]:
 
 # @annotate('extract_query_entities')
 def extract_query_entities(q: str) -> list[str]:
-    """Return deduplicated noun phrases + ≥3-char tokens."""
+    """Return deduplicated noun phrases + tokens of at least ``MIN_TOKEN_CHARS`` characters."""
     ents: list[str] = []
-    ents.extend([np for np in _noun_phrases(q) if len(np) >= 3])
-    ents.extend([tok for tok in _tokenize(q) if len(tok) >= 3])
+    ents.extend([np for np in _noun_phrases(q) if len(np) >= MIN_TOKEN_CHARS])
+    ents.extend([tok for tok in _tokenize(q) if len(tok) >= MIN_TOKEN_CHARS])
     seen: set[str] = set()
     uniq: list[str] = []
     for e in ents:
@@ -667,7 +695,10 @@ def cuda_warmup(device: str) -> None:
 
 # @annotate('snippet_text')
 def snippet_text(txt: str, length: int, hints: Sequence[str] | None) -> str:
-    """Extract a text snippet of given length, centered around hint term occurrences."""
+    """Extract a snippet of ``length`` chars starting a quarter-length before the first hint hit.
+
+    Without hints (or when none occurs) the snippet is the start of the text.
+    """
     if not txt or length <= 0:
         return ""
     if len(txt) <= length:
@@ -801,7 +832,7 @@ def _format_source_metadata(source: str, meta: dict[str, Any]) -> str:
 
 
 def _splash_base_url(uri: str) -> str:
-    """Normalize splash://, http://, or https:// URI to HTTP base URL."""
+    """Normalize splash://, http://, or https:// URI to HTTP base URL; ``ValueError`` otherwise."""
     parsed = urlparse(uri)
     if parsed.scheme == "splash":
         return f"http://{parsed.netloc}".rstrip("/")
@@ -811,12 +842,16 @@ def _splash_base_url(uri: str) -> str:
 
 
 def _splash_graphql(uri: str, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Execute one splash-links GraphQL request and return data payload."""
+    """Execute one splash-links GraphQL request and return its ``data`` payload.
+
+    Raises ``requests.HTTPError`` on a non-2xx reply and ``RuntimeError`` when the body
+    carries GraphQL ``errors``.
+    """
     url = f"{_splash_base_url(uri)}/splash_links/graphql"
     resp = requests.post(
         url,
         json={"query": query, "variables": variables or {}},
-        timeout=30,
+        timeout=SPLASH_GRAPHQL_TIMEOUT_S,
     )
     resp.raise_for_status()
     body = resp.json()
@@ -945,14 +980,14 @@ class NodeInfo:
     def score_prp(self) -> float:
         """Compute composite PRP score blending semantic, graph, lexical, evidence, and recency."""
         depth_fac = 1.0 / (1.0 + self.depth)
-        evid = math.tanh(self.evidence_ct / 5.0)
+        evid = math.tanh(self.evidence_ct / PRP_EVIDENCE_TANH_SCALE)
         # Recency boost: papers from last 3 years get up to 0.1 bonus,
         # decaying linearly for older papers. No penalty for missing year.
         recency = 0.0
         if self.publication_year:
             current_year = datetime.datetime.now(datetime.UTC).year
             age = max(0, current_year - self.publication_year)
-            recency = max(0.0, 0.1 * (1.0 - age / 10.0))
+            recency = max(0.0, PRP_RECENCY_MAX_BONUS * (1.0 - age / PRP_RECENCY_DECAY_YEARS))
         return (
             PRP_W_SEM * self.score_sem
             + PRP_W_DEPTH * depth_fac * self.score_graph
@@ -1100,7 +1135,7 @@ class KnowledgeGraph:
             self.embed_model = SentenceTransformer(embed_model, device="cpu")
             device = "cpu"
 
-        self.batch_size = int(USER_BATCH_OVERRIDE or (16 if device == "cuda" else 32))
+        self.batch_size = int(USER_BATCH_OVERRIDE or (ENCODE_BATCH_CUDA if device == "cuda" else ENCODE_BATCH_CPU))
         logger.info("Encode batch size = %d", self.batch_size)
         logger.info("Encoding %d nodes (≤%d chars)...", len(texts), MAX_TEXT_CHARS)
         embs: list[np.ndarray] = []
@@ -1135,7 +1170,7 @@ class KnowledgeGraph:
     def _build_faiss_index(self, emb: np.ndarray) -> None:
         """Build a FAISS IVF-Flat (or FlatIP) index from embedding matrix, with GPU fallback."""
         dim, N = emb.shape[1], emb.shape[0]
-        nlist = max(64, int(np.sqrt(N) * 2))
+        nlist = max(FAISS_MIN_NLIST, int(np.sqrt(N) * 2))
         logger.info("Building IVF-Flat: dim=%d nlist=%d vectors=%d", dim, nlist, N)
         cpu_index = faiss.index_factory(dim, f"IVF{nlist},Flat", faiss.METRIC_INNER_PRODUCT)
         use_gpu = (not FORCE_CPU) and faiss.get_num_gpus() > 0
@@ -1148,7 +1183,7 @@ class KnowledgeGraph:
                 except faiss.FaissException:  # type: ignore[attr-defined]  # missing from faiss stubs
                     self.index = faiss.GpuIndexFlatIP(res, dim)
                 self.index.add(emb)
-                self.index.nprobe = min(32, nlist // 4)
+                self.index.nprobe = min(FAISS_MAX_NPROBE, nlist // 4)
                 return
             except Exception as exc:
                 logger.error("GPU FAISS build failed (%s) → CPU.", exc)
@@ -1159,7 +1194,7 @@ class KnowledgeGraph:
         cpu_index.add(emb)
         self.index = cpu_index
         if hasattr(self.index, "nprobe"):
-            self.index.nprobe = min(32, nlist // 4)
+            self.index.nprobe = min(FAISS_MAX_NPROBE, nlist // 4)
 
     #  Semantic search ------------------------------------------------------
     # @annotate('KnowledgeGraph::_norm')
@@ -1193,10 +1228,13 @@ class KnowledgeGraph:
         return uniq
 
     def _lexical_search(self, q: str, topk: int) -> list[NodeScore]:
-        """Search nodes by token overlap (Jaccard-like) with query terms."""
+        """Search nodes by query-token overlap (fraction of query terms present, name hits boosted, capped at 1).
+
+        Empty query-term sets return ``[]`` without caching.
+        """
         if q in self._cache:
             return self._cache[q]
-        qt = set(t for t in _tokenize(q) if len(t) >= 3)
+        qt = set(t for t in _tokenize(q) if len(t) >= MIN_TOKEN_CHARS)
         if not qt:
             return []
         hits: list[NodeScore] = []
@@ -1206,7 +1244,7 @@ class KnowledgeGraph:
                 continue
             name_tokens = set(_tokenize(self.nodes[nid].get("name", "")))
             name_hit = len(qt & name_tokens)
-            score = (overlap / max(1, len(qt))) + (0.5 * name_hit)
+            score = (overlap / max(1, len(qt))) + (LEXICAL_NAME_HIT_BOOST * name_hit)
             hits.append(NodeScore(nid, min(score, 1.0), depth=0))
         hits.sort(key=lambda h: h.score, reverse=True)
         self._cache[q] = hits[:topk]
@@ -1243,8 +1281,9 @@ class KnowledgeGraph:
             for e in self.out_edges.get(nid, []):
                 nbr = e["object"]
                 pred = e["predicate"]
-                edge_w = 1.5 if not pred.endswith("RELATED_TO") else 1.2
-                edge_w += fuzz.partial_ratio(pred, "RELATED_TO") / 100.0
+                edge_w = (BFS_EDGE_W_SPECIFIC if not pred.endswith(RELATED_TO_PREDICATE_SUFFIX)
+                          else BFS_EDGE_W_RELATED)
+                edge_w += fuzz.partial_ratio(pred, RELATED_TO_PREDICATE_SUFFIX) / 100.0
                 if GENERIC_PAT.search(self.nodes.get(nbr, {}).get("name", "")):
                     edge_w *= GENERIC_PENALTY
                 nxt_score = score * edge_w / (depth + 1.0)
@@ -1288,7 +1327,7 @@ class KnowledgeGraph:
                 NodeInfo(
                     id=nid,
                     name=name,
-                    category=raw.get("category", "?"),
+                    category=raw.get("category", UNKNOWN_CATEGORY),
                     description=desc,
                     score_sem=sem_sc,
                     score_graph=g_sc,
@@ -1313,14 +1352,19 @@ class KnowledgeGraph:
         """Assemble retrieved context string from ranked nodes for LLM prompt injection.
 
         Args:
-            nodes: Ranked NodeInfo objects to render.
-            include_structured: Whether to prepend structured KG triples.
-            char_budget: Maximum character budget for the context block.
-            hint_terms: Query tokens used to center PDF snippet extraction.
-            include_pdf_snippets: Whether to include PDF snippets for the nodes.
+            nodes: Ranked NodeInfo objects to render. CodeSnippet nodes without code are skipped.
+            include_structured: Whether to prepend structured KG triples (at most
+                ``CTX_VOLUME_TRIPLES``).
+            char_budget: Soft character budget: sections are appended until the running total
+                (triples included) reaches it, so the result may exceed it by one section.
+            hint_terms: Query tokens used to position PDF snippet extraction.
+            include_pdf_snippets: Whether to include PDF snippets for the nodes' source papers.
+                Rendered snippets are also appended to the active :func:`capture_pdf_snippets`
+                list, if any.
 
         Returns:
-            Formatted context string with node metadata, code blocks, and relations.
+            Formatted context string (ANSI codes stripped) with structured facts, node metadata,
+            publication provenance, code blocks, PDF snippets and relations.
         """
         parts: list[str] = []
         chars = 0
@@ -1351,7 +1395,7 @@ class KnowledgeGraph:
                 continue
             raw = self.nodes[nid]
             name = getattr(ni, "name", None) or raw.get("name", nid)
-            category = getattr(ni, "category", None) or raw.get("category", "?")
+            category = getattr(ni, "category", None) or raw.get("category", UNKNOWN_CATEGORY)
             score = float(getattr(ni, "score_prp", 0.0) or 0.0)
             desc = getattr(ni, "description", None)
             if desc is None:
@@ -1500,7 +1544,18 @@ def retrieve_nodes(
     hops: int | None = None,
     max_nodes: int | None = None,
 ) -> list[NodeInfo]:
-    """Retrieve and rank KG nodes relevant to query, including BFS expansion."""
+    """Retrieve and rank KG nodes relevant to query, including BFS expansion.
+
+    Args:
+        q: The query.
+        kg: Graph to search.
+        hops: BFS depth; ``None`` means ``MAX_BFS_HOPS``, ``0`` disables expansion.
+        max_nodes: Nodes returned; ``None`` means ``DEFAULT_K``, values below 1 are clamped to 1.
+
+    Returns:
+        Up to ``max_nodes`` NodeInfo objects ranked by ``(score_prp, evidence_ct)``, with at
+        most ``MAX_CODE_SNIPPETS`` CodeSnippet nodes.
+    """
     hop_count = MAX_BFS_HOPS if hops is None else max(0, int(hops))
     limit = DEFAULT_K if max_nodes is None else max(1, int(max_nodes))
     seed_k = max(limit, DEFAULT_K)
@@ -1534,15 +1589,14 @@ def retrieve_nodes(
         reverse=True,
     )
 
-    # Cap CodeSnippet nodes to top 6 to prevent code from saturating
+    # Cap CodeSnippet nodes to the top MAX_CODE_SNIPPETS to prevent code from saturating
     # context on code-heavy queries (each snippet renders full code body).
-    MAX_SNIPPETS = 6
     code_ct = 0
     capped: list[NodeInfo] = []
     for ni in ranked:
         if ni.category == "CodeSnippet":
             code_ct += 1
-            if code_ct > MAX_SNIPPETS:
+            if code_ct > MAX_CODE_SNIPPETS:
                 continue
         capped.append(ni)
         if len(capped) >= limit:
@@ -1667,7 +1721,10 @@ class CBorgClient:
         )
 
     async def chat(self, messages: Sequence[dict[str, str]]) -> str:
-        """Send messages to CBORG and return the assistant response."""
+        """Send messages to CBORG (streamed) and return the assistant response.
+
+        Raises ``RuntimeError`` on connection, timeout or authentication failures.
+        """
         from .cborg_http import collect_stream_text_async
 
         try:
@@ -1720,7 +1777,7 @@ class Conversation:
 
     # @annotate('Conversation::build')
     def build(self, user: str, prepend: str | None = None) -> list[dict[str, str]]:
-        """Build message list for LLM call, optionally prepending a system message."""
+        """Build the message list for an LLM call: history, optional extra system message, then ``user``."""
         msgs = list(self.messages)
         if prepend:
             msgs.append({"role": "system", "content": prepend})
@@ -1810,7 +1867,11 @@ def build_rag_prompt(q: str, ctx: str) -> str:
 
 
 async def call_llm(cli: ChatClient, messages: Sequence[dict[str, str]], label: str) -> str:
-    """Call the LLM with timeout handling, printing status to stdout."""
+    """Call the LLM with timeout handling, printing status to stdout and recording the trace.
+
+    Every outcome is recorded with ``record_llm_call``. A timeout (``LLM_TIMEOUT`` plus
+    ``LLM_TIMEOUT_GRACE_S``) is re-raised as ``RuntimeError``; other client errors propagate.
+    """
     from .f2w_agent.trace import record_llm_call
 
     output.info(
@@ -1820,7 +1881,7 @@ async def call_llm(cli: ChatClient, messages: Sequence[dict[str, str]], label: s
     )
     started = time.perf_counter()
     try:
-        result = await asyncio.wait_for(cli.chat(messages), timeout=LLM_TIMEOUT + 5)
+        result = await asyncio.wait_for(cli.chat(messages), timeout=LLM_TIMEOUT + LLM_TIMEOUT_GRACE_S)
     except TimeoutError as exc:
         wrapped = RuntimeError(
             f"{label} call exceeded {LLM_TIMEOUT}s. Try --timeout 30, another model, or check CBORG."
