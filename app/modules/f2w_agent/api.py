@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 import re
 import shutil
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 import uuid
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -2608,11 +2608,29 @@ class _NoSplash:
 _TILED_SAVE_NO_SPLASH = _NoSplash()
 
 
+class SaveBackendProvider(Protocol):
+    """Resolves the Tiled Save backend at request time (T18D on ``:local``; owner decision 2026-11-04, tenth set).
+
+    ``backend()`` raises ``ContractError(UNSUPPORTED_CAPABILITY)`` while no publication is active; the route
+    answers the typed 501 and ``available()`` makes ``can_save`` false, so the frozen UI hides the Save controls.
+    """
+
+    def backend(self) -> TiledSaveBackend:
+        """The backend of the active publication, or raise ``UNSUPPORTED_CAPABILITY``."""
+        ...
+
+    def available(self) -> bool:
+        """Whether :meth:`backend` would succeed now."""
+        ...
+
+
 class AgentPipelineService:
     """Reusable in-process orchestrated pipeline for HTTP chat requests."""
 
     #: Class-level default so a service built without ``__init__`` (unit tests) still routes Saves to Splash.
     tiled_save: TiledSaveBackend | None = None
+    #: Lazily resolved Save backend (``:local`` after the first publication); ``None`` keeps the paths above.
+    tiled_save_provider: SaveBackendProvider | None = None
 
     def __init__(self, cfg: CoordinatorConfig) -> None:
         """Initialize coordinator, session state, runtime settings, and agents."""
@@ -2621,6 +2639,9 @@ class AgentPipelineService:
         #: Save and the session graph to Tiled from the first line of startup, so no Splash call is ever made.
         target = getattr(cfg, "tiled_save", None)
         self.tiled_save = TiledSaveBackend(target) if target is not None else None
+        #: Owner decision 2026-11-04 (tenth set): on ``:local`` the target is resolved per request from the active
+        #: publication (``cfg.tiled_save_provider``); Splash is never called once a provider is attached either.
+        self.tiled_save_provider = getattr(cfg, "tiled_save_provider", None)
         self.coord = Coordinator(cfg)
         self.memory = SessionMemory(self.coord.workdir / "session_memory.json")
         self.workflow = WorkflowStateStore(self.coord.workdir / "workflow_state.json")
@@ -2729,9 +2750,16 @@ class AgentPipelineService:
 
         With a Tiled save target the session graph is the effective record instead (no Splash call).
         """
-        if self.tiled_save is not None:
+        if self.tiled_save is not None or self.tiled_save_provider is not None:
             try:
-                self._materialize_effective_graph(self._session_graph_path())
+                backend = self._save_backend()
+            except ContractError as exc:    # :local before the first publication: nothing to show yet, no Splash call
+                logger.info("Session graph not rebuilt from Tiled: %s", exc)
+                return False
+            if backend is None:
+                return False
+            try:
+                self._materialize_effective_graph(self._session_graph_path(), backend)
                 return True
             except Exception as exc:
                 logger.warning("Failed to build the effective graph from the snapshot and journal: %s", exc)
@@ -3253,20 +3281,51 @@ class AgentPipelineService:
         self._sync_session_graph_from_splash()
         self._rebuild_agents()
 
+    def attach_tiled_save_provider(self, provider: SaveBackendProvider) -> None:
+        """Route the UI Save to a backend resolved per request (``:local``; owner decision 2026-11-04, tenth set).
+
+        Like :meth:`attach_tiled_save`, but the target is the deployment's active publication at the time of each
+        Save. Before the first publication the session graph is left as it is and Save is the typed 501; no
+        Splash call is made in either case.
+        """
+        self.tiled_save_provider = provider
+        self._sync_session_graph_from_splash()
+        self._rebuild_agents()
+
+    def _save_backend(self) -> TiledSaveBackend | None:
+        """The Tiled Save backend: the fixed one, the lazily resolved one, or ``None`` (the legacy Splash path).
+
+        Raises:
+            ContractError: ``UNSUPPORTED_CAPABILITY`` when a provider is attached but no publication is active
+                (the route answers 501 and ``can_save`` is false; never a 500).
+        """
+        if self.tiled_save is not None:
+            return self.tiled_save
+        if self.tiled_save_provider is not None:
+            return self.tiled_save_provider.backend()
+        return None
+
+    def save_available(self) -> bool:
+        """Whether a Save could reach its target now (``can_save`` of ``GET /v1/capabilities``)."""
+        if self.tiled_save is not None or self.tiled_save_provider is None:
+            return True
+        return self.tiled_save_provider.available()
+
     @property
     def _splash(self) -> Untyped:
         """The Splash client module, or the no-op stand-in when Saves go to Tiled (T18D: no Splash call)."""
-        return kg_update if self.tiled_save is None else _TILED_SAVE_NO_SPLASH
+        if self.tiled_save is None and self.tiled_save_provider is None:
+            return kg_update
+        return _TILED_SAVE_NO_SPLASH
 
-    def _materialize_effective_graph(self, graph_path: Path) -> None:
+    def _materialize_effective_graph(self, graph_path: Path, backend: TiledSaveBackend) -> None:
         """Write the effective record (active snapshot plus in-flight journal entries) to the session graph file.
 
         Every reader (``/graph``, node search and detail, retrieval) reads that file, so a journaled edit is
         visible to all of them at once. A pure function of the snapshot and the journal: a reverted edit
         disappears on the next call.
         """
-        assert self.tiled_save is not None
-        effective = self.tiled_save.effective_graph()
+        effective = backend.effective_graph()
         text = json.dumps(effective, indent=2, ensure_ascii=False)
         try:
             same = graph_path.read_text(encoding="utf-8") == text
@@ -3289,13 +3348,13 @@ class AgentPipelineService:
         if self.runtime.graph_source == "json":
             raise ValueError("Editing node properties requires splash graph mode")
 
-        tiled = self.tiled_save
+        tiled = self._save_backend()     # :local before the first publication: UNSUPPORTED_CAPABILITY (the route's 501)
         graph_path = self.graph_path()
         if tiled is not None:
             if ctx is None:
                 raise ContractError(ErrorCode.DENIED, "no server-resolved request context")
             await asyncio.to_thread(tiled.prepare, ctx)
-            self._materialize_effective_graph(graph_path)
+            self._materialize_effective_graph(graph_path, tiled)
         data = _load_session_graph(graph_path)
         before: dict[str, Any] | None = None
         if tiled is not None:    # never mutate the parse cache: a failed Save must leave readers untouched
@@ -3358,7 +3417,7 @@ class AgentPipelineService:
 
         if tiled is not None and ctx is not None and before is not None:
             await asyncio.to_thread(tiled.save, ctx, before, data)
-            self._materialize_effective_graph(graph_path)
+            self._materialize_effective_graph(graph_path, tiled)
         else:
             _save_session_graph(graph_path, data)
         await self.retrieval.reload_kg(str(graph_path), graph_source="splash")
@@ -6702,7 +6761,9 @@ def create_app(
     """Build the FastAPI app with CORS and agent pipeline routes.
 
     The signature is pinned (``tests/api_v1/test_v1_local.py``). A Tiled save target (T18D) travels on the
-    launcher's config as ``cfg.tiled_save`` (``create_api_app(tiled_save=...)`` sets it).
+    launcher's config as ``cfg.tiled_save`` (``create_api_app(tiled_save=...)`` sets it); on ``:local`` the
+    target is instead resolved per request by a ``SaveBackendProvider`` attached after wiring
+    (``AgentPipelineService.attach_tiled_save_provider``; owner decision 2026-11-04, tenth set).
 
     Access (T18B): ``deployment`` (``DeploymentSettings``) or ``startup_config``
     (``os.environ`` when ``None``, profile ``local`` when unset) selects the profile
@@ -6998,6 +7059,8 @@ def create_app(
         except ContractError as exc:
             if exc.code is ErrorCode.DENIED:     # the guard already answered 403 first; never a 502
                 raise
+            if exc.code is ErrorCode.UNSUPPORTED_CAPABILITY:     # :local before the first publication (typed 501)
+                raise HTTPException(status_code=501, detail=guard.error_detail(ctx, exc)) from exc
             raise HTTPException(status_code=502,
                                 detail=f"Splash update failed: {guard.error_detail(ctx, exc)}") from exc
         except Exception as exc:
