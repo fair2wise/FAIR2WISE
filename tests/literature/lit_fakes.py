@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, NamedTuple, Optional, Tuple
 
 import httpx
 
@@ -163,6 +163,210 @@ def make_paper_pdf(path: Path, *, title: str, doi: str = "", sections: Iterable[
     return path
 
 
+class TypesetPaper(NamedTuple):
+    """A typeset fixture PDF and where its figure and table sit (top-left points)."""
+
+    path: Path
+    page_size: Tuple[float, float]
+    figure_box: Tuple[float, float, float, float]
+    table_box: Tuple[float, float, float, float]
+
+
+_TYPESET_PARAGRAPHS = {
+    "intro": (
+        "Resonant soft X-ray scattering probes the molecular orientation of polymer blends. The technique "
+        "combines chemical contrast with the sensitivity of scattering to length scales. Here we describe the "
+        "measurement geometry and the analysis used for the blend films. Body line two.",
+        "The films were cast from solution onto silicon nitride windows and measured in transmission at the "
+        "carbon absorption edge, where the contrast between the two components is largest. Each exposure was "
+        "repeated to confirm that radiation damage did not alter the scattering from the films.",
+        "The sample environment was held at a pressure below 1e-7 torr throughout the experiment and the sample "
+        "temperature was controlled with a resistive heater mounted behind the window holder.",
+    ),
+    "results": (
+        "We found q = 0.1 per angstrom for the dominant scattering feature in every blend. The peak position was "
+        "stable across the annealing series and its width narrowed slowly. These observations are consistent "
+        "with gradual coarsening of the domains over time.",
+        "The fitted width is reported with its standard uncertainty. The uncertainty is dominated by the "
+        "background subtraction and not by counting statistics, so longer exposures would not reduce it.",
+        "The same trend was seen in all of the films that we measured, although the absolute width differed "
+        "between the two casting solvents by a factor that we did not attempt to explain here.",
+    ),
+}
+
+
+def make_typeset_paper_pdf(path: Path, *, doi: str = "", page_size: Tuple[float, float] = (612, 792),
+                           ruled_table: bool = True) -> TypesetPaper:
+    """Write a two-column journal-style paper PDF (generated here, so no third-party licence) with reportlab.
+
+    Unlike :func:`make_paper_pdf` this is laid out the way a typeset article is: a running header, a centred
+    title block and italic abstract over two columns of dense serif body text, a raster plot with a small
+    ``Figure 1.`` caption *below* it and a ruled table (``ruled_table=False`` gives booktabs rules, whose column structure the table model finds less
+    reliably) with a ``Table 1.`` caption *above* it, both one
+    column wide. The Docling layout model reads captions in this setting as captions (the lone 9 pt Helvetica
+    lines of ``make_paper_pdf`` come back as plain text, as do captions in non-embedded standard fonts), so this is the fixture for asserting caption linkage
+    with real weights. ``page_size`` scales the margins and columns.
+    """
+    from io import BytesIO
+
+    from PIL import Image, ImageDraw
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+    from reportlab.pdfgen import canvas
+
+    import matplotlib
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    # Embedded STIX General (a Times-like face shipped with matplotlib, SIL OFL). The standard-14 "Times" names are
+    # not embedded, so Docling's rasteriser substitutes a fallback face and the layout model stops seeing captions.
+    fonts = Path(matplotlib.get_data_path()) / "fonts" / "ttf"
+    for name, file in (("STIX-Roman", "STIXGeneral.ttf"), ("STIX-Bold", "STIXGeneralBol.ttf"),
+                       ("STIX-Italic", "STIXGeneralItalic.ttf")):
+        if name not in pdfmetrics.getRegisteredFontNames():
+            pdfmetrics.registerFont(TTFont(name, str(fonts / file)))
+    width, height = page_size
+    margin, gutter = width * 0.115, 22.0
+    col_w = (width - 2 * margin - gutter) / 2
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=page_size, invariant=1)
+    c.setTitle("Resonant soft X-ray scattering of blends")
+    c.setSubject(f"doi:{doi}" if doi else "")
+    c.setAuthor("")
+    c.setCreator("")
+    c.setFillColorRGB(0, 0, 0)
+
+    def wrap(value: str, font: str, size: float, limit: float) -> list[str]:
+        lines: list[str] = []
+        current = ""
+        for word in value.split():
+            trial = f"{current} {word}".strip()
+            if current and stringWidth(trial, font, size) > limit:
+                lines.append(current)
+                current = word
+            else:
+                current = trial
+        return [*lines, current] if current else lines
+
+    def text(x: float, top: float, value: str, font: str, size: float, *, centre: bool = False) -> None:
+        c.setFont(font, size)
+        (c.drawCentredString if centre else c.drawString)(x, height - top, value)
+
+    # Running header and page number, as a journal page has.
+    text(margin, 44, "Journal of Example Physics", "STIX-Italic", 8.5)
+    text(width - margin - stringWidth("Vol. 1, 1-4", "STIX-Roman", 8.5), 44, "Vol. 1, 1-4", "STIX-Roman", 8.5)
+    text(width / 2, height - 40, "1", "STIX-Roman", 9, centre=True)
+
+    top = 84.0
+    text(width / 2, top, "Resonant soft X-ray scattering of blends", "STIX-Bold", 17, centre=True)
+    top += 22
+    text(width / 2, top, "A. Author and B. Researcher", "STIX-Roman", 10.5, centre=True)
+    top += 12.5
+    text(width / 2, top, "Department of Materials Science, Example University", "STIX-Italic", 9, centre=True)
+    top += 12.5
+    if doi:
+        text(width / 2, top, f"https://doi.org/{doi}", "STIX-Roman", 9, centre=True)
+        top += 12.5
+    top += 14
+    abstract = ("We measure the molecular orientation and the domain size of polymer blend films by resonant soft "
+                "X-ray scattering and follow the coarsening of the domains through an annealing series.")
+    text(margin + 18, top, "Abstract", "STIX-Bold", 9.5)
+    top += 12
+    for part in wrap(abstract, "STIX-Italic", 9, width - 2 * margin - 36):
+        text(margin + 18, top, part, "STIX-Italic", 9)
+        top += 11
+    top += 14
+
+    cursor = [top, top]   # next free line in each column
+    col = 0
+    fig_box = tab_box = (0.0, 0.0, 0.0, 0.0)
+
+    def x0() -> float:
+        return margin + col * (col_w + gutter)
+
+    def heading(value: str) -> None:
+        cursor[col] += 8
+        text(x0(), cursor[col] + 10, value, "STIX-Bold", 11)
+        cursor[col] += 22
+
+    def para(value: str) -> None:
+        for part in wrap(value, "STIX-Roman", 9.5, col_w):
+            text(x0(), cursor[col] + 9.5, part, "STIX-Roman", 9.5)
+            cursor[col] += 11.6
+        cursor[col] += 4
+
+    def caption(label: str, value: str) -> None:
+        bold = stringWidth(label + " ", "STIX-Bold", 8)
+        for n, part in enumerate(wrap(value, "STIX-Roman", 8, col_w - bold)):
+            if n == 0:
+                text(x0(), cursor[col] + 8, label, "STIX-Bold", 8)
+                text(x0() + bold, cursor[col] + 8, part, "STIX-Roman", 8)
+            else:
+                text(x0(), cursor[col] + 8, part, "STIX-Roman", 8)
+            cursor[col] += 9.6
+
+    intro, results = _TYPESET_PARAGRAPHS["intro"], _TYPESET_PARAGRAPHS["results"]
+    heading("1. Introduction")
+    para(intro[0])
+    para(intro[1])
+    # Figure 1 (left column): a plot-like raster, caption below.
+    cursor[col] += 4
+    fig_w, fig_h = col_w, col_w * 0.72
+    plot = Image.new("RGB", (600, 432), (236, 240, 248))   # tinted, framed edge to edge: the box is unambiguous
+    draw = ImageDraw.Draw(plot)
+    draw.rectangle((0, 0, 599, 431), outline="black", width=4)
+    draw.rectangle((70, 20, 580, 370), fill="white", outline="black", width=2)
+    for k in range(1, 6):
+        draw.line((70 + k * 85, 370, 70 + k * 85, 355), fill="black", width=2)
+        draw.text((62 + k * 85, 380), f"0.{k}", fill="black")
+    for k in range(1, 5):
+        draw.line((70, 370 - k * 70, 85, 370 - k * 70), fill="black", width=2)
+        draw.text((38, 364 - k * 70), f"{k * 2}", fill="black")
+    draw.text((300, 405), "q (1/A)", fill="black")
+    draw.text((8, 190), "I", fill="black")
+    pts = [(70 + i * 8, 350 - int(300 / (1 + ((i - 30) / 6.0) ** 2)) - (i % 5)) for i in range(64)]
+    draw.line(pts, fill=(200, 30, 30), width=3)
+    draw.line([(px, min(360, py + 30 + (px % 9))) for px, py in pts], fill=(30, 60, 200), width=3)
+    fig_top = cursor[col]
+    c.drawImage(ImageReader(plot), x0(), height - fig_top - fig_h, width=fig_w, height=fig_h)
+    fig_box = (x0(), fig_top, x0() + fig_w, fig_top + fig_h)
+    cursor[col] += fig_h + 5
+    caption("Figure 1.", "Scattering pattern of the film, integrated over the azimuth and plotted against the "
+                         "scattering vector q for two annealing times.")
+    cursor[col] += 8
+    para(intro[2])
+    # Second column: the results, with Table 1 captioned above.
+    col = 1
+    heading("2. Results")
+    para(results[0])
+    cursor[col] += 4
+    caption("Table 1.", "Fitted parameters of the peak.")
+    cursor[col] += 3
+    row_h = 14.0
+    tab_top = cursor[col]
+    c.setStrokeColorRGB(0, 0, 0)
+    for i in range(4):
+        if ruled_table or i in (0, 1, 3):
+            c.setLineWidth(0.9 if i in (0, 3) else 0.5)
+            c.line(x0(), height - (tab_top + i * row_h), x0() + col_w, height - (tab_top + i * row_h))
+    if ruled_table:
+        c.setLineWidth(0.5)
+        for j in range(4):
+            c.line(x0() + j * col_w / 3, height - tab_top, x0() + j * col_w / 3, height - (tab_top + 3 * row_h))
+    for i, row in enumerate([["q", "I", "dI"], ["0.1", "10", "1"], ["0.2", "8", "1"]]):
+        for j, value in enumerate(row):
+            text(x0() + (j + 0.5) * col_w / 3, tab_top + i * row_h + 10, value,
+                 "STIX-Bold" if i == 0 else "STIX-Roman", 9, centre=True)
+    tab_box = (x0(), tab_top, x0() + col_w, tab_top + 3 * row_h)
+    cursor[col] += 3 * row_h + 12
+    para(results[1])
+    para(results[2])
+    c.showPage()
+    c.save()
+    path.write_bytes(buf.getvalue())
+    return TypesetPaper(path, page_size, fig_box, tab_box)
+
+
 class Router:
     """A tiny offline HTTP router for ``httpx.MockTransport``.
 
@@ -233,7 +437,7 @@ def json_dump(obj: Any) -> str:
 
 __all__ = (
     "NOW", "Router", "als_user_ctx", "have_pdf_stack", "json_dump", "local_ctx", "make_paper_pdf",
-    "minimal_pdf_bytes", "openalex_work",
+    "minimal_pdf_bytes", "openalex_work", "TypesetPaper", "make_typeset_paper_pdf",
 )
 
 

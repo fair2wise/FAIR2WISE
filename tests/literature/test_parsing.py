@@ -43,7 +43,7 @@ from tests.literature.lit_fakes import (
     als_user_ctx,
     
     local_ctx,
-    make_paper_pdf,
+    make_typeset_paper_pdf,
     minimal_pdf_bytes,
     openalex_work,
 )
@@ -234,37 +234,18 @@ def test_corrupt_source_is_refused(store):
         ParseService(store, [FakeParser()]).parse(local_ctx(), ref)
 
 
-# Paragraph-like prose: the layout model drops or merges sparse one-line fixtures (it reads them as figures or captions).
-INTRO_BODY = (
-    "Resonant soft X-ray scattering probes the molecular orientation of polymer blends.\n"
-    "The technique combines chemical contrast with the sensitivity of scattering to length scales.\n"
-    "Here we describe the measurement geometry and the analysis used for the blend films.\n"
-    "Body line two."
-)
-RESULTS_BODY = (
-    "We found q = 0.1 per angstrom for the dominant scattering feature in every blend.\n"
-    "The peak position was stable across the annealing series and its width narrowed slowly.\n"
-    "These observations are consistent with gradual coarsening of the domains over time."
-)
-
-
 @needs_docling
-def test_docling_parser_preserves_sections_figures_tables_geometry(store, tmp_path):
-    path = make_paper_pdf(
-        tmp_path / "p.pdf",
-        title="Resonant soft X-ray scattering of blends",
-        doi=DOI,
-        sections=[
-            ("1. Introduction", INTRO_BODY),
-            ("2. Results", RESULTS_BODY),
-        ],
-        figure=True,
-        table=True,
-    )
+@pytest.mark.parametrize("page_size", [(612, 792), (595, 842)], ids=["letter", "a4"])
+def test_docling_parser_preserves_sections_figures_tables_geometry(store, tmp_path, page_size):
+    # A typeset two-column fixture (embedded serif font, captions in the layout a journal uses): the real layout
+    # model labels its captions "caption", which is what links them to the figure and table. The lone Helvetica
+    # lines of make_paper_pdf, or captions in non-embedded standard fonts, come back as plain text.
+    paper = make_typeset_paper_pdf(tmp_path / "p.pdf", doi=DOI, page_size=page_size)
+    path = paper.path
     ref = store.put_file(local_ctx(), path, media_type="application/pdf", metadata={"kind": "source_pdf"}).ref
     service = ParseService(store, [DoclingParser()])
     doc = service.load(local_ctx(), service.parse(local_ctx(), ref))
-    assert doc.pages[0].width == 612 and doc.pages[0].height == 792
+    assert (doc.pages[0].width, doc.pages[0].height) == page_size
     names = doc.section_names()
     assert "1. Introduction" in names and "2. Results" in names
     intro = doc.sections[names.index("1. Introduction")]
@@ -272,13 +253,13 @@ def test_docling_parser_preserves_sections_figures_tables_geometry(store, tmp_pa
     assert any(DOI in s.text for s in doc.sections) and "Resonant soft X-ray" in " ".join((*names, doc.markdown))
     fig = doc.figures[0]
     # Docling boxes are BOTTOMLEFT; in top-left points the figure sits where the fixture drew it.
-    top_left = (fig.bbox.left, 792 - fig.bbox.top, fig.bbox.right, 792 - fig.bbox.bottom)
-    assert fig.bbox.coord_origin == "BOTTOMLEFT" and top_left == pytest.approx((330, 420, 530, 570), abs=2.0)
-    # Captions are not asserted here: whether the layout model labels a lone synthetic line "caption" (which is
-    # what links it to the figure/table) is model-dependent; caption plumbing is covered with fake Docling documents.
+    top_left = (fig.bbox.left, page_size[1] - fig.bbox.top, fig.bbox.right, page_size[1] - fig.bbox.bottom)
+    assert fig.bbox.coord_origin == "BOTTOMLEFT" and top_left == pytest.approx(paper.figure_box, abs=2.0)
+    assert fig.caption.startswith("Figure 1.")
     assert fig.images_scale == pytest.approx(2.0, abs=0.05)
     assert store.get(local_ctx(), fig.asset_ref).startswith(b"\x89PNG")
     table = doc.tables[0]
+    assert table.caption.startswith("Table 1.")
     assert (table.n_rows, table.n_cols) == (3, 3)
     rows = list(csv.reader(io.StringIO(store.get(local_ctx(), table.data_ref).decode())))
     assert rows[0] == ["q", "I", "dI"]
