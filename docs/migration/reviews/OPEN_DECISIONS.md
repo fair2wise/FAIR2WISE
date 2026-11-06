@@ -242,7 +242,7 @@ Recorded for the owner; nothing below is answered here.
 > 2. Are the existing flat files adopted, archived, or left as unpromotable legacy?
 > 3. Approval of the `.gitignore` negation and `-text` attributes for KG paths.
 > 4. Whether T23B stops writing `metadata.graph_snapshot` in promoted payloads.
-> 5. Errata to plan 4.14, GIT_KG_PROMOTION_SPEC 4 and JSON_KG_PUBLICATION_SPEC for E3.
+> 5. Errata to plan 4.14, GIT_KG_PROMOTION_SPEC 4 and JSON_KG_PUBLICATION_SPEC for E3. (Applied 2026-11-06, owner: "E3 errata. Change what you need to in order to allow KGs to ship with the image".)
 > 6. Where descriptors live: the release system, or a later commit under `docs/migration/data_releases/releases/`.
 
 ### D3 additions by T28C (2026-10-29)

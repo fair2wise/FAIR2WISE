@@ -392,3 +392,34 @@ def test_flat_allowlist_admits_legacy_names_but_not_other_flat_files():
            "storage/kg/matkg_x.pdf", "other/matkg_x.json", "/storage/kg/matkg_x.json"]
     assert check_paths(legacy) == []
     assert [f.location for f in check_paths(bad)] == bad
+
+
+def test_an_image_baked_flat_copy_is_used_only_when_its_sha256_equals_the_record(repo, tmp_path):
+    """E3 / release_contract.md section 7: images carry the flat ``matkg_*.json`` copy and the manifest, not the
+    nested ``graph.json``. The copy is accepted only when its bytes hash to the record's sha256; a different
+    image can never silently supply data, and the flat copy alone (no nested graph to check against) is not
+    enough to verify a snapshot directory."""
+    import shutil
+
+    root, result, _ = repo
+    manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+    recorded = manifest["graph"]["sha256"]
+    flat_bytes = result.flat_path.read_bytes()
+    assert releases.sha256_bytes(flat_bytes) == recorded  # a matching baked copy is the same bytes
+    # an image-shaped tree: flat copy + manifest/validation, nested graph.json omitted (.dockerignore)
+    baked = tmp_path / "baked"
+    shutil.copytree(root / "storage" / "kg", baked / "storage" / "kg",
+                    ignore=shutil.ignore_patterns("graph.json"))
+    with pytest.raises(ReleaseVerificationError) as err:
+        verify_snapshot_dir(baked / "storage" / "kg" / "synthetic" / "v1")
+    assert err.value.code == "layout"  # fails closed: nothing is verified from the flat copy alone
+    # a baked flat copy from another build (different bytes) does not hash to the record
+    (baked / "storage" / "kg" / result.flat_path.name).write_bytes(flat_bytes + b"\n")
+    other = (baked / "storage" / "kg" / result.flat_path.name).read_bytes()
+    assert releases.sha256_bytes(other) != recorded
+    # and the full layout rejects a flat copy that differs from the verified graph
+    shutil.copytree(root / "storage" / "kg", tmp_path / "full" / "storage" / "kg")
+    (tmp_path / "full" / "storage" / "kg" / result.flat_path.name).write_bytes(other)
+    with pytest.raises(ReleaseVerificationError) as err:
+        verify_snapshot_dir(tmp_path / "full" / "storage" / "kg" / "synthetic" / "v1")
+    assert err.value.code == "tampered"

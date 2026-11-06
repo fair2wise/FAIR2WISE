@@ -183,7 +183,7 @@ still governed by T21A.
 - The owner decided (E3, 2026-10-09) that **`storage/`, including `storage/kg`, may be baked into images.** O-D1
   (2026-10-12) confirms that KG JSON goes into the image together with its verbatim snippets. This
   supersedes the "exclude storage/kg from every image layer" clauses in plan 4.14, GIT_KG_PROMOTION_SPEC 4 and
-  JSON_KG_PUBLICATION_SPEC (v6/v7 additions) for KG JSON. Those companion texts need an errata (integrator action).
+  JSON_KG_PUBLICATION_SPEC (v6/v7 additions) for KG JSON. Those texts were amended by the E3 errata, applied 2026-11-06 on the owner's instruction (`reviews/H8/spec_errata_E3_draft.md`).
   Image exclusion of KG JSON is **not** a release requirement.
 - These stay excluded:
   - The Tiled catalog DB, `**/tiled_catalog*.db*`, except in a future `:local` image (`.dockerignore`, commit
@@ -194,7 +194,7 @@ still governed by T21A.
   selects `(data_commit, path, sha256)` from the descriptor and verifies bytes before activating. An image-baked file
   may be used as the byte source only if its sha256 equals the descriptor's. Otherwise the import fails. An image
   built from a different commit can never silently supply data.
-- [OBSERVED] `.dockerignore` does not exclude `storage/kg/*.json`. An image built from a developer working tree would
+- [OBSERVED] `.dockerignore` does not exclude flat `storage/kg/matkg_*.json`; it excludes the nested `storage/kg/*/v*/graph.json` copies (D3.24) and ships manifests and validation reports. An image built from a developer working tree would
   bake the gitignored untracked snapshots (section 4 lists their R3/R4/R7 hits). CI builds from a clean checkout would
   not. [PROPOSED] Images are built only from clean checkouts, or the build context excludes untracked KG files.
 - Baking data into an image does not authorize publication. Image rollout and data promotion stay separate operations.
@@ -616,9 +616,9 @@ as follows.
 3. **Q3: approved and applied** through `.gitattributes` (`storage/kg/** -text`, `storage/kg/*.json -text`,
    `storage/terminology/*.json -text`, `docs/migration/data_releases/releases/** -text`).
 4. **Q4: applied** (owner decision O-R1).
-5. **Q5: drafted (owner, 2026-11-03: "Yes, draft them").** Errata to plan 4.14, GIT_KG_PROMOTION_SPEC 4 and
-   JSON_KG_PUBLICATION_SPEC for E3 are in `docs/migration/reviews/H8/spec_errata_E3_draft.md`, for owner review. The
-   frozen documents are not edited until the owner approves the entries.
+5. **Q5: drafted (owner, 2026-11-03: "Yes, draft them"); applied 2026-11-06 (owner: "E3 errata. Change what you need to in order to allow KGs to ship with the image").** Errata to plan 4.14, GIT_KG_PROMOTION_SPEC 4 and
+   JSON_KG_PUBLICATION_SPEC for E3 are in `docs/migration/reviews/H8/spec_errata_E3_draft.md`, (status APPLIED). The
+   frozen documents were edited on that approval and `companion/SHA256SUMS.txt` re-pinned for the two companion files.
 6. **Q6: decided (owner, 2026-11-03): descriptors live under `docs/migration/data_releases/releases/`.** A descriptor
    is committed there, in a later commit than the data it pins (a descriptor never names its own containing commit).
    `scripts/adopt_legacy_kg.py descriptor` still prints to stdout or to a path outside the repository; writing the file

@@ -57,5 +57,6 @@ deploy
 # T26A (owner O-R1 Q2): adopted releases keep a nested storage/kg/<corpus>/v<N>/graph.json that is a byte
 # copy of the flat file. The flat copies stay the byte source in images (release_contract.md section 7), so the
 # nested graph copies are not sent to the build context (they would duplicate ~220 MB). manifest.json and
-# validation.json stay in the context. Git stores one blob either way.
+# validation.json stay in the context. Git stores one blob either way. (E3 errata, applied 2026-11-06: KG JSON
+# otherwise ships with the image; baking never selects data, release_contract.md section 7.)
 storage/kg/*/v*/graph.json
