@@ -30,7 +30,7 @@ from _wiring_support import make_cfg  # noqa: E402
 
 from app.api.operations import F2WOperations, PublicationGate  # noqa: E402
 from app.api.post_extraction import AUTO_SAFE_PLAN, PostExtractionPublisher  # noqa: E402
-from app.modules.f2w_agent import kg_update  # noqa: E402
+from app.modules.graph import kg_update  # noqa: E402
 from app.modules.graph.imports import tiled_json as tj  # noqa: E402
 from app.modules.schema.registry import SchemaRegistry  # noqa: E402
 from tests.jobs.replacement_world import SCOPE, RWorld, build_v1, derive, graph_of  # noqa: E402

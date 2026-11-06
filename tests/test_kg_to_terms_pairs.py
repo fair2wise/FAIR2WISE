@@ -21,7 +21,7 @@ from typing import Any
 import pytest
 
 from app.modules import json2kg
-from app.modules.f2w_agent.kg_update import rebuild_kg
+from app.modules.graph.kg_update import rebuild_kg
 from app.modules.graph.snapshot import build_graph_isolated
 from app.modules.term_extractor.kg_to_terms import KgToTermsError, kg_to_terms
 from app.modules.term_extractor.models import RelationRecord, TermRecord

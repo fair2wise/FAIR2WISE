@@ -20,13 +20,13 @@ from typing import Any, cast
 from academy.agent import Agent, action
 
 from .. import kg_rag_api as krag
-from ..hybrid_rag.pipeline import HybridSourceRAG, hybrid_rag_enabled
-from ..tiled_graph import (
+from ..graph.backends.tiled_lookup import (
     TILED_GRAPH_ID,
     is_experiment_identity_question,
     load_tiled_config,
     lookup_experiment_identity,
 )
+from ..hybrid_rag.pipeline import HybridSourceRAG, hybrid_rag_enabled
 from .materials_project import lookup_materials_project
 from .multi_kg import (
     DEFAULT_KG_QUERY_HOPS,

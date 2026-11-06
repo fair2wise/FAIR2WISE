@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.modules import tiled_graph as tg
+from app.modules.graph.backends import tiled_lookup as tg
 
 URI = "http://127.0.0.1:9"  # never contacted: requests.post is faked in every test that could call out
 

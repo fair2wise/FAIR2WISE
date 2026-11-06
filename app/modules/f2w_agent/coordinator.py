@@ -15,8 +15,8 @@ from pathlib import Path
 import shutil
 from typing import Any
 
-from . import kg_update
 from ..cli_output import output
+from ..graph import kg_update
 from .debate_agent import EvidenceDebateAgent
 from .download_agent import DownloadAgent
 from .extractor_agent import ExtractorAgent

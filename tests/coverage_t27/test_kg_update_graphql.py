@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.modules.f2w_agent import kg_update
+from app.modules.graph import kg_update
 
 
 class FakeSplash:

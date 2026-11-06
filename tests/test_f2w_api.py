@@ -2460,7 +2460,7 @@ def test_property_entries_flattens_tiled_dict():
 
 
 def test_query_graph_payload_includes_tiled_lookup_nodes(tmp_path):
-    from app.modules.tiled_graph import TILED_GRAPH_ID, TiledLookupGraph
+    from app.modules.graph.backends.tiled_lookup import TILED_GRAPH_ID, TiledLookupGraph
 
     science = tmp_path / "matkg_rsoxs_v1.json"
     science.write_text(
@@ -2518,7 +2518,7 @@ def test_query_graph_payload_includes_tiled_lookup_nodes(tmp_path):
 
 
 def test_graph_neighborhood_from_lookup_walks_tiled_identity_edges():
-    from app.modules.tiled_graph import TiledLookupGraph
+    from app.modules.graph.backends.tiled_lookup import TiledLookupGraph
 
     kg = TiledLookupGraph()
     kg.add_node(

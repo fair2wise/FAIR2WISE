@@ -321,7 +321,7 @@ def validate_external_url(profile: str, url: str) -> str:
     """Check that ``url`` is the one target ``profile`` may connect to.
 
     ALS profiles accept only their fixed URL (a profile allowlist of one, replacing the
-    hostname coercion in ``tiled_graph.coerce_local_tiled_uri``). Local and test profiles
+    hostname coercion in ``graph.backends.tiled_lookup.coerce_local_tiled_uri``). Local and test profiles
     accept only loopback http(s) and reject every ``*.als.lbl.gov`` host.
 
     Returns:

@@ -773,3 +773,11 @@ place. add a note in the addendum we want real ports". They are class (r) and st
 `tiled_graph.py`) under `graph/backends/`; routing and debate under `agent_runtime/` and `curation/`;
 `kg_update` under `graph/`; `bl1101` ingestion under `graph/imports/` (a multi-day task). Each port needs its
 own task, tests and owner scheduling before H8; none is started.
+
+**Status 2026-11-06** (owner: "start the work now"; branch `forge_merge-T17B-ports`, not merged): `tiled_graph.py` ->
+`graph/backends/tiled_lookup.py` and `f2w_agent/kg_update.py` -> `graph/kg_update.py` are ported (old paths are
+deprecated alias shims; wire behaviour unchanged; legacy_ui contract tests unchanged). `download_agent.py` audited:
+PDF bytes already flow only through the hardened downloader; its three metadata hops (pyalex, arxiv, Unpaywall) are
+pinned by test and proposed as P1. `orchestrator_agent`/`debate_agent` (P2, design decision needed) and
+`bl1101_ingest` (P3, multi-day) are proposals only. Record and proposals:
+`docs/migration/reviews/H8/legacy_ports_plan.md`.

@@ -305,7 +305,7 @@ class LibraryExtractor:
     def _run_locked(self, ctx: StageContext, args: Mapping[str, Any], backend: Mapping[str, str], root: Path,
                     rows: Sequence[dict[str, Any]], choice: Mapping[str, Any],
                     schema_block: Mapping[str, Any]) -> StageResult:
-        from ..f2w_agent import kg_update
+        from ..graph import kg_update
 
         model = args["model"]
         bundle = self.ensure_bundle(args, choice)
