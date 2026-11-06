@@ -1,0 +1,209 @@
+<testsuites name="binary-evaluation" tests="108" failures="0" errors="6" skipped="25">
+  <properties>
+    <property name="gate_status" value="NOT_PASS" />
+    <property name="gate_provisional" value="True" />
+    <property name="manifest_sha256" value="5d387012682b26eb3994e687067c1656565d8f6398e51707a5b426a7de7c9d52" />
+    <property name="runner_revision" value="t11b-runner-1" />
+    <property name="judge_model" value="lbl/cborg-deepthought" />
+    <property name="judge_model_source" value="cli" />
+    <property name="model_under_test" value="lbl/cborg-chat" />
+  </properties>
+  <testsuite name="AUTH" tests="11" failures="0" errors="0" skipped="0">
+    <testcase classname="binary.AUTH" name="AUTH-01" />
+    <testcase classname="binary.AUTH" name="AUTH-02" />
+    <testcase classname="binary.AUTH" name="AUTH-03" />
+    <testcase classname="binary.AUTH" name="AUTH-04" />
+    <testcase classname="binary.AUTH" name="AUTH-05" />
+    <testcase classname="binary.AUTH" name="AUTH-06" />
+    <testcase classname="binary.AUTH" name="AUTH-07" />
+    <testcase classname="binary.AUTH" name="AUTH-08" />
+    <testcase classname="binary.AUTH" name="AUTH-09" />
+    <testcase classname="binary.AUTH" name="AUTH-10" />
+    <testcase classname="binary.AUTH" name="AUTH-11" />
+  </testsuite>
+  <testsuite name="DEP" tests="22" failures="0" errors="0" skipped="8">
+    <testcase classname="binary.DEP" name="DEP-01">
+      <skipped message="skipped: 1 oracle test(s) skipped, 17 passed: tests/ci/test_release_scripts.py::test_manifest_records_commit_digests_locks_tiled_and_ui_tree: release manifest needs a git checkout" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-02" />
+    <testcase classname="binary.DEP" name="DEP-03" />
+    <testcase classname="binary.DEP" name="DEP-04" />
+    <testcase classname="binary.DEP" name="DEP-05" />
+    <testcase classname="binary.DEP" name="DEP-06" />
+    <testcase classname="binary.DEP" name="DEP-07" />
+    <testcase classname="binary.DEP" name="DEP-08">
+      <skipped message="blocked: blocked until: T24E (three-profile container, Ansible and restore integration)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-09" />
+    <testcase classname="binary.DEP" name="DEP-10">
+      <skipped message="blocked: blocked until: T24E (three-profile container, Ansible and restore integration)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-11" />
+    <testcase classname="binary.DEP" name="DEP-12" />
+    <testcase classname="binary.DEP" name="DEP-13" />
+    <testcase classname="binary.DEP" name="DEP-14" />
+    <testcase classname="binary.DEP" name="DEP-15" />
+    <testcase classname="binary.DEP" name="DEP-16">
+      <skipped message="blocked: blocked until: T24E (three-profile container, Ansible and restore integration)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-17">
+      <skipped message="blocked: blocked until: T24E (three-profile container, Ansible and restore integration)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-18">
+      <skipped message="blocked: blocked until: T24E (three-profile container, Ansible and restore integration)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-19" />
+    <testcase classname="binary.DEP" name="DEP-20">
+      <skipped message="blocked: blocked until: T24E (three-profile container, Ansible and restore integration)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-21">
+      <skipped message="blocked: blocked until: T24E (three-profile container, Ansible and restore integration); T13 (publication and rollback rehearsal)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-22" />
+  </testsuite>
+  <testsuite name="EXT" tests="5" failures="0" errors="0" skipped="4">
+    <testcase classname="binary.EXT" name="EXT-01">
+      <skipped message="blocked: rubric is a draft; owner approval at H3 is required" />
+    </testcase>
+    <testcase classname="binary.EXT" name="EXT-02">
+      <skipped message="blocked: rubric is a draft; owner approval at H3 is required" />
+    </testcase>
+    <testcase classname="binary.EXT" name="EXT-03">
+      <skipped message="blocked: rubric is a draft; owner approval at H3 is required" />
+    </testcase>
+    <testcase classname="binary.EXT" name="EXT-04">
+      <skipped message="PROVISIONAL: verdict PASS rests on unreviewed model labels; not a pass" type="provisional_labels" />
+    </testcase>
+    <testcase classname="binary.EXT" name="EXT-05" />
+  </testsuite>
+  <testsuite name="FIG" tests="4" failures="0" errors="0" skipped="3">
+    <testcase classname="binary.FIG" name="FIG-01">
+      <skipped message="blocked: rubric is a draft; owner approval at H3 is required" />
+    </testcase>
+    <testcase classname="binary.FIG" name="FIG-02">
+      <skipped message="blocked: rubric is a draft; owner approval at H3 is required" />
+    </testcase>
+    <testcase classname="binary.FIG" name="FIG-03">
+      <skipped message="PROVISIONAL: verdict PASS rests on unreviewed model labels; not a pass" type="provisional_labels" />
+    </testcase>
+    <testcase classname="binary.FIG" name="FIG-04" />
+  </testsuite>
+  <testsuite name="JSON" tests="10" failures="0" errors="0" skipped="0">
+    <testcase classname="binary.JSON" name="JSON-01" />
+    <testcase classname="binary.JSON" name="JSON-02" />
+    <testcase classname="binary.JSON" name="JSON-03" />
+    <testcase classname="binary.JSON" name="JSON-04" />
+    <testcase classname="binary.JSON" name="JSON-05" />
+    <testcase classname="binary.JSON" name="JSON-06" />
+    <testcase classname="binary.JSON" name="JSON-07" />
+    <testcase classname="binary.JSON" name="JSON-08" />
+    <testcase classname="binary.JSON" name="JSON-09" />
+    <testcase classname="binary.JSON" name="JSON-10" />
+  </testsuite>
+  <testsuite name="LLM" tests="8" failures="0" errors="0" skipped="3">
+    <testcase classname="binary.LLM" name="LLM-01" />
+    <testcase classname="binary.LLM" name="LLM-02" />
+    <testcase classname="binary.LLM" name="LLM-03" />
+    <testcase classname="binary.LLM" name="LLM-04" />
+    <testcase classname="binary.LLM" name="LLM-05">
+      <skipped message="blocked: blocked until: O03 (owner approval of the job-settings rule)" />
+    </testcase>
+    <testcase classname="binary.LLM" name="LLM-06">
+      <skipped message="blocked: blocked until: O03 (owner approval of the job-settings rule)" />
+    </testcase>
+    <testcase classname="binary.LLM" name="LLM-07">
+      <skipped message="blocked: blocked until: O03 (owner approval of the job-settings rule)" />
+    </testcase>
+    <testcase classname="binary.LLM" name="LLM-08" />
+  </testsuite>
+  <testsuite name="LOCAL" tests="10" failures="0" errors="0" skipped="1">
+    <testcase classname="binary.LOCAL" name="LOCAL-01" />
+    <testcase classname="binary.LOCAL" name="LOCAL-02">
+      <skipped message="blocked: blocked until: H3 (owner-approved gold fixtures and source truth); H3 B4 pilot labels (owner-run CBORG labelling of pilot papers A-C, then human review to gold; python -m evals.binary.label)" />
+    </testcase>
+    <testcase classname="binary.LOCAL" name="LOCAL-03" />
+    <testcase classname="binary.LOCAL" name="LOCAL-04" />
+    <testcase classname="binary.LOCAL" name="LOCAL-05" />
+    <testcase classname="binary.LOCAL" name="LOCAL-06" />
+    <testcase classname="binary.LOCAL" name="LOCAL-07" />
+    <testcase classname="binary.LOCAL" name="LOCAL-08" />
+    <testcase classname="binary.LOCAL" name="LOCAL-09" />
+    <testcase classname="binary.LOCAL" name="LOCAL-10" />
+  </testsuite>
+  <testsuite name="OPS" tests="5" failures="0" errors="5" skipped="0">
+    <testcase classname="binary.OPS" name="OPS-01">
+      <error message="timeout: pytest batch timed out" type="timeout" />
+    </testcase>
+    <testcase classname="binary.OPS" name="OPS-02">
+      <error message="timeout: pytest batch timed out" type="timeout" />
+    </testcase>
+    <testcase classname="binary.OPS" name="OPS-03">
+      <error message="timeout: pytest batch timed out" type="timeout" />
+    </testcase>
+    <testcase classname="binary.OPS" name="OPS-04">
+      <error message="timeout: pytest batch timed out" type="timeout" />
+    </testcase>
+    <testcase classname="binary.OPS" name="OPS-05">
+      <error message="timeout: pytest batch timed out" type="timeout" />
+    </testcase>
+  </testsuite>
+  <testsuite name="QA" tests="5" failures="0" errors="1" skipped="3">
+    <testcase classname="binary.QA" name="QA-01">
+      <skipped message="blocked: rubric is a draft; owner approval at H3 is required" />
+    </testcase>
+    <testcase classname="binary.QA" name="QA-02">
+      <error message="timeout: pytest batch timed out" type="timeout" />
+    </testcase>
+    <testcase classname="binary.QA" name="QA-03">
+      <skipped message="blocked: rubric is a draft; owner approval at H3 is required" />
+    </testcase>
+    <testcase classname="binary.QA" name="QA-04">
+      <skipped message="blocked: rubric is a draft; owner approval at H3 is required" />
+    </testcase>
+    <testcase classname="binary.QA" name="QA-05" />
+  </testsuite>
+  <testsuite name="QUOTE" tests="2" failures="0" errors="0" skipped="0">
+    <testcase classname="binary.QUOTE" name="QUOTE-01" />
+    <testcase classname="binary.QUOTE" name="QUOTE-02" />
+  </testsuite>
+  <testsuite name="REL" tests="9" failures="0" errors="0" skipped="2">
+    <testcase classname="binary.REL" name="REL-01" />
+    <testcase classname="binary.REL" name="REL-02" />
+    <testcase classname="binary.REL" name="REL-03" />
+    <testcase classname="binary.REL" name="REL-04" />
+    <testcase classname="binary.REL" name="REL-05" />
+    <testcase classname="binary.REL" name="REL-06" />
+    <testcase classname="binary.REL" name="REL-07" />
+    <testcase classname="binary.REL" name="REL-08">
+      <skipped message="blocked: blocked until: T26C (exact Git snapshot promotion and rollback rehearsal)" />
+    </testcase>
+    <testcase classname="binary.REL" name="REL-09">
+      <skipped message="blocked: blocked until: T15 (FORGE imports F2W agents)" />
+    </testcase>
+  </testsuite>
+  <testsuite name="SCH" tests="5" failures="0" errors="0" skipped="0">
+    <testcase classname="binary.SCH" name="SCH-01" />
+    <testcase classname="binary.SCH" name="SCH-02" />
+    <testcase classname="binary.SCH" name="SCH-03" />
+    <testcase classname="binary.SCH" name="SCH-04" />
+    <testcase classname="binary.SCH" name="SCH-05" />
+  </testsuite>
+  <testsuite name="SEC" tests="5" failures="0" errors="0" skipped="0">
+    <testcase classname="binary.SEC" name="SEC-01" />
+    <testcase classname="binary.SEC" name="SEC-02" />
+    <testcase classname="binary.SEC" name="SEC-03" />
+    <testcase classname="binary.SEC" name="SEC-04" />
+    <testcase classname="binary.SEC" name="SEC-05" />
+  </testsuite>
+  <testsuite name="TIL" tests="7" failures="0" errors="0" skipped="1">
+    <testcase classname="binary.TIL" name="TIL-01" />
+    <testcase classname="binary.TIL" name="TIL-02" />
+    <testcase classname="binary.TIL" name="TIL-03" />
+    <testcase classname="binary.TIL" name="TIL-04" />
+    <testcase classname="binary.TIL" name="TIL-05" />
+    <testcase classname="binary.TIL" name="TIL-06">
+      <skipped message="blocked: blocked until: T13 (publication and rollback rehearsal)" />
+    </testcase>
+    <testcase classname="binary.TIL" name="TIL-07" />
+  </testsuite>
+</testsuites>

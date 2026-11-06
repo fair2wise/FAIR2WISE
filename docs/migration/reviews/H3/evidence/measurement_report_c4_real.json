@@ -1,0 +1,236 @@
+{
+  "caveats": [
+    "Judge is a real language model: CBORG `lbl/cborg-deepthought` (free, LBL-hosted tier; owner decision 2026-11-06), temperature 0, one run, no retry. Model replies are not deterministic across runs.",
+    "The harness's permissive/conservative personas are deterministic decision rules with no real-model counterpart; this run has one judge mode, `cborg-deepthought`.",
+    "Encoder is the real sentence-transformer `sentence-transformers/paraphrase-MiniLM-L6-v2` (the F2W_MERGE_EMBED_MODEL default) on CPU from the local cache; it replaces the character-n-gram stand-in of measurement_report.json.",
+    "Baseline prompt is rebuilt with the current build_merge_prompt over all names; the 222b1e7 prompt text itself is not in this repo.",
+    "Legacy-prompt replies are normalized (last line, quotes stripped, None/NO_MATCH -> no merge); a reply that is not a listed name counts as no merge and is counted under run.judge.legacy_replies_not_a_listed_name.",
+    "The fixture is synthetic (24 mentions, 133 entities); numbers are not corpus estimates. The decision (C1) belongs to the owner.",
+    "Model under test for the surrounding H3 run: lbl/cborg-chat; labeler: lbl/gpt-oss-120b; judge: lbl/cborg-deepthought (roles pairwise different)."
+  ],
+  "fixture": {
+    "entities": 133,
+    "mentions": 24,
+    "negative_controls": 9,
+    "novel": 2,
+    "true_merges": 13
+  },
+  "harness_version": "t07-measure-1+c4-real-encoder-judge",
+  "parameters": {
+    "encoder": "sentence-transformers/paraphrase-MiniLM-L6-v2",
+    "faiss_top_k_default": 12,
+    "faiss_top_k_small": 5,
+    "judge_model": "lbl/cborg-deepthought",
+    "max_candidates": 8,
+    "token_budget": 400
+  },
+  "results": {
+    "cborg-deepthought": {
+      "baseline_full_list": {
+        "correct_merges": 10,
+        "false_merge_items": [],
+        "false_merges": 0,
+        "false_split_items": [
+          "Sohxlet extraction",
+          "Pilatus 2M",
+          "wide-angle scattering at grazing incidence"
+        ],
+        "false_splits": 3,
+        "false_splits_held_visible": 0,
+        "false_splits_no_match": 3,
+        "judge_calls": 24,
+        "mentions": 24,
+        "negative_controls_merged": 0,
+        "prompt_tokens_max": 2013,
+        "prompt_tokens_mean": 1990.7,
+        "recall_in_shortlist": 1.0,
+        "true_outside_shortlist": []
+      },
+      "candidate_search": {
+        "correct_merges": 12,
+        "false_merge_items": [],
+        "false_merges": 0,
+        "false_split_items": [
+          "charge coupled device area detector"
+        ],
+        "false_splits": 1,
+        "false_splits_held_visible": 1,
+        "false_splits_no_match": 0,
+        "judge_calls": 19,
+        "mentions": 24,
+        "negative_controls_merged": 0,
+        "prompt_tokens_max": 257,
+        "prompt_tokens_mean": 198.7,
+        "recall_in_shortlist": 1.0,
+        "true_outside_shortlist": []
+      },
+      "faiss_shortlist_k12": {
+        "correct_merges": 6,
+        "false_merge_items": [],
+        "false_merges": 0,
+        "false_split_items": [
+          "GIWAXS",
+          "small angle x-ray scattering",
+          "RSoXS",
+          "XRD",
+          "Sohxlet extraction",
+          "Pilatus 2M",
+          "wide-angle scattering at grazing incidence"
+        ],
+        "false_splits": 7,
+        "false_splits_held_visible": 0,
+        "false_splits_no_match": 7,
+        "judge_calls": 24,
+        "mentions": 24,
+        "negative_controls_merged": 0,
+        "prompt_tokens_max": 1155,
+        "prompt_tokens_mean": 1108.9,
+        "recall_in_shortlist": 0.692,
+        "true_outside_shortlist": [
+          "GIWAXS",
+          "small angle x-ray scattering",
+          "RSoXS",
+          "XRD"
+        ]
+      },
+      "faiss_shortlist_k5": {
+        "correct_merges": 6,
+        "false_merge_items": [],
+        "false_merges": 0,
+        "false_split_items": [
+          "GIWAXS",
+          "small angle x-ray scattering",
+          "RSoXS",
+          "XRD",
+          "Sohxlet extraction",
+          "Pilatus 2M",
+          "wide-angle scattering at grazing incidence"
+        ],
+        "false_splits": 7,
+        "false_splits_held_visible": 0,
+        "false_splits_no_match": 7,
+        "judge_calls": 24,
+        "mentions": 24,
+        "negative_controls_merged": 0,
+        "prompt_tokens_max": 1097,
+        "prompt_tokens_mean": 1058.8,
+        "recall_in_shortlist": 0.692,
+        "true_outside_shortlist": [
+          "GIWAXS",
+          "small angle x-ray scattering",
+          "RSoXS",
+          "XRD"
+        ]
+      },
+      "no_index": {
+        "baseline_full_list": {
+          "correct_merges": 10,
+          "false_merge_items": [],
+          "false_merges": 0,
+          "false_split_items": [
+            "Sohxlet extraction",
+            "Pilatus 2M",
+            "wide-angle scattering at grazing incidence"
+          ],
+          "false_splits": 3,
+          "false_splits_held_visible": 0,
+          "false_splits_no_match": 3,
+          "judge_calls": 24,
+          "mentions": 24,
+          "negative_controls_merged": 0,
+          "prompt_tokens_max": 2013,
+          "prompt_tokens_mean": 1990.7,
+          "recall_in_shortlist": 1.0,
+          "true_outside_shortlist": []
+        },
+        "candidate_search_lexical_only": {
+          "correct_merges": 12,
+          "false_merge_items": [],
+          "false_merges": 0,
+          "false_split_items": [
+            "charge coupled device area detector"
+          ],
+          "false_splits": 1,
+          "false_splits_held_visible": 1,
+          "false_splits_no_match": 0,
+          "judge_calls": 16,
+          "mentions": 24,
+          "negative_controls_merged": 0,
+          "prompt_tokens_max": 201,
+          "prompt_tokens_mean": 177.3,
+          "recall_in_shortlist": 1.0,
+          "true_outside_shortlist": []
+        },
+        "faiss_shortlist_k12": {
+          "correct_merges": 0,
+          "false_merge_items": [],
+          "false_merges": 0,
+          "false_split_items": [
+            "GIWAXS",
+            "GI-WAXS",
+            "small angle x-ray scattering",
+            "RSoXS",
+            "TEM",
+            "XRD",
+            "X-ray diffraction",
+            "Sohxlet extraction",
+            "P3HT",
+            "mote2",
+            "Pilatus 2M",
+            "charge coupled device area detector",
+            "wide-angle scattering at grazing incidence"
+          ],
+          "false_splits": 13,
+          "false_splits_held_visible": 0,
+          "false_splits_no_match": 13,
+          "judge_calls": 0,
+          "mentions": 24,
+          "negative_controls_merged": 0,
+          "prompt_tokens_max": 0,
+          "prompt_tokens_mean": 0,
+          "recall_in_shortlist": 0.0,
+          "true_outside_shortlist": [
+            "GIWAXS",
+            "GI-WAXS",
+            "small angle x-ray scattering",
+            "RSoXS",
+            "TEM",
+            "XRD",
+            "X-ray diffraction",
+            "Sohxlet extraction",
+            "P3HT",
+            "mote2",
+            "Pilatus 2M",
+            "charge coupled device area detector",
+            "wide-angle scattering at grazing incidence"
+          ]
+        }
+      }
+    }
+  },
+  "run": {
+    "encoder": {
+      "device": "cpu",
+      "name": "sentence-transformers/paraphrase-MiniLM-L6-v2",
+      "source": "local Hugging Face cache, HF_HUB_OFFLINE=1",
+      "texts_encoded": 470
+    },
+    "finished_at": "2026-11-06T21:21:47Z",
+    "judge": {
+      "backend": "cborg",
+      "cache_hits_identical_prompt": 9,
+      "calls": 98,
+      "elapsed_s": 258.5,
+      "failed_calls": 0,
+      "judge_model": "lbl/cborg-deepthought",
+      "legacy_replies_not_a_listed_name": 0,
+      "legacy_replies_total": 72,
+      "prompt_tokens_estimated": 104820,
+      "reply_tokens_estimated": 1251,
+      "temperature": 0.0
+    },
+    "kind": "c4_real_model_rerun",
+    "owner_decision": "2026-11-06 thirteenth set: best free CBORG model",
+    "started_at": "2026-11-06T21:17:23Z"
+  }
+}
