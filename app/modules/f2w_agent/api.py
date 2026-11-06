@@ -6436,8 +6436,9 @@ class AgentPipelineService:
         """Download the approved paper candidate and offer its extraction.
 
         On success the pending state becomes an extraction approval (``awaiting_extraction_decision``);
-        when nothing was downloaded the candidate is marked unavailable and the download decision is
-        re-offered.
+        when nothing was downloaded (including a PDF rejected by the configured semantic validation,
+        reported as "did not pass validation") the candidate is marked unavailable and the download
+        decision is re-offered. Validation follows ``cfg.validate_downloads`` (the DownloadAgent setting).
         """
         verdict = pending.get("verdict") or {}
         best = pending.get("selected_candidate")
@@ -6473,7 +6474,6 @@ class AgentPipelineService:
                 target_dir=str(self.coord.pdf_dir),
                 candidates=[best] if best else [],
                 max_papers=1,
-                validate_downloads=False,
                 refresh_urls=True,
             )
         except Exception as exc:

@@ -61,3 +61,58 @@ def test_b2_neighborhood_node_cap(monkeypatch):
     monkeypatch.setattr(api_mod, "NEIGHBORHOOD_MAX_NODES", 3)
     payload = api_mod.graph_neighborhood_from_lookup(_chain(10), "n0", 4)
     assert len(payload.nodes) == 3 and payload.nodes[0].id == "n0"
+
+
+# B3 -------------------------------------------------------------------------------------------
+def _approved_download_service(tmp_path, monkeypatch, *, validate: bool, verdict_ok: bool):
+    """Service whose real DownloadAgent has network stubbed; semantic validator is stubbed to ``verdict_ok``."""
+    from app.modules.f2w_agent import download_agent as da
+
+    def fake_download(url: str, dest: str) -> bool:
+        Path(dest).write_bytes(b"%PDF-1.4\nbody")
+        return True
+
+    calls: list[str] = []
+
+    def fake_validate(self, query, work, path):
+        calls.append(path.name)
+        return self._validate_downloads is False or verdict_ok
+
+    monkeypatch.setattr(da, "hardened_download_pdf", fake_download)
+    monkeypatch.setattr(da.DownloadAgent, "_validate_downloaded_pdf", fake_validate)
+    monkeypatch.setattr(da.DownloadAgent, "_refresh_candidate_urls", lambda self, c: c)
+    monkeypatch.setattr(da.DownloadAgent, "_sleep_between_download_attempts", lambda self: None)
+    service = api_mod.AgentPipelineService(
+        CoordinatorConfig(workdir=tmp_path / "run", kg_mode="json", max_rounds=1, validate_downloads=validate)
+    )
+    return service, calls
+
+
+def _pending():
+    best = {"id": "W1", "title": "Paper One", "pdf_urls": ["https://arxiv.org/pdf/1234.5678"], "score": 1.0}
+    return {
+        "kind": "download", "approval_token": "t", "verdict": {}, "missing_topics": ["x"],
+        "selected_candidate": best, "candidate_list": [best], "round_no": 1,
+        "original_question": "q", "effective_question": "q",
+    }
+
+
+def test_b3_approved_download_runs_configured_validation_and_surfaces_rejection(tmp_path, monkeypatch):
+    import asyncio
+
+    service, calls = _approved_download_service(tmp_path, monkeypatch, validate=True, verdict_ok=False)
+    response = asyncio.run(service._resume_download(_pending(), None))
+    assert calls, "validation was not invoked for the user-approved download"
+    assert response.status == "awaiting_download_decision"
+    assert "did not pass validation" in response.answer
+    assert not list((tmp_path / "run" / "pdfs").glob("*.pdf")), "rejected PDF must not be kept"
+
+
+def test_b3_approved_download_accepts_when_validation_passes_or_is_configured_off(tmp_path, monkeypatch):
+    import asyncio
+
+    service, calls = _approved_download_service(tmp_path, monkeypatch, validate=True, verdict_ok=True)
+    assert asyncio.run(service._resume_download(_pending(), None)).status == "awaiting_extraction_decision"
+    assert calls
+    service, calls = _approved_download_service(tmp_path / "off", monkeypatch, validate=False, verdict_ok=False)
+    assert asyncio.run(service._resume_download(_pending(), None)).status == "awaiting_extraction_decision"
