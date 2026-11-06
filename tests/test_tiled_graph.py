@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.modules.f2w_agent.retrieval_agent import RetrievalAgent
-from app.modules.tiled_graph import (
+from app.modules.graph.backends.tiled_lookup import (
     TILED_GRAPH_ID,
     coerce_local_tiled_uri,
     entity_to_node,
@@ -50,7 +50,7 @@ def test_probe_unsigned_when_graphql_empty(monkeypatch):
             return {"__typename": "Query"}
         return {"entities": []}
 
-    monkeypatch.setattr("app.modules.tiled_graph.tiled_graphql", fake_graphql)
+    monkeypatch.setattr("app.modules.graph.backends.tiled_lookup.tiled_graphql", fake_graphql)
     snap = probe_tiled_status(uri="http://127.0.0.1:8001", enabled=True)
     assert snap["use_live_tiled"] is True
     assert snap["tiled_uri"] == "http://127.0.0.1:8001"
@@ -66,7 +66,7 @@ def test_probe_empty_when_key_set(monkeypatch):
             return {"__typename": "Query"}
         return {"entities": []}
 
-    monkeypatch.setattr("app.modules.tiled_graph.tiled_graphql", fake_graphql)
+    monkeypatch.setattr("app.modules.graph.backends.tiled_lookup.tiled_graphql", fake_graphql)
     snap = probe_tiled_status(uri="http://127.0.0.1:8001", enabled=True)
     assert snap["tiled_api_key_set"] is True
     assert snap["tiled_status"] == "empty"
@@ -103,7 +103,7 @@ def test_lookup_pages_esaf(monkeypatch):
             }
         return {"entities": []}
 
-    monkeypatch.setattr("app.modules.tiled_graph.tiled_graphql", fake_graphql)
+    monkeypatch.setattr("app.modules.graph.backends.tiled_lookup.tiled_graphql", fake_graphql)
     result = lookup_experiment_identity(
         "Tell me about ESAF 2026-00041",
         uri="http://127.0.0.1:8000",
@@ -124,7 +124,7 @@ def test_lookup_unreachable_falls_back(monkeypatch):
     def boom(*_args, **_kwargs):
         raise ConnectionError("tiled down")
 
-    monkeypatch.setattr("app.modules.tiled_graph.tiled_graphql", boom)
+    monkeypatch.setattr("app.modules.graph.backends.tiled_lookup.tiled_graphql", boom)
     result = lookup_experiment_identity(
         "ESAF 2026-00041",
         uri="http://127.0.0.1:8000",
@@ -141,7 +141,7 @@ def test_lookup_unreachable_falls_back(monkeypatch):
 def test_unsigned_empty_is_explicit(monkeypatch):
     monkeypatch.delenv("TILED_API_KEY", raising=False)
     monkeypatch.setattr(
-        "app.modules.tiled_graph.tiled_graphql",
+        "app.modules.graph.backends.tiled_lookup.tiled_graphql",
         lambda *args, **kwargs: {"entities": []},
     )
     result = lookup_experiment_identity(
@@ -168,7 +168,7 @@ def test_count_node_for_proposals(monkeypatch):
             return {"entities": proposals}
         return {"entities": []}
 
-    monkeypatch.setattr("app.modules.tiled_graph.tiled_graphql", fake_graphql)
+    monkeypatch.setattr("app.modules.graph.backends.tiled_lookup.tiled_graphql", fake_graphql)
     result = lookup_experiment_identity(
         "how many proposals",
         uri="http://tiled.example:8000",
@@ -202,7 +202,7 @@ def test_entity_to_node_maps_cookbook_fields():
 
 
 def test_resolve_tiled_node_alias_and_neighborhood():
-    from app.modules.tiled_graph import TiledLookupGraph, resolve_tiled_node_id, tiled_neighborhood_ids
+    from app.modules.graph.backends.tiled_lookup import TiledLookupGraph, resolve_tiled_node_id, tiled_neighborhood_ids
 
     graph = TiledLookupGraph()
     esaf = entity_to_node(
@@ -245,7 +245,7 @@ def test_resolve_tiled_node_alias_and_neighborhood():
 
 def test_retrieval_agent_merges_tiled_hits(monkeypatch):
     from app.modules.f2w_agent.multi_kg import ScoredHit
-    from app.modules.tiled_graph import TiledLookupGraph, TiledLookupResult
+    from app.modules.graph.backends.tiled_lookup import TiledLookupGraph, TiledLookupResult
 
     agent = RetrievalAgent(graph_source="json", live_tiled=True, tiled_uri="http://127.0.0.1:8000")
     kg = SimpleNamespace(
@@ -428,26 +428,26 @@ class TestTiledGraphQLError:
     """Unit tests for the structured TiledGraphQLError exception."""
 
     def test_mentions_field_in_message(self):
-        from app.modules.tiled_graph import TiledGraphQLError
+        from app.modules.graph.backends.tiled_lookup import TiledGraphQLError
 
         err = TiledGraphQLError([{"message": "Cannot query field 'nodeId'", "locations": []}])
         assert err.mentions_field("nodeId") is True
         assert err.mentions_field("name") is False
 
     def test_mentions_field_in_path(self):
-        from app.modules.tiled_graph import TiledGraphQLError
+        from app.modules.graph.backends.tiled_lookup import TiledGraphQLError
 
         err = TiledGraphQLError([{"message": "Field error", "path": ["entities", "nodeId"]}])
         assert err.mentions_field("nodeId") is True
 
     def test_inherits_runtime_error(self):
-        from app.modules.tiled_graph import TiledGraphQLError
+        from app.modules.graph.backends.tiled_lookup import TiledGraphQLError
 
         err = TiledGraphQLError([{"message": "oops"}])
         assert isinstance(err, RuntimeError)
 
     def test_errors_attribute_preserved(self):
-        from app.modules.tiled_graph import TiledGraphQLError
+        from app.modules.graph.backends.tiled_lookup import TiledGraphQLError
 
         raw = [{"message": "bad field", "extensions": {"code": "GRAPHQL_VALIDATION_FAILED"}}]
         err = TiledGraphQLError(raw)

@@ -8,7 +8,7 @@ Differences from the donor ``GraphQLClient`` (all required by K-04's notes):
   GraphQL error is raised, never swallowed. An unavailable graph is never empty science.
 * **Target validated by deployment config.** The URL goes through
   ``deployment.tiled_config.validate_external_url`` for the trusted startup profile. An
-  ALS host is never rewritten to localhost (``tiled_graph.coerce_local_tiled_uri`` is not
+  ALS host is never rewritten to localhost (``tiled_lookup.coerce_local_tiled_uri`` is not
   used); a local/test profile pointed at an ALS host fails.
 * **Credentials from runtime config only.** :meth:`from_external` reads the writer secret
   file named by ``ExternalTiledConfig``; :meth:`from_managed` uses the managed server's

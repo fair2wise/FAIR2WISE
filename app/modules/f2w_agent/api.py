@@ -34,12 +34,7 @@ from ...api.upload_limits import LEGACY_MAX_BODY_BYTES, MaxBodySizeMiddleware
 from ..contracts.context import DeploymentProfile, RequestContext
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.json_types import Untyped
-from ..graph.legacy_save import SaveTarget, StaleSave, TiledSaveBackend
-from ..hybrid_rag.pipeline import hybrid_rag_enabled
-from ..project_config import config_value, get_config
-from ..runtime_bridge.selection import attach_read_path, attach_summary_path
-from ..security.authorization import SETTINGS_DEPLOYMENT_FIELDS, StartupConfigError
-from ..tiled_graph import (
+from ..graph.backends.tiled_lookup import (
     CITE_FOCUS_HOPS,
     TILED_GRAPH_ID,
     coerce_local_tiled_uri,
@@ -49,6 +44,11 @@ from ..tiled_graph import (
     resolve_tiled_node_id,
     tiled_neighborhood_ids,
 )
+from ..graph.legacy_save import SaveTarget, StaleSave, TiledSaveBackend
+from ..hybrid_rag.pipeline import hybrid_rag_enabled
+from ..project_config import config_value, get_config
+from ..runtime_bridge.selection import attach_read_path, attach_summary_path
+from ..security.authorization import SETTINGS_DEPLOYMENT_FIELDS, StartupConfigError
 from .coordinator import Coordinator, CoordinatorConfig
 from .debate_agent import EvidenceDebateAgent
 from .download_agent import (

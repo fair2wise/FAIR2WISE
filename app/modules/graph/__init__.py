@@ -5,6 +5,8 @@
 * :mod:`.snapshots` - read helpers over versioned JSON KG files (both shape families).
 * :mod:`.backends.json` - read-only GraphPort over JSON snapshots.
 * :mod:`.backends.tiled` / :mod:`.backends.tiled_client` - read/query GraphPort over Tiled 0.2.18.
+* :mod:`.backends.tiled_lookup` - the retained legacy UI's live experiment-identity lookup and Settings probe
+  (T17B real port of ``tiled_graph.py``; not a GraphPort).
 
 Publication (JSON -> Tiled import) is T08B and lives elsewhere; nothing here writes a graph.
 """

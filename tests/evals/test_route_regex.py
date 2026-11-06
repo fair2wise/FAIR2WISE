@@ -12,7 +12,7 @@ from app.modules.f2w_agent.retrieval_agent import (
     _is_numeric_claim,
     _is_ops_layout_question,
 )
-from app.modules.tiled_graph import is_experiment_identity_question
+from app.modules.graph.backends.tiled_lookup import is_experiment_identity_question
 
 pytestmark = pytest.mark.eval
 
