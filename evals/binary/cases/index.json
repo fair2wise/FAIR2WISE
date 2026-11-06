@@ -20,12 +20,20 @@
     "sha256": "039a70fb484f6e1147840d1d96e90a5ae85b90ad4b34ecba7a9884d7023d6174",
     "version": "8.0"
   },
-  "human_gate_records": {},
+  "human_gate_records": {
+    "H3": {
+      "approved_by": "david",
+      "decision_ref": "docs/migration/reviews/H3/decision.json",
+      "decision_sha256": "736139889400711ddfad46da7a8c59c08138e277212778f9090591e7a8657e71",
+      "recorded_on": "2026-11-06",
+      "status": "approved"
+    }
+  },
   "human_gates": {
-    "H3": "not_approved"
+    "H3": "approved"
   },
   "manifest_version": "t11a-1",
-  "note": "All cases are proposals. Owner approval of cases, oracles and rubrics is the H3 gate; no agent approves.",
+  "note": "H3 approval recorded by the owner with python -m evals.binary.approve (108 of 108 cases approved; the rest stay proposed because their expected rule changed since the reviewed packet). Rubrics stay draft until H3 B4 labels exist. No agent approves.",
   "repeat_policy": {
     "aggregation": "all_runs_must_pass",
     "declared_before_run": true,
@@ -145,5 +153,5 @@
   ],
   "required_membership_sha256": "c1455f1fde4a14ec551cfe698c58bb74ef29d0d7f0c3a07971cd27cf0fbe3b23",
   "rubrics_file": "rubrics.json",
-  "status": "proposed_for_h3_not_approved"
+  "status": "h3_recorded_by_owner"
 }

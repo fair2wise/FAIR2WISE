@@ -1,0 +1,554 @@
+{
+  "cases": {
+    "AUTH-01": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "AUTH-02": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "AUTH-03": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "AUTH-04": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "AUTH-05": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "AUTH-06": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "AUTH-07": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "AUTH-08": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "AUTH-09": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "AUTH-10": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "AUTH-11": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-01": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-02": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-03": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-04": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-05": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-06": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-07": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-08": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-09": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-10": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-11": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-12": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-13": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-14": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-15": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-16": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-17": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-18": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-19": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-20": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-21": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "DEP-22": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "EXT-01": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "EXT-02": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "EXT-03": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "EXT-04": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "EXT-05": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "FIG-01": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "FIG-02": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "FIG-03": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "FIG-04": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "JSON-01": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "JSON-02": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "JSON-03": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "JSON-04": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "JSON-05": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "JSON-06": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "JSON-07": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "JSON-08": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "JSON-09": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "JSON-10": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "LLM-01": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "LLM-02": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "LLM-03": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "LLM-04": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "LLM-05": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "LLM-06": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "LLM-07": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "LLM-08": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "LOCAL-01": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "LOCAL-02": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "LOCAL-03": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "LOCAL-04": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "LOCAL-05": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "LOCAL-06": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "LOCAL-07": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "LOCAL-08": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "LOCAL-09": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "LOCAL-10": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "OPS-01": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "OPS-02": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "OPS-03": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "OPS-04": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "OPS-05": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "QA-01": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "QA-02": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "QA-03": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "QA-04": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "QA-05": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "QUOTE-01": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "QUOTE-02": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "REL-01": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "REL-02": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "REL-03": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "REL-04": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "REL-05": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "REL-06": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "REL-07": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "REL-08": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "REL-09": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "SCH-01": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "SCH-02": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "SCH-03": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "SCH-04": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "SCH-05": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "SEC-01": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "SEC-02": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "SEC-03": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "SEC-04": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "SEC-05": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "TIL-01": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "TIL-02": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "TIL-03": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "TIL-04": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "TIL-05": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "TIL-06": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    },
+    "TIL-07": {
+      "approved_by": "david",
+      "ref": "docs/migration/reviews/H3/decision.json",
+      "status": "approved"
+    }
+  },
+  "human_gates": {
+    "H3": {
+      "approved_by": "david",
+      "decision_ref": "docs/migration/reviews/H3/decision.json",
+      "decision_sha256": "736139889400711ddfad46da7a8c59c08138e277212778f9090591e7a8657e71",
+      "recorded_on": "2026-11-06",
+      "status": "approved"
+    }
+  },
+  "record": "Owner gate approval transcribed by python -m evals.binary.approve (human act, not an agent's)"
+}

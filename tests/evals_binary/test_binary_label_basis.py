@@ -150,7 +150,8 @@ def test_generated_label_cases_name_their_pilot_papers_and_the_b4_blocker():
                 "QA-04", "OPS-04", "LOCAL-02"):
         case = manifest.by_id[cid]
         assert case["pilot_labels"]["papers"], cid
-        assert case["owner_approval"]["status"] == "proposed"
+        # H3 recorded by the owner (2026-11-06): the rule text is approved; readiness still waits on the B4 labels.
+        assert case["owner_approval"]["status"] == "approved"
         if case["readiness"] != "executable":
             assert any(b.startswith("H3 B4 pilot labels") for b in case["blocked_by"]), cid
     assert "pilot_labels" not in manifest.by_id["AUTH-01"]

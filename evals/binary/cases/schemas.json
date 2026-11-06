@@ -26,7 +26,7 @@
       "family": "SCH",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "f6ee5eb9923e092ebb7c44e8faf04f94df3a7d17915b145564122d615bc14514",
+        "case_sha256": "0f1e9d6d3b6bcbe7765157d6cf471572155efc62c8fc1fd778accbf56a40af3b",
         "config_sha256": "099e128c5335d12640d6e026bae4083ad02cae0d049f9be43e6245dac243e87e",
         "model_sha256": null,
         "oracle_source_sha256": "62eef75ac9d609cc4a935e9b82ebc5f30c6e5eb7dbd1421c5d581613a568b701",
@@ -56,9 +56,9 @@
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
-        "approved_by": null,
-        "ref": null,
-        "status": "proposed"
+        "approved_by": "david",
+        "ref": "docs/migration/reviews/H3/decision.json",
+        "status": "approved"
       },
       "readiness": "executable",
       "required": true,
@@ -97,7 +97,7 @@
       "family": "SCH",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "8d671175392e2792393ff76ebb1a79a0038f8912d4a2d6d9c348e7d24042730c",
+        "case_sha256": "9bae9185e6cb600defbe6b271ea8777733100e02de8364d3cf0516134eb81cce",
         "config_sha256": "09b01a2121d3bda785e1395107487ebdc0a56e2bb92ea7f3365c02d765f04607",
         "model_sha256": null,
         "oracle_source_sha256": "f74e6fa6d013b283bfe10ea27c6e09a50a5d06f87e08052676d7f7386f800ff5",
@@ -119,9 +119,9 @@
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
-        "approved_by": null,
-        "ref": null,
-        "status": "proposed"
+        "approved_by": "david",
+        "ref": "docs/migration/reviews/H3/decision.json",
+        "status": "approved"
       },
       "readiness": "executable",
       "required": true,
@@ -160,7 +160,7 @@
       "family": "SCH",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "e06431a5ccab0ce6288b1336445faae2642ab9eb6b4926a6c39d66748020e12d",
+        "case_sha256": "1a9b157315142632b907d26fa547d63533beb253f7fec538e7d28206696dd6b2",
         "config_sha256": "5abcc09cbd03b00cd15447bbc1354c84b9d711709204124ff785b636ff6dd06f",
         "model_sha256": null,
         "oracle_source_sha256": "09cfbf411ccb6d71a1c658f20bd76e714a499a20c0b986ee0d924bcc551bff70",
@@ -194,9 +194,9 @@
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
-        "approved_by": null,
-        "ref": null,
-        "status": "proposed"
+        "approved_by": "david",
+        "ref": "docs/migration/reviews/H3/decision.json",
+        "status": "approved"
       },
       "readiness": "executable",
       "required": true,
@@ -235,7 +235,7 @@
       "family": "SCH",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "de6a8ce972b5bc9c6ece6c0cd157c0bdb3b95929b671dd552d11a5bc3884f095",
+        "case_sha256": "e8a8333323228c2311f9e3eb963e43ff730ccc70cdf00883235dd86c75c6ceed",
         "config_sha256": "b8b15bafba711ccd9c469088e0522cf9e1d28b6f070085fa9963796716e1ac1d",
         "model_sha256": null,
         "oracle_source_sha256": "cc7094194bff958d171b3ce744ff24eb79e892ce267db8798a0f76b185f3e8a7",
@@ -266,9 +266,9 @@
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
-        "approved_by": null,
-        "ref": null,
-        "status": "proposed"
+        "approved_by": "david",
+        "ref": "docs/migration/reviews/H3/decision.json",
+        "status": "approved"
       },
       "readiness": "executable",
       "required": true,
@@ -307,7 +307,7 @@
       "family": "SCH",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "a1e0d30f5450e01e0b9d7937e788978b6cd36ba279a4d6efaf02da42767e1847",
+        "case_sha256": "5b24891ec3cb87c23a13ebd8a15ff4ba088ce6e28c5b4e20eb26ef3fdf94fec6",
         "config_sha256": "d3fe72f6a2c2f16931c40bcdfda52488440e04a1f8457a648b507bfd5bcc1094",
         "model_sha256": null,
         "oracle_source_sha256": "bdad3bf95ff62cd533fbe4255ac93d76c7bef7e8b372623fb0e8505901a26dcc",
@@ -333,9 +333,9 @@
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
-        "approved_by": null,
-        "ref": null,
-        "status": "proposed"
+        "approved_by": "david",
+        "ref": "docs/migration/reviews/H3/decision.json",
+        "status": "approved"
       },
       "readiness": "executable",
       "required": true,

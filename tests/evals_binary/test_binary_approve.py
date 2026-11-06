@@ -43,9 +43,16 @@ def _record(root, cases, **kw):
     return approve.record(**args)
 
 
-def test_committed_tree_has_no_approval_record():
-    assert not (REPO_ROOT / import_companion.APPROVALS).exists()
-    assert import_companion.load_approvals() is None
+def test_committed_tree_carries_the_owner_h3_approval_record():
+    """The owner ran ``python -m evals.binary.approve --gate H3`` on 2026-11-06; the record is committed."""
+    path = REPO_ROOT / import_companion.APPROVALS
+    assert path.exists()
+    record = import_companion.load_approvals()
+    assert record is not None
+    gate = record["human_gates"]["H3"]
+    assert gate["status"] == "approved" and gate["approved_by"] and gate["decision_ref"] == DECISION
+    assert gate["decision_sha256"] == hashlib.sha256((REPO_ROOT / DECISION).read_bytes()).hexdigest()
+    assert load_manifest().header["human_gates"] == {"H3": "approved"}
 
 
 def test_recording_approves_every_case_whose_rule_matches_the_packet_and_regenerates(temp_root):
@@ -120,7 +127,8 @@ def test_dry_run_writes_nothing(temp_root):
     assert summary["dry_run"] and summary["written"] == [] and len(summary["approved_cases"]) == 108
     assert not (root / import_companion.APPROVALS).exists()
     assert {p: p.read_bytes() for p in cases.iterdir()} == before
-    assert load_manifest(cases).header["human_gates"] == {"H3": "not_approved"}
+    # The copied cases carry whatever the committed tree recorded; a dry run leaves that header as it was.
+    assert load_manifest(cases).header["human_gates"] == load_manifest(CASES_DIR).header["human_gates"]
 
 
 @pytest.mark.parametrize(
@@ -170,11 +178,12 @@ def test_the_generator_refuses_a_malformed_approval_record(temp_root):
 
 def test_cli_dry_run_on_the_committed_tree_plans_without_writing(capsys):
     """The command the owner runs, with --dry-run, against the real tree: plan only."""
+    approvals_before = (REPO_ROOT / import_companion.APPROVALS).read_bytes()
     rc = approve.main(["--gate", "H3", "--decision", DECISION, "--approver", "Project Owner", "--dry-run"])
     out = capsys.readouterr().out
     assert rc == 0 and "would approve 108 case(s)" in out and "wrote" not in out
-    assert not (REPO_ROOT / import_companion.APPROVALS).exists()
-    assert load_manifest().header["human_gates"] == {"H3": "not_approved"}
+    assert (REPO_ROOT / import_companion.APPROVALS).read_bytes() == approvals_before
+    assert load_manifest().header["human_gates"] == {"H3": "approved"}
 
 
 def test_cli_refusal_exits_2(tmp_path, capsys):

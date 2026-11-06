@@ -30,7 +30,7 @@
       "family": "EXT",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "5ca0fc32acfcf24579f30cf33ad0c0ae10fe0f4cbd7396003c7f608f889231e8",
+        "case_sha256": "27e2b4d19f8975de7bbcfff0c0445566561df00b2323957c410b8120fc2401a0",
         "config_sha256": "6123b8db932be546a01c2ebff717f99dffc7f4941fd8a483fca513761b40866f",
         "model_sha256": null,
         "oracle_source_sha256": "6af762829503aed706ce25b8909da7d374a7dea463f184b1520225ac195be08c",
@@ -55,9 +55,9 @@
       },
       "oracle_type": "deterministic_plus_rubric",
       "owner_approval": {
-        "approved_by": null,
-        "ref": null,
-        "status": "proposed"
+        "approved_by": "david",
+        "ref": "docs/migration/reviews/H3/decision.json",
+        "status": "approved"
       },
       "pilot_labels": {
         "papers": [
@@ -109,7 +109,7 @@
       "family": "EXT",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "df27b9e316976f2b8a1786b5f4a4a5ae22076d30b4573f575d2508c9bf20ae2f",
+        "case_sha256": "964920e6a98f7f9bd89787abf8e8f86527bb6da7aa461821ff7fc02def57909b",
         "config_sha256": "0098b453de52d6216299ea5c1e0c204aed47b36a9a2e839f66e355321bd70826",
         "model_sha256": null,
         "oracle_source_sha256": "6af762829503aed706ce25b8909da7d374a7dea463f184b1520225ac195be08c",
@@ -134,9 +134,9 @@
       },
       "oracle_type": "deterministic_plus_rubric",
       "owner_approval": {
-        "approved_by": null,
-        "ref": null,
-        "status": "proposed"
+        "approved_by": "david",
+        "ref": "docs/migration/reviews/H3/decision.json",
+        "status": "approved"
       },
       "pilot_labels": {
         "papers": [
@@ -189,7 +189,7 @@
       "family": "EXT",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "637e391777e7f7037cf7f8d6d10803a04fdd73458621cb0ea5fee9d2588027cd",
+        "case_sha256": "5086e182398b5fa5205ea186679fb81f312e661ed7291f09af10bc788895f260",
         "config_sha256": "eac1f0cfb7697578552722e60c49c57e13ee9049c9eaec1fa9217e1b0989a848",
         "model_sha256": null,
         "oracle_source_sha256": "6af762829503aed706ce25b8909da7d374a7dea463f184b1520225ac195be08c",
@@ -216,9 +216,9 @@
       },
       "oracle_type": "deterministic_plus_rubric",
       "owner_approval": {
-        "approved_by": null,
-        "ref": null,
-        "status": "proposed"
+        "approved_by": "david",
+        "ref": "docs/migration/reviews/H3/decision.json",
+        "status": "approved"
       },
       "pilot_labels": {
         "papers": [
@@ -267,7 +267,7 @@
       "family": "EXT",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "4e18cc1fcf234a4d444c19f3ec701975cd58be3e7b589813be9c8fc5a47c0de0",
+        "case_sha256": "659ad6525de601d6fd0ec1aa446b043366e6f3aef2ed6df16d51a0cc62cf4306",
         "config_sha256": "b15762e55d127628f553865aa95fa67afa87cbdd48c9b60a3cd048a77335dfa6",
         "model_sha256": null,
         "oracle_source_sha256": "7ab0fb4db3fbcfcfa0c253e75258aa41a17ac29317e8113a56ecaa8486557897",
@@ -295,9 +295,9 @@
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
-        "approved_by": null,
-        "ref": null,
-        "status": "proposed"
+        "approved_by": "david",
+        "ref": "docs/migration/reviews/H3/decision.json",
+        "status": "approved"
       },
       "pilot_labels": {
         "papers": [
@@ -346,7 +346,7 @@
       "family": "EXT",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "e8bc22bab150751c03351ca56b683c4fb98dafe92a1a21764615fe3e04d4b87f",
+        "case_sha256": "f3f6229401e90728dfcce0f3fb8c08f192526996959c78cd90a8dc6368e3b775",
         "config_sha256": "5f6f8200318104a246f8adc59ffdae3bfe1ae7ae6626fd7c981b4d9b560d8dcc",
         "model_sha256": null,
         "oracle_source_sha256": "dee294d40c089aaa41cf8b66632e4c9f034d0d968c2add427f979be3d195f618",
@@ -377,9 +377,9 @@
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
-        "approved_by": null,
-        "ref": null,
-        "status": "proposed"
+        "approved_by": "david",
+        "ref": "docs/migration/reviews/H3/decision.json",
+        "status": "approved"
       },
       "readiness": "executable",
       "required": true,
