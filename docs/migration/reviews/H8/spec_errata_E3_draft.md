@@ -1,4 +1,15 @@
-# Spec errata for owner exception E3 (DRAFT for owner review)
+# Spec errata for owner exception E3 (APPLIED 2026-11-06)
+
+Status: **APPLIED** on 2026-11-06 (commit recorded in `reviews/owner_decisions_2026-11-03.md`, twelfth set, and the git
+log of branch `forge_merge-T-e3apply`). Owner approval, verbatim (2026-11-06): "E3 errata. Change what you need to in
+order to allow KGs to ship with the image". Entries 1 to 3 and the two edits of Entry 4 (plan.md section 5 deployment
+paragraph) were applied exactly as drafted below. Entry 4's `CHANGES_V7.md` line is historical and was left unedited;
+the errata index line it proposes is carried by this file. Amendment path: the edits were made to the frozen files and the
+recorded hashes of the two changed companion files in `companion/SHA256SUMS.txt` were re-pinned in the same commit
+(`plan.md` has no recorded hash). The text below is kept as the record of what was approved; its original status
+paragraph follows.
+
+Original status (before approval):
 
 Status: DRAFT. Drafted on owner approval of T26A Q5 ("Yes, draft them", `reviews/owner_decisions_2026-11-03.md`, fifth
 set). Nothing in this file has been applied. The documents quoted below are frozen (`docs/migration/plan.md`,

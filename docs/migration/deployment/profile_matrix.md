@@ -63,7 +63,7 @@
 
 `deployment_profiles.json` (`kg_promotion.bundled_in_images: false`) and plan 4.14/13.4 ("Docker build contexts/layers must continue excluding storage/kg corpus artifacts") were written before H0. E3 later allowed `storage/` (kg, terminology, schema) in the image.
 
-This document follows E3. To make the two consistent, H1 should record:
+The E3 errata (applied 2026-11-06, `reviews/H8/spec_errata_E3_draft.md`) amended plan 4.14 and the two companion KG specs accordingly; `deployment_profiles.json` is a frozen data file and still carries the pre-E3 flag. This document follows E3. The consistency points are:
 
 - KG JSON in the image is a **default or compatibility payload only**. It is not an import source.
 - Imports and promotion still read the commit/path/SHA-256-selected bytes from the `/var/lib/fair2wise/kg` mount (D31).

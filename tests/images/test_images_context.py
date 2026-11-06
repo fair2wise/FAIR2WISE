@@ -149,3 +149,22 @@ def test_nested_release_graph_copies_are_excluded_but_manifests_ship(name):
                 and p not in PRIVATE]
     assert "storage/kg" in DF.context_sources(name) or any(
         s.rstrip("/") == "storage/kg" for s in DF.context_sources(name))  # Dockerfile still COPYs storage/kg/
+
+
+@pytest.mark.parametrize("name", FINALS)
+def test_e3_every_flat_kg_copy_ships_and_no_nested_graph_or_private_path_does(name):
+    """E3 (errata applied 2026-11-06, D3.24): KGs ship with the image as the flat ``matkg_*.json`` copies and
+    the nested manifests/validation reports; nested ``graph.json`` duplicates, papers, ``source_index``, the
+    Tiled catalog DB, secrets and PDFs never do."""
+    flat = [p for p in CONTEXT if re.match(r"^storage/kg/matkg_[^/]+\.json$", p)]
+    nested_meta = [p for p in CONTEXT if re.match(r"^storage/kg/[^/]+/v[^/]+/(manifest|validation)\.json$", p)]
+    assert flat and nested_meta  # the checkout really holds adopted releases
+    shipped = set(image_paths(DF, name, CONTEXT, IGNORE))
+    assert set(flat) <= shipped
+    assert set(nested_meta) <= shipped
+    assert not [p for p in shipped if re.match(r"^storage/kg/[^/]+/v[^/]+/graph\.json$", p)]
+    for private in PRIVATE:
+        if private.startswith(("storage/kg/", "storage/terminology/")) or private in ("app/.env", "scripts/app/modules/kg_rag_api.py"):
+            assert private not in shipped, private
+    assert not [p for p in shipped if p.startswith(("papers/", "storage/source_index/"))]
+    assert not [p for p in shipped if re.search(r"tiled_catalog|\.pdf$|\.sqlite3?$|(^|/)\.env(\.(?!example$)|$)", p)]

@@ -26,7 +26,11 @@ but were not supplied, so those two lines fail. `../plan.md` is the plan text
 used here and does not hash to the listed `MIGRATION_PLAN.md`.
 
 Do not edit files in `companion/`. Record corrections, discrepancies and
-checkout-specific facts under `reviews/` instead.
+checkout-specific facts under `reviews/` instead. The one owner-approved
+exception is the E3 errata of 2026-11-06 (`reviews/H8/spec_errata_E3_draft.md`,
+status APPLIED): it changed `GIT_KG_PROMOTION_SPEC.md` and
+`JSON_KG_PUBLICATION_SPEC.md`, and their two lines in `SHA256SUMS.txt` were
+re-pinned to the amended bytes in the same commit.
 
 `companion/scripts/verify_handoff.py` checks static source evidence (hashes,
 AST spans, routes, task graph). Run it against a clean export of the baseline

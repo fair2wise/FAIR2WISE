@@ -75,7 +75,9 @@ LABEL Name="fair2wise-frontend" \
 # Image content is an allowlist of COPY lines; .dockerignore is only a backstop. Never in a
 # layer: papers/PDFs, parsed bodies, figure crops, storage/source_index, credentials or
 # dotenv files, runs/logs, job/session databases, Tiled catalogs. Tracked KG JSON
-# (storage/kg, storage/terminology) stays in the image (owner O-D1, H0 E3). Durable state is
+# (storage/kg, storage/terminology) stays in the image (owner O-D1, H0 E3; E3 errata applied
+# 2026-11-06): flat storage/kg/matkg_*.json copies and nested manifests/validation reports ship, nested
+# <corpus>/v<N>/graph.json duplicates do not (.dockerignore, D3.24). A baked file never selects data. Durable state is
 # mounted at runtime and checked by preflight (docker/profiles/README.md).
 # ---------------------------------------------------------------------------------------
 
