@@ -69,7 +69,6 @@ jobs:
           black --check
           app/modules/launchers
           app/modules/f2w_agent/kg_update.py
-          splash_links/scripts/import_kg.py
       - name: Lint with flake8
         run: |
           # stop the build if there are Python syntax errors or undefined names
