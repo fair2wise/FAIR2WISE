@@ -466,6 +466,7 @@ def test_persistence_key_evidence():
     assert keys == [
         "fair2wise-agent-settings-v1", "fair2wise-available-graphs-cache-v1", "fair2wise.chat.sessions.v2",
         "fair2wise.chat.messages.v1", "fair2wise-publication-favorites-v1", "fair2wise.citeFocusNodeId",
+        "fair2wise-graph-source-v1",  # 2026-11-06: graph source selector (not in the frozen baseline)
     ]
     for item in inventory["keys"]:
         file, line = item["declared_at"].rsplit(":", 1)

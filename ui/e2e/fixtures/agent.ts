@@ -197,6 +197,17 @@ export interface MockAgentOptions {
   judgePuts?: Array<Record<string, unknown>>;
   /** T18D: GET /v1/capabilities `can_save` (default true); 'absent' makes the route 404 (older server). */
   canSave?: boolean | 'absent';
+  /**
+   * Graph sources (GET /v1/graph/sources and the `source` query parameter of the graph routes). Unset: the
+   * listing route is absent (older server) and the selector hides itself. `graphs` maps a source id to the
+   * payload `GET /graph?source=` returns, or to a typed error `{ status, code, message }`; `requests` collects
+   * the `pathname+search` of every graph request that carried a `source`.
+   */
+  graphSources?: {
+    listing: Record<string, unknown>;
+    graphs: Record<string, typeof CATALOG_GRAPH | { status: number; code: string; message: string }>;
+    requests?: string[];
+  };
 }
 
 export async function mockAgent(page: Page, options: MockAgentOptions = {}) {
@@ -260,6 +271,44 @@ export async function mockAgent(page: Page, options: MockAgentOptions = {}) {
         judge_model_available: judge.judge_model ? models.includes(judge.judge_model) : null,
         updated_at: judge.judge_model ? '2026-10-16T00:00:00Z' : null }));
       return;
+    }
+
+    if (path === '/v1/graph/sources' && method === 'GET' && options.graphSources) {
+      await route.fulfill(json(options.graphSources.listing));
+      return;
+    }
+
+    const sourceId = url.searchParams.get('source');
+    if (sourceId && options.graphSources && path.startsWith('/graph')) {
+      options.graphSources.requests?.push(`${request.method()} ${path}${url.search}`);
+      const picked = options.graphSources.graphs[sourceId];
+      if (!picked) {
+        await route.fulfill(json({ detail: { code: 'unknown_source', message: 'Unknown graph source' } }, 404));
+        return;
+      }
+      if ('status' in picked) {
+        await route.fulfill(json({ detail: { code: picked.code, message: picked.message } }, picked.status));
+        return;
+      }
+      if (path === '/graph' && method === 'GET') {
+        await route.fulfill(json(picked));
+        return;
+      }
+      if (path === '/graph/nodes/search' && method === 'POST') {
+        const body = request.postDataJSON() as { query?: string };
+        const q = (body.query || '').toLowerCase();
+        await route.fulfill(json({
+          query: body.query || '',
+          retrieval_backend: 'lexical:source',
+          results: picked.nodes.filter(node => node.label.toLowerCase().includes(q)).map(node => ({ node, score: 0.6 })),
+        }));
+        return;
+      }
+      if (path.startsWith('/graph/node/') && method === 'GET') {
+        const id = decodeURIComponent(path.slice('/graph/node/'.length));
+        await route.fulfill(json(picked.nodes.find(node => node.id === id) ?? { id, label: id, type: 'Entity', description: '' }));
+        return;
+      }
     }
 
     if (path === '/graph' && method === 'GET') {

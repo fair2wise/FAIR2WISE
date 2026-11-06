@@ -31,8 +31,10 @@ from pathlib import Path
 import time
 
 from ..modules.contracts.context import DeploymentProfile, RequestContext
+from ..modules.contracts.json_types import JsonObject
 from ..modules.deployment import tiled_lifecycle
 from ..modules.deployment.tiled_config import ManagedTiledConfig, TiledConfigError, load_tiled_settings
+from ..modules.f2w_agent.graph_sources import GraphScanner
 from ..modules.graph.backends.tiled_mutations import TiledMutationClient
 from ..modules.graph.imports import tiled_json as tj
 from ..modules.graph.snapshot_manifest import SNAPSHOT_ID_RE
@@ -77,6 +79,38 @@ def local_tiled_target(settings: DeploymentSettings, managed: ManagedTiledConfig
     except ValueError:
         return None
     return own if own == settings.tiled_target else None
+
+
+class _ReadOnlyScanner:
+    """The two complete reads of the managed Tiled; the write methods of the client are not reachable from here."""
+
+    def __init__(self, client: TiledMutationClient) -> None:
+        self._client = client
+
+    def __repr__(self) -> str:  # never show the client (it holds the credential provider)
+        return "ReadOnlyTiledScanner()"
+
+    def scan_entities(self) -> list[JsonObject]:
+        """Every entity row of the managed Tiled."""
+        return self._client.scan_entities()
+
+    def scan_links(self) -> list[JsonObject]:
+        """Every link row of the managed Tiled."""
+        return self._client.scan_links()
+
+
+def local_graph_scanner(settings: DeploymentSettings, managed: ManagedTiledConfig | None) -> GraphScanner | None:
+    """Read-only scanner of the ``:local`` image's own Tiled for the UI graph sources, or ``None``.
+
+    Same condition as the publication gate (:func:`local_tiled_target`): only the managed loopback Tiled that is
+    this deployment's own target, never an ALS or external target, and nothing a request can name. The writer
+    credential is read lazily per request from the managed secret file and stays inside the client.
+    """
+    target = local_tiled_target(settings, managed)
+    if target is None or managed is None:
+        return None
+    return _ReadOnlyScanner(TiledMutationClient(
+        target, profile="local", credential=lambda: tiled_lifecycle.writer_credential(managed)))
 
 
 def local_publication_gate(settings: DeploymentSettings, managed: ManagedTiledConfig | None) -> PublicationGate:
@@ -234,5 +268,5 @@ def post_extraction_publisher(operations: F2WOperations, wired: LocalPublication
 
 
 __all__ = ("LocalIndexBuilder", "LocalPublication", "LocalRevisionProbe", "SNAPSHOTS_DIRNAME", "STATE_DIRNAME",
-           "build_local_publication", "install_local_publication", "local_publication_gate",
+           "build_local_publication", "install_local_publication", "local_graph_scanner", "local_publication_gate",
            "local_tiled_target", "managed_tiled_from", "post_extraction_publisher")

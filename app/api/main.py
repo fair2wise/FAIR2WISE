@@ -226,6 +226,7 @@ def create_api_app(
     """
     from . import routes_capabilities as capabilities
     from . import routes_folders as folders
+    from . import routes_graph_sources as graph_sources
     from . import routes_jobs as jobs
     from . import routes_library as library_routes
     from . import routes_library_harvest
@@ -259,7 +260,18 @@ def create_api_app(
     if operations.identity_port is None:
         operations.identity_port = identity_port
     if local_publication and settings.is_local:
-        from .local_publication import install_local_publication, post_extraction_publisher
+        from .local_publication import (
+            install_local_publication,
+            local_graph_scanner,
+            managed_tiled_from,
+            post_extraction_publisher,
+        )
+
+        # UI graph sources: the image's own managed Tiled, read-only (the same trust condition as the H5 gate).
+        ui_scanner = local_graph_scanner(settings, managed_tiled_from(os.environ if startup_config is None
+                                                                      else startup_config))
+        if ui_scanner is not None:
+            app.state.f2w_graph_sources.attach_tiled(ui_scanner)
 
         wired = install_local_publication(
             operations, environ=os.environ if startup_config is None else startup_config,
@@ -307,6 +319,7 @@ def create_api_app(
     publications.install(app)
     status.install(app)
     capabilities.install(app)
+    graph_sources.install(app)
     if judge_settings is None:
         judge_settings = JudgeModelService(JudgeModelStore(judge_settings_path(Path(cfg.workdir))))
     app.state.f2w_judge_settings = judge_settings

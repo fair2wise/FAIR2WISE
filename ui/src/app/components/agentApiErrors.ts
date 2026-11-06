@@ -9,6 +9,11 @@ export function parseAgentApiError(detail: string, status: number): string {
     if (typeof parsed.detail === 'string') {
       return parsed.detail;
     }
+    // Typed errors of the graph sources: {"detail": {"code": "...", "message": "..."}}.
+    if (parsed.detail && typeof parsed.detail === 'object' && !Array.isArray(parsed.detail)) {
+      const message = (parsed.detail as { message?: unknown }).message;
+      if (typeof message === 'string' && message) return message;
+    }
     if (Array.isArray(parsed.detail)) {
       return parsed.detail
         .map(item => (typeof item === 'object' && item && 'msg' in item ? String(item.msg) : String(item)))

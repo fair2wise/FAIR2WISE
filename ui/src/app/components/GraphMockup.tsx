@@ -21,6 +21,8 @@ import { PublicationList } from './PublicationList';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable';
 import { loadAgentSettings } from './agentSettings';
 import { canEditNode } from './capabilitiesApi';
+import { GraphSourceSelect } from './GraphSourceSelect';
+import { graphSourceFromPath, useGraphSourceState } from './graphSourceStore';
 import { useCapabilities } from './capabilitiesHooks';
 import {
   fetchGraphNeighborhood,
@@ -95,6 +97,8 @@ export interface GraphMockupProps {
   kgViewerNodeLimit?: number | 'all';
   onToggleKgViewer?: () => void;
   onKgViewerNodeLimitChange?: (limit: number | 'all') => void;
+  /** The viewer's graph source changed (the host reloads the catalog graph). */
+  onGraphSourceChange?: () => void;
 }
 
 export const SCHEMA_RELATIONSHIP_PREDICATES = [
@@ -507,9 +511,12 @@ function PropertyRows({ rows }: { rows: Array<{ label: string; value: string }> 
 function NodeSearchControl({
   activeNodeId,
   onSelect,
+  source = null,
 }: {
   activeNodeId: string | null;
   onSelect: (nodeId: string) => void;
+  /** Graph source the viewer shows (`null` = the default graph; no `source` parameter is sent). */
+  source?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -526,7 +533,7 @@ function NodeSearchControl({
     setLoading(true);
     setError(null);
     try {
-      const response = await searchGraphNodes(value, 10);
+      const response = await searchGraphNodes(value, 10, undefined, source);
       setResults(response.results);
       setRetrievalBackend(response.retrieval_backend);
       setSearched(true);
@@ -664,6 +671,8 @@ function NodeDetailPanel({
   const color = node.color;
   const capabilities = useCapabilities();
   const canEdit = canEditNode(loadAgentSettings().graphSource, capabilities);
+  // A graph source is read-only: no Edit control, and node reads carry the source the viewer shows.
+  const viewerSource = graphSourceFromPath(graphSourcePath);
 
   useEffect(() => {
     let cancelled = false;
@@ -675,7 +684,7 @@ function NodeDetailPanel({
       return;
     }
 
-    fetchGraphNodeDetail(node.id, uploadedGraphQueryParam(graphSourcePath))
+    fetchGraphNodeDetail(node.id, uploadedGraphQueryParam(graphSourcePath), viewerSource)
       .then(nextDetail => {
         if (cancelled) return;
         const fetchedUnknown = !nextDetail.type || nextDetail.type.toLowerCase() === 'unknown';
@@ -826,7 +835,7 @@ function NodeDetailPanel({
     setTargetSearching(true);
     setTargetSearchError(null);
     try {
-      const response = await searchGraphNodes(query, 8);
+      const response = await searchGraphNodes(query, 8, undefined, viewerSource);
       setTargetResults(
         response.results.map(result => result.node).filter(result => result.id !== node.id),
       );
@@ -938,7 +947,7 @@ function NodeDetailPanel({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {canEdit && !editing && (
+          {canEdit && viewerSource === null && !editing && (
             <button
               type="button"
               aria-label="Edit properties"
@@ -1653,6 +1662,7 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
   kgViewerNodeLimit = 'all',
   onToggleKgViewer,
   onKgViewerNodeLimitChange,
+  onGraphSourceChange,
 }, ref) {
   const [hoverPopup, setHoverPopup] = useState<HoverPopupState | null>(null);
   const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null);
@@ -1663,6 +1673,9 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
   const [tiledFocusGraph, setTiledFocusGraph] = useState<GraphPayload | null>(null);
   const [tiledFocusLoading, setTiledFocusLoading] = useState(false);
   const [viewBox, setViewBox] = useState<ViewBox>(fullViewBox(W, H));
+  const viewerSourceState = useGraphSourceState();
+  // The source whose catalog the KG viewer shows; chat mode always reads the default graph.
+  const viewerSource = isKgViewer ? graphSourceFromPath(graph.source_path) : null;
   const [drag, setDrag] = useState<DragState | null>(null);
   const [layoutMode, setLayoutMode] = useState<KgLayoutMode>('existing');
   const [hideWeak, setHideWeak] = useState(false);
@@ -1824,7 +1837,7 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
     }
     let cancelled = false;
     setTiledFocusLoading(true);
-    fetchGraphNeighborhood(activeFocusId, CITE_FOCUS_HOPS)
+    fetchGraphNeighborhood(activeFocusId, CITE_FOCUS_HOPS, viewerSource)
       .then(payload => {
         if (cancelled || !payload.nodes.length) return;
         setTiledFocusGraph(payload);
@@ -2120,6 +2133,10 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
     </label>
   ) : null;
 
+  const kgViewerSourceControl = isKgViewer ? (
+    <GraphSourceSelect onChange={() => onGraphSourceChange?.()} />
+  ) : null;
+
   const layoutModeSwitcher = (
     <LayoutModeSwitcher
       value={layoutMode}
@@ -2188,11 +2205,21 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
           <NodeSearchControl
             activeNodeId={searchedNodeId}
             onSelect={selectSearchNode}
+            source={viewerSource}
           />
+          {kgViewerSourceControl}
           {kgViewerLimitControl}
         </div>
         <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-3">
-          {tiledFocusLoading ? (
+          {isKgViewer && viewerSourceState.error ? (
+            <p role="status" data-testid="graph-source-error" className="max-w-md text-center text-sm text-rose-600">
+              {viewerSourceState.error}
+            </p>
+          ) : isKgViewer && viewerSource !== null && !viewerSourceState.loading ? (
+            <p role="status" data-testid="graph-source-empty" className="max-w-md text-center text-sm text-slate-500">
+              This graph source has no nodes to show.
+            </p>
+          ) : tiledFocusLoading ? (
             <>
               <Loader2 className="h-8 w-8 animate-spin text-sky-500" aria-label="Loading neighborhood" />
               <span className="text-xs text-slate-400">Loading Tiled neighbors…</span>
@@ -2251,7 +2278,9 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
           <NodeSearchControl
             activeNodeId={searchedNodeId}
             onSelect={selectSearchNode}
+            source={viewerSource}
           />
+          {kgViewerSourceControl}
           {kgViewerLimitControl}
           {hideWeakControl}
           {layoutMode === 'existing' && (

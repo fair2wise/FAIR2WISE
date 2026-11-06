@@ -41,6 +41,7 @@ import {
   fetchLiveGraph,
   GraphPayload,
 } from './components/data/liveAgent';
+import { getSelectedGraphSource, graphSourceFromPath, setGraphSourceStatus } from './components/graphSourceStore';
 import { installUiTelemetry, recordUiEvent } from './components/uiTelemetry';
 
 const queryClient = new QueryClient();
@@ -173,9 +174,32 @@ function AppShell() {
   }
 
   const reloadGraph = useCallback(async () => {
-    const nextGraph = await fetchLiveGraph();
-    setGraph(nextGraph);
+    const source = getSelectedGraphSource();
+    if (source) setGraphSourceStatus({ loading: true, error: null });
+    try {
+      const nextGraph = await fetchLiveGraph(source);
+      if (getSelectedGraphSource() !== source) return; // the choice changed while this was in flight
+      setGraph(nextGraph);
+      if (source) setGraphSourceStatus({ loading: false, error: null });
+    } catch (error) {
+      if (getSelectedGraphSource() !== source) return;
+      if (!source) throw error; // the default graph keeps its behavior
+      // Never leave another source's graph on screen under this source's name.
+      setGraph({ nodes: [], edges: [], source_path: `source:${source}` });
+      setGraphSourceStatus({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Graph source unavailable',
+      });
+    }
   }, []);
+
+  // The KG viewer opened or its source changed: load the catalog unless the loaded graph already is the selected one.
+  const loadCatalog = useCallback(() => {
+    if (graph.nodes.length > 0 && graphSourceFromPath(graph.source_path) === getSelectedGraphSource()) return;
+    void reloadGraph().catch(error => {
+      console.warn('Failed to load the knowledge graph', error);
+    });
+  }, [graph, reloadGraph]);
 
   useEffect(() => {
     let cancelled = false;
@@ -212,7 +236,7 @@ function AppShell() {
           setMessages={setActiveSessionMessages}
           onGraphUpdate={setGraph}
           onSelect={setActiveQuery}
-          onLoadCatalog={reloadGraph}
+          onLoadCatalog={loadCatalog}
         />
       ),
       icon: <Share2 size={28} />,
@@ -235,7 +259,7 @@ function AppShell() {
           },
         ]
       : []),
-  ], [activeQuery, activeSession.id, activeSession.messages, graph, libraryProbe.available, reloadGraph, setActiveSessionMessages]);
+  ], [activeQuery, activeSession.id, activeSession.messages, graph, libraryProbe.available, loadCatalog, reloadGraph, setActiveSessionMessages]);
 
   const headerLogoIcon = (
     <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-white">

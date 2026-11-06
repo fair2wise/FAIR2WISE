@@ -1215,11 +1215,12 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
       onToggleKgViewer={() => {
         setIsKgViewer(value => {
           const next = !value;
-          if (next && graph.nodes.length === 0) onLoadCatalog?.();
+          if (next) onLoadCatalog?.(); // the host reloads only when nothing is loaded or the source differs
           return next;
         });
       }}
       onKgViewerNodeLimitChange={setKgViewerNodeLimit}
+      onGraphSourceChange={() => onLoadCatalog?.()}
       onNodeUpdated={handleGraphNodeUpdated}
       onNodeClick={nodeId => recordUiEvent('graph_node_click', { node_id: nodeId }, currentTurnId())}
     />

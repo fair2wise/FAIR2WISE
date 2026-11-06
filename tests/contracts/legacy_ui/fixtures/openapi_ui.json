@@ -175,8 +175,26 @@
     "/graph": {
       "get": {
         "summary": "Graph",
-        "description": "Return the current graph payload.",
+        "description": "Return the current graph payload, or that of the graph source named by ``source``.",
         "operationId": "graph_graph_get",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -187,6 +205,16 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       }
@@ -194,17 +222,35 @@
     "/graph/nodes/search": {
       "post": {
         "summary": "Search Graph Nodes",
-        "description": "Search graph nodes by text query.",
+        "description": "Search graph nodes by text query, in the graph source named by ``source`` when given.",
         "operationId": "search_graph_nodes_graph_nodes_search_post",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/GraphNodeSearchRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -233,7 +279,7 @@
     "/graph/neighborhood/{node_id}": {
       "get": {
         "summary": "Graph Neighborhood",
-        "description": "Return a Tiled node's neighborhood subgraph.",
+        "description": "Return a node's neighborhood subgraph: from the graph source named by ``source``, else from Tiled.",
         "operationId": "graph_neighborhood_graph_neighborhood__node_id__get",
         "parameters": [
           {
@@ -253,6 +299,22 @@
               "type": "integer",
               "default": 3,
               "title": "Hops"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
             }
           }
         ],
@@ -283,7 +345,7 @@
     "/graph/node/{node_id}": {
       "get": {
         "summary": "Graph Node",
-        "description": "Return one graph node by id from Tiled or a JSON graph file.",
+        "description": "Return one graph node by id: from the graph source named by ``source``, else Tiled or a JSON graph file.",
         "operationId": "graph_node_graph_node__node_id__get",
         "parameters": [
           {
@@ -309,6 +371,22 @@
                 }
               ],
               "title": "Json Graph Path"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
             }
           }
         ],
@@ -337,7 +415,7 @@
       },
       "patch": {
         "summary": "Patch Graph Node",
-        "description": "Patch a splash-mode graph node.",
+        "description": "Patch a splash-mode graph node; a graph source is read-only and refuses every edit.",
         "operationId": "patch_graph_node_graph_node__node_id__patch",
         "parameters": [
           {
@@ -347,6 +425,22 @@
             "schema": {
               "type": "string",
               "title": "Node Id"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
             }
           }
         ],

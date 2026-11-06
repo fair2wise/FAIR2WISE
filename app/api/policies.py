@@ -162,6 +162,11 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
        note="file a PDF a person saved for a paywalled candidate into the run's category (multipart)"),
     _v("V79", "POST", "/library/harvest/candidates/{candidate_id}/dismiss", "library.upload", on_als=False,
        note="dismiss a paywalled candidate"),
+    # UI graph sources (owner instruction 2026-11-06): the selectable JSON/Tiled graphs of the graph view. Read-only;
+    # same entry capability as GET /graph (R06). The `source` query parameter on R06-R09 needs no extra capability.
+    _v("V80", "GET", "/graph/sources", "chat.read_support",
+       note="selectable graph sources: id, kind json|tiled, label, counts, read_only; Tiled only on :local "
+            "(own managed Tiled); ids are server-allowlisted, never a path or URL"),
     # T18D (Q13, O-U3): the capability read behind the frozen UI's hidden Edit/Save controls. V56-V59 belong to
     # another branch; this block is V60-V69.
     _v("V60", "GET", "/capabilities", "chat.read_support",

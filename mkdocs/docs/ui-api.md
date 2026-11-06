@@ -37,10 +37,11 @@ Vite variables are compiled into browser assets. Changing the variable after
 | `POST` | `/chat/action/stream` | `queryAgentActionStream` | Extraction approval/skip |
 | `POST` | `/session/reset` | `resetAgentSession` | Available client operation |
 | `DELETE` | `/session/{id}` | `deleteAgentSession` | Delete chat |
-| `GET` | `/graph` | `fetchLiveGraph` | Boot, settings reload, edit refresh |
-| `POST` | `/graph/nodes/search` | `searchGraphNodes` | Graph search and relationship target search |
-| `GET` | `/graph/node/{id}` | `fetchGraphNodeDetail` | Node detail panel |
-| `PATCH` | `/graph/node/{id}` | `updateGraphNode` | Splash node editor |
+| `GET` | `/graph` | `fetchLiveGraph` | Boot, settings reload, edit refresh; `?source=` reads a graph source in the KG viewer |
+| `GET` | `/v1/graph/sources` | `fetchGraphSources` | KG viewer source selector |
+| `POST` | `/graph/nodes/search` | `searchGraphNodes` | Graph search and relationship target search (optional `?source=`) |
+| `GET` | `/graph/node/{id}` | `fetchGraphNodeDetail` | Node detail panel (optional `?source=`) |
+| `PATCH` | `/graph/node/{id}` | `updateGraphNode` | Splash node editor (refused with `400 read_only_source` for any `?source=`) |
 | `POST` | `/publications/search` | `searchPublications` | Paper-search sheet |
 
 The backend also exposes health, graph upload, and OpenAPI routes that the
