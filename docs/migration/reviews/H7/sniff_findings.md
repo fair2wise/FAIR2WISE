@@ -1,7 +1,9 @@
 # T27 sniff-test findings (H7 review packet)
 
-Status: **not ready for H7 review: three `fix` rows are still open** (F2.4, F2.5, F3.8); F1.4, F1.6, F4.2 and the
-coverage figure (F0.2/F5.5) were closed on 2026-11-04 (last log entry). The owner accepted every proposed disposition
+Status: **every row has a closing state; H7 review is the owner's call (not approved here).** The last three `fix`
+rows (F2.4, F2.5, F3.8) were closed with evidence on 2026-11-06 (`readthrough_F25_F38.md`, last log entry); the
+read-through recorded 13 suspected code bugs and 4 contract docstrings that need an owner decision (listed there).
+F1.4, F1.6, F4.2 and the coverage figure (F0.2/F5.5) were closed on 2026-11-04. The owner accepted every proposed disposition
 below as written on 2026-11-03 (`owner_decisions_2026-11-03.md`, eighth set), so `fix` rows are decided fixes,
 `defer` rows are deferred with owner approval and `intentional` rows are accepted as they are.
 
@@ -42,8 +44,8 @@ approximate (the "silent handler" count in particular includes legitimate fallba
 | F2.1 | 322 public functions lack docstrings. | `bl1101_ingest.py` (32), `agent_runtime/supervisor.py` (23), `f2w_agent/trace.py` (20), `term_extractor/dashboard.py` (15), `graph/imports/tiled_json.py` (11), `agents/properties.py` (10), `runtime_bridge/qa_route.py` (9), `literature/download_pdfs.py` (7), `hybrid_rag/pipeline.py` (7), `hybrid_rag/index_store.py` (7). | fix; prioritise anything in a public or cross-module import (T27 exemption for single-caller helpers) |
 | F2.2 | 25 public classes lack docstrings. | `RepoSpec`, `BlueprintDevice`, `BlueprintStage` (`bl1101_ingest.py`); `GitHubRepoRef`, `SourceFile`, `SourceBlock` (`term_extractor/source_repos.py`); `AuditReport`; `Observation`, `WithheldPromotion` (`canonicalization/growth.py`); `CleanupItem`; `Orchestrator`; `ChatClient`, `OllamaChatClient`; `ToolState`; four in `canonicalization/campaign/models.py`. | fix |
 | F2.3 | 15 modules lack a module docstring. | Mostly `term_extractor/` (`tools`, `store`, `services`, `schema`, `orchestrator`) and `vision/__init__.py`. | fix |
-| F2.4 | Docstring style consistency (Google for new code, Sphinx for existing, never mixed in a module) not surveyed. | n/a | fix: check per module during the read-through |
-| F2.5 | Docstring-versus-implementation divergence (T27 item 3) needs a human read; the scan cannot detect it. | n/a | open: read-through of the hot modules in F3 |
+| F2.4 | Docstring style consistency (Google for new code, Sphinx for existing, never mixed in a module) not surveyed. | n/a | fix: check per module during the read-through. Done 2026-11-06: `scripts/ci/docstring_style.py`, 0 mixed modules (353 scanned), gated by `tests/ci/test_docstring_style.py` and the CI quality gate |
+| F2.5 | Docstring-versus-implementation divergence (T27 item 3) needs a human read; the scan cannot detect it. | n/a | open: read-through of the hot modules in F3. Done 2026-11-06: six F3.1 modules read, 53 docstrings corrected, 13 suspected code bugs recorded for the owner (`readthrough_F25_F38.md`) |
 
 ## F3. Sniff test: structure and dead code
 
@@ -56,7 +58,7 @@ approximate (the "silent handler" count in particular includes legitimate fallba
 | F3.5 | Commented-out code. | `extract_terms.py:683,693`; `kg_rag_api.py:51`. | fix |
 | F3.6 | Open TODO. | `term_extractor/dashboard.py:1007` (JS, event-driven `showConnection()`). The `agent_runtime/supervisor.py:92` TODO(T03) from AUD-18 is gone; the comment now documents that the default prompt is off the langgraph path. | defer / intentional |
 | F3.7 | AUD-18 pyflakes items to re-verify. | `extraction/schema_selection.py:18`, `literature/download_pdfs.py:895`, `operations/corpus.py:65`. | fix if still present |
-| F3.8 | Magic literals not surveyed. | n/a | open: read-through |
+| F3.8 | Magic literals not surveyed. | n/a | open: read-through. Done 2026-11-06: 58 named constants hoisted (112 occurrences, values unchanged), 53 literals justified in place (`readthrough_F25_F38.md`) |
 
 ## F4. Error handling and logging (standard sections 5 and 6)
 
@@ -234,8 +236,8 @@ the owner through the 2026-11-03 reply):
 | F2.1 function docstrings | fix | fixed (ruff `D` 0 with `D105`/`D107` ignored by project policy) |
 | F2.2 class docstrings | fix | fixed |
 | F2.3 module docstrings | fix | fixed |
-| F2.4 docstring style consistency | fix | **open**: no per-module check was made |
-| F2.5 docstring vs implementation | open | **open**: needs a human read-through |
+| F2.4 docstring style consistency | fix | fixed 2026-11-06: per-module classifier `scripts/ci/docstring_style.py`; `app/` has 208 Google, 0 Sphinx, 0 mixed, 145 marker-free modules (353); test and CI gate keep it at 0 mixed |
+| F2.5 docstring vs implementation | open | done 2026-11-06 for the six in-scope F3.1 hot spots (`readthrough_F25_F38.md`): 411 symbols read, 53 docstrings corrected, 13 suspected code bugs and 4 diverging contract docstrings left for the owner |
 | F3.1 long functions | defer | deferred with owner approval; code untouched (`create_app` and `build_tools` would stay as closures if ever split) |
 | F3.2 oversized modules | defer | deferred with owner approval; code untouched (`f2w_agent/api.py` is 7,267 lines now) |
 | F3.3 dead `_retired_deterministic_locked` | fix | fixed in `c364ff8`: the 292-line body had already gone, a ten-line shim was left and is now deleted; nothing called it |
@@ -243,7 +245,7 @@ the owner through the 2026-11-03 reply):
 | F3.5 commented-out code | fix | fixed for `kg_rag_api.py`; `extract_terms.py` is now under `legacy/` (out of scope); the other `ERA001` hits are comment tables, not code |
 | F3.6 open TODO | defer / intentional | deferred: `term_extractor/dashboard.py:1005` (JS, event-driven `showConnection()`); the supervisor TODO is gone |
 | F3.7 pyflakes | fix | fixed: 24 findings (unused imports and assignments, an f-string without placeholders, `field` shadowed by a loop variable in four loops of `f2w_agent/api.py`); the three AUD-18 sites named in the row and F821 `history` were already gone |
-| F3.8 magic literals | open | **open**: needs a read-through |
+| F3.8 magic literals | open | done 2026-11-06 in the same six modules: 58 constants hoisted (112 occurrences, no value change, frozen-contract literals left and listed), see `readthrough_F25_F38.md` |
 | F4.1 `except: pass` | fix | fixed: 25 handlers; 18 now log (debug, warning for the supervisor's audit-event emits), 5 `unlink` handlers became `unlink(missing_ok=True)`, the two `CancelledError` handlers keep their shutdown comment |
 | F4.2 return/continue-only handlers | fix after triage | fixed 2026-11-04: 155 typed `continue`/`return` handlers triaged one by one; 126 are legitimate fallbacks for an expected condition (about 95 now carry a one-line reason), 29 hid a failure (parser, catalog, job, I/O on required data) and now log the exception type at debug (22) or warning (7), control flow unchanged |
 | F4.3 `except Exception` without a logger | fix | fixed for every handler that swallows (17 modules got a module logger and a log call). Handlers that re-raise or chain (`raise X from exc`, bare `raise` after cleanup) were left alone on purpose; `_tiled_entry.py` (stdlib-only, import list pinned), `agents/chebi.py` (standalone script), `json2kg.py` and `download_pdfs.py` (already log via the root logger) were not changed |
@@ -334,3 +336,36 @@ Notes:
   locally, `vision/docling_ocr.py`, fails on forge_merge too: environment-dependent third-party classification).
   Not-slow suite from a clean export: 6333 passed, 54 skipped, 4 xfailed, 0 failed. No test files, `corpus_qa.py`,
   `ui/` or frozen files touched.
+
+### 2026-11-06: F2.4, F2.5 and F3.8 closed with evidence (branch `forge_merge-T27-sniff`)
+
+The owner asked for the read-through to be done by an agent; the H7 gate stays with the owner, so this entry
+prepares evidence and applies only safe fixes (docstring text and value-preserving constant hoists).
+
+- F2.4: `scripts/ci/docstring_style.py` classifies every module under `app/` (`legacy/`, `graphify-out`,
+  `__pycache__` excluded) as Google / Sphinx / mixed / none from docstring section markers (`Args:`/`Returns:`/
+  `Raises:`/`Yields:`/`Attributes:` headers vs `:param`/`:returns:`/`:raises`/`:rtype:`/`:ivar` fields).
+  Before: 353 modules, 208 Google, 0 Sphinx, 0 mixed, 145 none (confirmed by grep: no `:param`/`:returns:`/numpy
+  `Parameters\n----` marker anywhere in `app/` outside `legacy/`, which has none either). After: identical, so no
+  module needed converting. The gate: `tests/ci/test_docstring_style.py` (classifier unit tests on synthetic
+  Google/Sphinx/mixed/none sources plus `test_app_has_no_mixed_module`) and `python scripts/ci/docstring_style.py
+  --check` added to the CI `python-quality` Gate step (owner note: this is a new **blocking** line in that step; it
+  is at 0 today and the same assertion already runs in the baseline suite via the new test).
+- F2.5/F3.8: `readthrough_F25_F38.md`. The F3.1 hot-spot list minus `extract_terms.py` (now under `legacy/`):
+  `f2w_agent/api.py`, `kg_rag_api.py`, `f2w_agent/retrieval_agent.py`, `agent_runtime/supervisor.py`,
+  `agents/properties.py`, `term_extractor/tools.py`, read in full. 411 symbols compared with their docstrings;
+  53 docstrings corrected (Google style kept); 13 suspected code bugs recorded with file:line, none changed
+  (B1-B13 in the doc; the ones worth a ticket: `properties.py` `VALUE_UNIT_PATTERN` cannot parse `%` units so
+  the extractor's efficiency path is broken end to end; `api.py` `_resume_download` hard-codes
+  `validate_downloads=False`; `api.py` route `graph_neighborhood` ignores `hops` on the Tiled path;
+  `kg_rag_api.py` `retrieve_nodes` seed slice is a no-op). Four diverging docstrings were deliberately not edited
+  because they are contract text: the `graph_neighborhood` route description (frozen OpenAPI) and three `@tool`
+  descriptions in `term_extractor/tools.py` (LLM-visible). 58 module-level constants hoisted (112 literal
+  occurrences; values, types and evaluation time unchanged); 53 literals justified in place, including every
+  OpenAPI default, route path, wire key/value, LangGraph node name and LLM tool vocabulary.
+- Verification: AST comparison against `HEAD` with docstrings stripped and the new constants inlined back is
+  identical for four files; the two differences are a removed function-local `MAX_SNIPPETS = 6` (now module
+  level) and `/ 50.0` becoming `/ BEAM_PATH_INDEX_SPAN` (`50`, same float result). `ruff check app` 0,
+  `isort --check-only app` clean, `mypy` 0 errors (352 files), `python -m evals.binary.import_companion --check`
+  up to date, OpenAPI fixture unchanged. Full not-slow suite from a clean export: __SUITE__.
+- No behaviour change intended; no test, `corpus_qa.py`, `ui/` or frozen file touched; docker untouched.

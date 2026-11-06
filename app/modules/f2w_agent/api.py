@@ -126,6 +126,33 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# F3.8 (T27): named limits and sentinels of this module; every value is the literal it replaced.
+LLM_HELPER_TIMEOUT_SECONDS = 60  # timeout of each helper chat completion (routing, rewrite, fallback, memory)
+HISTORY_CONTENT_MAX_CHARS = 4000  # longest history message content forwarded to the agents
+EXTRA_FIELD_TEXT_MAX_CHARS = 800  # a longer string extra on a node is cut here and gets an ellipsis
+EXTRA_FIELD_LIST_MAX_ITEMS = 24  # a longer list extra on a node is dropped
+EXTRA_FIELD_DICT_MAX_ITEMS = 16  # a larger dict extra on a node is dropped
+CANDIDATE_ABSTRACT_MAX_CHARS = 600  # abstract length on a pending-paper card
+PUBLICATION_ABSTRACT_MAX_CHARS = 1600  # abstract length on the approved paper's publication record
+MAX_CANDIDATE_PREVIEW = 5  # candidate papers listed to the user and in a candidate_search_result event
+MAX_DECLINED_DOWNLOAD_TOPICS = 5  # declined download topics remembered per session (oldest evicted)
+DECLINED_TOPIC_OVERLAP_MIN = 0.5  # word-overlap share at which a question matches a declined topic
+CANDIDATE_TITLE_MATCH_MIN = 0.5  # word-overlap share at which a reply names a candidate by its title
+DEFAULT_TARGETED_MAX_PAGES = 6  # targeted-extraction page budget when the config gives none
+DEFAULT_CBORG_MODEL = "lbl/cborg-chat"  # CBORG model when neither env nor config names one
+DEFAULT_OLLAMA_MODEL = "deepseek-r1:70b"  # Ollama model when neither env nor config names one
+DEFAULT_PREDICATE = "rel:related_to"  # predicate of a graph edge that names none
+HAS_CODE_SNIPPET_PREDICATE = "rel:has_code_snippet"  # edge from a node to a linked CodeSnippet thing
+CODE_SNIPPET_CATEGORY = "CodeSnippet"  # MatKG category of a code-snippet thing
+UNKNOWN_NODE_TYPE = "unknown"  # lower-cased type of an unresolved stub node, hidden from search results
+EMPTY_PUBLICATION_KEY = "source-title::"  # _publication_key of a record with no DOI, source or title
+TILED_SOURCE_PATH = "tiled://graphql"  # source_path of a graph payload built from the Tiled lookup graph
+TILED_GRAPH_LABEL = "Tiled Graph"  # graph_label fallback of a Tiled node
+LEGACY_SESSION_KEY = "__legacy__"  # key of the single chat context used before session ids existed
+CHAT_SESSIONS_DIRNAME = "chat_sessions"  # per-session contexts live under <workdir>/chat_sessions/<key>
+SESSION_MEMORY_FILENAME = "session_memory.json"  # session memory file (legacy and per-session)
+WORKFLOW_STATE_FILENAME = "workflow_state.json"  # workflow state file (legacy and per-session)
+
 _CHAT_LABEL: contextvars.ContextVar[str] = contextvars.ContextVar(
     "f2w_chat_trace_label", default="chat"
 )
@@ -497,7 +524,11 @@ def storage_kg_dir(root: Path | None = None) -> Path:
 
 
 def list_storage_kg_json_files(root: Path | None = None) -> list[str]:
-    """List relative paths of JSON graphs in storage/kg."""
+    """List relative paths of JSON graphs in storage/kg, plus the registered KG bundle paths.
+
+    The bundle paths (``_bundle_graph_paths``) are appended only when ``root`` is ``None``; when
+    storage/kg does not exist they are the whole result.
+    """
     kg_dir = storage_kg_dir(root)
     if not kg_dir.is_dir():
         return _bundle_graph_paths(root)
@@ -537,11 +568,11 @@ def default_json_graph_path(
 class RuntimeSettings:
     """Mutable in-process agent runtime configuration."""
     backend: str = "cborg"
-    model: str = "lbl/cborg-chat"
+    model: str = DEFAULT_CBORG_MODEL
     graph_source: str = "json"
     workflow_mode: str = "agentic"
     extraction_mode: str = "targeted"
-    targeted_max_pages: int = 6
+    targeted_max_pages: int = DEFAULT_TARGETED_MAX_PAGES
     json_graph_path: str | None = None
     json_graph_paths: list[str] = field(default_factory=list)
     kg_query_max_nodes: int = DEFAULT_KG_QUERY_MAX_NODES
@@ -609,13 +640,13 @@ def default_runtime_model(backend: str, configured: str | None = None) -> str:
             env_value = os.environ.get(env_name)
             if env_value and env_value.strip():
                 return env_value.strip()
-        return str(config_value("kg_rag.ollama.model", "deepseek-r1:70b") or "deepseek-r1:70b")
+        return str(config_value("kg_rag.ollama.model", DEFAULT_OLLAMA_MODEL) or DEFAULT_OLLAMA_MODEL)
     for env_name in ("KG_RAG_CBORG_MODEL", "KG_RAG_MODEL", "F2W_MODEL"):
         env_value = os.environ.get(env_name)
         if env_value and env_value.strip():
             model = env_value.strip()
             return normalize_cborg_model(model) or model
-    default = str(config_value("kg_rag.cborg.model", "lbl/cborg-chat") or "lbl/cborg-chat")
+    default = str(config_value("kg_rag.cborg.model", DEFAULT_CBORG_MODEL) or DEFAULT_CBORG_MODEL)
     return normalize_cborg_model(default) or default
 
 
@@ -718,8 +749,8 @@ _CORE_NODE_KEYS = {
 
 
 def _source_paper_list(raw: dict[str, Any]) -> list[str]:
-    # New-format KGs store DOIs in "papers"; old format uses "source_papers".
     """Collect unique source-paper identifiers from a raw KG node."""
+    # New-format KGs store DOIs in "papers"; old format uses "source_papers".
     papers = raw.get("source_papers") or raw.get("papers") or []
     if not isinstance(papers, list):
         papers = [papers]
@@ -789,15 +820,16 @@ def _node_extra_fields(raw: dict[str, Any]) -> dict[str, Any]:
         if key in _CORE_NODE_KEYS or value in (None, "", [], {}):
             continue
         if isinstance(value, str):
-            extra[key] = value[:800] + "…" if len(value) > 800 else value
+            extra[key] = (value[:EXTRA_FIELD_TEXT_MAX_CHARS] + "…"
+                          if len(value) > EXTRA_FIELD_TEXT_MAX_CHARS else value)
             continue
         if isinstance(value, (int, float, bool)):
             extra[key] = value
             continue
-        if isinstance(value, list) and len(value) <= 24:
+        if isinstance(value, list) and len(value) <= EXTRA_FIELD_LIST_MAX_ITEMS:
             extra[key] = value
             continue
-        if isinstance(value, dict) and len(value) <= 16:
+        if isinstance(value, dict) and len(value) <= EXTRA_FIELD_DICT_MAX_ITEMS:
             extra[key] = value
     props = raw.get("properties")
     identity_source: dict[str, Any] = {}
@@ -1030,7 +1062,7 @@ def _publications_for_graph_node(raw: dict[str, Any]) -> list[dict[str, Any]]:
     def add_publication(publication: dict[str, Any]) -> None:
         """Merge one publication into the node's publication map by key."""
         key = _publication_key(publication)
-        if not key or key == "source-title::":
+        if not key or key == EMPTY_PUBLICATION_KEY:
             return
         existing = merged.get(key)
         if existing is None:
@@ -1301,7 +1333,11 @@ def _find_thing(data: dict[str, Any], node_id: str) -> dict[str, Any] | None:
 
 
 def _normalize_node_type(value: str) -> str:
-    """Strip matkg: and rel: prefixes from a node type string."""
+    """Strip matkg: and rel: prefixes from a node type string.
+
+    Raises:
+        ValueError: the stripped type is empty.
+    """
     cleaned = _string_value(value).replace("matkg:", "").replace("rel:", "").strip()
     if not cleaned:
         raise ValueError("Node type cannot be empty")
@@ -1313,7 +1349,12 @@ _RELATIONSHIP_CURIE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]*:[A-Za-z0-9][A-Za-
 
 
 def _normalize_relationship_predicate(value: str) -> str:
-    """Validate a predicate and coerce a local name to a rel: CURIE."""
+    """Validate a predicate and coerce a local name to a rel: CURIE.
+
+    Raises:
+        ValueError: the predicate is empty, a malformed CURIE, or a local name with no leading
+            letter or digit.
+    """
     cleaned = _string_value(value)
     if not cleaned:
         raise ValueError("Relationship predicate cannot be empty")
@@ -1403,7 +1444,7 @@ def _snippet_thing_payload(
     return {
         "id": snippet_id,
         "name": label or function_name or snippet_id,
-        "category": "CodeSnippet",
+        "category": CODE_SNIPPET_CATEGORY,
         "type": "matkg:CodeSnippet",
         "description": "",
         "function_name": function_name,
@@ -1427,7 +1468,12 @@ def _kg_raw_parts(data: dict[str, Any]) -> tuple[list[Any], list[Any]]:
 
 
 def graph_payload_from_file(graph_path: Path) -> GraphPayload:
-    """Load a MatKG JSON file into the compact UI graph contract."""
+    """Load a MatKG JSON file into the compact UI graph contract.
+
+    Raises:
+        OSError: the file cannot be read.
+        json.JSONDecodeError: the file is not JSON.
+    """
     with graph_path.open("r", encoding="utf-8") as fh:
         data = json.load(fh)
 
@@ -1457,7 +1503,7 @@ def graph_payload_from_file(graph_path: Path) -> GraphPayload:
                 GraphEdge(
                     source=source,
                     target=target,
-                    predicate=_string_value(raw.get("predicate"), "rel:related_to"),
+                    predicate=_string_value(raw.get("predicate"), DEFAULT_PREDICATE),
                 )
             )
 
@@ -1520,7 +1566,7 @@ def graph_subset_from_file(graph_path: Path, node_ids: list[str]) -> dict[str, A
                     {
                         "source": source,
                         "target": target,
-                        "predicate": _string_value(raw.get("predicate"), "rel:related_to"),
+                        "predicate": _string_value(raw.get("predicate"), DEFAULT_PREDICATE),
                     }
                 )
 
@@ -1528,7 +1574,12 @@ def graph_subset_from_file(graph_path: Path, node_ids: list[str]) -> dict[str, A
 
 
 def graph_subset_from_lookup(kg: object, wanted: Sequence[str]) -> dict[str, Any]:
-    """Serialize an in-memory lookup graph (Tiled) into the UI node contract."""
+    """Serialize an in-memory lookup graph (Tiled) into the UI node contract.
+
+    The wanted ids are first widened to their ``CITE_FOCUS_HOPS`` neighborhood
+    (``tiled_neighborhood_ids``); when that yields nothing, each wanted id is resolved
+    on its own. Returns ``{"nodes": [], "edges": []}`` when nothing resolves.
+    """
     wanted_ids = [str(node_id) for node_id in wanted if str(node_id).strip()]
     empty: dict[str, Any] = {"nodes": [], "edges": []}
     nodes_map = getattr(kg, "nodes", {}) or {}
@@ -1556,7 +1607,7 @@ def graph_subset_from_lookup(kg: object, wanted: Sequence[str]) -> dict[str, Any
         payload = dict(raw)
         payload.setdefault("id", node_id)
         payload.setdefault("graph_id", getattr(kg, "graph_id", TILED_GRAPH_ID))
-        payload.setdefault("graph_label", getattr(kg, "graph_label", "Tiled Graph"))
+        payload.setdefault("graph_label", getattr(kg, "graph_label", TILED_GRAPH_LABEL))
         node = _graph_node_from_raw(payload)
         dumped = _model_to_jsonable(node)
         dumped["graph_id"] = dumped.get("graph_id") or payload.get("graph_id")
@@ -1580,7 +1631,7 @@ def graph_subset_from_lookup(kg: object, wanted: Sequence[str]) -> dict[str, Any
                 {
                     "source": source,
                     "target": target,
-                    "predicate": _string_value(edge.get("predicate"), "rel:related_to"),
+                    "predicate": _string_value(edge.get("predicate"), DEFAULT_PREDICATE),
                 }
             )
     return {"nodes": nodes, "edges": edges}
@@ -1592,7 +1643,7 @@ def graph_neighborhood_from_lookup(kg: object, node_id: str) -> GraphPayload:
     return GraphPayload(
         nodes=subset.get("nodes") or [],
         edges=subset.get("edges") or [],
-        source_path="tiled://graphql",
+        source_path=TILED_SOURCE_PATH,
     )
 
 
@@ -1674,7 +1725,7 @@ def query_graph_payload(
         )
         if tiled_lookup:
             subset = graph_subset_from_lookup(kg, wanted) if kg is not None else {"nodes": [], "edges": []}
-            source_names.append("tiled://graphql")
+            source_names.append(TILED_SOURCE_PATH)
         else:
             path = path_map.get(gid) or graph_path
             source_names.append(str(path))
@@ -1705,7 +1756,7 @@ def query_graph_payload(
                 continue
             source = remap.get((gid, _string_value(edge.get("source"))))
             target = remap.get((gid, _string_value(edge.get("target"))))
-            predicate = _string_value(edge.get("predicate"), "rel:related_to")
+            predicate = _string_value(edge.get("predicate"), DEFAULT_PREDICATE)
             if not source or not target:
                 continue
             key = (source, predicate, target)
@@ -2191,7 +2242,11 @@ def _normalize_chat_text(text: str) -> str:
 
 
 def _history_payload(messages: list[ChatMessageInput] | None) -> list[dict[str, str]]:
-    """Convert recent user/assistant messages into trimmed role/content dicts."""
+    """Convert recent user/assistant messages into trimmed role/content dicts.
+
+    Keeps the last ``MAX_HISTORY_MESSAGES`` entries, drops blank or other-role entries and cuts
+    each content to ``HISTORY_CONTENT_MAX_CHARS`` characters.
+    """
     history: list[dict[str, str]] = []
     for message in (messages or [])[-MAX_HISTORY_MESSAGES:]:
         if isinstance(message, dict):
@@ -2201,7 +2256,7 @@ def _history_payload(messages: list[ChatMessageInput] | None) -> list[dict[str, 
             role = str(message.role or "").strip()
             content = str(message.content or "").strip()
         if role in {"user", "assistant"} and content:
-            history.append({"role": role, "content": content[:4000]})
+            history.append({"role": role, "content": content[:HISTORY_CONTENT_MAX_CHARS]})
     return history
 
 
@@ -2426,7 +2481,7 @@ def _merge_publications_prefer_existing(
         if pub.get("doi"):
             pub["doi"] = _normalize_doi(pub.get("doi"))
         key = _publication_key(pub)
-        if not key or key == "source-title::":
+        if not key or key == EMPTY_PUBLICATION_KEY:
             return
         existing = merged.get(key)
         if existing is None:
@@ -2553,7 +2608,7 @@ def publications_for_selected_nodes(graph_path: Path, node_ids: list[str]) -> li
         }
         for publication in _node_publications(raw):
             key = _publication_key(publication)
-            if not key or key == "source-title::":
+            if not key or key == EMPTY_PUBLICATION_KEY:
                 continue
             existing = merged.setdefault(key, {**publication, "supporting_nodes": []})
             existing_nodes = {node["id"] for node in existing["supporting_nodes"]}
@@ -2643,13 +2698,13 @@ class AgentPipelineService:
         #: publication (``cfg.tiled_save_provider``); Splash is never called once a provider is attached either.
         self.tiled_save_provider = getattr(cfg, "tiled_save_provider", None)
         self.coord = Coordinator(cfg)
-        self.memory = SessionMemory(self.coord.workdir / "session_memory.json")
-        self.workflow = WorkflowStateStore(self.coord.workdir / "workflow_state.json")
+        self.memory = SessionMemory(self.coord.workdir / SESSION_MEMORY_FILENAME)
+        self.workflow = WorkflowStateStore(self.coord.workdir / WORKFLOW_STATE_FILENAME)
         self.lock = asyncio.Lock()
         # Pending approvals survive backend and one-shot CLI restarts.
         self.pending: dict[str, Any] | None = self.workflow.pending
         self._last_orchestration: dict[str, Any] | None = None
-        self._active_session_key = "__legacy__"
+        self._active_session_key = LEGACY_SESSION_KEY
         self._session_contexts: dict[str, ChatSessionContext] = {
             self._active_session_key: ChatSessionContext(
                 memory=self.memory,
@@ -2677,7 +2732,9 @@ class AgentPipelineService:
             graph_source=initial_graph_source,
             workflow_mode=cfg.workflow_mode if cfg.workflow_mode in {"deterministic", "agentic"} else "agentic",
             extraction_mode=cfg.extraction_mode if cfg.extraction_mode in {"full", "targeted"} else "targeted",
-            targeted_max_pages=cfg.targeted_max_pages if cfg.targeted_max_pages > 0 else 6,
+            targeted_max_pages=(
+                cfg.targeted_max_pages if cfg.targeted_max_pages > 0 else DEFAULT_TARGETED_MAX_PAGES
+            ),
             json_graph_path=primary_json_graph_path(initial_paths),
             json_graph_paths=list(initial_paths),
             kg_query_max_nodes=clamp_kg_query_max_nodes(
@@ -2705,9 +2762,14 @@ class AgentPipelineService:
 
     @staticmethod
     def _session_key(session_id: str | None) -> str:
-        """Validate a session id or return the legacy session key."""
+        """Validate a session id or return the legacy session key.
+
+        Raises:
+            ValueError: ``session_id`` is not ``[A-Za-z0-9][A-Za-z0-9_-]{0,63}``
+                (the routes answer 400 "Invalid session ID").
+        """
         if session_id is None:
-            return "__legacy__"
+            return LEGACY_SESSION_KEY
         value = session_id.strip()
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", value):
             raise ValueError("Invalid session ID")
@@ -2730,9 +2792,9 @@ class AgentPipelineService:
         self._store_active_session()
         context = self._session_contexts.get(key)
         if context is None:
-            context_dir = self.coord.workdir / "chat_sessions" / key
-            memory = SessionMemory(context_dir / "session_memory.json")
-            workflow = WorkflowStateStore(context_dir / "workflow_state.json")
+            context_dir = self.coord.workdir / CHAT_SESSIONS_DIRNAME / key
+            memory = SessionMemory(context_dir / SESSION_MEMORY_FILENAME)
+            workflow = WorkflowStateStore(context_dir / WORKFLOW_STATE_FILENAME)
             context = ChatSessionContext(
                 memory=memory,
                 workflow=workflow,
@@ -2749,6 +2811,10 @@ class AgentPipelineService:
         """Refresh session MatKG JSON from splash so UI reads survive restarts.
 
         With a Tiled save target the session graph is the effective record instead (no Splash call).
+
+        Returns:
+            ``True`` when the session graph file was (re)written, ``False`` when it was left
+            alone (empty Splash graph, no active publication, or any failure, which is logged).
         """
         if self.tiled_save is not None or self.tiled_save_provider is not None:
             try:
@@ -2872,7 +2938,11 @@ class AgentPipelineService:
         return files
 
     def settings_response(self) -> AgentSettingsResponse:
-        """Build the public settings payload from runtime state."""
+        """Build the public settings payload from runtime state.
+
+        In JSON mode with no selected graph this also writes the default selection back onto
+        ``self.runtime`` (``json_graph_paths`` and ``json_graph_path``).
+        """
         available = list_storage_kg_json_files()
         paths = self._runtime_json_paths()
         if self.runtime.graph_source == "json" and not paths:
@@ -3017,7 +3087,13 @@ class AgentPipelineService:
     async def apply_settings(self, update: AgentSettingsUpdate, *, locked: bool = False) -> AgentSettingsResponse:
         """Apply a settings update and rebuild agents when backend or graph changes.
 
-        ``locked``: the caller already holds ``self.lock`` and chose the active runtime (T25D).
+        Args:
+            update: the fields to change; ``None`` fields are left as they are.
+            locked: the caller already holds ``self.lock`` and chose the active runtime (T25D).
+
+        Raises:
+            ValueError: the model name is empty, or JSON mode is selected while no JSON graph
+                is selected and storage/kg lists none (the route answers 400).
         """
         async with (contextlib.nullcontext() if locked else self.lock):
             if not locked:
@@ -3210,7 +3286,14 @@ class AgentPipelineService:
         }
 
     async def search_graph_nodes(self, query: str, limit: int = 10) -> GraphNodeSearchResponse:
-        """Rank graph nodes matching a text query."""
+        """Rank graph nodes matching a text query.
+
+        Asks the retrieval agent for up to three times ``limit`` (at most 25) matches, drops
+        ``unknown``-typed stubs and returns at most ``limit`` results.
+
+        Raises:
+            ValueError: the query is blank.
+        """
         query = query.strip()
         if not query:
             raise ValueError("Search query is required")
@@ -3228,7 +3311,7 @@ class AgentPipelineService:
                 raw = getattr(kg, "nodes", {}).get(_string_value(match.get("id")))
                 if isinstance(raw, dict):
                     node = _graph_node_from_raw(raw)
-            if node is None or node.type.strip().lower() == "unknown":
+            if node is None or node.type.strip().lower() == UNKNOWN_NODE_TYPE:
                 continue
             if gid:
                 node.graph_id = gid
@@ -3245,7 +3328,12 @@ class AgentPipelineService:
         )
 
     def ensure_tiled_lookup(self, node_id: str) -> Any:  # noqa: ANN401  # Any: a TiledLookupGraph or a donor KnowledgeGraph (untyped legacy class)
-        """Reuse the in-memory Tiled graph; only page GraphQL when it is empty."""
+        """Reuse the in-memory Tiled graph; only page GraphQL when it is empty.
+
+        Returns:
+            The Tiled lookup graph with nodes, or whatever the retrieval agent held (possibly
+            ``None`` or an empty graph) when the GraphQL lookup found nothing.
+        """
         graphs = getattr(self.retrieval, "_graphs", None)
         if not isinstance(graphs, dict):
             self.retrieval._graphs = {}
@@ -3268,7 +3356,7 @@ class AgentPipelineService:
         """Return the Tiled neighborhood subgraph for a node id."""
         kg = self.ensure_tiled_lookup(node_id)
         if kg is None:
-            return GraphPayload(nodes=[], edges=[], source_path="tiled://graphql")
+            return GraphPayload(nodes=[], edges=[], source_path=TILED_SOURCE_PATH)
         return graph_neighborhood_from_lookup(kg, node_id)
 
     def attach_tiled_save(self, target: SaveTarget) -> None:
@@ -3344,6 +3432,14 @@ class AgentPipelineService:
         With a Tiled save target (T18D) this is a journaled multi-write on Tiled with no Splash call:
         authorization, the switch refusal and the recovery of earlier half-done Saves come first, the diff is
         journaled and written to Tiled, and the request returns only after the Tiled effect (Q12).
+
+        Raises:
+            ValueError: JSON graph mode, or ``code_snippet`` set on a non-CodeSnippet node, or an
+                invalid relationship or snippet update.
+            FileNotFoundError: the node, a relationship endpoint or its Splash entity is missing.
+            ContractError: ``DENIED`` without a request context on the Tiled path;
+                ``UNSUPPORTED_CAPABILITY`` from the save provider before the first publication.
+            StaleSave: the Tiled save was made from an out-of-date copy (Q10).
         """
         if self.runtime.graph_source == "json":
             raise ValueError("Editing node properties requires splash graph mode")
@@ -3484,7 +3580,7 @@ class AgentPipelineService:
                     return False
                 return (
                     _string_value(raw.get("subject") or raw.get("source")) == source
-                    and _string_value(raw.get("predicate"), "rel:related_to") == predicate
+                    and _string_value(raw.get("predicate"), DEFAULT_PREDICATE) == predicate
                     and _string_value(raw.get("object") or raw.get("target")) == target
                 )
 
@@ -3518,7 +3614,16 @@ class AgentPipelineService:
         subject_splash_id: str,
         updates: list[LinkedCodeSnippetUpdate],
     ) -> None:
-        """Upsert or unlink code snippets associated with a node."""
+        """Upsert or unlink code snippets associated with a node.
+
+        ``updates`` is the complete desired set: every snippet currently linked to the node that
+        is not upserted here is unlinked at the end. A temp/new id (or none) mints a new
+        ``matkg:snippet...`` thing; a known id updates or recreates that thing. Mutates ``data``
+        in place and mirrors every change to Splash through ``self._splash``.
+
+        Raises:
+            ValueError: an upsert has no code body (neither in the update nor on the linked snippet).
+        """
         current = {
             snippet.id: snippet
             for snippet in _linked_code_snippets_from_data(data, subject_node_id)
@@ -3540,7 +3645,7 @@ class AgentPipelineService:
                 for assoc in associations
                 if not (
                     isinstance(assoc, dict)
-                    and _string_value(assoc.get("predicate"), "rel:related_to") == "rel:has_code_snippet"
+                    and _string_value(assoc.get("predicate"), DEFAULT_PREDICATE) == HAS_CODE_SNIPPET_PREDICATE
                     and (
                         (
                             _string_value(assoc.get("subject") or assoc.get("source")) == subject_node_id
@@ -3559,13 +3664,13 @@ class AgentPipelineService:
                 return
             for link in self._splash.splash_find_links(
                 subject_id=subject_splash_id,
-                predicate="rel:has_code_snippet",
+                predicate=HAS_CODE_SNIPPET_PREDICATE,
                 object_id=str(snippet_entity["id"]),
             ):
                 self._splash.splash_delete_link(str(link["id"]))
             for link in self._splash.splash_find_links(
                 subject_id=str(snippet_entity["id"]),
-                predicate="rel:has_code_snippet",
+                predicate=HAS_CODE_SNIPPET_PREDICATE,
                 object_id=subject_splash_id,
             ):
                 self._splash.splash_delete_link(str(link["id"]))
@@ -3606,7 +3711,7 @@ class AgentPipelineService:
                     existing["function_name"] = function_name
                     existing["code_language"] = code_language
                     existing["code_snippet"] = code_text
-                    existing["category"] = "CodeSnippet"
+                    existing["category"] = CODE_SNIPPET_CATEGORY
 
                 splash_snippet = self._splash.splash_find_entity_by_matkg_id(snippet_id)
                 snippet_props = {
@@ -3617,20 +3722,20 @@ class AgentPipelineService:
                 }
                 if splash_snippet is None:
                     splash_snippet = self._splash.splash_create_entity(
-                        entity_type="CodeSnippet",
+                        entity_type=CODE_SNIPPET_CATEGORY,
                         name=label,
                         uri=snippet_id,
                         properties=snippet_props,
                     )
                     self._splash.splash_create_link(
                         subject_id=subject_splash_id,
-                        predicate="rel:has_code_snippet",
+                        predicate=HAS_CODE_SNIPPET_PREDICATE,
                         object_id=str(splash_snippet["id"]),
                     )
                     associations.append(
                         {
                             "subject": subject_node_id,
-                            "predicate": "rel:has_code_snippet",
+                            "predicate": HAS_CODE_SNIPPET_PREDICATE,
                             "object": snippet_id,
                         }
                     )
@@ -3642,7 +3747,7 @@ class AgentPipelineService:
                     )
                     linked = any(
                         isinstance(assoc, dict)
-                        and _string_value(assoc.get("predicate"), "rel:related_to") == "rel:has_code_snippet"
+                        and _string_value(assoc.get("predicate"), DEFAULT_PREDICATE) == HAS_CODE_SNIPPET_PREDICATE
                         and (
                             (
                                 _string_value(assoc.get("subject") or assoc.get("source")) == subject_node_id
@@ -3658,13 +3763,13 @@ class AgentPipelineService:
                     if not linked:
                         self._splash.splash_create_link(
                             subject_id=subject_splash_id,
-                            predicate="rel:has_code_snippet",
+                            predicate=HAS_CODE_SNIPPET_PREDICATE,
                             object_id=str(splash_snippet["id"]),
                         )
                         associations.append(
                             {
                                 "subject": subject_node_id,
-                                "predicate": "rel:has_code_snippet",
+                                "predicate": HAS_CODE_SNIPPET_PREDICATE,
                                 "object": snippet_id,
                             }
                         )
@@ -3688,12 +3793,12 @@ class AgentPipelineService:
             associations.append(
                 {
                     "subject": subject_node_id,
-                    "predicate": "rel:has_code_snippet",
+                    "predicate": HAS_CODE_SNIPPET_PREDICATE,
                     "object": snippet_id,
                 }
             )
             splash_snippet = self._splash.splash_create_entity(
-                entity_type="CodeSnippet",
+                entity_type=CODE_SNIPPET_CATEGORY,
                 name=label,
                 uri=snippet_id,
                 properties={
@@ -3705,7 +3810,7 @@ class AgentPipelineService:
             )
             self._splash.splash_create_link(
                 subject_id=subject_splash_id,
-                predicate="rel:has_code_snippet",
+                predicate=HAS_CODE_SNIPPET_PREDICATE,
                 object_id=str(splash_snippet["id"]),
             )
             desired_ids.add(snippet_id)
@@ -3720,7 +3825,11 @@ class AgentPipelineService:
         max_results: int = 20,
         include_external: bool = False,
     ) -> PublicationSearchResponse:
-        """Search graph-linked publications, optionally including OpenAlex."""
+        """Search graph-linked publications, optionally including OpenAlex.
+
+        Raises:
+            ValueError: the query is blank.
+        """
         query = query.strip()
         if not query:
             raise ValueError("Search query is required")
@@ -3767,7 +3876,11 @@ class AgentPipelineService:
         return self._upload_dir() / clean
 
     def save_uploaded_graph(self, filename: str, graph: dict[str, Any]) -> GraphUploadResponse:
-        """Validate and write an uploaded MatKG JSON graph."""
+        """Validate and write an uploaded MatKG JSON graph.
+
+        Raises:
+            ValueError: ``things`` or ``associations`` is not a list.
+        """
         if not isinstance(graph.get("things"), list) or not isinstance(graph.get("associations"), list):
             raise ValueError("Uploaded graph must be a MatKG JSON with list fields: things and associations")
         graph_path = self._uploaded_graph_path(filename)
@@ -3811,7 +3924,10 @@ class AgentPipelineService:
         return roots
 
     def _try_resolve_runtime_json_graph_path(self, path: str) -> Path | None:
-        """Resolve a runtime JSON graph path, skipping missing files."""
+        """Resolve a runtime JSON graph path; ``None`` (logged) for a missing or empty file.
+
+        A ``ValueError`` (path outside storage/kg and uploads) propagates.
+        """
         try:
             return self._resolve_runtime_json_graph_path(path, missing_ok=True)
         except FileNotFoundError:
@@ -3821,7 +3937,15 @@ class AgentPipelineService:
             raise
 
     def _resolve_runtime_json_graph_path(self, path: str, *, missing_ok: bool = False) -> Path:
-        """Resolve and validate a runtime JSON graph path."""
+        """Resolve and validate a runtime JSON graph path.
+
+        ``missing_ok`` is accepted for compatibility; both branches raise the same error, so it
+        does not change the outcome.
+
+        Raises:
+            FileNotFoundError: the file is missing or empty.
+            ValueError: a non-configured path outside storage/kg and uploads.
+        """
         graph_path = Path(path)
         if not graph_path.is_absolute():
             graph_path = (project_root() / graph_path).resolve()
@@ -4007,7 +4131,12 @@ class AgentPipelineService:
         ui_settings: dict[str, Any] | None = None,
         batch_id: str | None = None,
         ) -> ChatResponse:
-        """Run a chat turn without streaming progress events."""
+        """Run a chat turn without streaming progress events.
+
+        Opens and finishes the trace turn around ``_ask_body``. With ``auto_approve`` every
+        pending offer is accepted in a loop (downloads take candidate 0) until the response has
+        no pending state.
+        """
         self._open_chat_trace(
             question,
             messages=messages,
@@ -4155,7 +4284,11 @@ class AgentPipelineService:
         ui_settings: dict[str, Any] | None = None,
         batch_id: str | None = None,
         ) -> ChatResponse:
-        """Run a chat turn, emitting progress events along the way."""
+        """Run a chat turn, emitting progress events along the way.
+
+        Opens and finishes the trace turn around ``_ask_with_progress_body``; ``auto_approve``
+        behaves as in :meth:`ask`.
+        """
         self._open_chat_trace(
             question,
             messages=messages,
@@ -4317,7 +4450,10 @@ class AgentPipelineService:
     # Download-decline guard (Bug 2 fix)
     # ------------------------------------------------------------------
     def _record_download_decline(self, question: str) -> None:
-        """Persist the declined question so the same download prompt is not re-shown."""
+        """Persist the declined question so the same download prompt is not re-shown.
+
+        Keeps the newest ``MAX_DECLINED_DOWNLOAD_TOPICS`` distinct (case-insensitive) topics.
+        """
         q = question.strip()
         if not q:
             return
@@ -4325,8 +4461,8 @@ class AgentPipelineService:
         q_lower = q.lower()
         if q_lower not in [d.lower() for d in declined]:
             declined.append(q)
-        # Keep the last 5 declines; oldest are evicted first.
-        self.workflow.update(declined_download_topics=declined[-5:])
+        # Keep the newest MAX_DECLINED_DOWNLOAD_TOPICS declines; oldest are evicted first.
+        self.workflow.update(declined_download_topics=declined[-MAX_DECLINED_DOWNLOAD_TOPICS:])
 
     def _was_download_recently_declined(self, question: str) -> bool:
         """Return True when the user already said 'no' to a download for a similar topic.
@@ -4345,7 +4481,7 @@ class AgentPipelineService:
             if not t_tokens:
                 continue
             overlap = len(q_tokens & t_tokens) / min(len(q_tokens), len(t_tokens))
-            if overlap >= 0.5:
+            if overlap >= DECLINED_TOPIC_OVERLAP_MIN:
                 return True
         return False
 
@@ -4618,7 +4754,9 @@ class AgentPipelineService:
             await loop.run_in_executor(
                 None,
                 bind_context(lambda: self.memory.compress(
-                    lambda prompt: self._labeled_completion(prompt, timeout=60, label="session-memory-compress")
+                    lambda prompt: self._labeled_completion(
+                        prompt, timeout=LLM_HELPER_TIMEOUT_SECONDS, label="session-memory-compress"
+                    )
                 )),
             )
         except Exception as exc:
@@ -4659,15 +4797,23 @@ class AgentPipelineService:
             )
 
     async def delete_session_context(self, session_id: str) -> dict[str, str]:
-        """Delete a named chat session's on-disk context."""
+        """Delete a named chat session's on-disk context.
+
+        Returns:
+            ``{"status": "deleted", "session_id": key}``; the legacy context is activated first
+            when the deleted session was the active one.
+
+        Raises:
+            ValueError: an invalid session id, or the legacy session.
+        """
         key = self._session_key(session_id)
-        if key == "__legacy__":
+        if key == LEGACY_SESSION_KEY:
             raise ValueError("Legacy session cannot be deleted")
         async with self.lock:
             if key == self._active_session_key:
                 self._activate_session(None)
             self._session_contexts.pop(key, None)
-            context_dir = self.coord.workdir / "chat_sessions" / key
+            context_dir = self.coord.workdir / CHAT_SESSIONS_DIRNAME / key
             if context_dir.exists():
                 shutil.rmtree(context_dir)
             return {"status": "deleted", "session_id": key}
@@ -4837,7 +4983,7 @@ class AgentPipelineService:
         candidates = (
             [candidate for candidate in raw_candidates if _is_arxiv_candidate(candidate)]
             + [candidate for candidate in raw_candidates if not _is_arxiv_candidate(candidate)]
-        )[:5]
+        )[:MAX_CANDIDATE_PREVIEW]
         titles = [
             str(candidate.get("title") or candidate.get("doi") or candidate.get("id") or "Untitled")
             for candidate in candidates
@@ -4930,7 +5076,7 @@ class AgentPipelineService:
 
         def run() -> dict[str, Any]:
             """Call the router prompt and parse requires_agents JSON."""
-            raw = self._labeled_completion(prompt, timeout=60, label="legacy-route")
+            raw = self._labeled_completion(prompt, timeout=LLM_HELPER_TIMEOUT_SECONDS, label="legacy-route")
             obj = _parse_json_object(raw)
             if "requires_agents" not in obj:
                 return {"requires_agents": True, "reason": "Router returned no usable JSON."}
@@ -4975,7 +5121,9 @@ class AgentPipelineService:
 
         def run() -> str:
             """Run the direct-response chat completion."""
-            return str(self._labeled_completion(prompt, timeout=60, label="direct-response") or "").strip()
+            return str(
+                self._labeled_completion(prompt, timeout=LLM_HELPER_TIMEOUT_SECONDS, label="direct-response") or ""
+            ).strip()
 
         try:
             loop = asyncio.get_event_loop()
@@ -5008,7 +5156,11 @@ class AgentPipelineService:
 
         def run() -> str:
             """Run the domain-knowledge fallback chat completion."""
-            return str(self._labeled_completion(prompt, timeout=60, label="domain-knowledge-fallback") or "").strip()
+            return str(
+                self._labeled_completion(
+                    prompt, timeout=LLM_HELPER_TIMEOUT_SECONDS, label="domain-knowledge-fallback"
+                ) or ""
+            ).strip()
 
         try:
             loop = asyncio.get_event_loop()
@@ -5065,7 +5217,11 @@ class AgentPipelineService:
 
         def run() -> str:
             """Run the standalone-question rewrite completion."""
-            return str(self._labeled_completion(prompt, timeout=60, label="rewrite-question") or "").strip()
+            return str(
+                self._labeled_completion(
+                    prompt, timeout=LLM_HELPER_TIMEOUT_SECONDS, label="rewrite-question"
+                ) or ""
+            ).strip()
 
         try:
             loop = asyncio.get_event_loop()
@@ -5144,7 +5300,11 @@ class AgentPipelineService:
 
         def run() -> str:
             """Run the JSON-graph leeway-answer completion."""
-            return str(self._labeled_completion(prompt, timeout=60, label="json-graph-leeway") or "").strip()
+            return str(
+                self._labeled_completion(
+                    prompt, timeout=LLM_HELPER_TIMEOUT_SECONDS, label="json-graph-leeway"
+                ) or ""
+            ).strip()
 
         try:
             loop = asyncio.get_event_loop()
@@ -5167,7 +5327,16 @@ class AgentPipelineService:
         source_rag: bool | None = None,
         use_live_tiled: bool | None = None,
     ) -> ChatResponse:
-        """Run the orchestrated retrieval, download, and extraction chat loop."""
+        """Run the retrieval rounds of a chat turn up to the download offer.
+
+        Each round queries the KG and either answers, refuses (JSON mode), stops, or runs the
+        candidate search and evidence debate and returns ``awaiting_download_decision`` with a
+        pending download. The download and extraction themselves run later in
+        :meth:`_act_locked` (``_resume_download`` / ``_resume_extraction``).
+
+        Raises:
+            ValueError: JSON graph mode with no selected graph file.
+        """
         rounds: list[dict[str, Any]] = []
         last_verdict: dict[str, Any] = {}
         effective_graph_source = (graph_source or self.runtime.graph_source).lower()
@@ -5443,7 +5612,7 @@ class AgentPipelineService:
                 round_info["candidate_search"] = search
                 candidate_titles = [
                     str(c.get("title") or c.get("doi") or c.get("id") or "Untitled")
-                    for c in candidates[:5]
+                    for c in candidates[:MAX_CANDIDATE_PREVIEW]
                 ]
                 if not candidates:
                     await self._orchestrator_decision(question, emit)
@@ -5474,7 +5643,8 @@ class AgentPipelineService:
                     preflight=preflight_no,
                     count=len(candidates),
                     candidate_titles=candidate_titles,
-                    scores=[float(c.get("score") or c.get("_score") or 0.0) for c in candidates[:5]],
+                    scores=[float(c.get("score") or c.get("_score") or 0.0)
+                            for c in candidates[:MAX_CANDIDATE_PREVIEW]],
                 )
 
                 await self._emit(
@@ -5628,7 +5798,7 @@ class AgentPipelineService:
         candidates: list[dict[str, Any]],
         debate_summary: dict[str, Any],
     ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
-        """Best candidate (debate pick, else top-ranked) plus a few alternatives."""
+        """Best candidate (debate pick, else top-ranked) plus up to three alternatives."""
         if not candidates:
             return None, []
         selected = _select_candidates_by_indices(candidates, debate_summary.get("candidate_indices"))
@@ -5648,7 +5818,11 @@ class AgentPipelineService:
         rounds: list[dict[str, Any]],
         approved_pdfs: list[Path],
     ) -> ChatResponse | None:
-        """Stage -> extract -> rebuild -> reload. Returns ChatResponse only on failure/no-op."""
+        """Stage -> extract -> rebuild -> reload. Returns ChatResponse only on failure/no-op.
+
+        Fills ``round_info`` (``pending_pdfs``, ``extraction``, ``kg``, ``splash``, ``reload``) and
+        records the extraction on the coordinator as it goes; ``None`` means every step succeeded.
+        """
         round_pdf_dir, pending_pdfs = self.coord._stage_unprocessed_pdfs(
             round_no,
             source_pdfs=approved_pdfs,
@@ -5938,7 +6112,7 @@ class AgentPipelineService:
                 score = len(message_tokens & title_tokens) / max(1, len(message_tokens))
                 if score > best_score:
                     best_index, best_score = index, score
-            if best_index is not None and best_score >= 0.5:
+            if best_index is not None and best_score >= CANDIDATE_TITLE_MATCH_MIN:
                 return {"action": "download", "candidate_index": best_index}
             if len(candidates) == 1:
                 return {"action": "download", "candidate_index": 0}
@@ -5979,7 +6153,7 @@ class AgentPipelineService:
         def run() -> dict[str, Any]:
             """Parse JSON intent from the pending-download interpreter prompt."""
             return _parse_json_object(self._labeled_completion(
-                prompt, timeout=60, label="pending-download-intent"
+                prompt, timeout=LLM_HELPER_TIMEOUT_SECONDS, label="pending-download-intent"
             ))
 
         try:
@@ -6162,7 +6336,13 @@ class AgentPipelineService:
         *,
         candidate_index: int | None = None,
     ) -> ChatResponse:
-        """Execute an approved or declined download or extraction while holding the lock."""
+        """Execute an approved or declined download or extraction while holding the lock.
+
+        Raises:
+            ValueError: ``kind`` does not match the pending kind; a download approval without a
+                valid, available ``candidate_index``; or the orchestrator did not confirm the
+                approved action (the routes answer 400).
+        """
         pending = self._normalize_pending_state()
         if not pending:
             return self._no_pending_response()
@@ -6250,7 +6430,12 @@ class AgentPipelineService:
         pending: dict[str, Any],
         emit: ProgressEmitter | None,
     ) -> ChatResponse:
-        """Download the approved paper candidate and continue the workflow."""
+        """Download the approved paper candidate and offer its extraction.
+
+        On success the pending state becomes an extraction approval (``awaiting_extraction_decision``);
+        when nothing was downloaded the candidate is marked unavailable and the download decision is
+        re-offered.
+        """
         verdict = pending.get("verdict") or {}
         best = pending.get("selected_candidate")
         missing = pending.get("missing_topics") or []
@@ -6402,7 +6587,12 @@ class AgentPipelineService:
         pending: dict[str, Any],
         emit: ProgressEmitter | None,
     ) -> ChatResponse:
-        """Extract the approved PDFs into the graph and continue the workflow."""
+        """Extract the approved PDFs into the graph and re-check the original question.
+
+        After :meth:`_extract_rebuild_reload` the KG is queried again and the extraction report,
+        the new verdict and (when still insufficient) the domain-knowledge fallback are combined
+        into the answer. Finalizes session memory on every path.
+        """
         verdict = pending.get("verdict") or {}
         missing = pending.get("missing_topics") or []
         question = pending.get("effective_question") or pending.get("original_question") or ""
@@ -6649,7 +6839,7 @@ class AgentPipelineService:
             "title": str(candidate.get("title") or candidate.get("doi") or candidate.get("id") or "Untitled"),
             "doi": candidate.get("doi"),
             "publication_year": candidate.get("publication_year"),
-            "abstract": str(candidate.get("abstract") or "")[:600],
+            "abstract": str(candidate.get("abstract") or "")[:CANDIDATE_ABSTRACT_MAX_CHARS],
             "score": float(candidate.get("score") or candidate.get("_score") or 0.0),
             "repository": candidate.get("repository"),
             "recommended": bool(recommended),
@@ -6683,7 +6873,7 @@ class AgentPipelineService:
             "doi": candidate.get("doi"),
             "publication_year": candidate.get("publication_year"),
             "source_paper": filename or _safe_candidate_filename(candidate),
-            "abstract_text": str(candidate.get("abstract") or "")[:1600],
+            "abstract_text": str(candidate.get("abstract") or "")[:PUBLICATION_ABSTRACT_MAX_CHARS],
         }
 
     @staticmethod
@@ -6886,6 +7076,7 @@ def create_app(
         return node
 
     def _source_payload(graph: SourceGraph) -> GraphPayload:
+        """Full wire payload of a source graph (``source_path`` is ``source:<id>``)."""
         return GraphPayload(
             nodes=[_source_graph_node(raw, graph) for raw in graph.nodes],
             edges=[GraphEdge(source=e["subject"], target=e["object"], predicate=e["predicate"])
@@ -6893,6 +7084,7 @@ def create_app(
             source_path=f"source:{graph.source_id}")
 
     def _source_failure(exc: SourceError) -> HTTPException:
+        """The HTTP error of a source failure, with its status and typed detail."""
         return HTTPException(status_code=exc.status, detail=exc.detail())
 
     @app.get("/graph", response_model=GraphPayload)
@@ -6926,7 +7118,7 @@ def create_app(
                 raise _source_failure(exc) from None
             results = [GraphNodeSearchResult(node=node, score=score)
                        for node, score in ((_source_graph_node(raw, picked), score) for raw, score in hits)
-                       if node.type.strip().lower() != "unknown"]
+                       if node.type.strip().lower() != UNKNOWN_NODE_TYPE]
             found_in_source = GraphNodeSearchResponse(query=req.query.strip(), retrieval_backend="lexical:source",
                                                       results=results)
             return cast(GraphNodeSearchResponse, guard.project_route(
@@ -6977,10 +7169,10 @@ def create_app(
         payload = dict(raw)
         payload.setdefault("id", raw.get("id") or resolved or node_id)
         payload.setdefault("graph_id", TILED_GRAPH_ID)
-        payload.setdefault("graph_label", "Tiled Graph")
+        payload.setdefault("graph_label", TILED_GRAPH_LABEL)
         node = _graph_node_from_raw(payload)
         node.graph_id = node.graph_id or TILED_GRAPH_ID
-        node.graph_label = node.graph_label or "Tiled Graph"
+        node.graph_label = node.graph_label or TILED_GRAPH_LABEL
         return node
 
     @app.get("/graph/node/{node_id}", response_model=GraphNode)

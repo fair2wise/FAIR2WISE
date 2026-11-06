@@ -31,6 +31,9 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# Decimal places kept on normalized values and uncertainties.
+NORMALIZED_DECIMALS = 6
+
 
 class PhysicalPropertyExtractor:
     """Extracts physical property mentions from text for known materials.
@@ -48,7 +51,8 @@ class PhysicalPropertyExtractor:
         - raw_unit: Extracted unit string or None
         - uncertainty: Extracted uncertainty string or None
         - context: Sentence or relation context (string)
-        - verified: True (initial assumption; can be overridden)
+        - verified: True when a numeric value was extracted (extract), or copied from the
+          relation entry (extract_from_relations); False otherwise
     """
 
     # Map various textual forms to canonical property names
@@ -91,7 +95,8 @@ class PhysicalPropertyExtractor:
         """Initialize extractor with optional custom property keywords.
 
         Args:
-            property_keywords: override for PROPERTY_KEYWORDS mapping.
+            property_keywords: override for PROPERTY_KEYWORDS mapping (an empty mapping falls
+                back to the default).
         """
         self.keywords = property_keywords or self.PROPERTY_KEYWORDS
 
@@ -214,7 +219,8 @@ class PhysicalPropertyExtractor:
         Returns:
             A list of dicts, each with keys:
                 - material: term_record["term"]
-                - property: canonical property name if matched, else raw related_term lowercased
+                - property: canonical property name if matched, else related_term lowercased
+                  with spaces replaced by underscores
                 - raw_value: None (no numeric in relation itself)
                 - raw_unit: None
                 - uncertainty: None
@@ -282,19 +288,27 @@ class PropertyNormalizer:
     def normalize(self, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Convert raw values and units into canonical numeric + unit form.
 
-        Plausibility filtering is applied after conversion.
+        Plausibility filtering is applied after conversion. Entries are copied, never
+        mutated in place. An entry without ``raw_value`` or ``raw_unit`` is passed through
+        with the new fields at their defaults. An unknown unit, a non-numeric value or an
+        implausible result sets ``unit_conversion_failed=True`` and leaves the normalized
+        fields ``None`` (the failure is logged at DEBUG). Unknown properties pass their raw
+        unit through unchanged.
 
         Args:
             entries: List of dicts from PhysicalPropertyExtractor, each containing:
                      raw_value (str or None), raw_unit (str or None),
-                     uncertainty (str or None), property (str), etc.
+                     uncertainty (str or None), property (str, required), etc.
 
         Returns:
             List of dicts with added fields for each entry:
-                - normalized_value: float or None
+                - normalized_value: float rounded to NORMALIZED_DECIMALS, or None
                 - normalized_unit: str or None
-                - uncertainty_value: float or None
+                - uncertainty_value: float rounded to NORMALIZED_DECIMALS, or None
                 - unit_conversion_failed: bool
+
+        Raises:
+            KeyError: If an entry has no ``property`` key.
         """
         normalized_entries: list[dict[str, Any]] = []
 
@@ -491,10 +505,10 @@ class PropertyNormalizer:
                     if not (low <= norm_val <= high):
                         raise ValueError(f"Plausibility check failed for {prop}: {norm_val} not in [{low},{high}]")
 
-                norm_entry["normalized_value"] = round(norm_val, 6)
+                norm_entry["normalized_value"] = round(norm_val, NORMALIZED_DECIMALS)
                 norm_entry["normalized_unit"] = unit
                 if unc_norm is not None:
-                    norm_entry["uncertainty_value"] = round(unc_norm, 6)
+                    norm_entry["uncertainty_value"] = round(unc_norm, NORMALIZED_DECIMALS)
 
             except Exception:
                 logger.debug("unit conversion failed for %s", prop, exc_info=True)

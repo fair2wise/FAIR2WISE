@@ -91,8 +91,28 @@ _TECHNIQUE_CATEGORY_HINTS = (
     "blueskyrun",
 )
 LAYOUT_KG_QUERY_HOPS = 16
+# Judge prompt: how many trailing chat turns are shown, and the per-turn content cap (chars).
+JUDGE_HISTORY_TURNS = 8
+JUDGE_HISTORY_CONTENT_CHARS = 1200
+# Promoted beam-path stages score BASE + (SPAN - index) / SPAN so stage 1 ranks highest.
+BEAM_PATH_SCORE_BASE = 2.0
+BEAM_PATH_INDEX_SPAN = 50
+# Substring device fallback: minimum node-name length considered, and the fixed score given.
+SUBSTRING_FALLBACK_MIN_NAME_CHARS = 4
+SUBSTRING_FALLBACK_SCORE = 1.5
+# RSoXS popularity supplement: min paper count, and score = BASE + papers / SCALE.
+POPULAR_NODE_MIN_PAPERS = 2
+POPULAR_NODE_SCORE_BASE = 0.3
+POPULAR_NODE_PAPERS_SCALE = 100.0
+# Intent routing: share of candidate slots for the intent-primary KGs vs the rest, and the
+# fraction of max_nodes below which literature queries get the popularity supplement.
+INTENT_PRIMARY_SHARE = 0.6
+INTENT_SECONDARY_SHARE = 0.4
+LITERATURE_SUPPLEMENT_SHARE = 0.3
+# Directed edge that links consecutive beam-path stages.
+BEAM_PATH_NEXT_PREDICATE = "rel:beam_path_next"
 _BEAM_PATH_PREDICATES = {
-    "rel:beam_path_next",
+    BEAM_PATH_NEXT_PREDICATE,
     "rel:upstream_of",
     "rel:feeds",
     "rel:connected_to",
@@ -206,12 +226,12 @@ def _format_history_for_judge(history: list[dict[str, str]] | None) -> str:
     if not history:
         return ""
     lines: list[str] = []
-    for message in history[-8:]:
+    for message in history[-JUDGE_HISTORY_TURNS:]:
         role = str(message.get("role") or "").strip() or "user"
         content = str(message.get("content") or "").strip()
         if not content:
             continue
-        lines.append(f"{role}: {content[:1200]}")
+        lines.append(f"{role}: {content[:JUDGE_HISTORY_CONTENT_CHARS]}")
     if not lines:
         return ""
     return "Conversation so far:\n" + "\n".join(lines) + "\n\n"
@@ -275,9 +295,10 @@ def _parse_judge(raw: str) -> dict[str, Any]:
 def _has_direct_evidence(kg: object, node_info: object) -> bool:
     """Evidence strong enough to ask the judge.
 
-    Snippets and publications still count. For conceptual questions, a non-empty
-    description or a technique/measurement category is also enough to try
-    synthesizing an answer. Graph degree alone is not enough.
+    Source papers, publications, snippets and code count. A non-empty description, a
+    technique/measurement-like category, or an evidence-bearing out-edge also counts
+    regardless of question type (``query`` decides separately whether non-conceptual
+    questions may rely on that). Graph degree alone is not enough.
     """
     raw = getattr(kg, "nodes", {}).get(getattr(node_info, "id", ""), {}) if kg is not None else {}
     if not isinstance(raw, dict):
@@ -349,7 +370,7 @@ def _beam_path_nodeinfos(kg: object) -> list[Any]:
             seen.add(nid)
             ordered_ids.append(nid)
             for edge in getattr(kg, "out_edges", {}).get(nid, []):
-                if str(edge.get("predicate") or "") == "rel:beam_path_next":
+                if str(edge.get("predicate") or "") == BEAM_PATH_NEXT_PREDICATE:
                     target = str(edge.get("object") or "")
                     if target and target not in seen:
                         queue.append(target)
@@ -366,7 +387,7 @@ def _beam_path_nodeinfos(kg: object) -> list[Any]:
                 name=str(raw.get("name") or nid),
                 category=str(raw.get("category") or "BeamlineStage"),
                 description=str(raw.get("description") or ""),
-                score_prp=2.0 + max(0, 50 - index) / 50.0,
+                score_prp=BEAM_PATH_SCORE_BASE + max(0, BEAM_PATH_INDEX_SPAN - index) / BEAM_PATH_INDEX_SPAN,
                 evidence_ct=max(1, int(raw.get("evidence_ct") or 1)),
             )
         )
@@ -455,7 +476,10 @@ class RetrievalAgent(Agent):
         return None
 
     def _build_kgs(self) -> dict[str, Any]:
-        """Load each configured JSON KG, skipping missing/empty/broken files."""
+        """Load each configured KG (honouring ``graph_source``), skipping missing/empty/broken files.
+
+        Side effect: replaces ``self._skipped`` with the skipped ``{"path", "reason"}`` records.
+        """
         graphs: dict[str, Any] = {}
         skipped: list[dict[str, str]] = []
         for path in self._graph_files:
@@ -504,7 +528,20 @@ class RetrievalAgent(Agent):
         graph_source: str | None = None,
         graph_files: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Rebuild the in-memory KG(s). Missing/empty files are skipped."""
+        """Rebuild the in-memory KG(s).
+
+        Args:
+            graph_file: Primary graph path. Alone, it replaces the configured files and is loaded
+                as a single KG (a missing/broken file raises here, nothing is skipped).
+            graph_source: Replaces the configured source (``json``/``splash``) when truthy.
+            graph_files: When not ``None``, the multi-KG set to load; missing/empty/broken files
+                are skipped and reported under ``skipped``.
+
+        Returns:
+            Dict with ``status`` (``"reloaded"``), ``graph_file``, ``graph_files``, ``graph_ids``,
+            ``skipped``, ``nodes`` (total across loaded graphs), ``graph_source_requested`` and
+            ``graph_source_used``.
+        """
         if graph_source:
             self._graph_source = graph_source
         if graph_files is not None:
@@ -553,7 +590,7 @@ class RetrievalAgent(Agent):
         return {}
 
     async def _ensure_graphs(self) -> dict[str, Any]:
-        """Load graphs on first use; raise if none can be opened."""
+        """Load graphs on first use; raise ``RuntimeError`` if none can be opened."""
         graphs = self._active_graphs()
         if graphs:
             return graphs
@@ -603,7 +640,11 @@ class RetrievalAgent(Agent):
         graphs: dict[str, Any],
         kg_hits: list[ScoredHit],
     ) -> tuple[dict[str, Any], list[ScoredHit]]:
-        """Merge live Tiled identity hits into *graphs*/*kg_hits* when the question needs them."""
+        """Merge live Tiled identity hits into *graphs*/*kg_hits* when the question needs them.
+
+        Side effects: refreshes ``self._last_tiled_meta`` on every call and, when a Tiled graph
+        is returned, stores it in ``self._graphs`` under ``TILED_GRAPH_ID``.
+        """
         if not self._live_tiled:
             self._last_tiled_meta = load_tiled_config(
                 uri=self._tiled_uri, enabled=False
@@ -763,7 +804,7 @@ class RetrievalAgent(Agent):
                 if not isinstance(raw, dict):
                     continue
                 name = str(raw.get("name") or "").strip()
-                if len(name) < 4:
+                if len(name) < SUBSTRING_FALLBACK_MIN_NAME_CHARS:
                     continue
                 if name.lower() not in q_lower:
                     continue
@@ -774,7 +815,7 @@ class RetrievalAgent(Agent):
                     ScoredHit(
                         id=nid,
                         graph_id=gid,
-                        score=1.5,  # slightly above normal retrieval floor
+                        score=SUBSTRING_FALLBACK_SCORE,  # slightly above normal retrieval floor
                         evidence_ct=max(1, int(raw.get("evidence_ct") or 1)),
                         category=str(raw.get("category") or ""),
                         name=name,
@@ -784,7 +825,7 @@ class RetrievalAgent(Agent):
                             name=name,
                             category=str(raw.get("category") or ""),
                             description=str(raw.get("description") or ""),
-                            score_prp=1.5,
+                            score_prp=SUBSTRING_FALLBACK_SCORE,
                             evidence_ct=max(1, int(raw.get("evidence_ct") or 1)),
                         ),
                     )
@@ -831,7 +872,7 @@ class RetrievalAgent(Agent):
             if not isinstance(papers, list):
                 continue
             count = len(papers)
-            if count < 2:
+            if count < POPULAR_NODE_MIN_PAPERS:
                 continue
             candidates.append((count, str(nid), raw))
 
@@ -840,7 +881,7 @@ class RetrievalAgent(Agent):
         graph_label = getattr(kg, "graph_label", graph_label_for_id(graph_id))
         hits: list[ScoredHit] = []
         for count, nid, raw in candidates[:max_n]:
-            score = 0.3 + count / 100.0
+            score = POPULAR_NODE_SCORE_BASE + count / POPULAR_NODE_PAPERS_SCALE
             entity_type = str(
                 raw.get("entity_type") or raw.get("entityType") or ""
             )
@@ -896,9 +937,9 @@ class RetrievalAgent(Agent):
             # Can't split — just do equal allocation
             return self._parallel_retrieve(question, graphs, hops, max_nodes, layout=False)
 
-        primary_max = max(1, int(max_nodes * 0.6))
+        primary_max = max(1, int(max_nodes * INTENT_PRIMARY_SHARE))
         other_count = max(1, len(secondary))
-        secondary_max = max(1, int(max_nodes * 0.4 / other_count))
+        secondary_max = max(1, int(max_nodes * INTENT_SECONDARY_SHARE / other_count))
 
         logger.debug(
             "Intent routing %r → intent=%s primary=%s (max=%d) secondary=%s (max=%d)",
@@ -919,7 +960,7 @@ class RetrievalAgent(Agent):
         # with the most paper-cited nodes so they don't get crowded out by ops nodes.
         if intent == "literature":
             rsoxs_hit_count = sum(1 for h in raw_hits if is_science_graph_id(h.graph_id))
-            threshold = max_nodes * 0.3
+            threshold = max_nodes * LITERATURE_SUPPLEMENT_SHARE
             if rsoxs_hit_count < threshold:
                 existing_ids = {h.id for h in raw_hits}
                 for gid, kg in primary.items():
@@ -1172,7 +1213,25 @@ class RetrievalAgent(Agent):
         history: list[dict[str, str]] | None = None,
         source_rag: bool | None = None,
     ) -> dict[str, Any]:
-        """Retrieve context for ``question`` and judge whether it suffices to answer."""
+        """Retrieve context for ``question`` and judge whether it suffices to answer.
+
+        Args:
+            question: The user question.
+            history: Prior chat turns (``{"role", "content"}`` dicts); the last
+                ``JUDGE_HISTORY_TURNS`` are shown to the judge and leeway prompts.
+            source_rag: Per-call override of hybrid source RAG; ``None`` uses the instance setting.
+
+        Returns:
+            Dict with ``status`` (``"success"``, ``"context_error"`` or ``"judge_error"``),
+            ``question``, ``sufficient``, ``answer`` (``None`` unless sufficient), ``missing_topics``,
+            ``selected`` (hit ids), ``selected_hits``, ``no_evidence``, ``direct_evidence_count``,
+            the ``_source_meta`` keys, ``hybrid_rag`` and ``materials_project``; the two error
+            statuses add ``error``. A ``no_evidence`` early return is still ``status="success"``.
+            Never raises for retrieval/context/judge failures (they are logged and reported).
+
+        Side effects: sets the ``_trace_*`` attributes, ``_last_intent``, ``_last_mp_meta`` and
+        ``_last_tiled_meta``; may add the live Tiled graph to ``self._graphs``.
+        """
         loop = asyncio.get_event_loop()
         graphs = await self._ensure_graphs()
         self._trace_layout_ops_only_applied = False

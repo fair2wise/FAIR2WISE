@@ -17,6 +17,9 @@ from .store import TermStore
 
 logger = logging.getLogger(__name__)
 
+# Max candidate display names returned by check_existing_term's "possible_matches:" reply.
+POSSIBLE_MATCHES_LIMIT = 5
+
 
 @dataclass
 class ToolState:
@@ -87,8 +90,9 @@ def build_tools(state: ToolState) -> list[BaseTool]:
             if name_lower in display.lower() or display.lower() in name_lower
         ]
         if candidates:
-            logger.debug("check_existing_term: '%s' → possible_matches %s", name, candidates[:5])
-            return "possible_matches:" + ",".join(candidates[:5])
+            logger.debug("check_existing_term: '%s' → possible_matches %s", name,
+                         candidates[:POSSIBLE_MATCHES_LIMIT])
+            return "possible_matches:" + ",".join(candidates[:POSSIBLE_MATCHES_LIMIT])
         return "not_found"
 
     @tool

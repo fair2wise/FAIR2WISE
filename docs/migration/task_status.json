@@ -512,7 +512,7 @@
       "gate": "H7",
       "status": "open",
       "merge_commit": null,
-      "note": "typing zero, ANN401 enforced (149 Any signatures kept with reasons), ruff/isort/mypy/pyflakes gated, coverage 93.2% with no module under 80%, sniff-list rows fixed or deferred per the owner reply of 2026-11-03; merged through f2deeae; open fix rows: F2.4 (docstring style), F2.5 (docstring versus implementation) and F3.8 (magic literals), all needing a human read | isort/pyflakes gates restored by 25129e81ee36e4176ab13d293b16941c37c871f5 (2026-11-05: imports sorted in four files, unused/duplicate imports removed)"
+      "note": "typing zero, ANN401 enforced (149 Any signatures kept with reasons), ruff/isort/mypy/pyflakes gated, coverage 93.2% with no module under 80%, sniff-list rows fixed or deferred per the owner reply of 2026-11-03; merged through f2deeae; F2.4, F2.5 and F3.8 closed with evidence on branch forge_merge-T27-sniff (2026-11-06: scripts/ci/docstring_style.py gate, reviews/H7/readthrough_F25_F38.md: 53 docstrings corrected, 58 constants hoisted, 13 suspected code bugs and 4 contract docstrings await the owner; H7 not approved) | isort/pyflakes gates restored by 25129e81ee36e4176ab13d293b16941c37c871f5 (2026-11-05: imports sorted in four files, unused/duplicate imports removed)"
     },
     {
       "id": "T22C",
