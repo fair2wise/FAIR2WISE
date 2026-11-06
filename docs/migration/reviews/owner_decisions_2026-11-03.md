@@ -88,3 +88,12 @@ Interpretation notes (agent, for the owner to correct):
 | SaveTarget on :local | "Wire lazily after the first :local publication (Recommended)" |
 | Corpus scope default on the :local image | "Set none; name one per run (Recommended)" |
 | Library-to-publish route/button | "Not now; do the E2E with the existing steps (Recommended)" |
+
+## Eleventh set (2026-11-06)
+
+| Question | Owner answer |
+|---|---|
+| Approval of the E2E publication plan `job-9166b202380119cedfdf1dbc` (plan_sha256 `0c4fd3feb…`) | "You approve it in the UI" (the owner approves; the agent does not submit the approval) |
+| E3 spec errata | "Explain it to me first" (not decided; the agent explains the draft in plain words, then asks again) |
+| Caption assertions dropped from the real-weights parsing test | "Restore with a real PDF fixture" |
+| Retire list of 16 legacy files | "Not now" (the list stays held, nothing is deleted) |
