@@ -95,6 +95,6 @@
     ],
     "requires_staging_pass": true,
     "reextract_in_production": false,
-    "bundled_in_images": false
+    "bundled_in_images": true
   }
 }
