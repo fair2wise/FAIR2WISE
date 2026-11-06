@@ -33,10 +33,43 @@ and from the worker factory):
   settings wires nothing.
 - The writer credential is read by `tiled_lifecycle.writer_credential`, lazily per request, as before.
 
+## UI Save on `:local` (T18D), wired lazily (2026-11-06, branch `forge_merge-T-savetarget`)
+
+Owner decision 2026-11-04 (tenth set): "Wire lazily after the first :local publication". `SaveTarget` needs an
+active published snapshot and an edit journal per corpus, which exist only after the first publication, so nothing
+is bound at startup. `app/api/local_save.py` (`LocalSaveProvider`, built by `build_local_publication` and attached
+to the legacy service by `create_api_app(local_publication=True)` unless an explicit `tiled_save` is given)
+resolves the target **per Save request** from the deployment's own publication state:
+
+- Target: the one Tiled the `:local` gate allows (same trust condition as the publication).
+- Corpus rule (one target, possibly several corpora): the corpus named by the **active publication pointer** of
+  that target (`PublishStore.pointer(target).snapshot_ref = "<corpus>/<vN>"`, the last publication activated on the
+  image). The session graph the UI edits in its editable (`splash`-labelled) mode is that corpus's effective record
+  (active snapshot plus in-flight journal entries), so the node being edited is a node of that corpus; a node of
+  another corpus is the legacy 404, and the UI's selectable graph sources stay read-only (`source` -> 400). With
+  `F2W_CORPUS_SCOPE` set, the pointer's corpus must be in scope (defence in depth: the publication job already
+  refuses out-of-scope corpora).
+- Base snapshot: `<workdir>/storage_kg/<corpus>/<vN>/graph.json` with the pointer's recorded `snapshot_sha256`;
+  the importer's own `release.json` of that corpus must name the same snapshot as live. `TiledSaveBackend`
+  hash-checks the base on every read (a mismatch is its `CONFLICT`, the route's 502, never a 500); `StaleSave`
+  (409) and every other legacy_save rule are unchanged.
+- Journal: per corpus, `<ops_root>/publication-state/<target>/<corpus>/edits.jsonl`. The publication step now
+  reads the same file (`ReplacementPublishStep(edit_journals=...)`), so a later publication of an edited corpus is
+  refused with `CONFLICT` until the edit is reconciled or a reviewed resolution is attached (owner: the
+  import-time conflict block is sufficient; no separate "unresolved edits" surface).
+- Credential: the managed lifecycle's writer reader, called lazily per request; never cached, logged or in a repr.
+- Before the first publication, or when a check fails: `PATCH /graph/node/{id}` answers the typed 501
+  (`UNSUPPORTED_CAPABILITY`, wording "JSON available, Tiled unavailable: ..."), `GET /v1/capabilities` reports
+  `can_save = false` (the frozen UI hides the Save controls) and no Splash call is made. After a publication the
+  next Save resolves the new target without a restart; a later publication is resolved anew.
+
+Operator note: the image starts the API with `--kg-mode json` (read-only; Save is the legacy 400 there). To edit,
+switch Settings -> graph source to the editable mode; the session graph is then rebuilt from the active publication.
+
+Tests: `tests/api_wiring/test_local_save.py` (memory double and a real disposable Tiled).
+
 ## Not done / follow-ups for the owner
 
-- `SaveTarget` (UI Save as journaled Tiled writes) is not wired: it needs an active published snapshot and an edit
-  journal per corpus, which only exist after the first publication. Wiring it is a separate decision.
 - The vocabulary revision on `:local` is the fixed label `local-unversioned` (no separately versioned vocabulary
   is deployed on the image); the schema revision is a digest of the registered schema fingerprints.
 - The index builder on `:local` is a verified pointer to the frozen JSON graph (the JSON graph is the retrieval

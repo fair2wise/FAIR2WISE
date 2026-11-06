@@ -18,6 +18,10 @@ says), and the gate still refuses every other target with 403 (not on this deplo
 The writer credential is read the way the managed lifecycle already reads it
 (:func:`~app.modules.deployment.tiled_lifecycle.writer_credential`, lazily, per request, from the
 private secret file under the Tiled data directory). No new secret path exists and nothing is logged.
+
+The UI Save (T18D) is wired lazily on the same condition (owner decision 2026-11-04, tenth set): the
+:class:`~.local_save.LocalSaveProvider` built here resolves its target per request from the active
+publication pointer, so Save becomes available after the first publication without a restart.
 """
 
 from __future__ import annotations
@@ -35,6 +39,7 @@ from ..modules.contracts.json_types import JsonObject
 from ..modules.deployment import tiled_lifecycle
 from ..modules.deployment.tiled_config import ManagedTiledConfig, TiledConfigError, load_tiled_settings
 from ..modules.f2w_agent.graph_sources import GraphScanner
+from ..modules.graph import edit_journal as ej
 from ..modules.graph.backends.tiled_mutations import TiledMutationClient
 from ..modules.graph.imports import tiled_json as tj
 from ..modules.graph.snapshot_manifest import SNAPSHOT_ID_RE
@@ -53,6 +58,7 @@ from ..modules.security.authorization import (
     worker_context,
 )
 from ..modules.security.tiled_identity import normalize_tiled_target
+from .local_save import LocalSaveProvider, local_edit_journal
 from .operations import F2WOperations, PublicationGate
 from .post_extraction import PostExtractionPublisher, snapshot_freezer
 
@@ -172,6 +178,8 @@ class LocalPublication:
     step: ReplacementPublishStep
     target: str
     storage_kg: Path
+    #: The lazily resolved UI Save target (T18D), attached to the legacy service by ``create_api_app``.
+    save_provider: LocalSaveProvider
 
 
 def build_local_publication(jobs: JobService, settings: DeploymentSettings, managed: ManagedTiledConfig, *,
@@ -207,16 +215,26 @@ def build_local_publication(jobs: JobService, settings: DeploymentSettings, mana
     now = clock or (lambda: datetime.now(UTC))
     # The writer credential: the managed lifecycle's own reader, called lazily per request (never cached or logged).
     client = TiledMutationClient(target, profile="local", credential=lambda: tiled_lifecycle.writer_credential(managed))
+
+    def journal_for(scope: str) -> ej.EditJournal:
+        # The per-corpus Save journal: the import-time conflict block reads the very file Save writes.
+        return local_edit_journal(state_dir, target, scope)
+
     step = ReplacementPublishStep(client=client, settings=settings, supported_schema_fingerprints=fingerprints,
-                                  storage_kg=storage_kg, state_dir=state_dir, clock=now)
+                                  storage_kg=storage_kg, state_dir=state_dir, clock=now, edit_journals=journal_for)
     recorder = audit or AuditRecorder(AuditLog(Path(ops_root) / "audit.sqlite3", clock=epoch))
     operator = local_operator_context(settings, request_id="local-publication")
+    store = PublishStore(jobs.store.db, clock=epoch)
     deps = PublicationDeps(
         snapshots=DirectorySnapshotSource(storage_kg), step=step, index=LocalIndexBuilder(storage_kg),
-        probe=LocalRevisionProbe(fingerprints), store=PublishStore(jobs.store.db, clock=epoch), audit=recorder,
+        probe=LocalRevisionProbe(fingerprints), store=store, audit=recorder,
         ctx_for=lambda job: worker_context(operator, run_id=job.job_id), clock=epoch,
         verify_approval=lambda approval, plan, at: verify_approval(approval, plan, settings, at=at))
-    return LocalPublication(Publication(jobs, deps), PublicationGate(frozenset({target})), step, target, storage_kg)
+    save_provider = LocalSaveProvider(settings=settings, managed=managed, target=target, storage_kg=storage_kg,
+                                      state_dir=state_dir, store=store, clock=now, namespace=step.namespace,
+                                      access_blob=step.access_blob)
+    return LocalPublication(Publication(jobs, deps), PublicationGate(frozenset({target})), step, target, storage_kg,
+                            save_provider)
 
 
 def managed_tiled_from(environ: Mapping[str, str]) -> ManagedTiledConfig | None:

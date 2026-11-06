@@ -217,7 +217,9 @@ def create_api_app(
         local_publication: Trusted wiring flag (``run_api`` sets it; never read from a request, setting or
             environment value). On the ``:local`` profile only, with a managed Tiled whose loopback URL is the
             deployment's own Tiled target, wire the real publication job and put exactly that target in the H5
-            gate (:mod:`app.api.local_publication`). ALS profiles and every other target stay gated.
+            gate (:mod:`app.api.local_publication`), and attach the lazily resolved UI Save target
+            (:mod:`app.api.local_save`; unless ``tiled_save`` is given). ALS profiles and every other target
+            stay gated.
 
     Raises:
         StartupConfigError: As ``create_app``, ``operations`` bound to other settings,
@@ -280,6 +282,10 @@ def create_api_app(
             auto = post_extraction_publisher(operations, wired)
             if auto is not None:
                 cfg.extraction_publisher = auto
+        if wired is not None and getattr(cfg, "tiled_save", None) is None:
+            # T18D on :local (owner decision 2026-11-04, tenth set): the UI Save target is resolved lazily, per
+            # request, from the active publication; before the first publication Save is the typed 501.
+            app.state.f2w_agent_service.attach_tiled_save_provider(wired.save_provider)
     if knowledge_operations is not None and operations.knowledge is not None:
         raise StartupConfigError("config_rejected: knowledge_operations given but operations already carry one")
     if operations.knowledge is None:

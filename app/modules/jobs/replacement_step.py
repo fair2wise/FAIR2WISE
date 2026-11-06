@@ -55,6 +55,8 @@ class ReplacementPublishStep:
         namespace: Optional target namespace (``#namespace``).
         access_blob: Access blob written on records.
         edit_journal: Scoped edit journal checked for lost edits (T23C), or ``None``.
+        edit_journals: Per-corpus journals (``scope -> journal``) used when ``edit_journal`` is ``None``; the
+            ``:local`` image passes the Save journals so a publication never papers over an acknowledged edit.
     """
 
     adapter_version = cs.ADAPTER_VERSION
@@ -66,13 +68,21 @@ class ReplacementPublishStep:
     def __init__(self, *, client: TiledMutationClient, settings: DeploymentSettings,
                  supported_schema_fingerprints: Collection[str], storage_kg: Path, state_dir: Path,
                  clock: Callable[[], datetime], namespace: str | None = None,
-                 access_blob: Mapping[str, Any] | None = None, edit_journal: ej.EditJournal | None = None) -> None:
+                 access_blob: Mapping[str, Any] | None = None, edit_journal: ej.EditJournal | None = None,
+                 edit_journals: Callable[[str], ej.EditJournal] | None = None) -> None:
         self.client, self.settings, self.fingerprints = client, settings, supported_schema_fingerprints
         self.storage_kg, self.state_dir, self.clock = Path(storage_kg), Path(state_dir), clock
         self.namespace, self.access_blob, self.edit_journal = namespace, dict(access_blob or {}), edit_journal
+        self.edit_journals = edit_journals
         self.target = target_for(client, namespace)
         self.receipts = ReceiptStore(self.state_dir / "receipts")
         self._plans: dict[str, Any] = {}
+
+    def _journal_for(self, scope: str) -> ej.EditJournal | None:
+        """The edit journal the import of ``scope`` must not lose edits from, or ``None``."""
+        if self.edit_journal is not None:
+            return self.edit_journal
+        return self.edit_journals(scope) if self.edit_journals is not None else None
 
     # --- plan persistence -------------------------------------------------------------------------
 
@@ -126,7 +136,7 @@ class ReplacementPublishStep:
             self.source_dir(snapshot.corpus, snapshot.manifest.snapshot_id), client=self.client,
             settings=self.settings, supported_schema_fingerprints=self.fingerprints, namespace=self.namespace,
             access_blob=self.access_blob, adopt_legacy=bool(opts.get("adopt_legacy")),
-            edit_journal=self.edit_journal, resolutions=resolutions, state_dir=self.state_dir)
+            edit_journal=self._journal_for(snapshot.corpus), resolutions=resolutions, state_dir=self.state_dir)
         return self._remember("replacement", rp)
 
     def plan_is_safe(self, plan: ChangePlan) -> bool:
@@ -240,7 +250,7 @@ class ReplacementPublishStep:
             resolutions = [ej.ConflictResolution.model_validate(r) for r in params.get("resolutions") or ()]
             rplan = cp.plan_retire_all(client=self.client, settings=self.settings, scope=scope,
                                        confirm_scope=str(params.get("confirm_scope", "")), namespace=self.namespace,
-                                       access_blob=self.access_blob, edit_journal=self.edit_journal,
+                                       access_blob=self.access_blob, edit_journal=self._journal_for(scope),
                                        resolutions=resolutions)
             return self._remember("retire", rplan)
         if operation == "purge":

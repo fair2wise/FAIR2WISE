@@ -7,7 +7,8 @@ entry (T18D, TIL-22).
 
 * ``can_edit``: the caller holds ``graph.edit`` (the guard of ``PATCH /graph/node/{id}``, R10).
 * ``can_save``: ``can_edit`` and the active graph source is editable (not the read-only JSON mode, where the
-  same PATCH answers 400).
+  same PATCH answers 400) and a Save target is reachable now (on ``:local`` before the first publication the
+  same PATCH answers the typed 501; owner decision 2026-11-04, tenth set).
 * ``can_upload``: ``graph.upload`` (R11).
 * ``role``: ``local_operator`` (``:local``, no sign-in), ``admin`` (verified Tiled admin) or ``user``.
 """
@@ -43,6 +44,9 @@ def install(app: FastAPI) -> FastAPI:
         service = getattr(request.app.state, "f2w_agent_service", None)
         runtime = getattr(service, "deployment_runtime", None)
         editable = getattr(runtime, "graph_source", "splash") != "json"
+        available = getattr(service, "save_available", None)
+        if editable and callable(available):
+            editable = bool(available())
         return cast(dict[str, Any], project(request, capabilities_for_caller(ctx, editable_source=editable)))
 
     return app
