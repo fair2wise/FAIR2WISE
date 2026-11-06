@@ -58,6 +58,13 @@ from .download_agent import (
     _sanitize_openalex_search,
 )
 from .extractor_agent import ExtractorAgent
+from .graph_sources import (
+    GraphSources,
+    JsonFile,
+    SourceError,
+    SourceGraph,
+    read_only_error,
+)
 from .multi_kg import (
     DEFAULT_KG_QUERY_HOPS,
     DEFAULT_KG_QUERY_MAX_NODES,
@@ -2817,6 +2824,24 @@ class AgentPipelineService:
                 if resolved is not None:
                     return resolved
         return self._session_graph_path()
+
+    def json_source_files(self) -> list[JsonFile]:
+        """The JSON KG files the UI may pick as a graph source: server listings only, each resolved under the roots.
+
+        The names come from :func:`list_storage_kg_json_files` and pass the same root check as every other
+        JSON graph read; a path a request supplies never reaches this method.
+        """
+        files: list[JsonFile] = []
+        for rel in list_storage_kg_json_files():
+            try:
+                path = self._resolve_json_graph_path(rel)
+            except (ValueError, FileNotFoundError):
+                continue
+            gid = graph_id_for_path(rel)
+            stem = Path(rel).stem
+            files.append(JsonFile(stem[len("matkg_"):] if stem.startswith("matkg_") else stem, gid,
+                                  Path(rel).name, path))
+        return files
 
     def settings_response(self) -> AgentSettingsResponse:
         """Build the public settings payload from runtime state."""
@@ -6695,6 +6720,9 @@ def create_app(
     )
     service = AgentPipelineService(cfg)
     app.state.f2w_agent_service = service
+    app.state.f2w_graph_sources = GraphSources(
+        flat_json=service.json_source_files,
+        release_root=Path(cfg.workdir) / "storage_kg" if guard.is_local else None)  # releases: :local only
     service.personal_settings = guard.personal_settings  # T25D: None on :local
     guard.check_service(service)
     guard.install(app)
@@ -6784,18 +6812,64 @@ def create_app(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    def _sources() -> GraphSources:
+        """The app's graph-source catalog (built in ``create_app``; Tiled is attached by the launcher)."""
+        return cast(GraphSources, app.state.f2w_graph_sources)
+
+    def _source_graph_node(raw: dict[str, Any], graph: SourceGraph, *, detail: bool = False) -> GraphNode:
+        """Wire node of a source graph: the JSON converter over the raw node, tagged with the source's graph."""
+        node = _graph_node_from_raw(raw, include_code=detail, include_linked_code=detail,
+                                    graph_data=graph.data if detail else None)
+        node.graph_id = node.graph_id or graph.graph_id
+        node.graph_label = node.graph_label or graph.graph_label
+        return node
+
+    def _source_payload(graph: SourceGraph) -> GraphPayload:
+        return GraphPayload(
+            nodes=[_source_graph_node(raw, graph) for raw in graph.nodes],
+            edges=[GraphEdge(source=e["subject"], target=e["object"], predicate=e["predicate"])
+                   for e in graph.edges],
+            source_path=f"source:{graph.source_id}")
+
+    def _source_failure(exc: SourceError) -> HTTPException:
+        return HTTPException(status_code=exc.status, detail=exc.detail())
+
     @app.get("/graph", response_model=GraphPayload)
-    async def graph(ctx: RequestContext = Depends(ui_context)) -> GraphPayload:
-        """Return the current graph payload."""
+    async def graph(
+        response: Response, source: str | None = None, ctx: RequestContext = Depends(ui_context),
+    ) -> GraphPayload:
+        """Return the current graph payload, or that of the graph source named by ``source``."""
+        if source:
+            try:
+                picked = await asyncio.to_thread(_sources().graph, source)
+                source_payload = await asyncio.to_thread(_source_payload, picked)
+            except SourceError as exc:
+                raise _source_failure(exc) from None
+            if picked.truncated:
+                response.headers["X-F2W-Graph-Truncated"] = "true"
+            return cast(GraphPayload, guard.project_route(ctx, "GET", "/graph", _model_to_jsonable(source_payload)))
         with service.runtime_view(guard.settings_key(ctx)):
             payload = service.graph_payload()
         return cast(GraphPayload, guard.project_route(ctx, "GET", "/graph", _model_to_jsonable(payload)))
 
     @app.post("/graph/nodes/search", response_model=GraphNodeSearchResponse)
     async def search_graph_nodes(
-        req: GraphNodeSearchRequest, ctx: RequestContext = Depends(ui_context),
+        req: GraphNodeSearchRequest, source: str | None = None, ctx: RequestContext = Depends(ui_context),
     ) -> GraphNodeSearchResponse:
-        """Search graph nodes by text query."""
+        """Search graph nodes by text query, in the graph source named by ``source`` when given."""
+        if source:
+            try:
+                picked = await asyncio.to_thread(_sources().graph, source)
+                hits = GraphSources.search(picked, req.query, req.limit)
+            except SourceError as exc:
+                raise _source_failure(exc) from None
+            results = [GraphNodeSearchResult(node=node, score=score)
+                       for node, score in ((_source_graph_node(raw, picked), score) for raw, score in hits)
+                       if node.type.strip().lower() != "unknown"]
+            found_in_source = GraphNodeSearchResponse(query=req.query.strip(), retrieval_backend="lexical:source",
+                                                      results=results)
+            return cast(GraphNodeSearchResponse, guard.project_route(
+                ctx, "POST", "/graph/nodes/search", _model_to_jsonable(found_in_source)))
         try:
             found = await service.search_graph_nodes(req.query, req.limit)
         except ValueError as exc:
@@ -6807,12 +6881,23 @@ def create_app(
 
     @app.get("/graph/neighborhood/{node_id:path}", response_model=GraphPayload)
     async def graph_neighborhood(
-        node_id: str, hops: int = CITE_FOCUS_HOPS, ctx: RequestContext = Depends(ui_context),
+        node_id: str, hops: int = CITE_FOCUS_HOPS, source: str | None = None,
+        ctx: RequestContext = Depends(ui_context),
     ) -> GraphPayload:
-        """Return a Tiled node's neighborhood subgraph."""
+        """Return a node's neighborhood subgraph: from the graph source named by ``source``, else from Tiled."""
         cleaned = str(node_id or "").strip()
         if not cleaned:
             raise HTTPException(status_code=400, detail="Node id is required")
+        if source:
+            try:
+                picked = await asyncio.to_thread(_sources().graph, source)
+                around = GraphSources.neighborhood(picked, cleaned, hops)
+            except SourceError as exc:
+                raise _source_failure(exc) from None
+            if around is None:
+                raise HTTPException(status_code=404, detail=f"Neighborhood not found: {cleaned}")
+            return cast(GraphPayload, guard.project_route(
+                ctx, "GET", "/graph/neighborhood/" + cleaned, _model_to_jsonable(_source_payload(around))))
         payload = await asyncio.to_thread(service.tiled_neighborhood_payload, cleaned)
         if payload.nodes:
             return cast(GraphPayload, guard.project_route(ctx, "GET", "/graph/neighborhood/" + cleaned, _model_to_jsonable(payload)))
@@ -6841,9 +6926,20 @@ def create_app(
     async def graph_node(
         node_id: str,
         json_graph_path: str | None = None,
+        source: str | None = None,
         ctx: RequestContext = Depends(ui_context),
     ) -> GraphNode:
-        """Return one graph node by id from Tiled or a JSON graph file."""
+        """Return one graph node by id: from the graph source named by ``source``, else Tiled or a JSON graph file."""
+        if source:   # a source wins over json_graph_path (which is never read when a source is named)
+            try:
+                picked = await asyncio.to_thread(_sources().graph, source)
+            except SourceError as exc:
+                raise _source_failure(exc) from None
+            raw = picked.by_id.get(node_id)
+            if raw is None:
+                raise HTTPException(status_code=404, detail=f"Node not found: {node_id}")
+            return cast(GraphNode, guard.project_route(
+                ctx, "GET", "/graph/node/" + node_id, _model_to_jsonable(_source_graph_node(raw, picked, detail=True))))
         node = await _graph_node(node_id, json_graph_path, guard.settings_key(ctx))
         return cast(GraphNode, guard.project_route(ctx, "GET", "/graph/node/" + node_id, _model_to_jsonable(node)))
 
@@ -6885,9 +6981,12 @@ def create_app(
 
     @app.patch("/graph/node/{node_id}", response_model=GraphNode)
     async def patch_graph_node(
-        node_id: str, req: GraphNodeUpdateRequest, ctx: RequestContext = Depends(ui_context),
+        node_id: str, req: GraphNodeUpdateRequest, source: str | None = None,
+        ctx: RequestContext = Depends(ui_context),
     ) -> GraphNode:
-        """Patch a splash-mode graph node."""
+        """Patch a splash-mode graph node; a graph source is read-only and refuses every edit."""
+        if source:
+            raise HTTPException(status_code=400, detail=read_only_error().detail())
         try:
             node = await service.update_graph_node(node_id, req, ctx)
         except FileNotFoundError as exc:

@@ -62,6 +62,26 @@ is 100. Limited views choose a deterministic, connected-first subset beginning
 with high-degree nodes and then continue across disconnected components. The
 edge set is induced from the selected nodes.
 
+#### Graph source
+
+In the full-width viewer the **Source** control chooses what the viewer reads:
+
+- **Default graph**: the graph picked in Settings (no `source` parameter is sent).
+- **JSON KGs**: the `storage/kg/*.json` files the server lists and, on the local
+  image, the adopted release snapshots (`<corpus> / vN (release)`).
+- **Tiled**: each F2W graph in the local image's own Tiled (`<graph> / <release>`),
+  showing only the live release (staged and retired records are never nodes).
+
+The badge next to the control shows the kind of the selected source and that it is
+read-only: Edit is hidden and the server refuses edits (`400 read_only_source`).
+The choice is remembered per browser; a remembered source the server no longer
+lists falls back to the default graph. When Tiled is down the control says
+**Tiled unavailable** and a read of a Tiled source shows the error instead of an
+empty or stale graph. Search, node details and neighborhoods all carry the same
+`source`. Source ids are opaque names listed by `GET /v1/graph/sources`; the server
+never accepts a path, URL or Tiled address. A graph is cut at 100,000 nodes and
+Tiled is scanned at most once every 20 seconds.
+
 ## Navigation and inspection
 
 | Interaction | Result |

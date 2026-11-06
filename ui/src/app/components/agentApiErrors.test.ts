@@ -21,3 +21,10 @@ describe('agentApiErrors', () => {
       .toContain('start_agent_backend.sh');
   });
 });
+
+describe('typed graph source errors', () => {
+  it('reads the message of an object detail', () => {
+    expect(parseAgentApiError('{"detail":{"code":"unknown_source","message":"Unknown graph source"}}', 404))
+      .toBe('Unknown graph source');
+  });
+});

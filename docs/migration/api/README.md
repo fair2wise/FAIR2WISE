@@ -9,7 +9,7 @@
 | Entrypoint | Behaviour |
 | --- | --- |
 | `app.modules.f2w_agent.api.create_app(cfg, *, cors_origins, deployment, startup_config, identity_port, credential_store, clock)` | Unchanged signature and routes: the 19 UI routes, ALS sign-in handlers, access control and disclosure projection. The frozen UI and T18A/T18B contract tests use it as before. |
-| `app.api.main.create_api_app(cfg, ...)` | Calls `create_app` with the same arguments, then adds the 63 `/v1` routes (46 on an ALS profile: the folder and library routes are registered on `:local` only), the origin gate and the body cap on `/v1/` and `/auth/`, and the scope-change wiring. Extra arguments: `operations`, `operations_root`, `publication_gate`, `max_body_bytes`, `sse_poll_seconds`, `sse_max_seconds`, `judge_settings`, `knowledge_operations` (T19E), `folder_roots` (T32). |
+| `app.api.main.create_api_app(cfg, ...)` | Calls `create_app` with the same arguments, then adds the 64 `/v1` routes (47 on an ALS profile: the folder and library routes are registered on `:local` only), the origin gate and the body cap on `/v1/` and `/auth/`, and the scope-change wiring. Extra arguments: `operations`, `operations_root`, `publication_gate`, `max_body_bytes`, `sse_poll_seconds`, `sse_max_seconds`, `judge_settings`, `knowledge_operations` (T19E), `folder_roots` (T32). |
 | `python -m app.modules.f2w_agent.cli api` | Unchanged (legacy app). `api --jobs-api` serves `create_api_app`. |
 | `python -m app.api.cli --root DIR jobs|cases|cost|vocab|scales|folders|audit|ops ...` | Calls `F2WOperations` directly with a `cli` context (local profile only). `ops statistics|compare|paper-subgraph|recent|corpus-audit|submit|result` are the T19E Knowledge Operation wrappers (graphs from `--project-root/storage/kg` or `--graph-file`, corpora from `storage/terminology`). `cases bulk-review`, `cost show|set`, `vocab quality` and `scales list|show|record` are the T31 wrappers; `folders roots|list|index` (T32) browse the roots named by `F2W_FOLDER_ROOTS`. |
 | `F2WOperations` | Direct Python use (SDK, notebooks, FORGE). Same methods the routes call. |
@@ -92,7 +92,7 @@ Legacy SSE framing (`event:`/`data:` LF blocks, as `/chat/stream`) with `JobEven
 
 ## 3. Route policies (`app/api/policies.py`, DEP-19)
 
-All 63 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` resolves them for the legacy surface the factory extends, and `undeclared_routes` now also fails closed on routes it cannot inspect (mounts, lazily included routers). Rules:
+All 64 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` resolves them for the legacy surface the factory extends, and `undeclared_routes` now also fails closed on routes it cannot inspect (mounts, lazily included routers). Rules:
 
 - A route whose effect needs one fixed capability declares it, so the dependency refuses the caller first and, for an admin capability, re-runs the ALS role check.
 - Routes whose capability depends on the job kind or on ownership declare no entry capability (signed-in on ALS) and rely on `JobService`; their mutating handlers re-run the ALS role check (`fresh_request_context`).
@@ -145,6 +145,7 @@ All 63 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` reso
 | V78 | POST /v1/library/harvest/candidates/{id}/pdf | `library.upload`, `:local` only | multipart `file`; files the PDF into the run's category exactly like an upload (year folder, category manifest); `{candidate, paper, duplicate, manifest}`; 409 unless the candidate is `paywalled` |
 | V79 | POST /v1/library/harvest/candidates/{id}/dismiss | `library.upload`, `:local` only | marks a `paywalled` candidate `dismissed`; `{candidate}` |
 | V60 | GET /v1/capabilities | `chat.read_support` | T18D (Q13, O-U3): `{role, profile, can_edit, can_save, can_upload}` for the caller, computed from the same checks that answer 403 on `PATCH /graph/node` (`graph.edit`) and `POST /graph/upload` (`graph.upload`); the frozen UI hides Edit/Save when `can_save` is false; the 403 stays the backstop |
+| V80 | GET /v1/graph/sources | `chat.read_support` | UI graph sources (owner instruction 2026-11-06): `{sources: [{id, kind: json\|tiled, label, read_only, available, node_count, edge_count, revision, detail}], tiled: {status: ok\|unavailable\|not_offered, detail}}`; ids are server-built (`json:<name>`, `json:<corpus>/<vN>` on `:local`, `tiled:<graph_id>` on `:local`) and are the only values the optional `source` query parameter of `GET /graph`, `POST /graph/nodes/search`, `GET /graph/neighborhood/{id}` and `GET /graph/node/{id}` accepts (a path, URL or Tiled target is `404 unknown_source`); every source is read-only (`PATCH /graph/node/{id}?source=` is `400 read_only_source`); see `docs/migration/reviews/H8/ui_graph_sources.md` |
 
 Every admin capability is held only by verified Tiled admins on ALS, so all privileged `/v1` actions are admin-only there and trusted on `:local`.
 

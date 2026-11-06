@@ -183,6 +183,38 @@
       "value_format": "raw string (not JSON): a graph node id from a [KG: ...] citation, possibly graph-prefixed or a Tiled identity ref",
       "defaults": {"value": null},
       "migration_rule": "Tab-scoped. Holds old node ids across reloads, so node ids (and the Tiled 'beamline:'/'tiled:' prefixes resolved at ChatSidebar.tsx:753-755) must keep resolving after any backend revision."
+    },
+    {
+      "key": "fair2wise-graph-source-v1",
+      "storage": "localStorage",
+      "owner": "ui/src/app/components/graphSourceStore.ts",
+      "declared_at": "ui/src/app/components/graphSourceStore.ts:12",
+      "read_at": [
+        "ui/src/app/components/graphSourceStore.ts:31"
+      ],
+      "written_at": [
+        "ui/src/app/components/graphSourceStore.ts:41"
+      ],
+      "removed_at": [
+        "ui/src/app/components/graphSourceStore.ts:43"
+      ],
+      "callers": {
+        "read": [
+          "ui/src/app/components/graphSourceStore.ts:50 (module load: initial store state)"
+        ],
+        "write": [
+          "ui/src/app/components/GraphSourceSelect.tsx:74 (the viewer's Source select)"
+        ],
+        "clear": [
+          "ui/src/app/components/GraphSourceSelect.tsx:51 (the remembered id is no longer listed by GET /v1/graph/sources)"
+        ]
+      },
+      "value_format": "raw string (not JSON): an opaque server source id, `json:<name>` or `tiled:<graph>`; only a value matching GRAPH_SOURCE_ID_RE is read back or stored",
+      "added": "2026-11-06 (owner instruction: the UI reads both JSON KGs and Tiled KGs); not part of the frozen T18A baseline. See docs/migration/reviews/H8/ui_graph_sources.md.",
+      "defaults": {
+        "value": null
+      },
+      "migration_rule": "Absent means the default graph (no `source` query parameter is sent). Ids are server-allowlisted and may disappear (file removed, Tiled graph retired): the selector then falls back to the default. Never store a path or URL."
     }
   ],
   "not_persisted_or_unreachable": [

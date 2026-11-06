@@ -262,7 +262,7 @@ export interface AgentSettingsApiUpdate {
   tiled_uri?: string | null;
 }
 
-import { agentNetworkErrorMessage, settingsApiErrorMessage } from '../agentApiErrors';
+import { agentNetworkErrorMessage, parseAgentApiError, settingsApiErrorMessage } from '../agentApiErrors';
 import { loadAgentSettings } from '../agentSettings';
 
 export function newClientTurnId(): string {
@@ -673,10 +673,28 @@ export async function queryAgentActionStream(
   }
 }
 
-export async function fetchLiveGraph(): Promise<GraphPayload> {
-  const response = await fetch(`${AGENT_API_BASE}/graph`);
+/**
+ * Query string carrying the graph source (`json:<name>` / `tiled:<graph>`), or `''` for the default graph.
+ * The default graph sends no `source` at all, so default requests are byte-identical to before.
+ */
+export function graphSourceQuery(source?: string | null): string {
+  return source ? `source=${encodeURIComponent(source)}` : '';
+}
+
+function withQuery(url: string, ...parts: string[]): string {
+  const query = parts.filter(Boolean).join('&');
+  return query ? `${url}?${query}` : url;
+}
+
+async function graphErrorText(response: Response): Promise<string> {
+  return parseAgentApiError(await response.text(), response.status);
+}
+
+export async function fetchLiveGraph(source?: string | null): Promise<GraphPayload> {
+  const response = await fetch(withQuery(`${AGENT_API_BASE}/graph`, graphSourceQuery(source)));
 
   if (!response.ok) {
+    if (source) throw new Error(await graphErrorText(response));
     const detail = await response.text();
     throw new Error(detail || `Agent API returned ${response.status}`);
   }
@@ -688,8 +706,9 @@ export async function searchGraphNodes(
   query: string,
   limit = 10,
   signal?: AbortSignal,
+  source?: string | null,
 ): Promise<GraphNodeSearchResponse> {
-  const response = await fetch(`${AGENT_API_BASE}/graph/nodes/search`, {
+  const response = await fetch(withQuery(`${AGENT_API_BASE}/graph/nodes/search`, graphSourceQuery(source)), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, limit }),
@@ -697,6 +716,7 @@ export async function searchGraphNodes(
   });
 
   if (!response.ok) {
+    if (source) throw new Error(await graphErrorText(response));
     const detail = await response.text();
     throw new Error(detail || `Agent API returned ${response.status}`);
   }
@@ -707,14 +727,17 @@ export async function searchGraphNodes(
 export async function fetchGraphNeighborhood(
   nodeId: string,
   hops = 3,
+  source?: string | null,
 ): Promise<GraphPayload> {
   const params = new URLSearchParams();
   if (hops > 0) params.set('hops', String(hops));
+  if (source) params.set('source', source);
   const query = params.toString();
   const response = await fetch(
     `${AGENT_API_BASE}/graph/neighborhood/${encodeURIComponent(nodeId)}${query ? `?${query}` : ''}`,
   );
   if (!response.ok) {
+    if (source) throw new Error(await graphErrorText(response));
     const detail = await response.text();
     throw new Error(detail || `Agent API returned ${response.status}`);
   }
@@ -724,10 +747,14 @@ export async function fetchGraphNeighborhood(
 export async function fetchGraphNodeDetail(
   nodeId: string,
   jsonGraphPath?: string,
+  source?: string | null,
 ): Promise<LiveGraphNode> {
   const params = new URLSearchParams();
   if (jsonGraphPath) {
     params.set('json_graph_path', jsonGraphPath);
+  }
+  if (source) {
+    params.set('source', source);
   }
   const query = params.toString();
   const response = await fetch(
@@ -735,6 +762,7 @@ export async function fetchGraphNodeDetail(
   );
 
   if (!response.ok) {
+    if (source) throw new Error(await graphErrorText(response));
     const detail = await response.text();
     throw new Error(detail || `Agent API returned ${response.status}`);
   }
