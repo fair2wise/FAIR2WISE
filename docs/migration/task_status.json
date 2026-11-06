@@ -3,7 +3,7 @@
   "kind": "f2w_task_status_overlay",
   "generated_on": "2026-10-29",
   "generated_by": "T28D (AUD-14)",
-  "note": "Status overlay for docs/migration/companion/task_graph.json, which stays byte-for-byte as supplied (every task there still reads not_started). merge_commit is the first-parent commit on forge_merge (git log --first-parent 222b1e7..HEAD) that brought the task in; two tasks may share a commit when they were merged together. gate is stop_before from the task graph, else the human gate that lists the task as evidence, else the gate after the task's gate dependency. status values: merged | open | blocked_on_owner. Gate approvals: H0-H3 approved (H3 on 2026-10-16); H4-H8 open. tests/docs/test_task_status.py checks that every task_graph id is present and every merged commit is on the first-parent log.",
+  "note": "Status overlay for docs/migration/companion/task_graph.json, which stays byte-for-byte as supplied (every task there still reads not_started). merge_commit is the first-parent commit on forge_merge (git log --first-parent 222b1e7..HEAD) that brought the task in; two tasks may share a commit when they were merged together. gate is stop_before from the task graph, else the human gate that lists the task as evidence, else the gate after the task's gate dependency. status values: merged | open | blocked_on_owner. Gate approvals: H0-H3 approved (H3 on 2026-10-16); H4-H8 open. tests/docs/test_task_status.py checks that every task_graph id is present and every merged commit is on the first-parent log. H3 approval recorded in the evals store at 8c9a29046e33133dc8e4aed83dbb5f4bcfbc1746 (owner ran python -m evals.binary.approve on 2026-11-06 on the authority of reviews/H3/decision.json; 108/108 cases approved; rubrics stay draft; 13 label cases stay blocked on B4).",
   "baseline_commit": "222b1e7b130567dbf4a3242697ac2b465794a38d",
   "gates": {
     "H0": "approved",
@@ -177,7 +177,7 @@
       "gate": "H5",
       "status": "open",
       "merge_commit": null,
-      "note": "publication and rollback rehearsal; after H4 | :local-only publication into the container's own Tiled merged at 50b0c4cef7265c64d16b298cfbd5e9ebc08361ef (T-localpub, owner decision 2026-11-04; reviews/H5/local_publication.md); stays open, rehearsal and H5 approval still owner-gated"
+      "note": "publication and rollback rehearsal; after H4 | :local-only publication into the container's own Tiled merged at 50b0c4cef7265c64d16b298cfbd5e9ebc08361ef (T-localpub, owner decision 2026-11-04; reviews/H5/local_publication.md); stays open, rehearsal and H5 approval still owner-gated | rehearsal in progress 2026-11-06: publications e2e_demo/v1 (job-9166b202380119cedfdf1dbc, 269 entities, 126 links) and bl1101/v4 completed into the :local container's own Tiled with owner approvals in the UI; rollback-replacement plan staged, awaiting owner approval (owner: rollback must touch one KG, not the other); not done, H5 still owner-gated"
     },
     {
       "id": "T14",
@@ -249,7 +249,8 @@
       "gate": "H6",
       "status": "merged",
       "merge_commit": "fae8abb7799339706fcc9041ef14cfb123f42d49",
-      "merge_commit_subject": "Merge T18C frozen-frontend closure suite on disposable Tiled, UI01-UI28 matrix"
+      "merge_commit_subject": "Merge T18C frozen-frontend closure suite on disposable Tiled, UI01-UI28 matrix",
+      "note": "follow-up T-uigraph merged at 842c7927a66558ec4b19f2d2f5e1da8158bb63a9 (2026-11-06, owner instruction twelfth set): the graph view reads JSON KGs and :local Tiled KGs through server-allowlisted sources; new route V80 GET /v1/graph/sources (chat.read_support), optional source query on R06-R10; H8 review packet reviews/H8/ui_graph_sources.md. Owner-gated (section 7, not self-approved): separate capability for browsing Tiled content; ALS reachability of the external Tiled graph; flat JSON files listed to every ALS reader (O-A5); one persistence key added to the frozen T18A inventory; :local Tiled labels only the live release of a graph; not done: editing a Tiled graph from the viewer, FORGE/non-F2W entities, JSON file counts"
     },
     {
       "id": "T19A",
@@ -447,7 +448,8 @@
       "gate": "H1",
       "status": "merged",
       "merge_commit": "bd508f243d6e3bb4fc6761ddf35f7f5b043099e3",
-      "merge_commit_subject": "test(contracts): T23A json2kg contract and T26A Git KG release contract"
+      "merge_commit_subject": "test(contracts): T23A json2kg contract and T26A Git KG release contract",
+      "note": "release-contract questions Q2-Q6: Q5 E3 errata drafted on owner approval ('Yes, draft them', fifth set; reviews/H8/spec_errata_E3_draft.md) and applied to the frozen documents by T-e3apply merged at b26d99efba6c0a83ca3cd06926cd37c4c832b26a (owner approval 2026-11-06, twelfth set: 'E3 errata. Change what you need to in order to allow KGs to ship with the image'); companion SHA256SUMS re-pinned in the same commit; tests for the image KG rules added. Q6 (descriptor) stays open"
     },
     {
       "id": "T26B",
@@ -510,7 +512,7 @@
       "gate": "H7",
       "status": "open",
       "merge_commit": null,
-      "note": "typing zero, ANN401 enforced (149 Any signatures kept with reasons), ruff/isort/mypy/pyflakes gated, coverage 93.2% with no module under 80%, sniff-list rows fixed or deferred per the owner reply of 2026-11-03; merged through f2deeae; open fix rows: F2.4 (docstring style), F2.5 (docstring versus implementation) and F3.8 (magic literals), all needing a human read"
+      "note": "typing zero, ANN401 enforced (149 Any signatures kept with reasons), ruff/isort/mypy/pyflakes gated, coverage 93.2% with no module under 80%, sniff-list rows fixed or deferred per the owner reply of 2026-11-03; merged through f2deeae; open fix rows: F2.4 (docstring style), F2.5 (docstring versus implementation) and F3.8 (magic literals), all needing a human read | isort/pyflakes gates restored by 25129e81ee36e4176ab13d293b16941c37c871f5 (2026-11-05: imports sorted in four files, unused/duplicate imports removed)"
     },
     {
       "id": "T22C",
@@ -648,7 +650,8 @@
       "gate": "H6",
       "status": "merged",
       "merge_commit": "2da69addcff2b08953c56bd9c5a061d2f52d83f8",
-      "merge_commit_subject": "Merge T30: Docling OCR engine for figures (opt-in, weights fetched at image build, degrades to current behaviour)"
+      "merge_commit_subject": "Merge T30: Docling OCR engine for figures (opt-in, weights fetched at image build, degrades to current behaviour)",
+      "note": "follow-ups merged 2026-11-06: T30-ocrfix at 27192b5aff69dd75db801df193b4dddf7375ae3c (Docling OCR lines read from the assembled clusters; real-weights fixtures made robust) and T30-captions at a3cb4397c2b500dd6b351c28327bea4e6c973fb9 (real-weights caption assertions restored with an embedded-font typeset fixture, owner answer 'Restore with a real PDF fixture', eleventh set); owner review at H6"
     },
     {
       "id": "T31",
