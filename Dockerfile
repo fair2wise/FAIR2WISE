@@ -186,6 +186,13 @@ COPY --from=docs-build /build/site /usr/share/nginx/html/fair2wise/docs
 COPY docker/nginx.conf /etc/fair2wise/nginx/gateway.conf.template
 COPY docker/entrypoint/ /opt/fair2wise/entrypoint/
 
+# The f2w-* console commands of pyproject.toml [project.scripts] (f2w-kg-adopt, f2w-kg-release, ...):
+# the project is not pip-installed (the environment has no pip; the code runs from PYTHONPATH=/app),
+# so launchers are generated from the same table pip would read (E2E finding 2026-11-06).
+RUN python -I /opt/fair2wise/entrypoint/install_console_scripts.py \
+        --pyproject /app/pyproject.toml --bin /usr/local/bin \
+        --python /opt/fair2wise/pixi/.pixi/envs/default/bin/python
+
 # Mount points owned by the runtime user (a fresh named volume inherits the owner);
 # preflight refuses to start unless they are real mounts.
 RUN python app/modules/deployment/gateway.py check-build \
