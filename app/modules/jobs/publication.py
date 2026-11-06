@@ -474,13 +474,25 @@ class Publication:
         return StageResult(artifact_refs=(f"pointer:{plan.target}@{result['version']}",), data=result)
 
     def _check_marker(self, sc: StageContext, ctx: RequestContext, plan: ChangePlan, snapshot: FrozenSnapshot) -> None:
-        """TIL-14: the Tiled release marker must name the version the pointer is about to name."""
+        """TIL-14: the Tiled release marker must name the version the pointer is about to name.
+
+        The marker names the plan that wrote it. A zero-operation plan (the version is live already; another
+        corpus moved the pointer in between) wrote nothing, so its marker still names the *covering* plan: the
+        step names that receipt (``covering_receipt``) and only its plan hash and receipt id are accepted in
+        place of the plan's own.
+        """
         marker = self.deps.step.release_marker(ctx, plan.corpus_scope[0])  # type: ignore[attr-defined]
-        if (
-            marker is None
-            or marker.get("snapshot_id") != snapshot.manifest.snapshot_id
-            or marker.get("plan_sha256") != plan.plan_sha256
-        ):
+        ok = marker is not None and marker.get("snapshot_id") == snapshot.manifest.snapshot_id
+        if ok and marker is not None and marker.get("plan_sha256") != plan.plan_sha256:
+            cover = getattr(self.deps.step, "covering_receipt", None)
+            covering: ImportReceipt | None = cover(ctx, plan) if cover is not None else None
+            ok = (
+                covering is not None
+                and marker.get("plan_sha256") == covering.plan_sha256
+                and marker.get("receipt_id") == covering.receipt_id
+                and marker.get("graph_sha256") == snapshot.sha256
+            )
+        if not ok:
             self.store.quarantine(
                 sc.job.job_id,
                 plan.target,

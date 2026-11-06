@@ -10,7 +10,7 @@ from app.modules.contracts.errors import ContractError, ErrorCode
 from app.modules.contracts.jobs import JobState
 from app.modules.graph.imports import tiled_json as tj
 from app.modules.schema.registry import SchemaRegistry
-from tests.jobs.replacement_world import SCOPE, RWorld, build_v1, derive
+from tests.jobs.replacement_world import SCOPE, RWorld, build_v1, derive, graph_of
 
 
 @pytest.fixture(scope="module")
@@ -168,3 +168,132 @@ def test_corpus_removal_and_purge_are_separate_jobs_with_their_own_approvals(wor
     assert not [e for e in world.client.scan_entities() if (e.get("properties") or {}).get("f2w_graph_id") == SCOPE]
     assert world.foreign() == foreign
     assert world.store.stage(purge.job_id, "record").result["report"]["outcomes"]["deleted_entities"] > 0
+
+
+# --- zero-operation rollback: one pointer per target, several corpora ------------------------------------
+
+OTHER = "othercorpus"
+
+
+def derive_corpus(v1, corpus: str) -> None:
+    """A ``v1`` snapshot of a second corpus next to the synthetic one (same shape, its own node ids)."""
+    import copy
+
+    from import_fakes import snapshot_with_graph
+
+    g = copy.deepcopy(graph_of(v1))
+    rename = {t["id"]: f"{corpus}:{t['id'].split(':', 1)[-1]}" for t in g["things"]}
+    for t in g["things"]:
+        t["id"] = rename[t["id"]]
+    for a in g["associations"]:
+        a["subject"], a["object"] = rename.get(a["subject"], a["subject"]), rename.get(a["object"], a["object"])
+    snapshot_with_graph(v1, v1.parents[3], corpus, "v1", g)
+
+
+def live_of(world, scope: str) -> dict[str, str]:
+    from app.modules.graph import identity_adapter as ida
+
+    out = {}
+    for e in world.client.scan_entities():
+        key = ida.literature_entity_key(e)
+        if key and key[0] == scope:
+            out[key[1]] = e["id"]
+    return out
+
+
+def counts(world) -> tuple[int, int]:
+    return len(list(world.client.scan_entities())), len(list(world.client.scan_links()))
+
+
+def test_noop_rollback_after_an_unrelated_corpus_moves_the_pointer_and_writes_nothing_to_tiled(world):
+    """E2E rehearsal (T13): A/v1, then B/v1 on the same target, then rollback-replacement.
+
+    Nothing of A was retired by B, so the rollback plans zero operations; the job must still receipt and
+    activate (pointer A/v1 at version 3) while Tiled, both corpora's records and A's marker stay untouched.
+    """
+    derive_corpus(world.v1, OTHER)
+    a_job = world.publish("v1")
+    a_live, a_marker = world.live(), world.step.release_marker(world.ctx, SCOPE)
+    a_receipt = world.pubstore.pointer(world.target).receipt_id
+    assert a_marker["plan_sha256"] == world.pubstore.current_plan(a_job).plan.plan_sha256
+    world.finish(world.pub.submit(world.ctx, f"{OTHER}/v1", world.target).job_id)
+    b_live, b_marker = live_of(world, OTHER), world.step.release_marker(world.ctx, OTHER)
+    assert world.pubstore.pointer(world.target).version == 2
+    assert world.pubstore.pointer(world.target).snapshot_ref == f"{OTHER}/v1"
+    assert world.live() == a_live, "publishing another corpus retires nothing of A"
+    before, n_writes = counts(world), len(world.client.writes)
+
+    handle = world.pub.rollback_replacement(world.ctx, world.target, reason="back to A")
+    assert world.work() == (handle.job_id, JobState.AWAITING_REVIEW)
+    plan = world.pub.current_plan(world.ctx, handle.job_id)
+    assert (plan.creates, plan.links, plan.supersessions) == (0, 0, 0) and plan.corpus_scope == (SCOPE,)
+    assert plan.plan_sha256 != a_marker["plan_sha256"]
+    world.approve(handle.job_id)
+    assert world.work() == (handle.job_id, JobState.SUCCEEDED)
+
+    pointer = world.pubstore.pointer(world.target)
+    assert (pointer.version, pointer.snapshot_ref) == (3, f"{SCOPE}/v1")
+    assert pointer.receipt_id != a_receipt, "the rollback has its own receipt under its own plan hash"
+    assert world.agree() == {"agree": True, "pointer_snapshot_id": "v1", "marker_snapshot_id": "v1"}
+    assert counts(world) == before and len(world.client.writes) == n_writes, "nothing written to Tiled"
+    assert world.live() == a_live and live_of(world, OTHER) == b_live
+    assert world.step.release_marker(world.ctx, SCOPE) == a_marker, "A's marker still names the covering plan"
+    assert world.step.release_marker(world.ctx, OTHER) == b_marker, "a rollback never removes a corpus"
+    assert world.store.stage(handle.job_id, "import").result["created"] == 0
+    progress = world.service.progress(world.ctx, handle.job_id)["phases"]["import"]["progress"]
+    assert progress["import.created"] == 0 and progress["import.reconciled"] == 0
+    report = world.store.stage(handle.job_id, "receipt").result["report"]
+    assert report["noop"] is True and report["covered_by"] == a_receipt and report["kind"] == "noop"
+    assert report["revived_entities"] == 0 and report["snapshot_id"] == "v1"
+    assert not world.pubstore.quarantined(handle.job_id)
+
+    # The B28 toggle back is a no-op for B as well: pointer version 4, still nothing written.
+    world.finish(world.pub.rollback_replacement(world.ctx, world.target, reason="and forward").job_id)
+    pointer = world.pubstore.pointer(world.target)
+    assert (pointer.version, pointer.snapshot_ref) == (4, f"{OTHER}/v1")
+    assert counts(world) == before and len(world.client.writes) == n_writes
+    assert world.live() == a_live and live_of(world, OTHER) == b_live
+
+
+def test_noop_receipt_fails_verify_for_another_revision_target_or_without_its_covering_receipt(world):
+    from app.modules.graph import literature_writer as lw
+    from app.modules.graph.imports.receipts import receipt_valid_for
+    from app.modules.jobs.publish_ports import ApplyOutcome
+    from app.modules.jobs.replacement_step import NOOP_KIND
+
+    derive_corpus(world.v1, OTHER)
+    world.publish("v1")
+    world.finish(world.pub.submit(world.ctx, f"{OTHER}/v1", world.target).job_id)
+    job = world.finish(world.pub.rollback_replacement(world.ctx, world.target, reason="back to A").job_id)
+    plan = world.pubstore.current_plan(job).plan
+    outcome = ApplyOutcome.from_dict(world.store.stage(job, "import").result)
+    thin = world.step.receipts.find(plan_sha256=plan.plan_sha256)[0]
+    assert thin.extras.kind == NOOP_KIND and thin.receipt.outcomes["noop"] == 1
+    ctx = world.deps.ctx_for(world.service.store.get(job))
+    assert world.step.verify(ctx, plan, outcome).ok
+    assert world.step.reconcile(ctx, plan, operation_id="x") is not None
+
+    # Another target: the receipt names its own target only.
+    assert not receipt_valid_for(thin, target="https://tiled-staging.example/api/v1", revision=thin.extras.resulting_revision)
+
+    # The covering replacement receipt disappears: the thin receipt alone no longer verifies or reconciles.
+    cover_id = world.step.covering_receipt(ctx, plan).receipt_id
+    cover_path = world.step.receipts.root / f"{cover_id}.json"
+    saved = cover_path.read_bytes()
+    cover_path.unlink()
+    assert world.step.covering_receipt(ctx, plan) is None
+    verification = world.step.verify(ctx, plan, outcome)
+    assert (verification.ok, verification.detail) == (False, "no receipt matches the target as read back now")
+    assert verification.target_revision == thin.extras.resulting_revision
+    assert world.step.reconcile(ctx, plan, operation_id="x") is None
+    cover_path.write_bytes(saved)
+    assert world.step.verify(ctx, plan, outcome).ok
+
+    # The scope moves to another revision (an owned record appears): neither receipt is valid for it.
+    spec = lw.entity_spec(SCOPE, {"id": "late", "category": "Material", "name": "late"})
+    world.client.create_entity(entity_type=spec.entity_type, name=spec.name, uri=spec.uri,
+                               properties=spec.properties, access_blob={})
+    verification = world.step.verify(ctx, plan, outcome)
+    assert not verification.ok and verification.target_revision != thin.extras.resulting_revision
+    assert world.step.reconcile(ctx, plan, operation_id="x") is None
+    assert world.step.covering_receipt(ctx, plan) is None

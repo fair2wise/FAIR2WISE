@@ -171,6 +171,28 @@ live release marker from Tiled; if it does not name the snapshot and plan being 
 the previous pointer stays active. `Publication.verify_agreement(ctx, target, scope)` reports
 `{agree, pointer_snapshot_id, marker_snapshot_id}` (both `None` after a corpus removal).
 
+**One pointer per target, several corpora: a no-op rollback (T13 E2E rehearsal, 2026-11-06).** The pointer is per
+*target*, the release marker and the scope revision are per *corpus*. Publishing corpus B after corpus A retires
+nothing of A (different scope), so a rollback-replacement from B/vN back to A/vM plans **zero operations**
+(`creates 0, links 0, supersessions 0`, `is_noop`): A's records are all still live and A's marker still names vM.
+Such a rollback **moves the pointer and writes nothing to Tiled**; it never removes B, whose records, marker and
+revision stay as they are (removing a corpus is `corpus_retire`, V54). The importer answers `noop` with the receipt
+that put A/vM live (an older plan hash); `ReplacementPublishStep.apply` then writes a thin receipt of kind `noop`
+under the rollback plan's own hash (zero counts, `outcomes.noop = 1`, the live records' identity mapping), so the
+job's receipt stage (plan hash, approval, snapshot) and the pointer stay strict and unchanged. Verification of a
+`noop` receipt requires, beyond its own target and revision, that the covering replacement receipt (same snapshot,
+same scope, this adapter, not itself a noop) is valid for the scope revision read *now*
+(`ReplacementPublishStep.covering_receipt`); the activate stage accepts the marker naming that covering plan and
+receipt (and the snapshot's `graph_sha256`) in place of the rollback plan's hash, nothing else. The receipt-stage
+report carries `noop: true` and `covered_by: <covering receipt id>`; job progress reports `created 0`. Before this
+fix the job quarantined at `verify` ("no receipt matches the target as read back now") although Tiled was untouched.
+A quarantine row (`pub_quarantine`) only annotates that job's view (`ui_state = quarantined`); it blocks no later
+submission, approval or activation on the target. A rollback re-submitted with the *same* reason is the same job
+(idempotent job identity: kind, snapshot, target, pointer version, reason) and stays failed, and `resume` does not
+heal it either (the completed `import` stage is reused, so `verify` fails again): submit the rollback again with
+another reason, which is a new job. *Owner question (not decided here):* whether a no-op rollback should still require the
+V18 approval or may fall under the `:local` safe-plan auto-approval (a no-op plan is `safe` by construction).
+
 **Reviewed resolutions (Q15, T23C).** A rollback below a snapshot that carries a `reconciled` edit is refused at plan
 time unless each such edit has a reviewed `ConflictResolution` (`discarded` or `carried`) passed as
 `resolutions` on submit; the resolutions are bound into the plan hash.
