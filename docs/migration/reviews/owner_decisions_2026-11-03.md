@@ -130,3 +130,5 @@ not the other": confirmed (the plan's scope was e2e_demo only and bl1101's recor
 | Parallel work | "finish T27's read-through, T17B's clean ports, T19E's loose ends" and "also work on T16B splash_links retirement" (read as: prepare the retirement, inventory and deletion list, safe code-side removals; no production cutover, which stays H8-gated) |
 
 | Paid CBORG model run (C4 rerun, B4 labelling) | "for the paid cborg run, let's just use the best cborg model available that is free" (2026-11-06) |
+
+| Suspected bugs B1-B13 of the T27 read-through (`reviews/H7/readthrough_F25_F38.md`) | "let's fix these bugs" (B11, B3, the dead `missing_ok`, the Tiled neighborhood ignoring `hops`, the stale `_skipped` reset, and the others listed there) (2026-11-06) |
