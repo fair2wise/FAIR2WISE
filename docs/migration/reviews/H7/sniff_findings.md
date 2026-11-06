@@ -367,5 +367,5 @@ prepares evidence and applies only safe fixes (docstring text and value-preservi
   identical for four files; the two differences are a removed function-local `MAX_SNIPPETS = 6` (now module
   level) and `/ 50.0` becoming `/ BEAM_PATH_INDEX_SPAN` (`50`, same float result). `ruff check app` 0,
   `isort --check-only app` clean, `mypy` 0 errors (352 files), `python -m evals.binary.import_companion --check`
-  up to date, OpenAPI fixture unchanged. Full not-slow suite from a clean export: __SUITE__.
+  up to date, OpenAPI fixture unchanged. Full not-slow suite from a clean export: 6734 passed, 55 skipped, 4 xfailed, 0 failed (`-n 4` on a machine at load average 130-190: the first pass gave 6699 passed and 35 disposable-Tiled-server tests that hit the 60 s health timeout; those files, `tests/tiled`, `tests/security_live` and `tests/graph_import` live-server tests, re-ran at `-n 2` with 225 passed).
 - No behaviour change intended; no test, `corpus_qa.py`, `ui/` or frozen file touched; docker untouched.
