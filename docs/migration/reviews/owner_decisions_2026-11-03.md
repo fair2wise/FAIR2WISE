@@ -110,3 +110,13 @@ The owner reported the E2E plan `job-9166b202380119cedfdf1dbc` approved ("ok its
 | E3 spec errata | "E3 errata. Change what you need to in order to allow KGs to ship with the image" (read as approval to apply the E3 draft entries to the frozen documents and to change the build context so KGs ship, per D3.24: flat `storage/kg/matkg_*.json` copies in, nested `<corpus>/v<N>/graph.json` copies out; papers, `storage/source_index/`, secrets stay out) |
 
 Approvals of plans stay with the owner (each import/rollback plan is approved by the owner; the agent never submits an approval).
+
+### E2E rehearsal record (2026-11-06)
+
+Owner-approved steps on the `:local` container (approvals submitted by the owner with curl; the agent never approved):
+`e2e_demo/v1` published (job-9166b202380119cedfdf1dbc, pointer v1); `bl1101/v4` published (job-1f6f9abbe056f354ebb80339,
+pointer v2); rollback-replacement first attempt (job-de67da9f0e36f9367aa8eee6) quarantined at verify (noop-receipt bug,
+fixed in d25a32f; Tiled unchanged); second attempt (job-59e3a33d4342333cd5f3dd67, same plan hash ab8af850…) succeeded:
+pointer v3 = e2e_demo/v1, thin receipt receipt-fe1e4d0bc34c17088635, Tiled entities/links identical before and after
+(691/1063; e2e_demo 268 final, bl1101 421 final; both markers unchanged). Owner's check "the rollback only touches one KG
+not the other": confirmed (the plan's scope was e2e_demo only and bl1101's records and marker were untouched).
