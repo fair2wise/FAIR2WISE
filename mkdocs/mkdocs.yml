@@ -109,5 +109,4 @@ markdown_extensions:
 watch:
   - ../app
   - ../scripts
-  - ../splash_links/src
   - ../ui/src
