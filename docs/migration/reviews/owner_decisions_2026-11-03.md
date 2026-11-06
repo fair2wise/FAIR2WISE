@@ -120,3 +120,11 @@ fixed in d25a32f; Tiled unchanged); second attempt (job-59e3a33d4342333cd5f3dd67
 pointer v3 = e2e_demo/v1, thin receipt receipt-fe1e4d0bc34c17088635, Tiled entities/links identical before and after
 (691/1063; e2e_demo 268 final, bl1101 421 final; both markers unchanged). Owner's check "the rollback only touches one KG
 not the other": confirmed (the plan's scope was e2e_demo only and bl1101's records and marker were untouched).
+
+## Thirteenth set (2026-11-06)
+
+| Question | Owner answer |
+|---|---|
+| T13 / H5 remaining steps | explained (owner sign-off in `reviews/H5/decision.json`; real-target T26C rehearsal needs the owner to name the target); no answer yet |
+| T07B canonicalization apply adapters (previously "Not yet") | "go on this: T07B: canonicalization apply adapters" (read as: wire the apply adapters now, behind the existing approval gate; the C4 paid real-model rerun is still the owner's own run, no paid model is used by agents) |
+| Parallel work | "finish T27's read-through, T17B's clean ports, T19E's loose ends" and "also work on T16B splash_links retirement" (read as: prepare the retirement, inventory and deletion list, safe code-side removals; no production cutover, which stays H8-gated) |
