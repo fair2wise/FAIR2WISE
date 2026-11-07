@@ -116,3 +116,47 @@ def test_b3_approved_download_accepts_when_validation_passes_or_is_configured_of
     assert calls
     service, calls = _approved_download_service(tmp_path / "off", monkeypatch, validate=False, verdict_ok=False)
     assert asyncio.run(service._resume_download(_pending(), None)).status == "awaiting_extraction_decision"
+
+
+# B4 -------------------------------------------------------------------------------------------
+def test_b4_ask_locked_pins_one_graph_path_for_the_whole_call(tmp_path, monkeypatch):
+    import asyncio
+    import json
+
+    graph_a, graph_b = tmp_path / "a.json", tmp_path / "b.json"
+    for path in (graph_a, graph_b):
+        path.write_text(json.dumps({"things": [], "associations": []}), encoding="utf-8")
+    service = api_mod.AgentPipelineService(
+        CoordinatorConfig(
+            graph=str(graph_a), graphs=[str(graph_a), str(graph_b)], workdir=tmp_path / "run",
+            kg_mode="json", max_rounds=1,
+        )
+    )
+    assert service.graph_path() == graph_a.resolve()  # the runtime viewer selection differs from the request
+
+    async def no_reload(*args, **kwargs):
+        return {}
+
+    async def insufficient(*args, **kwargs):
+        return {"sufficient": False, "selected": [], "missing_topics": ["x"]}
+
+    async def stop(*args, **kwargs):
+        return {"action": "stop", "reason": "no search"}
+
+    seen: list[Path] = []
+    real_response = service._response
+
+    def spy(status, answer, sufficient, verdict, rounds, graph_path, **kwargs):
+        seen.append(Path(graph_path))
+        return real_response(status, answer, sufficient, verdict, rounds, graph_path, **kwargs)
+
+    monkeypatch.setattr(service, "_reload_retrieval", no_reload)
+    monkeypatch.setattr(service, "_query_retrieval", insufficient)
+    monkeypatch.setattr(service, "_orchestrator_decision", stop)
+    monkeypatch.setattr(service, "_response", spy)
+    monkeypatch.setattr(api_mod, "_json_graph_should_search_candidates", lambda question, verdict: True)
+    response = asyncio.run(
+        service._ask_locked("fetch a paper", None, graph_source="json", json_graph_path=str(graph_b))
+    )
+    assert response.status == "stop_insufficient"
+    assert seen == [graph_b.resolve()]

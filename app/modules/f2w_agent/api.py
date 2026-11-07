@@ -5568,7 +5568,7 @@ class AgentPipelineService:
                         False,
                         verdict,
                         rounds,
-                        self.graph_path(),
+                        active_graph_path,
                     )
                 await self._emit(
                     emit,
@@ -5588,7 +5588,7 @@ class AgentPipelineService:
                         False,
                         verdict,
                         rounds,
-                        self.graph_path(),
+                        active_graph_path,
                     )
                 try:
                     search = await search_action(
@@ -5604,7 +5604,7 @@ class AgentPipelineService:
                         False,
                         verdict,
                         rounds,
-                        self.graph_path(),
+                        active_graph_path,
                     )
                 candidates = search.get("candidates") or []
                 self.workflow.update(
@@ -5625,7 +5625,7 @@ class AgentPipelineService:
                         False,
                         verdict,
                         rounds,
-                        self.graph_path(),
+                        active_graph_path,
                     )
 
                 debate_decision = await self._orchestrator_decision(question, emit)
@@ -5636,7 +5636,7 @@ class AgentPipelineService:
                         False,
                         verdict,
                         rounds,
-                        self.graph_path(),
+                        active_graph_path,
                     )
                 await self._emit(
                     emit,
@@ -5666,7 +5666,7 @@ class AgentPipelineService:
                         False,
                         verdict,
                         rounds,
-                        self.graph_path(),
+                        active_graph_path,
                     )
                 try:
                     debate_summary = await debate_action(question, verdict, candidates, round_no)
@@ -5678,7 +5678,7 @@ class AgentPipelineService:
                         False,
                         verdict,
                         rounds,
-                        self.graph_path(),
+                        active_graph_path,
                     )
                 round_info["debate"] = debate_summary
                 await self._emit(
@@ -5782,7 +5782,7 @@ class AgentPipelineService:
                 False,
                 verdict,
                 rounds,
-                self.graph_path(),
+                active_graph_path,
                 pending=pending_payload,
                 publications_override=[],
             )
@@ -5793,7 +5793,7 @@ class AgentPipelineService:
             False,
             last_verdict,
             rounds,
-            self.graph_path(),
+            active_graph_path,
         )
 
     def _pick_candidate(
