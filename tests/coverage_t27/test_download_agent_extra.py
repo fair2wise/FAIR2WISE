@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-import sys
 from types import SimpleNamespace
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -166,99 +166,91 @@ def test_agent_defaults_from_environment(monkeypatch):
 
 
 # ------------------------------------------------------------------ arXiv / OpenAlex search
-class FakeArxivResult:
-    def __init__(self, short_id, title="Title  here", doi="", pdf_url=None, year=2024):
-        self._id, self.title, self.summary = short_id, title, "A  summary"
-        self.doi, self.pdf_url = doi, pdf_url
-        self.published = SimpleNamespace(year=year)
+def _atom_entry(short_id, title="Title  here", doi="", pdf_url=None, year=2024):
+    pdf = f'<link title="pdf" href="{pdf_url}" rel="related" type="application/pdf"/>' if pdf_url else ""
+    doi_tag = f"<arxiv:doi>{doi}</arxiv:doi>" if doi else ""
+    return (f"<entry><id>http://arxiv.org/abs/{short_id}v1</id><updated>{year}-01-02T03:04:05Z</updated>"
+            f"<published>{year}-01-02T03:04:05Z</published><title>{title}</title><summary>A  summary</summary>"
+            f"{pdf}{doi_tag}</entry>")
 
-    def get_short_id(self):
-        return self._id
+
+def _atom(entries):
+    return ('<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom" '
+            'xmlns:arxiv="http://arxiv.org/schemas/atom">' + "".join(entries) + "</feed>").encode()
 
 
 @pytest.fixture
 def fake_arxiv(monkeypatch):
     state = {"results": {}, "fail_for": set(), "searches": []}
 
-    class Client:
-        def __init__(self, **kw):
-            state["client_kw"] = kw
+    def get_bytes(url, **kw):
+        query = parse_qs(urlsplit(url).query)
+        text = query["search_query"][0]
+        state["searches"].append((text, int(query["max_results"][0])))
+        if text in state["fail_for"]:
+            from app.modules.literature.legacy_download import JSONFetchError
 
-        def results(self, search):
-            if search.query in state["fail_for"]:
-                raise RuntimeError("arxiv 503")
-            return iter(state["results"].get(search.query, []))
+            raise JSONFetchError("HTTP 503")
+        return _atom(state["results"].get(text, []))
 
-    class Search:
-        def __init__(self, query, max_results, sort_by):
-            self.query = query
-            state["searches"].append((query, max_results))
-
-    mod = SimpleNamespace(Client=Client, Search=Search, SortCriterion=SimpleNamespace(Relevance="rel"))
-    monkeypatch.setitem(sys.modules, "arxiv", mod)
+    monkeypatch.setattr(da, "hardened_get_bytes", get_bytes)
     return state
 
 
 def test_arxiv_candidates_are_normalised_deduped_and_pool_limited(fake_arxiv):
     fake_arxiv["results"] = {
-        "q m1": [FakeArxivResult("2401.00001", doi="10.1/x", pdf_url="https://arxiv.org/pdf/2401.00001"),
-                 FakeArxivResult("2401.00001", doi="10.1/x"),
-                 FakeArxivResult("2401.00002")],
-        "m1": [FakeArxivResult("2401.00003")],
+        "q m1": [_atom_entry("2401.00001", doi="10.1/x", pdf_url="https://arxiv.org/pdf/2401.00001"),
+                 _atom_entry("2401.00001", doi="10.1/x"),
+                 _atom_entry("2401.00002")],
+        "m1": [_atom_entry("2401.00003")],
     }
     agent = da.DownloadAgent(download_delay_seconds=0)
     out = agent._search_arxiv_candidates("q", ["m1"], pool=3)
-    assert [w["id"] for w in out] == ["https://arxiv.org/abs/2401.00001", "https://arxiv.org/abs/2401.00002",
-                                       "https://arxiv.org/abs/2401.00003"]
+    assert [w["id"] for w in out] == ["https://arxiv.org/abs/2401.00001v1", "https://arxiv.org/abs/2401.00002v1",
+                                       "https://arxiv.org/abs/2401.00003v1"]
     assert out[0]["doi"] == "https://doi.org/10.1/x" and out[0]["title"] == "Title here"
-    assert out[1]["doi"] == "https://doi.org/10.48550/arXiv.2401.00002"
-    assert out[1]["pdf_urls"] == ["https://arxiv.org/pdf/2401.00002"] and out[0]["repository"] == "arXiv"
-    assert agent._search_arxiv_candidates("q", ["m1"], pool=1)[0]["id"].endswith("00001")
+    assert out[1]["doi"] == "https://doi.org/10.48550/arXiv.2401.00002v1"
+    assert out[1]["pdf_urls"] == ["https://arxiv.org/pdf/2401.00002v1"] and out[0]["repository"] == "arXiv"
+    assert agent._search_arxiv_candidates("q", ["m1"], pool=1)[0]["id"].endswith("00001v1")
 
 
-def test_arxiv_search_survives_query_failures_and_missing_package(fake_arxiv, monkeypatch):
+def test_arxiv_search_survives_query_failures(fake_arxiv):
     fake_arxiv["fail_for"] = {"q m1"}
-    fake_arxiv["results"] = {"m1": [FakeArxivResult("2401.00009")]}
+    fake_arxiv["results"] = {"m1": [_atom_entry("2401.00009")]}
     agent = da.DownloadAgent(download_delay_seconds=0)
-    assert [w["id"] for w in agent._search_arxiv_candidates("q", ["m1"], pool=5)] == ["https://arxiv.org/abs/2401.00009"]
-    monkeypatch.setitem(sys.modules, "arxiv", None)
-    assert agent._search_arxiv_candidates("q", [], pool=5) == []
+    assert [w["id"] for w in agent._search_arxiv_candidates("q", ["m1"], pool=5)] == ["https://arxiv.org/abs/2401.00009v1"]
+    assert fake_arxiv["searches"].count(("q m1", 5)) == 3  # one try plus the package's two retries
 
 
 class FakeWorks:
+    """``hardened_get_json`` stand-in serving recorded OpenAlex ``/works`` answers keyed by search text."""
+
     data: dict = {}
     fail_oa = False
     fail_all = False
+    headers: list = []
+    urls: list = []
 
-    def __init__(self):
-        self.text, self.oa = "", False
-
-    def search(self, text):
-        self.text = text
-        return self
-
-    def filter(self, **kw):
-        self.oa = True
-        return self
-
-    def get(self, per_page):
-        if self.fail_all or (self.oa and self.fail_oa):
+    def __call__(self, url, **kw):
+        query = parse_qs(urlsplit(url).query)
+        oa = "filter" in query
+        type(self).urls.append(url)
+        type(self).headers.append(kw.get("headers"))
+        if self.fail_all or (oa and self.fail_oa):
             raise RuntimeError("openalex down")
-        return self.data.get(self.text, [])
+        return {"meta": {}, "results": self.data.get(query["search"][0], [])}
 
 
 @pytest.fixture
 def fake_openalex(monkeypatch):
-    import pyalex
-
     FakeWorks.data, FakeWorks.fail_oa, FakeWorks.fail_all = {}, False, False
-    monkeypatch.setattr(pyalex, "Works", FakeWorks)
-    return FakeWorks
+    FakeWorks.headers, FakeWorks.urls = [], []
+    fake = FakeWorks()
+    monkeypatch.setattr(da, "hardened_get_json", fake)
+    return fake
 
 
 def test_search_candidates_merges_arxiv_first_then_openalex_dedupes_by_title_and_doi(fake_openalex, monkeypatch):
-    import pyalex
-
     arxiv_hit = {"id": "https://arxiv.org/abs/1", "doi": "https://doi.org/10.1/a", "title": "Shared Title",
                  "pdf_urls": ["https://arxiv.org/pdf/1"]}
     agent = da.DownloadAgent(download_delay_seconds=0, mailto="me@example.org")
@@ -271,7 +263,7 @@ def test_search_candidates_merges_arxiv_first_then_openalex_dedupes_by_title_and
     ]}
     out = agent._search_candidates("q", [], pool=5)
     assert [w["id"] for w in out] == ["https://arxiv.org/abs/1", "W4"]
-    assert out[1]["repository"] == "Zenodo" and pyalex.config.email == "me@example.org"
+    assert out[1]["repository"] == "Zenodo" and FakeWorks.headers[0]["From"] == "me@example.org" and "mailto=me%40example.org" in FakeWorks.urls[0]
     assert agent._search_candidates("q", [], pool=1) == [arxiv_hit]  # pool already satisfied by arXiv
 
 
@@ -279,9 +271,9 @@ def test_search_one_falls_back_without_oa_filter(fake_openalex):
     agent = da.DownloadAgent(download_delay_seconds=0)
     fake_openalex.data = {"t": [{"id": "W"}]}
     fake_openalex.fail_oa = True
-    assert agent._search_one(fake_openalex, "t", 10) == [{"id": "W"}]
+    assert agent._search_one("t", 10) == [{"id": "W"}]
     fake_openalex.fail_all = True
-    assert agent._search_one(fake_openalex, "t", 10) == []
+    assert agent._search_one("t", 10) == []
 
 
 # ------------------------------------------------------------------ ranking and validation
@@ -349,22 +341,20 @@ def test_validate_downloaded_pdf_decisions(chat, tmp_path, monkeypatch):
 
 # ------------------------------------------------------------------ refresh and store forwarding
 def test_refresh_candidate_urls_merges_openalex_unpaywall_and_rewrites(monkeypatch):
-    import pyalex
-
     full = {"id": "https://openalex.org/W5", "title": "Full Title", "doi": "https://doi.org/10.1/z",
             "publication_year": 2020, "abstract_inverted_index": {"abs": [0]},
             "best_oa_location": {"pdf_url": "https://arxiv.org/pdf/2101.00001"},
             "open_access": {"oa_url": "https://zenodo.org/record/1/files/p.pdf"}}
 
-    class Works:
-        def __getitem__(self, wid):
-            assert wid == "W5"
-            return full
+    def get_json(url, **kw):
+        if "api.unpaywall.org" in url:
+            return {"best_oa_location": {"host_type": "repository", "is_oa": True,
+                                         "url_for_pdf": "https://www.biorxiv.org/content/10.1101/x.full.pdf"}}
+        assert urlsplit(url).path == "/works/W5"
+        return full
 
-    monkeypatch.setattr(pyalex, "Works", Works)
-    monkeypatch.setattr(da._dl, "fetch_unpaywall_oa_pdfs",
-                        lambda doi, email: (["https://www.biorxiv.org/content/10.1101/x.full.pdf"], []))
-    agent = da.DownloadAgent(download_delay_seconds=0, mailto="me@example.org")
+    monkeypatch.setattr(da, "hardened_get_json", get_json)
+    agent = da.DownloadAgent(download_delay_seconds=0, mailto="curator@lbl.gov")
     cand = {"id": "https://openalex.org/W5", "title": "", "pdf_urls": ["https://publisher.example/x"],
             "oa_url": "https://zenodo.org/record/1/files/p.pdf"}
     out = agent._refresh_candidate_urls(cand)
@@ -377,13 +367,10 @@ def test_refresh_candidate_urls_merges_openalex_unpaywall_and_rewrites(monkeypat
 
 
 def test_refresh_tolerates_openalex_failure_and_non_openalex_ids(monkeypatch):
-    import pyalex
+    def get_json(url, **kw):
+        raise RuntimeError("down")
 
-    class Works:
-        def __getitem__(self, wid):
-            raise RuntimeError("down")
-
-    monkeypatch.setattr(pyalex, "Works", Works)
+    monkeypatch.setattr(da, "hardened_get_json", get_json)
     agent = da.DownloadAgent(download_delay_seconds=0)
     out = agent._refresh_candidate_urls({"id": "https://openalex.org/W5", "pdf_urls": ["https://arxiv.org/pdf/2101.00001"]})
     assert out["pdf_urls"] == ["https://arxiv.org/pdf/2101.00001"]

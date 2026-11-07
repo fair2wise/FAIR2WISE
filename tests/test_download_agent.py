@@ -2,7 +2,7 @@ import asyncio
 import json
 from pathlib import Path
 
-import pyalex
+from urllib.parse import parse_qs, urlsplit
 
 from app.modules.f2w_agent import download_agent as mod
 from app.modules.f2w_agent.download_agent import DownloadAgent, _search_queries
@@ -87,29 +87,23 @@ def test_search_candidates_excludes_publisher_only_urls(monkeypatch):
     assert result["candidates"][0]["repository"] == "arXiv"
 
 
-class FakeWorks:
-    calls = []
-    fail_all = False
-    fail_oa = False
-    data = {}
+class FakeOpenAlex:
+    """Stands in for ``hardened_get_json``: serves recorded OpenAlex ``/works`` answers keyed by search text."""
 
     def __init__(self):
-        self.search_text = ""
-        self.oa_filter = False
+        self.calls = []
+        self.fail_all = False
+        self.fail_oa = False
+        self.data = {}
 
-    def search(self, text):
-        self.search_text = text
-        return self
-
-    def filter(self, **kwargs):
-        self.oa_filter = True
-        return self
-
-    def get(self, per_page):
-        self.calls.append((self.search_text, self.oa_filter, per_page))
-        if self.fail_all or (self.oa_filter and self.fail_oa):
+    def __call__(self, url, **kwargs):
+        query = parse_qs(urlsplit(url).query)
+        text = query["search"][0]
+        oa = "filter" in query
+        self.calls.append((text, oa, int(query["per-page"][0])))
+        if self.fail_all or (oa and self.fail_oa):
             raise RuntimeError("openalex down")
-        return self.data.get(self.search_text, [])[:per_page]
+        return {"meta": {"count": 0}, "results": self.data.get(text, [])[: int(query["per-page"][0])]}
 
 
 def test_download_agent_does_not_count_invalid_download(tmp_path, monkeypatch):
@@ -152,15 +146,14 @@ def test_download_agent_does_not_count_invalid_download(tmp_path, monkeypatch):
 
 def test_search_candidates_fallback_failure_returns_empty(monkeypatch):
     agent = DownloadAgent(backend="ollama", model="test", download_delay_seconds=0)
-    FakeWorks.calls = []
-    FakeWorks.fail_all = True
-    FakeWorks.fail_oa = False
-    FakeWorks.data = {}
+    fake = FakeOpenAlex()
+    fake.fail_all = True
+    monkeypatch.setattr(mod, "hardened_get_json", fake)
 
-    candidates = agent._search_one(FakeWorks, "graphene oxide", 5)
+    candidates = agent._search_one("graphene oxide", 5)
 
     assert candidates == []
-    assert FakeWorks.calls == [
+    assert fake.calls == [
         ("graphene oxide", True, 5),
         ("graphene oxide", False, 5),
     ]
@@ -168,10 +161,8 @@ def test_search_candidates_fallback_failure_returns_empty(monkeypatch):
 
 def test_search_candidates_merges_missing_topic_queries(monkeypatch):
     agent = DownloadAgent(backend="ollama", model="test", download_delay_seconds=0)
-    FakeWorks.calls = []
-    FakeWorks.fail_all = False
-    FakeWorks.fail_oa = False
-    FakeWorks.data = {
+    fake = FakeOpenAlex()
+    fake.data = {
         "How measure scattering peak fitting": [
             {"id": "W1", "title": "broad", "best_oa_location": {"pdf_url": "https://arxiv.org/pdf/2401.00001"}},
         ],
@@ -180,14 +171,14 @@ def test_search_candidates_merges_missing_topic_queries(monkeypatch):
             {"id": "W2", "title": "focused", "best_oa_location": {"pdf_url": "https://arxiv.org/pdf/2401.00002"}},
         ],
     }
-    monkeypatch.setattr(pyalex, "Works", FakeWorks)
+    monkeypatch.setattr(mod, "hardened_get_json", fake)
     monkeypatch.setattr(agent, "_search_arxiv_candidates", lambda query, missing, pool: [])
 
     candidates = agent._search_candidates("How measure scattering", ["peak fitting"], 10)
 
     assert [c["id"] for c in candidates] == ["W1", "W2"]
-    assert ("How measure scattering peak fitting", True, 10) in FakeWorks.calls
-    assert ("peak fitting", True, 10) in FakeWorks.calls
+    assert ("How measure scattering peak fitting", True, 10) in fake.calls
+    assert ("peak fitting", True, 10) in fake.calls
 
 
 def test_search_queries_strip_openalex_wildcards():
