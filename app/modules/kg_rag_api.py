@@ -981,8 +981,8 @@ class NodeInfo:
         """Compute composite PRP score blending semantic, graph, lexical, evidence, and recency."""
         depth_fac = 1.0 / (1.0 + self.depth)
         evid = math.tanh(self.evidence_ct / PRP_EVIDENCE_TANH_SCALE)
-        # Recency boost: papers from last 3 years get up to 0.1 bonus,
-        # decaying linearly for older papers. No penalty for missing year.
+        # Recency boost: up to PRP_RECENCY_MAX_BONUS for a paper from the current year, decaying
+        # linearly to 0 over PRP_RECENCY_DECAY_YEARS (no plateau). No penalty for missing year.
         recency = 0.0
         if self.publication_year:
             current_year = datetime.datetime.now(datetime.UTC).year
@@ -1109,7 +1109,7 @@ class KnowledgeGraph:
         elif self.retrieval_backend != "lexical":
             raise ValueError(f"Unknown KG_RAG_RETRIEVAL_BACKEND: {self.retrieval_backend}")
 
-        self._cache: dict[str, list[NodeScore]] = {}
+        self._cache: dict[tuple[str, int], list[NodeScore]] = {}
         logger.info(
             Fore.GREEN
             + f"KG ready ({len(self.ids)} nodes, retrieval={self.retrieval_backend})."
@@ -1204,10 +1204,11 @@ class KnowledgeGraph:
 
     def _semantic_search(self, q: str, topk: int) -> list[NodeScore]:
         """Search nodes by embedding similarity using FAISS."""
-        if q in self._cache:
-            return self._cache[q]
+        key = (q, topk)
+        if key in self._cache:
+            return self._cache[key]
         if not self.ids or self.index is None or self.embed_model is None:
-            self._cache[q] = []
+            self._cache[key] = []
             return []
         q_vec = self.embed_model.encode([q], convert_to_numpy=True, normalize_embeddings=True)
         dists, idx = self.index.search(q_vec.astype("float32"), topk)
@@ -1224,7 +1225,7 @@ class KnowledgeGraph:
                 continue
             seen.add(canon)
             uniq.append(h)
-        self._cache[q] = uniq
+        self._cache[key] = uniq
         return uniq
 
     def _lexical_search(self, q: str, topk: int) -> list[NodeScore]:
@@ -1232,8 +1233,9 @@ class KnowledgeGraph:
 
         Empty query-term sets return ``[]`` without caching.
         """
-        if q in self._cache:
-            return self._cache[q]
+        key = (q, topk)
+        if key in self._cache:
+            return self._cache[key]
         qt = set(t for t in _tokenize(q) if len(t) >= MIN_TOKEN_CHARS)
         if not qt:
             return []
@@ -1247,8 +1249,8 @@ class KnowledgeGraph:
             score = (overlap / max(1, len(qt))) + (LEXICAL_NAME_HIT_BOOST * name_hit)
             hits.append(NodeScore(nid, min(score, 1.0), depth=0))
         hits.sort(key=lambda h: h.score, reverse=True)
-        self._cache[q] = hits[:topk]
-        return self._cache[q]
+        self._cache[key] = hits[:topk]
+        return self._cache[key]
 
     # @annotate('KnowledgeGraph::semantic_search')
     def semantic_search(self, q: str, topk: int = DEFAULT_K * 2) -> list[NodeScore]:
@@ -1560,11 +1562,11 @@ def retrieve_nodes(
     limit = DEFAULT_K if max_nodes is None else max(1, int(max_nodes))
     seed_k = max(limit, DEFAULT_K)
     ents = extract_query_entities(q)
-    seeds = kg.semantic_search(q)[: seed_k * 2]
+    seeds = list(kg.semantic_search(q, topk=seed_k * 2))
 
     if STEPWISE:
         for sub in decompose(q)[:STEPWISE_MAX_STEPS]:
-            seeds.extend(kg.semantic_search(sub)[:seed_k])
+            seeds.extend(kg.semantic_search(sub, topk=seed_k)[:seed_k])
 
     #  keep highest score per node
     s_map: dict[str, NodeScore] = {}
