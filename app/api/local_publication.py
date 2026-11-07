@@ -267,6 +267,15 @@ def install_local_publication(operations: F2WOperations, *, environ: Mapping[str
         return None
     operations.publication = wired.publication
     operations.gate = wired.gate
+    if operations.merge_apply is None and operations.curation is not None:
+        # T07B: the apply adapter over the same lazily resolved Save port (journaled node patches on the active
+        # publication). No governed vocabulary is approved on the image before H5, so ``vocabulary`` is ``None``
+        # and the route answers the typed ``unsupported_capability`` until the owner wires one.
+        from ..modules.canonicalization.apply_adapters import MergeApplyService
+
+        operations.merge_apply = MergeApplyService(
+            cases=operations.curation, vocabulary=None, port=wired.save_provider.backend, target=wired.target,
+            clock=clock or (lambda: datetime.now(UTC)))
     return wired
 
 

@@ -23,7 +23,11 @@ first and forwards to the T10 services, so the same authorization runs on every 
   (:mod:`app.modules.canonicalization.quality_snapshots`) and human-read figure-scale records
   (:class:`~app.modules.curation.scale_records.ScaleRecordStore`);
 * T32 (owner decision B4): folder browse and index over roots fixed in configuration
-  (:class:`~app.api.folders.FolderRoots`), ``:local`` only.
+  (:class:`~app.api.folders.FolderRoots`), ``:local`` only;
+* T07B (owner go 2026-11-06, thirteenth set): accepted canonicalization proposals -> scoped merge plan ->
+  one of the gated apply routes (:class:`~app.modules.canonicalization.apply_adapters.MergeApplyService`);
+  the approval is made here by ``create_approval`` for the exact ``plan_sha256`` the caller was shown, and
+  only once the route's gate is open (closed until the owner's C4 real-model rerun: typed ``gate_closed``).
 
 Nothing here parses HTTP, and no route holds an algorithm of its own. The only logic added
 here is the H5 publication gate (:class:`PublicationGate`) and the read-only UI mapping of a
@@ -68,6 +72,7 @@ from ..modules.security.authorization import (
 from ..modules.security.tiled_identity import TiledCredential, TiledIdentityPort, normalize_tiled_target
 
 if TYPE_CHECKING:  # annotation only; the publication job is passed in by the caller
+    from ..modules.canonicalization.apply_adapters import MergeApplyService
     from ..modules.curation.approval import CostApproval
     from ..modules.curation.scale_records import ScaleRecordStore
     from ..modules.curation.store import CurationStore
@@ -173,6 +178,9 @@ class F2WOperations:
         quality_dir: Directory of the vocabulary-quality snapshots (T31); ``None`` = not configured.
         folders: ``FolderRoots`` for folder browse/index (T32); ``None`` = not configured. Trusted
             wiring sets it on ``:local`` only; the folder methods refuse every other profile.
+        merge_apply: The T07B apply-adapter service (accepted proposals -> gated apply routes), or ``None``
+            when no graph target and vocabulary are wired (the merge methods then raise
+            ``UNSUPPORTED_CAPABILITY``). Set by trusted wiring only.
     """
 
     def __init__(self, settings: DeploymentSettings, jobs: JobService, *, publication: Publication | None = None,
@@ -180,7 +188,7 @@ class F2WOperations:
                  publication_gate: PublicationGate | None = None, clock: Clock = _utcnow,
                  approval_ttl: timedelta | None = PROFILE_APPROVAL_TTL, knowledge: KnowledgeOperations | None = None,
                  scales: ScaleRecordStore | None = None, control_path: Path | None = None, quality_dir: Path | None = None,
-                 folders: FolderRoots | None = None) -> None:
+                 folders: FolderRoots | None = None, merge_apply: MergeApplyService | None = None) -> None:
         """Bind the services; see the class docstring for the arguments.
 
         Raises:
@@ -207,6 +215,7 @@ class F2WOperations:
         self.control_path = Path(control_path) if control_path is not None else None
         self.quality_dir = Path(quality_dir) if quality_dir is not None else None
         self.folders = folders
+        self.merge_apply = merge_apply
 
     # --- contexts ---------------------------------------------------------------------
 
@@ -602,6 +611,75 @@ class F2WOperations:
                      ) -> dict[str, Any]:
         """Bounded document inventory under one folder (``FolderRoots.index_folder``)."""
         return self._folders(ctx).index_folder(root, path, limit=limit)
+
+    # --- T07B: accepted canonicalization proposals -> gated apply routes -----------------------
+
+    def _merge_apply(self) -> MergeApplyService:
+        if self.merge_apply is None:
+            raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
+                                "applying accepted proposals is not configured on this deployment (no graph target "
+                                "or governed vocabulary wired; H4/H5)")
+        return self.merge_apply
+
+    def apply_accepted_merges(self, ctx: RequestContext, *, corpus: str, route: str = "apply_migration",
+                              dry_run: bool = True, plan_sha256: str | None = None) -> dict[str, Any]:
+        """Plan the accepted canonicalization proposals of ``corpus`` and, unless ``dry_run``, apply them.
+
+        ``graph.publish`` is the entry capability (owner-gated choice, see ``docs/migration/reviews/H4/
+        apply_adapters.md``); a real apply is made by a human who also holds ``curation.approve`` and names
+        the ``plan_sha256`` a dry run showed. Order of a real apply: the route's gate (closed until the C4
+        rerun: typed ``gate_closed``, nothing else happens, no approval is recorded), the plan is re-made from
+        the live graph and compared with ``plan_sha256`` (``STALE_APPROVAL`` on a difference), the approval is
+        created by ``security.authorization.create_approval`` for that exact hash, and the service runs the
+        route under the write-ahead audit guard. The returned report separates false merges from false splits
+        and keeps every unresolved term visible.
+
+        Raises:
+            ContractError: ``DENIED``; ``UNSUPPORTED_CAPABILITY`` (not wired, gate closed, vocabulary not
+                approved); ``STALE_APPROVAL`` (plan moved, or no ``plan_sha256`` for a real apply); ``CONFLICT``
+                (stale source/vocabulary at apply time); ``INVALID_INPUT`` (unknown route).
+        """
+        from ..modules.canonicalization import gates
+        from ..modules.canonicalization.apply_adapters import ROUTE_GATES, RefusedApply, contract_error
+
+        require(ctx, "graph.publish")
+        self._human(ctx, "applying accepted proposals")
+        service = self._merge_apply()
+        if not dry_run:
+            gate = ROUTE_GATES.get(route)
+            if gate is None:
+                raise ContractError(ErrorCode.INVALID_INPUT, f"unknown apply route {route!r}")
+            try:
+                gates.require_gate(gate)
+            except gates.ApplyRefused as exc:
+                raise contract_error(exc) from exc
+        draft, report, _rows, vocabulary = service.plan(ctx, corpus=corpus, route=route)
+        if dry_run:
+            return service.apply_plan(ctx, draft, report, approval=None, vocabulary=vocabulary, dry_run=True,
+                                      now=self.clock()).as_dict()
+        if draft.plan is None:
+            return report.as_dict()
+        if not plan_sha256 or draft.plan.plan_sha256 != plan_sha256:
+            raise ContractError(ErrorCode.STALE_APPROVAL,
+                                "the plan is not the one shown (or none was named); run a dry run and approve its hash")
+        change_plan = draft.plan.to_change_plan()
+        now = self.clock()
+        approval = create_approval(
+            ctx, change_plan, self.settings, approval_id="appr-" + uuid.uuid4().hex, clock=self.clock,
+            identity_port=self.identity_port, operation_id=f"merge-apply:{corpus}:{draft.plan.plan_id}",
+            expires_at=(now + self.approval_ttl) if self.approval_ttl is not None else None)
+
+        def mutation() -> dict[str, Any]:
+            try:
+                return service.apply_plan(ctx, draft, report, approval=approval, vocabulary=vocabulary,
+                                          dry_run=False, now=now).as_dict()
+            except RefusedApply as exc:
+                raise contract_error(exc) from exc
+
+        return self._guarded(ctx, kind="merge_apply", target=service.target,
+                             payload={"corpus": corpus, "route": route, "plan_id": draft.plan.plan_id,
+                                      "plan_sha256": plan_sha256, "approval_id": approval.approval_id},
+                             mutation=mutation)
 
     # --- publication -------------------------------------------------------------------------
 

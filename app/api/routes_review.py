@@ -1,4 +1,4 @@
-"""``/v1/curation`` routes over ``review_case``, cost approvals and cost control (policies V10-V15, V32-V34).
+"""``/v1/curation`` routes: review, cost approvals/control and the T07B merge apply (V10-V15, V32-V34, V81).
 
 Case lists carry no evidence text; a single case carries a bounded evidence excerpt
 (``EVIDENCE_EXCERPT_CHARS``), never the stored chunk in full (D19: no reconstructable
@@ -9,7 +9,7 @@ review (T31) is one decision per case with one result per case.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from fastapi import Depends, FastAPI, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -66,6 +66,22 @@ class BulkDecision(BaseModel):
     accept: bool
     resolution: dict[str, Any] | None = None
     reason: str = Field(default="", max_length=2000)
+
+
+class MergeApplyRequest(BaseModel):
+    """Body of ``POST /v1/curation/merges/apply`` (T07B): accepted canonicalization proposals of one corpus.
+
+    ``dry_run`` (default) plans and reports without writing. A real apply names the ``plan_sha256`` a dry run
+    showed; the gate stays closed until the owner's C4 rerun (``501 unsupported_capability``, reason
+    ``gate_closed``).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    corpus: str = Field(min_length=1, max_length=200)
+    route: Literal["apply_migration", "apply_cleanup", "apply_campaign"] = "apply_migration"
+    dry_run: bool = True
+    plan_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
 
 class BulkReviewRequest(BaseModel):
@@ -159,8 +175,16 @@ def install(app: FastAPI) -> FastAPI:
                 item["case"] = _excerpt(item["case"])
         return cast(dict[str, Any], project(request, result))
 
+    @router.post("/merges/apply")
+    def apply_merges(request: Request, body: MergeApplyRequest,
+                     ctx: RequestContext = Depends(fresh_context)) -> dict[str, Any]:
+        """Plan (and, unless ``dry_run``, apply) the accepted canonicalization proposals of a corpus (T07B)."""
+        report = operations(request).apply_accepted_merges(ctx, corpus=body.corpus, route=body.route,
+                                                           dry_run=body.dry_run, plan_sha256=body.plan_sha256)
+        return cast(dict[str, Any], project(request, {"report": report}))
+
     return app
 
 
 __all__ = ("CASE_SUMMARY_FIELDS", "BulkDecision", "BulkReviewRequest", "CostApprovalRequest", "CostControlRequest",
-           "EVIDENCE_EXCERPT_CHARS", "ReviewRequest", "install")
+           "EVIDENCE_EXCERPT_CHARS", "MergeApplyRequest", "ReviewRequest", "install")
