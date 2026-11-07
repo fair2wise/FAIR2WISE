@@ -560,6 +560,7 @@ class RetrievalAgent(Agent):
                 self._graph_files = unique_graph_paths([graph_file])
             loop = asyncio.get_event_loop()
             self._kg = await loop.run_in_executor(None, self._build_kg)
+            self._skipped = []
             self._graphs = {}
             if self._kg is not None:
                 gid = self._annotate_kg(self._kg, str(self._graph_file))
@@ -683,7 +684,8 @@ class RetrievalAgent(Agent):
         kg_hits: list[ScoredHit] = []
         graphs, tiled_hits = self._merge_live_tiled(query, graphs, kg_hits)
         matches: list[dict[str, Any]] = []
-        backend = "lexical"
+        backends: list[str] = []
+        tiled_backend: str | None = None
         for hit in tiled_hits:
             matches.append(
                 {
@@ -695,9 +697,11 @@ class RetrievalAgent(Agent):
             )
         for gid, kg in graphs.items():
             if gid == TILED_GRAPH_ID:
-                backend = getattr(kg, "retrieval_backend", "graphql")
+                tiled_backend = str(getattr(kg, "retrieval_backend", "graphql"))
                 continue
-            backend = getattr(kg, "retrieval_backend", backend)
+            kg_backend = str(getattr(kg, "retrieval_backend", "lexical"))
+            if kg_backend not in backends:
+                backends.append(kg_backend)
             hits = await loop.run_in_executor(None, kg.semantic_search, query, limit)
             for hit in hits:
                 matches.append(
@@ -709,6 +713,7 @@ class RetrievalAgent(Agent):
                     }
                 )
         matches.sort(key=lambda item: float(item.get("score") or 0.0), reverse=True)
+        backend = "+".join(backends) if backends else (tiled_backend or "lexical")
         return {
             "retrieval_backend": backend,
             "matches": matches[:limit],
@@ -1421,7 +1426,7 @@ class RetrievalAgent(Agent):
             missing = [question]
         answer = verdict.get("answer") if sufficient else None
 
-        if not sufficient and (selected or chunk_count) and not numeric:
+        if not sufficient and (selected or chunk_count or has_mp) and not numeric:
             leeway = await self._synthesize_leeway_answer(
                 cli, question, ctx, history, missing
             )
