@@ -1,7 +1,8 @@
 """DownloadAgent: relevance-driven paper acquisition from reliable OA repositories.
 
 Given a user query plus the topics the RetrievalAgent found missing, this agent:
-  1. searches arXiv first, then OpenAlex for repository-backed alternatives,
+  1. searches arXiv first, then OpenAlex for repository-backed alternatives (metadata through the
+     hardened getters of ``literature.legacy_download`` only),
   2. keeps only works with a reliable direct PDF link from arXiv or an adjacent
      open repository,
   3. ranks candidates by relevance to the query (LLM scoring of title+abstract,
@@ -31,7 +32,15 @@ logger = logging.getLogger(__name__)
 MAX_SEARCH_QUERIES = 5
 
 from ..literature import download_pdfs as _dl
-from ..literature.legacy_download import hardened_download_pdf
+from ..literature.legacy_download import (
+    arxiv_search,
+    hardened_download_pdf,
+    hardened_get_bytes,
+    hardened_get_json,
+    openalex_search,
+    openalex_work,
+    unpaywall_oa_pdfs,
+)
 
 RELIABLE_PDF_HOSTS = _dl.RELIABLE_PDF_HOSTS
 
@@ -395,22 +404,17 @@ class DownloadAgent(Agent):
         )
 
     # ------------------------------------------------------------------
-    def _search_one(self, works: Callable[[], Any], search_text: str, pool: int) -> list[dict[str, Any]]:
+    def _search_one(self, search_text: str, pool: int) -> list[dict[str, Any]]:
         """Search OpenAlex for ``search_text``, retrying without the OA filter on failure."""
         try:
-            results = (
-                works()
-                .search(search_text)
-                .filter(open_access={"is_oa": True})
-                .get(per_page=min(pool, 50))
-            )
-            return list(results or [])
+            return list(openalex_search(search_text, min(pool, 50), oa_only=True, mailto=self._mailto,
+                                        get_json=hardened_get_json))
         except Exception as e:
             logger.warning("OpenAlex OA search failed for %r (%s); retrying without OA filter", search_text, e)
 
         try:
-            results = works().search(search_text).get(per_page=min(pool, 50))
-            return list(results or [])
+            return list(openalex_search(search_text, min(pool, 50), oa_only=False, mailto=self._mailto,
+                                        get_json=hardened_get_json))
         except Exception as e:
             logger.warning("OpenAlex fallback search failed for %r (%s)", search_text, e)
             return []
@@ -422,39 +426,25 @@ class DownloadAgent(Agent):
         pool: int,
     ) -> list[dict[str, Any]]:
         """Search arXiv directly and normalize results to OpenAlex-like records."""
-        try:
-            import arxiv
-        except ImportError:
-            logger.warning("arxiv package unavailable; using repository-backed OpenAlex results")
-            return []
-
         merged: list[dict[str, Any]] = []
         seen = set()
         per_query = max(1, min(pool, 25))
-        client = arxiv.Client(page_size=per_query, delay_seconds=0, num_retries=2)
         for search_text in _search_queries(query, missing_topics):
             try:
-                search = arxiv.Search(
-                    query=search_text,
-                    max_results=per_query,
-                    sort_by=arxiv.SortCriterion.Relevance,
-                )
-                results = client.results(search)
-                for result in results:
-                    short_id = str(result.get_short_id()).strip()
-                    pdf_url = str(result.pdf_url or f"https://arxiv.org/pdf/{short_id}").strip()
+                for result in arxiv_search(search_text, per_query, get_bytes=hardened_get_bytes):
+                    short_id = result["short_id"].strip()
+                    pdf_url = str(result["pdf_url"] or f"https://arxiv.org/pdf/{short_id}").strip()
                     if not short_id or not _is_reliable_pdf_url(pdf_url):
                         continue
-                    published = getattr(result, "published", None)
-                    doi = str(getattr(result, "doi", "") or "").strip()
+                    doi = result["doi"].strip()
                     if doi and not doi.lower().startswith("http"):
                         doi = f"https://doi.org/{doi}"
                     work = {
                         "id": f"https://arxiv.org/abs/{short_id}",
                         "doi": doi or f"https://doi.org/10.48550/arXiv.{short_id}",
-                        "title": " ".join(str(result.title or "").split()),
-                        "abstract": " ".join(str(result.summary or "").split()),
-                        "publication_year": getattr(published, "year", None),
+                        "title": " ".join(result["title"].split()),
+                        "abstract": " ".join(result["summary"].split()),
+                        "publication_year": result["year"],
                         "pdf_urls": [pdf_url],
                         "open_access": {"oa_url": pdf_url},
                         "repository": "arXiv",
@@ -472,12 +462,6 @@ class DownloadAgent(Agent):
 
     def _search_candidates(self, query: str, missing_topics: list[str], pool: int) -> list[dict[str, Any]]:
         """Merge arXiv then OpenAlex OA works until ``pool`` unique candidates."""
-        from pyalex import Works
-        from pyalex import config as pyalex_config
-
-        if self._mailto:
-            pyalex_config.email = self._mailto
-
         merged = self._search_arxiv_candidates(query, missing_topics, pool)
         seen = {_dedupe_key(work) for work in merged}
         seen_titles = {
@@ -488,7 +472,7 @@ class DownloadAgent(Agent):
         if len(merged) >= pool:
             return merged[:pool]
         for search_text in _search_queries(query, missing_topics):
-            for work in self._search_one(Works, search_text, pool):
+            for work in self._search_one(search_text, pool):
                 reliable_urls = _reliable_pdf_urls(work)
                 if not reliable_urls:
                     continue
@@ -577,12 +561,7 @@ class DownloadAgent(Agent):
         work_id = _openalex_work_id(candidate)
         if work_id:
             try:
-                from pyalex import Works
-                from pyalex import config as pyalex_config
-
-                if self._mailto:
-                    pyalex_config.email = self._mailto
-                work = Works()[work_id]
+                work = openalex_work(work_id, mailto=self._mailto, get_json=hardened_get_json)
                 if isinstance(work, dict):
                     urls.extend(_pdf_urls(work))
                     selected, _, _ = _dl.select_openalex_oa_pdfs(work)
@@ -600,7 +579,7 @@ class DownloadAgent(Agent):
 
         doi = str(refreshed.get("doi") or "").strip()
         if doi and self._mailto:
-            upw_urls, _ = _dl.fetch_unpaywall_oa_pdfs(doi, self._mailto)
+            upw_urls, _ = unpaywall_oa_pdfs(doi, self._mailto, get_json=hardened_get_json)
             urls.extend(upw_urls)
 
         deduped: list[str] = []

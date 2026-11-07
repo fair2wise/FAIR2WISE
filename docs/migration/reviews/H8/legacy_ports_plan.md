@@ -38,21 +38,17 @@ leave those patches unobserved by the callers. New code imports the new path onl
 | Semantics | Unchanged. Reachability unchanged: the Splash operations still talk only to the configured `splash://` endpoint (`KG_RAG_SPLASH_URI` / `SPLASH_LINKS_URI`, loopback default) over `urllib`, with no credential; nothing was added. |
 | Tests added | `tests/graph/test_kg_update.py`: new home, alias pin, callers share the module object, `splash_uri_default` read at call time, `publish_state` mapping (including an unmapped status passing through). |
 
-### 3. `download_agent.py`: audit result, no code change
+### 3. `download_agent.py`: audit result, then P1 (done, see below)
 
-The agent already has no direct `requests`/`urllib` fetch: PDF bytes flow only through
-`literature.legacy_download.hardened_download_pdf` (T29). What remains outside the hardened egress policy are three
-*metadata* hops: OpenAlex search and work refresh through `pyalex.Works`, arXiv search through the `arxiv` package,
-and Unpaywall through `download_pdfs.fetch_unpaywall_oa_pdfs` (`requests`). Moving them is not a mechanical change
-(query construction parity for `search` + `filter(open_access={"is_oa": True})` + `per_page`, relevance scores,
-inverted-index abstracts; `tests/test_download_agent.py` and the contract harness fake the pyalex `Works` interface),
-so it is proposed below rather than half-done. Added `tests/literature/test_download_agent_egress.py`, which pins
-the current state: no private HTTP code in the agent, `hardened_download_pdf` the only PDF fetch, and the three
-metadata hops by name (a new hop fails the test until this plan is updated).
+The audit found no direct `requests`/`urllib` fetch in the agent: PDF bytes flow only through
+`literature.legacy_download.hardened_download_pdf` (T29). Three *metadata* hops sat outside the hardened egress
+policy: OpenAlex through `pyalex.Works`, arXiv through the `arxiv` package, Unpaywall through
+`download_pdfs.fetch_unpaywall_oa_pdfs` (`requests`). They are ported by P1 below; `tests/literature/test_download_agent_egress.py`
+now pins the hop set as empty.
 
-## Proposals (not started; owner scheduling needed)
+## Proposals (owner scheduling needed; P1 is done)
 
-### P1. `download_agent` metadata hops onto `hardened_get_json`
+### P1. `download_agent` metadata hops onto `hardened_get_json` (DONE, branch `forge_merge-T17B-p1`, not merged)
 
 | | |
 |---|---|
@@ -62,6 +58,42 @@ metadata hops by name (a new hop fails the test until this plan is updated).
 | Tests | Parity tests feeding the same recorded OpenAlex/arXiv/Unpaywall JSON to the old (pyalex/arxiv/requests) and the new path (`httpx.MockTransport`); rewrite the `FakeWorks` fakes in `tests/test_download_agent.py`, `tests/coverage_t27/test_download_agent_extra.py` and the contract harness to fake the JSON fetcher instead; extend `test_download_agent_egress.py` to assert the hop set is empty. |
 | Risks | pyalex adds `mailto` and user-agent conventions and handles cursor paging; relevance scores come from the API as `relevance_score` and must map to `_score` identically. The `arxiv` package applies a polite delay the new helper must keep (`OA_HOST_DELAYS`). The contract harness fakes `DownloadAgent` wholesale (`api_mod.DownloadAgent`), so the legacy UI tests are unaffected, but `tests/test_download_agent.py` is a rewrite. |
 | Size | 1-2 days (helpers 0.5 d, parity fixtures and test rewrite 1 d). |
+
+**Done (2026-11-06).** `legacy_download.py` gained `hardened_get_bytes` (the transport of `hardened_get_json`, which now
+wraps it unchanged), `openalex_search`, `openalex_work`, `arxiv_search` + `parse_arxiv_atom`, `unpaywall_oa_pdfs`.
+`DownloadAgent` calls only those, with the getter passed explicitly from its module globals (so
+`monkeypatch.setattr(da, "hardened_get_json", ...)` is the fake point, as `hardened_download_pdf` already is).
+`_search_one(search_text, pool)` lost its `works` factory argument (private; callers were the agent and its tests).
+`download_pdfs.fetch_unpaywall_oa_pdfs` stays as the parity oracle.
+
+- Hosts: `api.openalex.org`, `export.arxiv.org`, `api.unpaywall.org` (the hosts the old clients used; the egress policy has no
+  host allowlist, it checks scheme, port 80/443, credentials and public addresses on every hop). No host added.
+- Parity (`tests/literature/test_download_agent_metadata_parity.py`, golden fixtures in
+  `tests/literature/fixtures/download_agent_metadata/`): the real pyalex, `arxiv` package and `fetch_unpaywall_oa_pdfs` are driven
+  offline with a recorded answer and compared with the new helpers on the same answer: OpenAlex records equal (including
+  `relevance_score`) and the request query (`search`, `filter`, `per-page`) and `From`/`Authorization` headers equal; arXiv request
+  URL byte-identical to `arxiv.Client._format_url`, entries equal field by field (short id with version, pdf link, doi, whitespace-folded
+  title, summary, year; entries without `<published>` skipped by both); Unpaywall URL byte-identical to the prepared `requests`
+  request (DOIs with parentheses, `<>`, `%`, spaces) and result tuples equal, failure paths (404, 500, non-object, non-JSON) all `([], [])`.
+- Behaviour kept: arXiv first then OpenAlex, OA-filter retry without the filter and its warning texts, `per_page = min(pool, 50)`
+  (1..200 enforced as pyalex did), arXiv `page_size == max_results` and 2 retries with no pause (`delay_seconds=0`), pool and
+  dedupe logic, record shapes.
+- Differences, all deliberate: (1) OpenAlex requests also carry the documented `mailto=` query parameter next to the `From` header
+  pyalex sent. (2) An arXiv API error entry (id not under `arxiv.org/abs/`) is skipped; the package turned it into a bogus short id.
+  (3) arXiv Atom is parsed with the stdlib parser after refusing any non-UTF-8 body and any `<!DOCTYPE`/`<!ENTITY` (arXiv answers never
+  have one), so entity expansion and external references are impossible; a refused or malformed document yields no entries, as the
+  package's `recover=True` parser did. No new dependency (`defusedxml` is not a declared dependency). (4) A policy refusal is not
+  retried; a failure retried as the package retried.
+- OpenAlex API key: the agent never used one (pyalex `api_key` unset, no env read). The helpers accept `api_key` and send
+  `Authorization: Bearer` only as a header, never in the URL, never logged (tested), but the agent does not pass one: wiring
+  `OPENALEX_API_KEY` is a new secrets path and is owner-gated.
+- Quota/`Retry-After`: neither pyalex (`max_retries=0`) nor the agent handled them, and `hardened_get_json` does not expose response
+  headers, so a 429 is a failed lookup (warning, fallback, empty), as before. Honouring `Retry-After` needs a getter variant returning headers: owner-gated.
+- Dependencies: `pyalex` and `arxiv` are NOT unused: `f2w_agent/api.py` (publication search), `commands/harvest_rsoxs.py`,
+  `library/harvest.py` and `literature/download_pdfs.py` still import them. `pixi.toml`/`pyproject.toml` unchanged, lock untouched.
+- Residual risks: the other pyalex/arxiv users above remain outside the hardened policy (follow-up ports, same helpers apply);
+  `mailto` is sent to OpenAlex in the URL as well as the header; the arXiv terms ask for one request per 3 s and the agent keeps
+  the previous no-pause behaviour (up to 5 queries x 3 tries per search).
 
 ### P2. `orchestrator_agent.py` + `debate_agent.py` -> `agent_runtime/` and `curation/`
 

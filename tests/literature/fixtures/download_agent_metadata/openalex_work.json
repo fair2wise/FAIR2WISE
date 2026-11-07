@@ -1,0 +1,68 @@
+{
+  "id": "https://openalex.org/W4385000001",
+  "doi": "https://doi.org/10.1021/acsnano.2c01234",
+  "title": "Resonant soft X-ray scattering of block copolymer thin films",
+  "display_name": "Resonant soft X-ray scattering of block copolymer thin films",
+  "publication_year": 2022,
+  "relevance_score": 412.7,
+  "abstract_inverted_index": {
+    "Resonant": [
+      0
+    ],
+    "scattering": [
+      1,
+      5
+    ],
+    "probes": [
+      2
+    ],
+    "polymer": [
+      3
+    ],
+    "domain": [
+      4
+    ],
+    "order.": [
+      6
+    ]
+  },
+  "best_oa_location": {
+    "is_oa": true,
+    "landing_page_url": "https://arxiv.org/abs/2201.01234",
+    "pdf_url": "https://arxiv.org/pdf/2201.01234",
+    "source": {
+      "display_name": "arXiv (Cornell University)",
+      "type": "repository"
+    }
+  },
+  "open_access": {
+    "is_oa": true,
+    "oa_status": "green",
+    "oa_url": "https://arxiv.org/pdf/2201.01234"
+  },
+  "primary_location": {
+    "is_oa": false,
+    "pdf_url": null,
+    "landing_page_url": "https://doi.org/10.1021/acsnano.2c01234"
+  },
+  "locations": [
+    {
+      "is_oa": true,
+      "pdf_url": "https://arxiv.org/pdf/2201.01234",
+      "landing_page_url": "https://arxiv.org/abs/2201.01234"
+    },
+    {
+      "is_oa": false,
+      "pdf_url": null,
+      "landing_page_url": "https://doi.org/10.1021/acsnano.2c01234"
+    }
+  ],
+  "authorships": [
+    {
+      "author": {
+        "id": "https://openalex.org/A5000000001",
+        "display_name": "A. Researcher"
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "doi": "10.1021/acsnano.2c01234",
+  "is_oa": true,
+  "oa_status": "green",
+  "best_oa_location": {"is_oa": true, "host_type": "repository", "url": "https://arxiv.org/abs/2201.01234", "url_for_pdf": "https://arxiv.org/pdf/2201.01234", "license": null, "version": "submittedVersion"},
+  "oa_locations": [
+    {"is_oa": true, "host_type": "repository", "url": "https://arxiv.org/abs/2201.01234", "url_for_pdf": "https://arxiv.org/pdf/2201.01234", "version": "submittedVersion"},
+    {"is_oa": true, "host_type": "repository", "url": "https://europepmc.org/articles/PMC7654321", "url_for_pdf": "https://europepmc.org/articles/PMC7654321?pdf=render", "version": "publishedVersion"},
+    {"is_oa": true, "host_type": "publisher", "url": "https://pubs.acs.org/doi/10.1021/acsnano.2c01234", "url_for_pdf": null, "version": "publishedVersion"}
+  ],
+  "title": "Resonant soft X-ray scattering of block copolymer thin films",
+  "year": 2022
+}
