@@ -125,7 +125,7 @@
     "version_store": "F2W_git_repository",
     "production_promotion": "exact_staging_validated_commit_path_sha256",
     "production_reextraction_for_promotion": false,
-    "bundled_in_images": false
+    "bundled_in_images": true
   },
   "deployment": {
     "profiles": "deployment_profiles.json",

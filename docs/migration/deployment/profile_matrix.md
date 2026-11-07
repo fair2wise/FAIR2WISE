@@ -8,7 +8,7 @@
 - D34: `:local` gives full access with no sign-in.
 - H0 E3/E4: `storage/` (kg, terminology, schema) may be included in an image (owner exception). The Tiled catalog DB may be included only in `:local`. `storage/source_index` and papers are always excluded and must be mounted.
 
-**Machine-readable source:** `docs/migration/companion/deployment_profiles.json`. Where it conflicts with E3, see the note at the end.
+**Machine-readable source:** `docs/migration/companion/deployment_profiles.json`. It agrees with E3 (see the note at the end).
 
 ## 1. Matrix
 
@@ -63,7 +63,7 @@
 
 `deployment_profiles.json` (`kg_promotion.bundled_in_images: false`) and plan 4.14/13.4 ("Docker build contexts/layers must continue excluding storage/kg corpus artifacts") were written before H0. E3 later allowed `storage/` (kg, terminology, schema) in the image.
 
-The E3 errata (applied 2026-11-06, `reviews/H8/spec_errata_E3_draft.md`) amended plan 4.14 and the two companion KG specs accordingly; `deployment_profiles.json` is a frozen data file and still carries the pre-E3 flag. This document follows E3. The consistency points are:
+The E3 errata (applied 2026-11-06, `reviews/H8/spec_errata_E3_draft.md`) amended plan 4.14 and the two companion KG specs accordingly, and `deployment_profiles.json` (`kg_promotion.bundled_in_images: true`, re-pinned in `companion/SHA256SUMS.txt`) now agrees: flat `storage/kg/matkg_*.json` ship in images, nested release `graph.json` copies do not. The mismatch noted here no longer exists; this section is kept as history. This document follows E3. The consistency points are:
 
 - KG JSON in the image is a **default or compatibility payload only**. It is not an import source.
 - Imports and promotion still read the commit/path/SHA-256-selected bytes from the `/var/lib/fair2wise/kg` mount (D31).

@@ -214,3 +214,8 @@ def test_check_mode_prints_the_plan_without_starting(name, tmp_path):
     plan = json.loads(done.stdout)
     assert plan["profile"] == name and plan["env"]["F2W_DEPLOYMENT_PROFILE"] == name
     assert [s["name"] for s in plan["services"]][-3:] == ["api", "worker", "gateway"]
+
+
+def test_companion_matrix_records_e3_kg_bundling():
+    matrix = json.loads((REPO / "docs/migration/companion/deployment_profiles.json").read_text(encoding="utf-8"))
+    assert matrix["kg_promotion"]["bundled_in_images"] is True
