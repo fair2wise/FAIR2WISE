@@ -10,6 +10,8 @@ entry (T18D, TIL-22).
   same PATCH answers 400) and a Save target is reachable now (on ``:local`` before the first publication the
   same PATCH answers the typed 501; owner decision 2026-11-04, tenth set).
 * ``can_upload``: ``graph.upload`` (R11).
+* ``can_run_operations``: ``chat.ask`` (the entry capability of the ``GET /v1/operations/*`` reads, V25-V29;
+  T19E frontend closure): the Operations tab shows only when this is true.
 * ``role``: ``local_operator`` (``:local``, no sign-in), ``admin`` (verified Tiled admin) or ``user``.
 """
 
@@ -31,7 +33,8 @@ def capabilities_for_caller(ctx: RequestContext, *, editable_source: bool = True
     else:
         role = "admin" if ctx.principal.is_admin else "user"
     return {"role": role, "profile": ctx.profile.value, "can_edit": can_edit,
-            "can_save": can_edit and editable_source, "can_upload": "graph.upload" in ctx.capabilities}
+            "can_save": can_edit and editable_source, "can_upload": "graph.upload" in ctx.capabilities,
+            "can_run_operations": "chat.ask" in ctx.capabilities}
 
 
 def install(app: FastAPI) -> FastAPI:

@@ -150,6 +150,8 @@ def test_listing_has_json_and_tiled_sources_all_read_only(tmp_path):
     demo = listing["sources"][1]
     assert (demo["node_count"], demo["edge_count"], demo["available"]) == (3, 2, True)
     assert listing["tiled"] == {"status": "ok", "detail": None}
+    # T19E frontend closure: every row carries the Knowledge Operations graph_id (never a path or a URL).
+    assert [s["graph_id"] for s in listing["sources"]] == ["one", "e2e_demo", "other_corpus"]
 
 
 def test_without_a_scanner_tiled_is_not_offered(tmp_path):

@@ -715,6 +715,14 @@ class GraphOperationsTool:
         """Operations this suite runs (job dispatch)."""
         return tuple(spec.name for spec in self.specs)
 
+    def known_graph_ids(self) -> tuple[str, ...]:
+        """The graph ids this suite accepts: the explicit list, else the port's listing, else unknown (``()``)."""
+        if self._graph_ids is not None:
+            return self._graph_ids
+        if hasattr(self.port, "graph_ids"):
+            return tuple(str(g) for g in self.port.graph_ids())
+        return ()
+
     def compute_operation(self, ctx: RequestContext, operation: str, args: Mapping[str, Any],
                           control: ScanControl | None = None) -> OperationReport:
         """Job entry point (same as :meth:`compute`)."""

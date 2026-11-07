@@ -197,6 +197,17 @@ export interface MockAgentOptions {
   judgePuts?: Array<Record<string, unknown>>;
   /** T18D: GET /v1/capabilities `can_save` (default true); 'absent' makes the route 404 (older server). */
   canSave?: boolean | 'absent';
+  /** T19E: GET /v1/capabilities `can_run_operations` (default true). 'omitted' leaves the field out (older server). */
+  canRunOperations?: boolean | 'omitted';
+  /**
+   * T19E: GET /v1/operations/<route> answers, keyed by route segment (`statistics`, `compare`, `paper-subgraph`,
+   * `recent`, `corpus-audit`): a ToolResult body (200) or a typed error `{ status, code, message }`. Unset
+   * routes answer 404. `requests` collects `pathname+search` of every operations request.
+   */
+  operations?: {
+    routes: Record<string, Record<string, unknown> | { status: number; code: string; message: string }>;
+    requests?: string[];
+  };
   /**
    * Graph sources (GET /v1/graph/sources and the `source` query parameter of the graph routes). Unset: the
    * listing route is absent (older server) and the selector hides itself. `graphs` maps a source id to the
@@ -243,9 +254,11 @@ export async function mockAgent(page: Page, options: MockAgentOptions = {}) {
 
     if (path === '/v1/capabilities' && method === 'GET' && options.canSave !== 'absent') {
       const canSave = options.canSave ?? true;
+      const ops = options.canRunOperations ?? true;
       await route.fulfill(json({
         role: canSave ? 'local_operator' : 'user', profile: canSave ? 'local' : 'als',
         can_edit: canSave, can_save: canSave, can_upload: canSave,
+        ...(ops === 'omitted' ? {} : { can_run_operations: ops }),
       }));
       return;
     }
@@ -275,6 +288,21 @@ export async function mockAgent(page: Page, options: MockAgentOptions = {}) {
 
     if (path === '/v1/graph/sources' && method === 'GET' && options.graphSources) {
       await route.fulfill(json(options.graphSources.listing));
+      return;
+    }
+
+    if (path.startsWith('/v1/operations/') && method === 'GET' && options.operations) {
+      options.operations.requests?.push(`${path}${url.search}`);
+      const answer = options.operations.routes[path.slice('/v1/operations/'.length)];
+      if (!answer) {
+        await route.fulfill(json({ code: 'not_found', message: 'no such operation route' }, 404));
+        return;
+      }
+      if ('status' in answer && typeof answer.status === 'number' && 'code' in answer) {
+        await route.fulfill(json({ code: answer.code, message: answer.message }, answer.status));
+        return;
+      }
+      await route.fulfill(json(answer));
       return;
     }
 

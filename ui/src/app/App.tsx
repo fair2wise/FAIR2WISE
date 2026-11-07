@@ -7,12 +7,15 @@ import {
   HubHeader,
   HubSidebar,
 } from '@blueskyproject/finch';
-import { FlaskConical, Library, Share2 } from 'lucide-react';
+import { Calculator, FlaskConical, Library, Share2 } from 'lucide-react';
 import { ExtractionTab } from './components/ExtractionTab';
 import { KeepAliveMainContent } from './components/KeepAliveMainContent';
 import { LibraryTab } from './components/LibraryTab';
+import { OperationsTab } from './components/OperationsTab';
 import { Toaster } from './components/ui/sonner';
 import { useLibraryProbe } from './components/libraryHooks';
+import { canRunOperations } from './components/capabilitiesApi';
+import { useCapabilities } from './components/capabilitiesHooks';
 import { AppBookmarksButton } from './components/AppBookmarksButton';
 import { AppNewChatButton } from './components/AppNewChatButton';
 import { AppPaperSearchButton } from './components/AppPaperSearchButton';
@@ -104,6 +107,7 @@ export default function App() {
 
 function AppShell() {
   const libraryProbe = useLibraryProbe();
+  const operationsAllowed = canRunOperations(useCapabilities());
   const [activeQuery, setActiveQuery] = useState<ExampleQuery>(EMPTY_QUERY);
   const [graph, setGraph] = useState(EMPTY_GRAPH);
   const [chatStore, setChatStore] = useState(() => loadChatSessionStore());
@@ -259,7 +263,19 @@ function AppShell() {
           },
         ]
       : []),
-  ], [activeQuery, activeSession.id, activeSession.messages, graph, libraryProbe.available, loadCatalog, reloadGraph, setActiveSessionMessages]);
+    // Operations (T19E) exists only when `/v1/capabilities` confirms `can_run_operations` (the `chat.ask`
+    // entry capability of the `/v1/operations` reads); unknown or absent hides it.
+    ...(operationsAllowed
+      ? [
+          {
+            path: '/operations',
+            label: 'Operations',
+            element: <OperationsTab />,
+            icon: <Calculator size={28} />,
+          },
+        ]
+      : []),
+  ], [activeQuery, activeSession.id, activeSession.messages, graph, libraryProbe.available, loadCatalog, operationsAllowed, reloadGraph, setActiveSessionMessages]);
 
   const headerLogoIcon = (
     <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-white">

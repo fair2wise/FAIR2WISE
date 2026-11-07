@@ -14,7 +14,10 @@ Knowledge Operations (T19E; the CLI wrappers of the five T19C operations, which 
 stay as the parity oracle): ``ops statistics --graph G``, ``ops compare --graph A --graph B``,
 ``ops paper-subgraph --graph G --paper P``, ``ops recent --graph G [--since T] [--limit N]``,
 ``ops corpus-audit --corpus C [--section S ...]``, ``ops submit --operation NAME --args JSON``
-(a ``knowledge_operation`` job) and ``ops result <job_id>``. Graphs come from
+(a ``knowledge_operation`` job), ``ops result <job_id>`` and ``ops list`` (the operations, graph
+ids and corpus names this CLI can run). ``ops summarize --terms T --manifest M --paper FILE
+[--max-terms N] [--query Q]`` is the T19B ``lit_summarize_extracted_terms`` wrapper over one
+session's files (the same typed result the SDK's ``summarize_paper_terms`` returns). Graphs come from
 ``<project-root>/storage/kg`` (or ``--graph-file`` overrides) and corpora from
 ``<project-root>/storage/terminology``; the output is the bounded typed result the agent
 Tool and ``/v1/operations`` return (``status`` ``ok`` or ``partial``).
@@ -142,6 +145,7 @@ def build_parser() -> argparse.ArgumentParser:
     ops = sub.add_parser("ops", help="Monitoring status and knowledge operations (T19E)")
     osub = ops.add_subparsers(dest="action", required=True)
     osub.add_parser("status")
+    osub.add_parser("list", help="Operations, graph ids and corpus names this CLI can run")
     st = osub.add_parser("statistics", help="kg_compute_statistics of one graph")
     st.add_argument("--graph", required=True, dest="graph_id")
     cmp_ = osub.add_parser("compare", help="kg_compare_snapshots over graphs in the given order")
@@ -164,6 +168,12 @@ def build_parser() -> argparse.ArgumentParser:
     sm.add_argument("--scope", action="append", default=None, help="corpus_scope entry (repeatable)")
     rs = osub.add_parser("result", help="Handle and bounded report of a knowledge_operation job")
     rs.add_argument("job_id")
+    su = osub.add_parser("summarize", help="lit_summarize_extracted_terms over one session's files (T19B)")
+    su.add_argument("--terms", required=True, help="session extracted-terms JSON")
+    su.add_argument("--manifest", required=True, help="extraction manifest JSON")
+    su.add_argument("--paper", required=True, help="PDF filename key in the manifest")
+    su.add_argument("--max-terms", type=int, default=None)
+    su.add_argument("--query", default="")
     return p
 
 
@@ -223,6 +233,14 @@ def run(ops: F2WOperations, args: argparse.Namespace) -> JsonValue:
         return ops.audit_status(ctx)
     if action == "status":
         return ops.ops_status(ctx)
+    if action == "list":
+        return ops.knowledge_catalog(ctx)
+    if action == "summarize":
+        from ..modules.operations.papers import PaperScope
+
+        scope = PaperScope(terms_path=str(Path(args.terms)), manifest_path=str(Path(args.manifest)),
+                           filename=args.paper)
+        return _dump(ops.summarize_paper_terms(ctx, scope, max_terms=args.max_terms, query=args.query))
     if action == "statistics":
         return _dump(ops.graph_statistics(ctx, args.graph_id))
     if action == "compare":

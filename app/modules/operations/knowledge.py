@@ -92,6 +92,8 @@ _DISCOVER_Q = "query($l: Int!, $o: Int!) { entities(limit: $l, offset: $o) { uri
 GraphFilesProvider = Callable[[], Sequence[str | Path]]
 #: Returns the Tiled GraphPort to read, or ``None`` when no server is reachable right now.
 TiledBackendFactory = Callable[[], Any | None]
+#: Lists the corpus names a resolver would accept (for the catalog).
+CorpusLister = Callable[[], Sequence[str]]
 
 
 class DynamicJsonGraphs:
@@ -389,6 +391,19 @@ def storage_graph_files(root: str | Path) -> list[str]:
     return [str(p) for p in sorted(kg_dir.glob("*.json"), key=lambda p: p.name.lower())]
 
 
+def directory_corpus_names(directory: str | Path) -> CorpusLister:
+    """The corpus names :func:`directory_corpus_resolver` over ``directory`` would resolve (file stems, sorted)."""
+    base = Path(directory)
+
+    def names() -> list[str]:
+        if not base.is_dir():
+            return []
+        return sorted((p.stem for p in base.glob("*.json") if p.is_file() and not p.name.startswith(".")),
+                      key=str.lower)
+
+    return names
+
+
 def directory_corpus_resolver(directory: str | Path) -> CorpusResolver:
     """Resolve a corpus name to ``<directory>/<name>.json`` (the extracted-terms files).
 
@@ -424,10 +439,12 @@ class KnowledgeOperations:
         corpus: The corpus audit suite, or ``None`` when no corpus is configured.
         artifact_store: Optional ``DocumentStore`` for the private full report of a direct call
             (jobs pass their own through ``register_operation_jobs``).
+        corpora: Optional lister of the corpus names ``corpus`` resolves (for :meth:`catalog`);
+            ``None`` means the names are not enumerable (the catalog lists none).
     """
 
     def __init__(self, graph: GraphOperationsTool, corpus: CorpusAuditTool | None = None, *,
-                 artifact_store: object = None) -> None:
+                 artifact_store: object = None, corpora: CorpusLister | None = None) -> None:
         if not isinstance(graph, GraphOperationsTool):
             raise TypeError("graph must be an operations.graph.GraphOperationsTool")
         if corpus is not None and not isinstance(corpus, CorpusAuditTool):
@@ -435,6 +452,7 @@ class KnowledgeOperations:
         self.graph = graph
         self.corpus = corpus
         self.artifact_store = artifact_store
+        self._corpora = corpora
         suites: list[Any] = [graph] + ([corpus] if corpus is not None else [])
         self._dispatch: OperationFn = operation_dispatch(*suites)
         self._names: tuple[str, ...] = tuple(n for s in suites for n in s.operation_names())
@@ -452,8 +470,9 @@ class KnowledgeOperations:
         root = Path(root)
         graph = GraphOperationsTool(DynamicJsonGraphs(lambda: storage_graph_files(root)),
                                     max_records=graph_max_records)
-        corpus = CorpusAuditTool(directory_corpus_resolver(root / "storage" / "terminology"))
-        return cls(graph, corpus, artifact_store=artifact_store)
+        terminology = root / "storage" / "terminology"
+        corpus = CorpusAuditTool(directory_corpus_resolver(terminology))
+        return cls(graph, corpus, artifact_store=artifact_store, corpora=directory_corpus_names(terminology))
 
     @classmethod
     def from_deployment(cls, settings: DeploymentSettings, environ: object = None, root: str | Path | None = None, *,
@@ -484,13 +503,14 @@ class KnowledgeOperations:
         if reason:
             port.record_warning(reason)
         graph = GraphOperationsTool(port, max_records=graph_max_records)
-        corpus = CorpusAuditTool(directory_corpus_resolver(root / "storage" / "terminology"))
-        return cls(graph, corpus, artifact_store=artifact_store)
+        terminology = root / "storage" / "terminology"
+        corpus = CorpusAuditTool(directory_corpus_resolver(terminology))
+        return cls(graph, corpus, artifact_store=artifact_store, corpora=directory_corpus_names(terminology))
 
     @classmethod
     def from_graph_files(cls, provider: GraphFilesProvider, *, corpus: CorpusAuditTool | None = None,
                          artifact_store: object = None, graph_max_records: int = 500_000,
-                         tiled: object = None,
+                         tiled: object = None, corpora: CorpusLister | None = None,
                          discovery_ttl: float = TILED_DISCOVERY_TTL) -> KnowledgeOperations:
         """Operations following a caller-supplied graph selection (T25D: the active runtime's files).
 
@@ -501,7 +521,7 @@ class KnowledgeOperations:
         if tiled is not None:
             port = CompositeGraphPort(port, tiled, ttl=discovery_ttl)
         graph = GraphOperationsTool(port, max_records=graph_max_records)
-        return cls(graph, corpus, artifact_store=artifact_store)
+        return cls(graph, corpus, artifact_store=artifact_store, corpora=corpora)
 
     # -- agent runtime -------------------------------------------------------------------------
 
@@ -531,6 +551,29 @@ class KnowledgeOperations:
         return out
 
     # -- shared service, routes, SDK, CLI --------------------------------------------------------
+
+    def catalog(self, ctx: RequestContext) -> dict[str, Any]:
+        """What this bundle can run for ``ctx``: operations, graph ids and corpus names (T19E closure).
+
+        Graphs and corpora outside a non-empty ``ctx.corpus_scope`` are left out (the T19C scope
+        rule, applied as a filter rather than a refusal). Graph ids come from the port's listing
+        (Tiled discovery included); corpus names from the lister, ``[]`` when none is configured.
+        The catalog names no path, URL or credential.
+
+        Raises:
+            ContractError: ``DENIED`` without ``chat.ask``.
+        """
+        require(ctx, READ_CAPABILITY)
+        scope = set(ctx.corpus_scope or ())
+
+        def visible(name: str) -> bool:
+            return not scope or name in scope
+
+        operations = [{"name": s.name, "version": s.version, "description": s.description} for s in self.specs()]
+        graphs = [g for g in self.graph.known_graph_ids() if visible(g)]
+        corpora = [c for c in (self._corpora() if self._corpora is not None and self.corpus is not None else [])
+                   if visible(c)]
+        return {"operations": operations, "graphs": graphs, "corpora": corpora}
 
     @property
     def dispatch(self) -> OperationFn:
@@ -629,8 +672,9 @@ def job_scope(args: Mapping[str, Any]) -> tuple[str, ...]:
 
 
 __all__: tuple[str, ...] = (
-    "CompositeGraphPort", "DynamicJsonGraphs", "KnowledgeOperations", "OPERATION_JOB_KIND", "READ_CAPABILITY",
-    "TILED_DISCOVERY_MAX_SCAN", "TILED_DISCOVERY_TTL", "TiledBackendFactory", "directory_corpus_resolver",
+    "CompositeGraphPort", "CorpusLister", "DynamicJsonGraphs", "KnowledgeOperations", "OPERATION_JOB_KIND",
+    "READ_CAPABILITY", "TILED_DISCOVERY_MAX_SCAN", "TILED_DISCOVERY_TTL", "TiledBackendFactory",
+    "directory_corpus_names", "directory_corpus_resolver",
     "job_params", "job_scope", "knowledge_job_context", "resolve_tiled_settings", "storage_graph_files",
     "tiled_backend_factory",
 )

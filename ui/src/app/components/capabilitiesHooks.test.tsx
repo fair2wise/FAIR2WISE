@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { canEditNode } from './capabilitiesApi';
 import { useCapabilities } from './capabilitiesHooks';
 
-const FULL = { role: 'user', profile: 'als', can_edit: false, can_save: false, can_upload: false };
+const FULL = { role: 'user', profile: 'als', can_edit: false, can_save: false, can_upload: false, can_run_operations: true };
 
 afterEach(() => vi.unstubAllGlobals());
 

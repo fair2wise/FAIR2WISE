@@ -43,6 +43,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+import logging
 from pathlib import Path
 import time
 from typing import TYPE_CHECKING, Any, TypeVar
@@ -53,7 +54,7 @@ from ..modules.contracts.context import LOCAL_OPERATOR, ActorKind, RequestContex
 from ..modules.contracts.errors import ContractError, ErrorCode
 from ..modules.contracts.jobs import JobEvent, JobHandle, JobState
 from ..modules.contracts.json_types import JsonValue
-from ..modules.contracts.tools import ToolResult
+from ..modules.contracts.tools import ToolResult, ToolStatus
 from ..modules.jobs.keys import OperationInputs
 from ..modules.jobs.service import JobService
 from ..modules.jobs.store import JobLog
@@ -77,6 +78,7 @@ if TYPE_CHECKING:  # annotation only; the publication job is passed in by the ca
     from .folders import FolderRoots
 
 Clock = Callable[[], datetime]
+_LOG = logging.getLogger(__name__)
 
 #: Lifetime of a publication approval made through this interface on ALS (owner decision
 #: O-T2, 2026-10-30: 24 h on ALS, no expiry on ``:local``; chat approvals never expire, H2 Q8).
@@ -722,6 +724,67 @@ class F2WOperations:
             raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
                                 "knowledge operations are not configured on this deployment")
         return self.knowledge
+
+    def knowledge_catalog(self, ctx: RequestContext) -> dict[str, Any]:
+        """The operations, graph ids and corpus names the caller may run (``KnowledgeOperations.catalog``).
+
+        Reads need ``chat.ask``; graphs and corpora outside a non-empty ``ctx.corpus_scope`` are
+        left out. Names only: no path, URL or credential. (No ``/v1`` route yet: a listing route
+        needs its own policy row, owner-gated; the SDK and the CLI ``ops list`` expose it.)
+        """
+        return self._knowledge().catalog(ctx)
+
+    def summarize_paper_terms(self, ctx: RequestContext, scope: object, *, max_terms: int | None = None,
+                              query: str = "", missing_topics: Sequence[str] | None = None,
+                              relevant_node_names: Sequence[str] | None = None) -> ToolResult:
+        """Deterministic summary of one extracted paper (T19B ``lit_summarize_extracted_terms``; T19E CLI closure).
+
+        ``scope`` is an ``operations.papers.PaperScope`` chosen by trusted caller code (the CLI's
+        ``ops summarize`` arguments, a session's files); it is never a model argument. The
+        arguments are checked against the Tool's schema exactly as the executor checks them, the
+        caller needs ``chat.ask``, and the result is the typed ``ToolResult`` the agent Tool and the
+        SDK's ``summarize_paper_terms`` return (``ok``, ``empty`` or a typed error; the
+        ``unreadable`` message names server files and is not forwarded).
+        """
+        from ..modules.agent_runtime.executor import _validate as validate_schema
+        from ..modules.agent_runtime.executor import is_control_flow
+        from ..modules.operations.papers import (
+            LIT_SUMMARIZE_EXTRACTED_TERMS,
+            MAX_TERMS_CAP,
+            TOOL_NAME,
+            PaperScope,
+            summarize_paper_terms,
+            summary_to_result,
+        )
+
+        if not isinstance(scope, PaperScope):
+            raise TypeError("scope must be an operations.papers.PaperScope")
+        require(ctx, "chat.ask")
+        args: dict[str, Any] = {}
+        if max_terms is not None:
+            args["max_terms"] = max_terms
+        if query:
+            args["query"] = query
+        if missing_topics is not None:
+            args["missing_topics"] = list(missing_topics)
+        if relevant_node_names is not None:
+            args["relevant_node_names"] = list(relevant_node_names)
+        problem = validate_schema(LIT_SUMMARIZE_EXTRACTED_TERMS.input_schema, dict(args))
+        if problem:
+            raise ContractError(ErrorCode.INVALID_INPUT, f"invalid arguments for {TOOL_NAME}: {problem}")
+        provenance_id = f"f2w-op:{uuid.uuid4().hex}"
+        try:
+            outcome = summarize_paper_terms(scope, max_terms=args.get("max_terms", MAX_TERMS_CAP),
+                                            query=args.get("query", ""), missing_topics=args.get("missing_topics"),
+                                            relevant_node_names=args.get("relevant_node_names"))
+        except Exception as exc:  # noqa: BLE001 - typed result, as PaperSummaryTool.run
+            if is_control_flow(exc):
+                raise
+            _LOG.warning("summarizing extracted terms failed", exc_info=True)
+            return ToolResult(tool=TOOL_NAME, status=ToolStatus.ERROR, error_code=ErrorCode.INTERNAL,
+                              provenance_id=provenance_id,
+                              warnings=(f"summarizing extracted terms failed ({type(exc).__name__})",))
+        return summary_to_result(outcome.summary, provenance_id=provenance_id)
 
     def run_knowledge_operation(self, ctx: RequestContext, operation: str, args: Mapping[str, Any]) -> ToolResult:
         """Run one T19C operation inline and return the bounded typed result the agent Tool returns.

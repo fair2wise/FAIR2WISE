@@ -16,6 +16,10 @@ describe('parseGraphSourceListing', () => {
     const parsed = parseGraphSourceListing(LISTING);
     expect(parsed.sources.map(s => s.id)).toEqual(['json:rsoxs_v1', 'tiled:e2e_demo']);
     expect(parsed.sources[1]).toMatchObject({ kind: 'tiled', node_count: 268, edge_count: 126, read_only: true });
+    // T19E: graph_id is carried when the server sends it and null otherwise (older server).
+    expect(parseGraphSourceListing({ sources: [{ ...LISTING.sources[0], graph_id: 'rsoxs_v1' }] }).sources[0].graph_id)
+      .toBe('rsoxs_v1');
+    expect(parsed.sources[0].graph_id).toBeNull();
     expect(parsed.tiled).toEqual({ status: 'ok', detail: null });
   });
 
