@@ -42,12 +42,13 @@ def test_every_project_script_maps_to_an_importable_app_callable():
 
 def test_launchers_are_written_executable_with_the_requested_interpreter(tmp_path):
     ics = _load()
-    names = ics.install(PYPROJECT, tmp_path / "bin", "/opt/env/bin/python")
+    names = ics.install(PYPROJECT, tmp_path / "bin", "/opt/env/bin/python", "/app")
     assert "f2w-kg-adopt" in names
     launcher = tmp_path / "bin" / "f2w-kg-adopt"
     text = launcher.read_text(encoding="utf-8")
     assert text.startswith("#!/opt/env/bin/python -I\n")
     assert "from app.modules.commands.adopt_legacy_kg import main as _entry" in text
+    assert "sys.path.insert(0, '/app')" in text  # -I ignores PYTHONPATH, so the root is explicit
     mode = launcher.stat().st_mode
     assert mode & stat.S_IXUSR and mode & stat.S_IXOTH and mode & stat.S_IROTH
 
@@ -63,4 +64,18 @@ def test_dockerfile_runs_the_installer_into_usr_local_bin():
     text = (ROOT / "Dockerfile").read_text(encoding="utf-8")
     step = text[text.index("install_console_scripts.py"):]
     assert "--pyproject /app/pyproject.toml" in step and "--bin /usr/local/bin" in step
-    assert "/opt/fair2wise/pixi/.pixi/envs/default/bin/python" in step
+    assert "/opt/fair2wise/pixi/.pixi/envs/default/bin/python" in step and "--root /app" in step
+
+
+def test_launcher_imports_its_target_from_the_given_root_under_isolated_mode(tmp_path):
+    """A generated launcher runs with ``python -I`` (no PYTHONPATH, no cwd) and still finds ``app``."""
+    import subprocess
+    import sys
+
+    ics = _load()
+    ics.install(PYPROJECT, tmp_path / "bin", sys.executable, str(ROOT))
+    launcher = tmp_path / "bin" / "f2w-kg-adopt"
+    out = subprocess.run([sys.executable, "-I", str(launcher), "--help"], capture_output=True, text=True,
+                         cwd=tmp_path, env={"PATH": "/usr/bin:/bin"}, timeout=120, check=False)
+    assert out.returncode == 0, out.stderr[-400:]
+    assert "adopt" in out.stdout

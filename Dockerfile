@@ -191,7 +191,7 @@ COPY docker/entrypoint/ /opt/fair2wise/entrypoint/
 # so launchers are generated from the same table pip would read (E2E finding 2026-11-06).
 RUN python -I /opt/fair2wise/entrypoint/install_console_scripts.py \
         --pyproject /app/pyproject.toml --bin /usr/local/bin \
-        --python /opt/fair2wise/pixi/.pixi/envs/default/bin/python
+        --python /opt/fair2wise/pixi/.pixi/envs/default/bin/python --root /app
 
 # Mount points owned by the runtime user (a fresh named volume inherits the owner);
 # preflight refuses to start unless they are real mounts.
