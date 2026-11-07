@@ -82,10 +82,17 @@ class PhysicalPropertyExtractor:
     }
 
     # Regex to capture a numeric value (with optional uncertainty) and unit.
-    # Matches: "1.9 ± 0.1 eV", "2.1eV", "2.1 eV", "250 K", "150 °C", "5.2 g/cm3", "200 GPa"
+    # Matches: "1.9 ± 0.1 eV", "2.1eV", "2.1 eV", "250 K", "150 °C", "5.2 g/cm3", "200 GPa",
+    # "85%", "12.5 %", "5 m²/g", "10 cm⁻¹", "2 W/(m*K)", "3 J·mol(-1)".
+    # The value may not start inside a word or number ("v8.5", "Na3"). The unit must start with a
+    # letter, µ/μ, ° or be "%", so a digit run is never split into value and unit ("85" is not
+    # 8 + 5; "2024-11" is not 2024 + "-11"). After the first character a unit may contain digits,
+    # superscripts (² ³ ⁻ ¹ ...), "·", "*", "^", "_", "/" and "-", plus balanced "(...)" groups, so
+    # an enclosing "(1.9 eV)" does not leak its ")" into the unit.
     VALUE_UNIT_PATTERN = re.compile(
-        r'(?P<value>[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)(?:\s*±\s*(?P<uncertainty>\d+(?:\.\d+)?))?\s*'
-        r'(?P<unit>°[CF]|[A-Za-zµμ/°\^\-0-9]+)'
+        r'(?<![\w.])(?P<value>[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)'
+        r'(?:\s*±\s*(?P<uncertainty>\d+(?:\.\d+)?))?\s*'
+        r'(?P<unit>%|°[CF]|[A-Za-zµμ°](?:[A-Za-zµμ°/\^\-_*·0-9²³⁰¹⁴⁵⁶⁷⁸⁹⁻]|\([^()\s]*\))*)'
     )
 
     # Maximum number of characters between material and property phrase to be considered “proximal” 
@@ -276,7 +283,7 @@ class PropertyNormalizer:
     # flag unit_conversion_failed=True
     PLAUSIBILITY_RANGES: dict[str, Any] = {
         "efficiency": (0.0, 100.0),       # percent
-        "density": (0.0, float("inf")),   # density must be positive
+        "density": (0.0, float("inf")),   # density > 0 (lower bound exclusive, see EXCLUSIVE_LOWER_BOUND)
         "band_gap": (0.0, 10.0),          # reasonable eV range
         "formation_energy": (-10.0, 10.0),# eV/atom range
         "bulk_modulus": (0.0, 1000.0),    # GPa range
@@ -284,6 +291,25 @@ class PropertyNormalizer:
         "magnetic_moment": (0.0, 100.0),  # μ_B range
         "energy_above_hull": (0.0, 5.0),  # eV/atom
     }
+
+    # Properties whose plausibility range excludes its lower bound (density 0.0 is not plausible)
+    EXCLUSIVE_LOWER_BOUND: frozenset[str] = frozenset({"density"})
+
+    _SUPERSCRIPTS = str.maketrans({
+        "²": "2", "³": "3", "¹": "1", "⁰": "0", "⁴": "4", "⁵": "5", "⁶": "6", "⁷": "7",
+        "⁸": "8", "⁹": "9", "⁻": "-", "−": "-", "µ": "μ",
+    })
+
+    @classmethod
+    def _canonical_unit(cls, raw_unit: str) -> str:
+        """Return a spelling-independent form of a unit for comparison.
+
+        Lower-cases, maps superscripts to plain digits ("cm⁻¹" -> "cm-1", "m²" -> "m2"), maps the
+        micro sign to the Greek mu, and drops spaces, "·", "*", "^" and parentheses, so that
+        "W/(m*K)", "W/(m·K)" and "W/mK" compare equal, as do "S·cm⁻¹" and "S*cm-1".
+        """
+        text = raw_unit.strip().lower().translate(cls._SUPERSCRIPTS)
+        return re.sub(r"[\s·*^()]", "", text)
 
     def normalize(self, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Convert raw values and units into canonical numeric + unit form.
@@ -333,7 +359,7 @@ class PropertyNormalizer:
 
             try:
                 val = float(raw_val)
-                unit_lower = raw_unit.strip().lower()
+                unit_lower = self._canonical_unit(raw_unit)
 
                 # Temperature-based properties → Kelvin
                 if prop in ("melting_point", "glass_transition_temperature"):
@@ -363,11 +389,11 @@ class PropertyNormalizer:
 
                 # Conductivity → S/m (1 S/cm = 100 S/m)
                 elif prop == "conductivity":
-                    if unit_lower in {"s/cm", "s·cm-1", "s·cm⁻¹"}:
+                    if unit_lower in {"s/cm", "scm-1"}:
                         norm_val = val * 100.0
                         unit = "S/m"
                         unc_norm = (float(unc) * 100.0) if unc else None
-                    elif unit_lower in {"s/m", "s·m-1", "s·m⁻¹"}:
+                    elif unit_lower in {"s/m", "sm-1"}:
                         norm_val = val
                         unit = "S/m"
                         unc_norm = float(unc) if unc else None
@@ -376,11 +402,11 @@ class PropertyNormalizer:
 
                 # Mobility → m2/(V*s) (1 cm²/V·s = 1e-4 m²/V·s)
                 elif prop == "mobility":
-                    if unit_lower in {"cm2/vs", "cm^2/vs", "cm²/vs"}:
+                    if unit_lower in {"cm2/vs", "cm2v-1s-1"}:
                         norm_val = val * 1e-4
                         unit = "m2/(V*s)"
                         unc_norm = (float(unc) * 1e-4) if unc else None
-                    elif unit_lower in {"m2/vs", "m^2/vs", "m²/vs"}:
+                    elif unit_lower in {"m2/vs", "m2v-1s-1"}:
                         norm_val = val
                         unit = "m2/(V*s)"
                         unc_norm = float(unc) if unc else None
@@ -401,11 +427,11 @@ class PropertyNormalizer:
 
                 # Thermal conductivity → W/(m*K)
                 elif prop == "thermal_conductivity":
-                    if unit_lower in {"w/mk", "w/(m*k)", "w/(m·k)"}:
+                    if unit_lower in {"w/mk", "wm-1k-1"}:
                         norm_val = val
                         unit = "W/(m*K)"
                         unc_norm = float(unc) if unc else None
-                    elif unit_lower in {"w/cmk", "w/(cm*k)"}:
+                    elif unit_lower in {"w/cmk", "wcm-1k-1"}:
                         # 1 W/(cm*K) = 100 W/(m*K)
                         norm_val = val * 100.0
                         unit = "W/(m*K)"
@@ -421,11 +447,11 @@ class PropertyNormalizer:
 
                 # Density → kg/m3 (1 g/cm3 = 1000 kg/m3)
                 elif prop == "density":
-                    if unit_lower in {"g/cm3", "g/cm^3", "g·cm-3", "g·cm⁻³"}:
+                    if unit_lower in {"g/cm3", "gcm-3"}:
                         norm_val = val * 1000.0
                         unit = "kg/m3"
                         unc_norm = (float(unc) * 1000.0) if unc else None
-                    elif unit_lower in {"kg/m3", "kg·m-3"}:
+                    elif unit_lower in {"kg/m3", "kgm-3"}:
                         norm_val = val
                         unit = "kg/m3"
                         unc_norm = float(unc) if unc else None
@@ -473,7 +499,7 @@ class PropertyNormalizer:
 
                 # Magnetic moment → μ_B (assuming raw unit "μB", "uB", "mu_B", etc.)
                 elif prop == "magnetic_moment":
-                    if unit_lower in {"μb", "ub", "mu_b", "mu-b", "mu b"}:
+                    if unit_lower in {"μb", "ub", "mu_b", "mu-b", "mub"}:
                         norm_val = val
                         unit = "μ_B"
                         unc_norm = float(unc) if unc else None
@@ -502,7 +528,8 @@ class PropertyNormalizer:
                 # Apply plausibility checks
                 if prop in self.PLAUSIBILITY_RANGES:
                     low, high = self.PLAUSIBILITY_RANGES[prop]
-                    if not (low <= norm_val <= high):
+                    low_ok = norm_val > low if prop in self.EXCLUSIVE_LOWER_BOUND else norm_val >= low
+                    if not (low_ok and norm_val <= high):
                         raise ValueError(f"Plausibility check failed for {prop}: {norm_val} not in [{low},{high}]")
 
                 norm_entry["normalized_value"] = round(norm_val, NORMALIZED_DECIMALS)

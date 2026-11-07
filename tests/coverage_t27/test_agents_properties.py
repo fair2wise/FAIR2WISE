@@ -261,3 +261,121 @@ def test_extract_from_relations_falls_back_to_snake_case_property_and_defaults_u
     )
     assert out == [{"material": "TiN", "property": "hall_coefficient", "raw_value": None, "raw_unit": None,
                     "uncertainty": None, "context": "measured_property:Hall Coefficient", "verified": False}]
+
+
+# --- T27 read-through regressions: B11 (percent), B12 (density > 0), B13 (unit spellings) ---
+
+def _extract_norm(text, material="Na3Bi", prop=None):
+    raw = PhysicalPropertyExtractor().extract(text, [material])
+    if prop is not None:  # "thermal conductivity" also matches the "conductivity" keyword
+        raw = [r for r in raw if r["property"] == prop]
+    assert len(raw) == 1, raw
+    return raw[0], PropertyNormalizer().normalize(raw)[0]
+
+
+@pytest.mark.parametrize(
+    ("text", "value", "expected"),
+    [
+        ("The efficiency of Na3Bi was 85%.", "85", 85.0),
+        ("The efficiency of Na3Bi was 12.5 %.", "12.5", 12.5),
+        ("The efficiency of Na3Bi was 12.5 ± 0.5%.", "12.5", 12.5),
+        ("The efficiency of Na3Bi reached 100% in tests.", "100", 100.0),
+        ("The efficiency of Na3Bi (85%) was high.", "85", 85.0),
+    ],
+)
+def test_b11_percent_is_extracted_and_normalized(text, value, expected):
+    raw, norm = _extract_norm(text)
+    assert raw["raw_value"] == value and raw["raw_unit"] == "%"
+    assert norm["unit_conversion_failed"] is False
+    assert norm["normalized_value"] == pytest.approx(expected)
+    assert norm["normalized_unit"] == "%"
+
+
+def test_b11_percent_uncertainty_end_to_end():
+    raw, norm = _extract_norm("The efficiency of Na3Bi was 12.5 ± 0.5%.")
+    assert raw["uncertainty"] == "0.5" and norm["uncertainty_value"] == pytest.approx(0.5)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The band gap of Na3Bi is discussed on page 85.",
+        "The band gap of Na3Bi follows v8.5 of the code.",
+        "The band gap of Na3Bi was reported in 2024-11.",
+        "The band gap of Na3Bi is in Table 12.",
+    ],
+)
+def test_b11_plain_numbers_are_not_values(text):
+    raw = PhysicalPropertyExtractor().extract(text, ["Na3Bi"])
+    assert len(raw) == 1
+    assert raw[0]["raw_value"] is None and raw[0]["raw_unit"] is None and raw[0]["verified"] is False
+
+
+def test_b11_digit_is_never_split_into_value_and_unit():
+    raw = PhysicalPropertyExtractor().extract("The density of Na3Bi is 85 on page 5.", ["Na3Bi"])
+    assert all(r["raw_unit"] != "5" for r in raw)
+
+
+def test_b12_density_zero_is_implausible():
+    assert _norm("density", "0.0", "g/cm3")["unit_conversion_failed"] is True
+    assert _norm("density", "0", "kg/m3")["unit_conversion_failed"] is True
+    out = _norm("density", "0.001", "g/cm3")
+    assert out["unit_conversion_failed"] is False and out["normalized_value"] == pytest.approx(1.0)
+    # end to end
+    raw, norm = _extract_norm("The density of Na3Bi was 0.0 g/cm3.")
+    assert raw["raw_value"] == "0.0" and norm["unit_conversion_failed"] is True
+
+
+def test_b12_other_ranges_stay_inclusive():
+    assert _norm("band_gap", "0", "eV")["unit_conversion_failed"] is False
+    assert _norm("efficiency", "0", "%")["unit_conversion_failed"] is False
+    assert _norm("efficiency", "100", "%")["unit_conversion_failed"] is False
+
+
+@pytest.mark.parametrize(
+    ("text", "unit", "prop", "expected", "expected_unit"),
+    [
+        ("The conductivity of Na3Bi was 10 S·cm⁻¹.", "S·cm⁻¹", "conductivity", 1000.0, "S/m"),
+        ("The conductivity of Na3Bi was 10 S·cm-1.", "S·cm-1", "conductivity", 1000.0, "S/m"),
+        ("The conductivity of Na3Bi was 10 S·m⁻¹.", "S·m⁻¹", "conductivity", 10.0, "S/m"),
+        ("The mobility of Na3Bi was 5 cm²/Vs.", "cm²/Vs", "mobility", 5e-4, "m2/(V*s)"),
+        ("The mobility of Na3Bi was 5 cm²/(V·s).", "cm²/(V·s)", "mobility", 5e-4, "m2/(V*s)"),
+        ("The mobility of Na3Bi was 5 m²/V·s.", "m²/V·s", "mobility", 5.0, "m2/(V*s)"),
+        ("The mobility of Na3Bi was 5 cm2/V*s.", "cm2/V*s", "mobility", 5e-4, "m2/(V*s)"),
+        ("The thermal conductivity of Na3Bi was 2 W/(m*K).", "W/(m*K)", "thermal_conductivity", 2.0, "W/(m*K)"),
+        ("The thermal conductivity of Na3Bi was 2 W/(m·K).", "W/(m·K)", "thermal_conductivity", 2.0, "W/(m*K)"),
+        ("The thermal conductivity of Na3Bi was 2 W·m⁻¹·K⁻¹.", "W·m⁻¹·K⁻¹", "thermal_conductivity", 2.0, "W/(m*K)"),
+        ("The thermal conductivity of Na3Bi was 2 W/(cm*K).", "W/(cm*K)", "thermal_conductivity", 200.0, "W/(m*K)"),
+        ("The density of Na3Bi was 6 g·cm-3.", "g·cm-3", "density", 6000.0, "kg/m3"),
+        ("The density of Na3Bi was 6 g·cm⁻³.", "g·cm⁻³", "density", 6000.0, "kg/m3"),
+        ("The density of Na3Bi was 6 g/cm^3.", "g/cm^3", "density", 6000.0, "kg/m3"),
+        ("The density of Na3Bi was 6000 kg·m-3.", "kg·m-3", "density", 6000.0, "kg/m3"),
+        ("The magnetic moment of Na3Bi was 2 μB.", "μB", "magnetic_moment", 2.0, "μ_B"),
+        ("The magnetic moment of Na3Bi was 2 µB.", "µB", "magnetic_moment", 2.0, "μ_B"),
+    ],
+)
+def test_b13_unit_spellings_reach_normalize_from_extract(text, unit, prop, expected, expected_unit):
+    raw, norm = _extract_norm(text, prop=prop)
+    assert raw["raw_unit"] == unit
+    assert norm["unit_conversion_failed"] is False, norm
+    assert norm["normalized_value"] == pytest.approx(expected)
+    assert norm["normalized_unit"] == expected_unit
+
+
+def test_b13_unit_examples_from_other_properties():
+    ex = PhysicalPropertyExtractor({"wavenumber": "wavenumber", "area": "area", "enthalpy": "enthalpy"})
+    cases = {
+        "The wavenumber of Na3Bi was 10 cm⁻¹.": "cm⁻¹",
+        "The area of Na3Bi was 5 m²/g.": "m²/g",
+        "The enthalpy of Na3Bi was 3 J·mol(-1).": "J·mol(-1)",
+    }
+    for text, unit in cases.items():
+        (raw,) = ex.extract(text, ["Na3Bi"])
+        assert raw["raw_unit"] == unit, text
+        norm = PropertyNormalizer().normalize([raw])[0]
+        assert norm["normalized_unit"] == unit  # unknown property: raw unit passes through
+
+
+def test_b13_enclosing_parentheses_are_not_part_of_the_unit():
+    raw, _ = _extract_norm("The band gap of Na3Bi (1.9 eV) is wide.")
+    assert raw["raw_unit"] == "eV"
