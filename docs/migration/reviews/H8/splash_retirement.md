@@ -29,7 +29,7 @@ shorter than the tree.
 | (d) owner decision | window length, fate of `splash_links/` and its `_tests`, `links.sqlite`, the `kg_rag` default, UI text, NERSC scripts, the diagnostic field | 9 questions (section 5) |
 
 Counts are of files/locations; "mentions" are case-insensitive `splash` hits. Out of scope and not Splash-links
-(listed so the completeness test knows them): `app/modules/bl1101_ingest.py` names the unrelated ALS repository
+(listed so the completeness test knows them): `app/modules/bl1101_ingest.py` and its ported definitions `app/modules/graph/imports/bl1101/specs.py` name the unrelated ALS repository
 `als-computing/splash_tiled` as beamline metadata; `app/modules/tiled_sim.py` mentions Splash in a docstring about
 Tiled GraphQL entity types; `.gitignore` ignores `splash_flows_globus/` and `splash_auth/` (other ALS projects);
 `ui/ATTRIBUTIONS.md` is about Unsplash photos; `app/modules/security/disclosure.py` redacts any config subtree named
