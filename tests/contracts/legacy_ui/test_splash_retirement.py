@@ -34,7 +34,7 @@ FORBIDDEN_IMPORT_ROOTS = ("splash_links", "strawberry", "alembic", "pgvector", "
 
 #: Class (a)/(c) of the packet: the only two modules that may hold the legacy Splash GraphQL client.
 SPLASH_CLIENT_MODULES = {
-    "app/modules/f2w_agent/kg_update.py",
+    "app/modules/graph/kg_update.py",  # moved from f2w_agent/kg_update.py by the T17B port (alias shim stays there)
     "app/modules/kg_rag_api.py",
 }
 
