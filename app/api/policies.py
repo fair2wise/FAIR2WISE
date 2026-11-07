@@ -171,6 +171,13 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
     # another branch; this block is V60-V69.
     _v("V60", "GET", "/capabilities", "chat.read_support",
        note="caller's role, can_edit (graph.edit), can_save, can_upload; computed from the guards that answer 403"),
+    # T07B (owner go 2026-11-06, thirteenth set): accepted canonicalization proposals -> scoped plan -> gated apply
+    # route. graph.publish follows the other apply/publish rows (V16, V20, V53-V55); the choice is owner-gated
+    # (docs/migration/reviews/H4/apply_adapters.md). V61-V69 and V81+ are free; this row is V81.
+    _v("V81", "POST", "/curation/merges/apply", "graph.publish",
+       note="human only; dry_run default plans and reports; a real apply names the shown plan_sha256, the approval "
+            "is created by create_approval (curation.approve) and every route runs the one canonicalization gate "
+            "(closed until the C4 rerun: 501 gate_closed)" + _FRESH),
 )
 
 #: ``(METHOD, path) -> RoutePolicy`` for the ``/v1`` routes.
