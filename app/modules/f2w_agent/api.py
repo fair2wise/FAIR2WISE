@@ -59,6 +59,8 @@ from .download_agent import (
 )
 from .extractor_agent import ExtractorAgent
 from .graph_sources import (
+    MAX_HOPS,
+    NEIGHBORHOOD_MAX_NODES,
     GraphSources,
     JsonFile,
     SourceError,
@@ -744,7 +746,6 @@ _CORE_NODE_KEYS = {
     "source_score",
     "haystack",
     "outgoingLinks",
-    "relations",
 }
 
 
@@ -1573,11 +1574,13 @@ def graph_subset_from_file(graph_path: Path, node_ids: list[str]) -> dict[str, A
     return {"nodes": nodes, "edges": edges}
 
 
-def graph_subset_from_lookup(kg: object, wanted: Sequence[str]) -> dict[str, Any]:
+def graph_subset_from_lookup(
+    kg: object, wanted: Sequence[str], *, hops: int = CITE_FOCUS_HOPS, max_nodes: int | None = None,
+) -> dict[str, Any]:
     """Serialize an in-memory lookup graph (Tiled) into the UI node contract.
 
-    The wanted ids are first widened to their ``CITE_FOCUS_HOPS`` neighborhood
-    (``tiled_neighborhood_ids``); when that yields nothing, each wanted id is resolved
+    The wanted ids are first widened to their ``hops`` neighborhood (default ``CITE_FOCUS_HOPS``;
+    ``tiled_neighborhood_ids``), keeping at most ``max_nodes`` nodes when given; when that yields nothing, each wanted id is resolved
     on its own. Returns ``{"nodes": [], "edges": []}`` when nothing resolves.
     """
     wanted_ids = [str(node_id) for node_id in wanted if str(node_id).strip()]
@@ -1586,7 +1589,9 @@ def graph_subset_from_lookup(kg: object, wanted: Sequence[str]) -> dict[str, Any
     if not wanted_ids or not isinstance(nodes_map, dict):
         return empty
 
-    expanded = tiled_neighborhood_ids(kg, wanted_ids, hops=CITE_FOCUS_HOPS)
+    expanded = tiled_neighborhood_ids(kg, wanted_ids, hops=hops)
+    if max_nodes is not None:
+        expanded = expanded[:max_nodes]
     if not expanded:
         expanded = []
         seen: set[str] = set()
@@ -1637,9 +1642,14 @@ def graph_subset_from_lookup(kg: object, wanted: Sequence[str]) -> dict[str, Any
     return {"nodes": nodes, "edges": edges}
 
 
-def graph_neighborhood_from_lookup(kg: object, node_id: str) -> GraphPayload:
-    """3-hop Tiled identity subgraph for cite-click / node select."""
-    subset = graph_subset_from_lookup(kg, [node_id])
+def graph_neighborhood_from_lookup(kg: object, node_id: str, hops: int = CITE_FOCUS_HOPS) -> GraphPayload:
+    """Tiled identity subgraph for cite-click / node select (default 3 hops).
+
+    ``hops`` is clamped to 1..``MAX_HOPS`` and the node count capped at ``NEIGHBORHOOD_MAX_NODES``,
+    as for the JSON graph sources.
+    """
+    subset = graph_subset_from_lookup(
+        kg, [node_id], hops=max(1, min(int(hops), MAX_HOPS)), max_nodes=NEIGHBORHOOD_MAX_NODES)
     return GraphPayload(
         nodes=subset.get("nodes") or [],
         edges=subset.get("edges") or [],
@@ -3352,12 +3362,12 @@ class AgentPipelineService:
             return pack.graph
         return kg
 
-    def tiled_neighborhood_payload(self, node_id: str) -> GraphPayload:
-        """Return the Tiled neighborhood subgraph for a node id."""
+    def tiled_neighborhood_payload(self, node_id: str, hops: int = CITE_FOCUS_HOPS) -> GraphPayload:
+        """Return the Tiled neighborhood subgraph for a node id, ``hops`` deep (clamped, node-capped)."""
         kg = self.ensure_tiled_lookup(node_id)
         if kg is None:
             return GraphPayload(nodes=[], edges=[], source_path=TILED_SOURCE_PATH)
-        return graph_neighborhood_from_lookup(kg, node_id)
+        return graph_neighborhood_from_lookup(kg, node_id, hops)
 
     def attach_tiled_save(self, target: SaveTarget) -> None:
         """Route the UI Save to a journaled multi-write on Tiled and the session graph to the effective record.
@@ -3929,18 +3939,15 @@ class AgentPipelineService:
         A ``ValueError`` (path outside storage/kg and uploads) propagates.
         """
         try:
-            return self._resolve_runtime_json_graph_path(path, missing_ok=True)
+            return self._resolve_runtime_json_graph_path(path)
         except FileNotFoundError:
             logger.warning("Skipping missing JSON graph %s", path)
             return None
         except ValueError:
             raise
 
-    def _resolve_runtime_json_graph_path(self, path: str, *, missing_ok: bool = False) -> Path:
+    def _resolve_runtime_json_graph_path(self, path: str) -> Path:
         """Resolve and validate a runtime JSON graph path.
-
-        ``missing_ok`` is accepted for compatibility; both branches raise the same error, so it
-        does not change the outcome.
 
         Raises:
             FileNotFoundError: the file is missing or empty.
@@ -3953,12 +3960,8 @@ class AgentPipelineService:
             graph_path = graph_path.resolve()
         if any(graph_path == configured for configured in self._configured_graph_paths()):
             if not graph_path.exists():
-                if missing_ok:
-                    raise FileNotFoundError(f"JSON graph not found: {path}")
                 raise FileNotFoundError(f"JSON graph not found: {path}")
             if graph_path.stat().st_size == 0:
-                if missing_ok:
-                    raise FileNotFoundError(f"JSON graph empty: {path}")
                 raise FileNotFoundError(f"JSON graph empty: {path}")
             return graph_path
         resolved = self._resolve_json_graph_path(path)
@@ -5565,7 +5568,7 @@ class AgentPipelineService:
                         False,
                         verdict,
                         rounds,
-                        self.graph_path(),
+                        active_graph_path,
                     )
                 await self._emit(
                     emit,
@@ -5585,7 +5588,7 @@ class AgentPipelineService:
                         False,
                         verdict,
                         rounds,
-                        self.graph_path(),
+                        active_graph_path,
                     )
                 try:
                     search = await search_action(
@@ -5601,7 +5604,7 @@ class AgentPipelineService:
                         False,
                         verdict,
                         rounds,
-                        self.graph_path(),
+                        active_graph_path,
                     )
                 candidates = search.get("candidates") or []
                 self.workflow.update(
@@ -5622,7 +5625,7 @@ class AgentPipelineService:
                         False,
                         verdict,
                         rounds,
-                        self.graph_path(),
+                        active_graph_path,
                     )
 
                 debate_decision = await self._orchestrator_decision(question, emit)
@@ -5633,7 +5636,7 @@ class AgentPipelineService:
                         False,
                         verdict,
                         rounds,
-                        self.graph_path(),
+                        active_graph_path,
                     )
                 await self._emit(
                     emit,
@@ -5663,7 +5666,7 @@ class AgentPipelineService:
                         False,
                         verdict,
                         rounds,
-                        self.graph_path(),
+                        active_graph_path,
                     )
                 try:
                     debate_summary = await debate_action(question, verdict, candidates, round_no)
@@ -5675,7 +5678,7 @@ class AgentPipelineService:
                         False,
                         verdict,
                         rounds,
-                        self.graph_path(),
+                        active_graph_path,
                     )
                 round_info["debate"] = debate_summary
                 await self._emit(
@@ -5779,7 +5782,7 @@ class AgentPipelineService:
                 False,
                 verdict,
                 rounds,
-                self.graph_path(),
+                active_graph_path,
                 pending=pending_payload,
                 publications_override=[],
             )
@@ -5790,7 +5793,7 @@ class AgentPipelineService:
             False,
             last_verdict,
             rounds,
-            self.graph_path(),
+            active_graph_path,
         )
 
     def _pick_candidate(
@@ -6433,8 +6436,9 @@ class AgentPipelineService:
         """Download the approved paper candidate and offer its extraction.
 
         On success the pending state becomes an extraction approval (``awaiting_extraction_decision``);
-        when nothing was downloaded the candidate is marked unavailable and the download decision is
-        re-offered.
+        when nothing was downloaded (including a PDF rejected by the configured semantic validation,
+        reported as "did not pass validation") the candidate is marked unavailable and the download
+        decision is re-offered. Validation follows ``cfg.validate_downloads`` (the DownloadAgent setting).
         """
         verdict = pending.get("verdict") or {}
         best = pending.get("selected_candidate")
@@ -6470,7 +6474,6 @@ class AgentPipelineService:
                 target_dir=str(self.coord.pdf_dir),
                 candidates=[best] if best else [],
                 max_papers=1,
-                validate_downloads=False,
                 refresh_urls=True,
             )
         except Exception as exc:
@@ -7151,7 +7154,7 @@ def create_app(
                 raise HTTPException(status_code=404, detail=f"Neighborhood not found: {cleaned}")
             return cast(GraphPayload, guard.project_route(
                 ctx, "GET", "/graph/neighborhood/" + cleaned, _model_to_jsonable(_source_payload(around))))
-        payload = await asyncio.to_thread(service.tiled_neighborhood_payload, cleaned)
+        payload = await asyncio.to_thread(service.tiled_neighborhood_payload, cleaned, hops)
         if payload.nodes:
             return cast(GraphPayload, guard.project_route(ctx, "GET", "/graph/neighborhood/" + cleaned, _model_to_jsonable(payload)))
         raise HTTPException(status_code=404, detail=f"Neighborhood not found: {cleaned}")
