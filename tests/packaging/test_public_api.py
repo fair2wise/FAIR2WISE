@@ -116,7 +116,7 @@ def test_literature_and_evidence_methods_without_wiring_are_unsupported(method, 
     ("graph_statistics", ("g",)), ("compare_graphs", (["a", "b"],)), ("paper_subgraph", ("g", "paper.pdf")),
     ("recent_entities", ("g",)), ("audit_corpus", ("c",)), ("run_knowledge_operation", ("kg_compute_statistics", {})),
     ("submit_knowledge_operation", ("kg_compute_statistics", {})), ("knowledge_job_result", ("j",)),
-    ("cost_control", ()), ("bulk_review", ([],)), ("vocabulary_quality", ()), ("figure_scales", ()),
+    ("knowledge_catalog", ()), ("cost_control", ()), ("bulk_review", ([],)), ("vocabulary_quality", ()), ("figure_scales", ()),
     ("figure_scale", ("r",)), ("folder_roots", ()), ("list_folder", ("papers",)), ("folder_index", ("papers",)),
 ])
 def test_job_methods_without_operations_are_unsupported(method, args):

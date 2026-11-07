@@ -16,7 +16,8 @@ the methods that exist today are implemented:
 - :meth:`F2WClient.graph_statistics`, :meth:`~F2WClient.compare_graphs`,
   :meth:`~F2WClient.paper_subgraph`, :meth:`~F2WClient.recent_entities`,
   :meth:`~F2WClient.audit_corpus`, :meth:`~F2WClient.run_knowledge_operation`,
-  :meth:`~F2WClient.submit_knowledge_operation` and :meth:`~F2WClient.knowledge_job_result`
+  :meth:`~F2WClient.submit_knowledge_operation`, :meth:`~F2WClient.knowledge_job_result` and
+  :meth:`~F2WClient.knowledge_catalog`
   (T19E): the five T19C Knowledge Operations, forwarded unchanged to the same
   ``F2WOperations`` (``/v1/operations/...``); the typed result is the agent Tool's;
 - :meth:`F2WClient.cost_control`, :meth:`~F2WClient.set_cost_control`, :meth:`~F2WClient.bulk_review`,
@@ -289,6 +290,14 @@ class F2WClient:
             ctx, job_id, plan_sha256, approver_credential=approver_credential, expires_at=expires_at)
 
     # -- knowledge operations (T19E): forwarded to the shared F2WOperations (same policy as /v1) -----
+
+    def knowledge_catalog(self, ctx: RequestContext) -> dict[str, Any]:
+        """The operations, graph ids and corpus names the caller may run (``F2WOperations.knowledge_catalog``).
+
+        ``{"operations": [{name, version, description}], "graphs": [...], "corpora": [...]}``; graphs and
+        corpora outside a non-empty scope are left out. Same as the CLI ``ops list``; no ``/v1`` route yet.
+        """
+        return self._operations("knowledge_catalog").knowledge_catalog(ctx)
 
     def run_knowledge_operation(self, ctx: RequestContext, operation: str, args: Mapping[str, Any]) -> ToolResult:
         """Run one T19C operation by Tool name (``F2WOperations.run_knowledge_operation``).

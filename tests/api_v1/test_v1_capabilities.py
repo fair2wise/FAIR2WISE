@@ -22,7 +22,7 @@ def test_the_policy_row_exists_and_needs_a_signed_in_reader():
 def test_til22_local_operator_can_edit_and_save(local):
     body = local.client().get("/v1/capabilities").json()
     assert body == {"role": "local_operator", "profile": "local", "can_edit": True, "can_save": True,
-                    "can_upload": True}
+                    "can_upload": True, "can_run_operations": True}
 
 
 def test_til22_als_admin_can_edit_and_save(als):
@@ -33,15 +33,26 @@ def test_til22_als_admin_can_edit_and_save(als):
 def test_til22_als_non_admin_sees_no_edit_or_save_and_the_server_still_refuses(als):
     user = als.client("user")
     body = user.get("/v1/capabilities").json()
-    assert body == {"role": "user", "profile": "als-dev", "can_edit": False, "can_save": False, "can_upload": False}
+    assert body == {"role": "user", "profile": "als-dev", "can_edit": False, "can_save": False, "can_upload": False,
+                    "can_run_operations": True}  # T19E: every signed-in user holds chat.ask (V25-V29 reads)
     # The capability read never leaks more than the booleans and the role.
-    assert set(body) == {"role", "profile", "can_edit", "can_save", "can_upload"}
+    assert set(body) == {"role", "profile", "can_edit", "can_save", "can_upload", "can_run_operations"}
     # Forged headers do not change the answer.
     forged = als.client("user", headers=FORGED).get("/v1/capabilities").json()
     assert forged == body
     # The 403 is the backstop: the same caller's forged Save is refused.
     resp = user.patch("/graph/node/matkg:TermA", json={"label": "forged"})
     assert resp.status_code == 403 and resp.json()["code"] == "denied"
+
+
+def test_can_run_operations_follows_chat_ask_exactly():
+    """T19E frontend closure: the Operations tab's gate is the entry capability of the operation reads."""
+    from app.api.routes_capabilities import capabilities_for_caller
+    from tests.runtime.runtime_fakes import als_ctx
+
+    assert capabilities_for_caller(als_ctx("u", capabilities=frozenset({"chat.ask"})))["can_run_operations"] is True
+    assert capabilities_for_caller(als_ctx("u", capabilities=frozenset({"chat.read_support"})))[
+        "can_run_operations"] is False
 
 
 def test_til22_anonymous_als_caller_gets_401_not_a_capability_answer(als):

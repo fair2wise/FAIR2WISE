@@ -331,6 +331,57 @@ def test_cli_ops_subcommands_print_the_same_bounded_results(local, files, tmp_pa
         assert CANARY not in text and SNIPPET not in text and "/abs/" not in text and str(tmp_path) not in text
 
 
+def test_cli_ops_list_and_sdk_catalog_name_the_same_operations_graphs_and_corpora(local, files, tmp_path, capsys):
+    """T19E closure: the catalog (``ops list`` / ``F2WClient.knowledge_catalog``) is names only."""
+    root, project = str(tmp_path / "cli-list"), str(files["root"])
+    code, listing = _cli(capsys, "list", root=root, project_root=project)
+    assert code == 0
+    assert [op["name"] for op in listing["operations"]] == [TOOL_STATS, TOOL_COMPARE, TOOL_SUBGRAPH,
+                                                            "kg_recent_entities", TOOL_AUDIT]
+    assert all(set(op) == {"name", "version", "description"} for op in listing["operations"])
+    assert listing["graphs"] == ["rsoxs_prev", "rsoxs_v2"] and listing["corpora"] == [CORPUS_NAME]
+    assert str(files["root"]) not in json.dumps(listing) and "storage" not in json.dumps(listing["graphs"])
+    with _sdk(local) as client:
+        sdk = client.knowledge_catalog(local.ops.cli_context())
+    # the server fixture binds a mapping resolver (no lister) and an explicit graph mapping
+    assert [op["name"] for op in sdk["operations"]] == [op["name"] for op in listing["operations"]]
+    assert sorted(sdk["graphs"]) == sorted([GRAPH, PREV]) and sdk["corpora"] == []
+    # explicit --graph-file: ids derive from the file names; the corpora still come from the project root
+    code, explicit = _cli(capsys, "list", root=root, project_root=project, graph_files=[files[GRAPH]])
+    assert code == 0 and explicit["graphs"] == ["rsoxs_v2"] and explicit["corpora"] == []
+
+
+def test_catalog_filters_to_the_scope_and_needs_chat_ask(als):
+    user = _ctx(als, "user")  # scope {"rsoxs"}
+    listing = als.ops.knowledge_catalog(user)
+    assert listing["graphs"] == [GRAPH] and listing["corpora"] == []
+    with pytest.raises(ContractError) as err:
+        als.ops.knowledge_catalog(user.model_copy(update={"capabilities": frozenset({"chat.read_support"})}))
+    assert err.value.code is ErrorCode.DENIED
+
+
+def test_cli_summarize_is_the_t19b_operation_with_the_sdk_result(local, tmp_path, capsys):
+    """OP01 on the CLI: same typed result as ``F2WClient.summarize_paper_terms``; schema-checked; no paths out."""
+    from tests.operations.summary_fakes import CASES, write_case
+
+    entry, terms = CASES["capped"]
+    paths = write_case(tmp_path / "case", entry, terms)
+    root = str(tmp_path / "cli-sum")
+    argv = ["--terms", paths["terms_path"], "--manifest", paths["manifest_path"], "--paper", paths["filename"]]
+    code, out = _cli(capsys, "summarize", *argv, "--max-terms", "5", root=root, project_root=str(tmp_path / "none"))
+    assert code == 0 and out["status"] == "ok" and out["tool"] == "lit_summarize_extracted_terms"
+    assert out["data"]["term_count"] == 23 and out["data"]["displayed_term_count"] == 5
+    assert str(tmp_path) not in json.dumps(out)
+    code, refused = _cli(capsys, "summarize", *argv, "--max-terms", "99", root=root, project_root=str(tmp_path / "none"))
+    assert code == 2 and refused["code"] == "invalid_input"
+    code, missing = _cli(capsys, "summarize", "--terms", paths["terms_path"], "--manifest", paths["manifest_path"],
+                         "--paper", "other.pdf", root=root, project_root=str(tmp_path / "none"))
+    assert code == 0 and missing["status"] == "error" and missing["error_code"] == "not_found"
+    assert str(tmp_path) not in json.dumps(missing)
+    with pytest.raises(TypeError):
+        local.ops.summarize_paper_terms(local.ops.cli_context(), paths["terms_path"])
+
+
 def test_cli_submits_and_reads_back_an_operation_job(files, tmp_path, capsys):
     root, project = str(tmp_path / "cli-jobs"), str(files["root"])
     code, handle = _cli(capsys, "submit", "--operation", TOOL_STATS, "--args",

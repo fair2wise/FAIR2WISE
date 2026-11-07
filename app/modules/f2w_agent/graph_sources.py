@@ -159,12 +159,15 @@ class SourceInfo:
     edge_count: int | None = None
     revision: str | None = None
     detail: str | None = None
+    #: The ``graph_id`` the Knowledge Operations (``GET /v1/operations/*``, T19E) know this graph by: the wire
+    #: ``graph_id`` of a JSON file, the ``f2w_graph_id`` of a Tiled graph. Not a path and not a request key here.
+    graph_id: str | None = None
 
     def as_json(self) -> JsonObject:
         """The wire form."""
         return {"id": self.id, "kind": self.kind, "label": self.label, "read_only": self.read_only,
                 "available": self.available, "node_count": self.node_count, "edge_count": self.edge_count,
-                "revision": self.revision, "detail": self.detail}
+                "revision": self.revision, "detail": self.detail, "graph_id": self.graph_id}
 
 
 @dataclass(frozen=True)
@@ -458,7 +461,7 @@ class GraphSources:
         for sid, item in self._json_files():
             nodes, edges, revision = self._cached_json_counts(item)
             entries[sid] = _Entry(SourceInfo(sid, KIND_JSON, item.label, node_count=nodes, edge_count=edges,
-                                             revision=revision), json_file=item)
+                                             revision=revision, graph_id=item.graph_id), json_file=item)
         return entries
 
     @staticmethod
@@ -469,7 +472,8 @@ class GraphSources:
             entries[sid] = _Entry(SourceInfo(
                 sid, KIND_TILED, tg.label, available=tg.conflict is None, node_count=len(tg.nodes),
                 edge_count=len(tg.edges), revision=tg.revision,
-                detail=None if tg.conflict is None else "inconsistent records in Tiled"), tiled_id=gid)
+                detail=None if tg.conflict is None else "inconsistent records in Tiled", graph_id=gid),
+                tiled_id=gid)
         return entries
 
     def listing(self) -> SourceListing:

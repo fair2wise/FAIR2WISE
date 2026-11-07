@@ -21,6 +21,8 @@ export interface GraphSourceInfo {
   edge_count: number | null;
   revision: string | null;
   detail: string | null;
+  /** The id the Knowledge Operations (`GET /v1/operations/*`) know this graph by; `null` on an older server. */
+  graph_id: string | null;
 }
 
 export interface GraphSourceListing {
@@ -58,6 +60,7 @@ export function parseGraphSourceListing(raw: unknown): GraphSourceListing {
       edge_count: count(item.edge_count),
       revision: text(item.revision),
       detail: text(item.detail),
+      graph_id: text(item.graph_id),
     });
   }
   const tiled = body.tiled !== null && typeof body.tiled === 'object' ? (body.tiled as Record<string, unknown>) : {};

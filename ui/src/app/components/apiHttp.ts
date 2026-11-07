@@ -25,11 +25,19 @@ export class ApiError extends Error {
   }
 }
 
+/** A query value: a scalar, or a list sent as a repeated parameter (`graph_ids=a&graph_ids=b`). */
+export type QueryValue = string | number | boolean | undefined | ReadonlyArray<string | number>;
+
 /** Build the absolute URL of a `/v1` path, with an optional query object (undefined values dropped). */
-export function v1Url(path: string, query?: Record<string, string | number | boolean | undefined>): string {
+export function v1Url(path: string, query?: Record<string, QueryValue>): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query ?? {})) {
-    if (value !== undefined) params.set(key, String(value));
+    if (value === undefined) continue;
+    if (Array.isArray(value)) {
+      for (const item of value) params.append(key, String(item));
+    } else {
+      params.set(key, String(value));
+    }
   }
   const qs = params.toString();
   return `${AGENT_API_BASE}${path}${qs ? `?${qs}` : ''}`;

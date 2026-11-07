@@ -1,17 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { canEditNode, fetchCapabilities, parseCapabilities } from './capabilitiesApi';
+import { canEditNode, canRunOperations, fetchCapabilities, parseCapabilities } from './capabilitiesApi';
 
-const FULL = { role: 'user', profile: 'als', can_edit: false, can_save: false, can_upload: false };
+const FULL = { role: 'user', profile: 'als', can_edit: false, can_save: false, can_upload: false, can_run_operations: true };
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe('parseCapabilities', () => {
-  it('parses the five fields', () => {
+  it('parses the six fields', () => {
     expect(parseCapabilities(FULL)).toEqual(FULL);
   });
   it('turns missing, malformed or non-boolean fields into null', () => {
     expect(parseCapabilities({ role: 'root', can_save: 'false', can_edit: 0, profile: 3 })).toEqual({
-      role: null, profile: null, can_edit: null, can_save: null, can_upload: null,
+      role: null, profile: null, can_edit: null, can_save: null, can_upload: null, can_run_operations: null,
     });
     for (const bad of [null, undefined, 'x', 42, []]) {
       expect(parseCapabilities(bad).can_save).toBeNull();
@@ -30,6 +30,16 @@ describe('canEditNode gate', () => {
   });
   it('keeps hiding for the json graph source', () => {
     expect(canEditNode('json', parseCapabilities({ can_save: true }))).toBe(false);
+  });
+});
+
+describe('canRunOperations gate (T19E)', () => {
+  it('shows only on an explicit true; unknown, missing field and false hide', () => {
+    expect(canRunOperations(undefined)).toBe(false);
+    expect(canRunOperations(parseCapabilities({}))).toBe(false);
+    expect(canRunOperations(parseCapabilities({ can_run_operations: 'true' }))).toBe(false);
+    expect(canRunOperations(parseCapabilities({ can_run_operations: false }))).toBe(false);
+    expect(canRunOperations(parseCapabilities({ can_run_operations: true }))).toBe(true);
   });
 });
 

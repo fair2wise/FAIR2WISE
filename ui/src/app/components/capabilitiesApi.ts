@@ -15,6 +15,8 @@ export interface Capabilities {
   can_edit: boolean | null;
   can_save: boolean | null;
   can_upload: boolean | null;
+  /** T19E: the caller holds `chat.ask`, the entry capability of the `GET /v1/operations/*` reads. */
+  can_run_operations: boolean | null;
 }
 
 const ROLES: ReadonlySet<string> = new Set(['local_operator', 'admin', 'user']);
@@ -29,7 +31,16 @@ export function parseCapabilities(raw: unknown): Capabilities {
     can_edit: flag(body.can_edit),
     can_save: flag(body.can_save),
     can_upload: flag(body.can_upload),
+    can_run_operations: flag(body.can_run_operations),
   };
+}
+
+/**
+ * Whether the Operations tab shows. Unlike the Edit gate, an unknown answer hides it: the tab has nothing to
+ * show to a caller the server has not confirmed (older server without the field, 401, network error).
+ */
+export function canRunOperations(caps: Capabilities | null | undefined): boolean {
+  return caps?.can_run_operations === true;
 }
 
 /** `GET /v1/capabilities`. Rejects with `ApiError` on 401/404/other failures (callers keep defaults). */
