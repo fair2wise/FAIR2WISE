@@ -54,8 +54,9 @@ class Harness:
         self.status = tmp / "status.json"
         self.proc: Optional[subprocess.Popen] = None
         self.stderr_path = tmp / "supervisor.err"
+        self.names: List[str] = []
 
-    def service(self, name: str, *, port: Optional[int] = None, alive_for: float = 0.0, timeout: float = 10.0,
+    def service(self, name: str, *, port: Optional[int] = None, alive_for: float = 0.0, timeout: float = 60.0,
                 extra: Optional[List[str]] = None, **fields: Any) -> Dict[str, Any]:
         argv = ["@python", str(FAKE), "--name", name, "--log", str(self.log)]
         if port:
@@ -63,13 +64,17 @@ class Harness:
         argv += extra or []
         health = {"http": f"http://127.0.0.1:{port}/health"} if port else {"alive_for": alive_for or 0.3}
         health.update(timeout=timeout, interval=0.1)
-        return {"name": name, "argv": argv, "health": health, "stop_timeout": 3, **fields}
+        # Generous defaults (the supervisor returns as soon as the condition holds): a child's
+        # interpreter start and its exit after SIGTERM can take seconds on a loaded CI runner.
+        # Tests about the supervisor's own deadlines pass explicit small values.
+        return {"name": name, "argv": argv, "health": health, "stop_timeout": 30, **fields}
 
     def profile(self, services: List[Dict[str, Any]], **fields: Any) -> Path:
         data = {"schema": "f2w.image.profile/v1", "profile": "local", "tiled_mode": "managed",
                 "locked_env": {"F2W_DEPLOYMENT_PROFILE": "local"}, "services": services, **fields}
         path = self.tmp / "profile.json"
         path.write_text(json.dumps(data), encoding="utf-8")
+        self.names = [str(s["name"]) for s in services]
         return path
 
     def start(self, profile: Path, env: Optional[Dict[str, str]] = None, args: Optional[List[str]] = None):
@@ -82,12 +87,12 @@ class Harness:
                                      env=base, stdout=subprocess.PIPE, stderr=self.err, text=True)
         return self.proc
 
-    def run(self, profile: Path, env: Optional[Dict[str, str]] = None, timeout: float = 30,
+    def run(self, profile: Path, env: Optional[Dict[str, str]] = None, timeout: float = 120,
             args: Optional[List[str]] = None) -> int:
         self.start(profile, env, args)
         return self.wait(timeout)
 
-    def wait(self, timeout: float = 30) -> int:
+    def wait(self, timeout: float = 120) -> int:
         assert self.proc is not None
         try:
             return self.proc.wait(timeout=timeout)
@@ -103,7 +108,7 @@ class Harness:
     def stderr(self) -> str:
         return self.stderr_path.read_text(encoding="utf-8")
 
-    def until(self, predicate: Callable[[], bool], timeout: float = 15.0) -> None:
+    def until(self, predicate: Callable[[], bool], timeout: float = 120.0) -> None:
         end = time.monotonic() + timeout
         while time.monotonic() < end:
             if predicate():
@@ -114,7 +119,15 @@ class Harness:
         raise AssertionError(f"condition not met; events={self.kinds()} stderr={self.stderr()[-2000:]}")
 
     def ready(self) -> bool:
-        return "f2w-supervisor: ready" in self.stderr()
+        """Supervisor reported ready AND every child logged its start (its handlers are installed).
+
+        ``alive_for`` health is measured from spawn, so "ready" alone can precede a slow child's
+        interpreter start; signalling it then would kill it before it can log or ignore the signal.
+        """
+        if "f2w-supervisor: ready" not in self.stderr():
+            return False
+        started = {e[1] for e in self.events() if e[0] == "start"}
+        return set(self.names) <= started
 
     def kill(self) -> None:
         if self.proc is not None and self.proc.poll() is None:
@@ -182,7 +195,8 @@ def test_next_service_waits_for_the_previous_health_check(h):
 
 def test_required_child_death_stops_everything_and_exits_nonzero(h):
     profile = h.profile([h.service("api", alive_for=0.2),
-                         h.service("worker", alive_for=0.2, extra=["--die-after", "1.0", "--exit-code", "9"]),
+                         h.service("worker", alive_for=0.2, extra=["--die-after-starts", "3", "--die-after", "0.3",
+                                                   "--exit-code", "9"]),
                          h.service("gateway", alive_for=0.2)])
     assert h.run(profile) == 70
     kinds = h.kinds()
@@ -210,7 +224,7 @@ def test_optional_child_is_restarted_with_backoff_then_marked_failed(h):
         h.service("api", alive_for=0.2),
     ])
     h.start(profile)
-    h.until(lambda: "service_failed service=tiled" in h.stderr(), timeout=20)
+    h.until(lambda: "service_failed service=tiled" in h.stderr())
     assert h.kinds().count("start tiled") == 3  # first start + 2 restarts
     assert h.proc.poll() is None  # the application keeps running without Tiled
     status = json.loads(h.status.read_text(encoding="utf-8"))

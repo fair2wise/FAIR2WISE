@@ -382,11 +382,13 @@ def test_a_busy_log_capture_is_a_retryable_conflict(tmp_path):
 
         with _ACTIVE_LOCK:
             entered.set()
-            release.wait(5)
+            release.wait(300)
 
     thread = threading.Thread(target=hold)
     thread.start()
-    entered.wait(5)
+    # Deadlines are hang guards, not races: the job below can take many seconds on a loaded machine
+    # and the lock must stay held for all of it (a 5 s release timeout let the capture succeed).
+    assert entered.wait(120), "the holder thread never took the capture lock"
     try:
         handle, state = world.run(world.params(names))
     finally:
