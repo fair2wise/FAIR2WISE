@@ -163,6 +163,24 @@ class ReplacementPublishStep:
             return False
         return bool(kind == "replacement" and obj.is_safe)
 
+    def plan_is_noop(self, plan: ChangePlan) -> bool:
+        """Whether ``plan`` is a safe zero-operation replacement that a covering receipt stands behind *now*.
+
+        No creates, links or supersessions, no boundary links or legacy adoption, the scope still at the plan's base
+        revision, and a valid replacement receipt of the same snapshot (:meth:`_covering`). The ``:local``
+        auto-approval of a no-op rollback (owner decision 2026-11-09) uses this and nothing else.
+        """
+        if plan.creates or plan.links or plan.supersessions:
+            return False
+        try:
+            kind, obj = self._recall(plan)
+        except ContractError:
+            return False
+        if kind != "replacement" or not obj.is_noop or not obj.is_safe:
+            return False
+        state = cs.read_scope_state(self.client, obj.scope, adopted=tuple(obj.detail.get("adopted_graph_ids") or ()))
+        return state.revision == plan.base_revision and self._covering(plan, obj.scope, state.revision) is not None
+
     def _scope_revision(self, scope: str, adopted: Sequence[str]) -> str:
         state = cs.read_scope_state(self.client, scope, adopted=tuple(adopted))
         return state.revision

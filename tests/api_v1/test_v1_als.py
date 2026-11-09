@@ -142,7 +142,7 @@ def test_ordinary_user_is_refused_every_privileged_action_before_effects(als, he
     assert als.ops.scales.list_records([CORPUS]) == [] and not (als.ops.control_path).exists()
     assert user.get("/v1/jobs").json() == {"jobs": []}
     pointer = user.get("/v1/publications/pointer", params={"target": als.target})
-    assert pointer.status_code == 200 and pointer.json() == {"pointer": None}  # chat.read_support
+    assert pointer.status_code == 200 and pointer.json() == {"pointer": None, "corpora": {}}  # chat.read_support
     # T31 reads for any signed-in user (chat.read_support): vocabulary quality and figure-scale records
     assert user.get("/v1/vocabulary/quality").json() == {"snapshots": [], "count": 0, "latest": None}
     assert user.get("/v1/figures/scales").json() == {"records": []}

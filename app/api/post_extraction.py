@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Any
 import uuid
 
-from ..modules.contracts.changes import ChangePlan
+from ..modules.contracts.changes import ApprovalRecord, ChangePlan
 from ..modules.contracts.context import ActorKind, RequestContext
 from ..modules.contracts.errors import ContractError
 from ..modules.contracts.jobs import JobState
@@ -82,6 +82,29 @@ def decide_approval(settings: DeploymentSettings, plan: ChangePlan, is_safe: Cal
     if not is_safe(plan):
         return ApprovalDecision(False, "the plan has boundary links or legacy adoption: review required")
     return ApprovalDecision(True, AUTO_SAFE_PLAN)
+
+
+def noop_rollback_auto_approver(
+    settings: DeploymentSettings, *, clock: Callable[[], datetime]
+) -> Callable[[ChangePlan, str], ApprovalRecord | None]:
+    """The ``:local`` policy that approves a zero-operation rollback plan (owner decision 2026-11-09).
+
+    Returns the ``PublicationDeps.auto_approve`` hook. The publication job offers it only a rollback plan the
+    importer reports as a no-op; the hook answers ``None`` on any profile but ``:local`` (the human approval route
+    stays required there), and on ``:local`` makes the same plan-hash- and profile-bound local-operator approval a
+    person would, with ``reason = "auto_safe_plan"`` (never anonymous, never claimed as a human decision).
+    """
+    def approver(plan: ChangePlan, job_id: str) -> ApprovalRecord | None:
+        if not settings.is_local:
+            return None
+        operator = local_operator_context(settings, request_id=f"auto-{job_id}", actor_kind=ActorKind.INTERACTIVE)
+        ttl = default_approval_ttl(settings)
+        now = clock()
+        return create_approval(operator, plan, settings, approval_id="appr-" + uuid.uuid4().hex, clock=clock,
+                               operation_id=job_id, expires_at=(now + ttl) if ttl is not None else None,
+                               reason=AUTO_SAFE_PLAN)
+
+    return approver
 
 
 def snapshot_freezer(*, storage_kg: Path, corpus: str, registry: SchemaRegistry | None = None,
@@ -219,4 +242,5 @@ class PostExtractionPublisher:
                 "plan": detail.get("plan"), "receipt_id": detail.get("receipt_id")}
 
 
-__all__ = ("AUTO_SAFE_PLAN", "ApprovalDecision", "PostExtractionPublisher", "decide_approval", "snapshot_freezer")
+__all__ = ("AUTO_SAFE_PLAN", "ApprovalDecision", "PostExtractionPublisher", "decide_approval",
+           "noop_rollback_auto_approver", "snapshot_freezer")

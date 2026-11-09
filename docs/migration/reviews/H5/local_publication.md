@@ -90,6 +90,25 @@ not heal it (its completed `import` stage is reused, so `verify` fails again; ch
 fix is deployed, submit the rollback again with another reason. That new job plans the same zero-operation plan, waits
 for approval, writes the thin receipt and activates `e2e_demo/v1` as pointer version 3 without touching Tiled.
 
+## Pointer Model C (owner decision 2026-11-09)
+
+The per-target pointer stays "last activated"; a per-corpus live-version view is derived from the pointer history
+(`GET /v1/publications/pointer` gains `corpora`), `rollback-replacement` and `rollback` take an optional `corpus` (the
+previous version of that corpus), `verify_agreement` and the job `ui_state` compare per corpus. Details, errors and the
+owner-gated open questions (corpus-less rollback with several corpora live; which corpus Save edits) are in
+`docs/migration/api/README.md` section 3.2. Tests: `tests/jobs/test_replacement_publication.py` (two corpora, two
+versions each, rollback of A while B stays live, rollback of B) and `tests/api_v1/test_v1_corpus_pointer.py`.
+
+## Zero-operation rollback auto-approval (owner decision 2026-11-09, `:local` only)
+
+On `:local` a rollback-replacement plan that is a no-op (zero creates/links/supersessions, a covering receipt valid
+now) is approved by the deployment policy inside the job's `review` stage, with the local operator's normal
+plan-bound approval carrying `reason = "auto_safe_plan"` (same marker as T18E; a human approval has no reason). ALS
+profiles and every non-empty plan keep the human `POST /v1/publications/{job_id}/approval`. Wiring:
+`build_local_publication` passes `noop_rollback_auto_approver(settings, clock=now)`; the hook itself answers nothing off
+`:local`. See `docs/migration/api/README.md` section 3.1. Tests: `tests/jobs/test_replacement_publication.py`
+(auto-approved with the record checked; non-empty plan and non-local profile still need the human; no policy by default).
+
 ## Not done / follow-ups for the owner
 
 - The vocabulary revision on `:local` is the fixed label `local-unversioned` (no separately versioned vocabulary

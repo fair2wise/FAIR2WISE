@@ -297,3 +297,192 @@ def test_noop_receipt_fails_verify_for_another_revision_target_or_without_its_co
     assert not verification.ok and verification.target_revision != thin.extras.resulting_revision
     assert world.step.reconcile(ctx, plan, operation_id="x") is None
     assert world.step.covering_receipt(ctx, plan) is None
+
+
+# --- Model C: per-corpus live versions, corpus-aware rollback (owner decision 2026-11-09) ------------------
+
+def derive_other_v2(world) -> None:
+    """``othercorpus/v2``: one node revised, next to ``othercorpus/v1``."""
+    from import_fakes import snapshot_with_graph
+
+    g = graph_of(world.v1.parents[1] / OTHER / "v1")
+    g["things"][0]["description"] = "revised in v2"
+    snapshot_with_graph(world.v1, world.v1.parents[3], OTHER, "v2", g)
+
+
+def submit_finish(world, corpus: str, version: str) -> str:
+    return world.finish(world.pub.submit(world.ctx, f"{corpus}/{version}", world.target).job_id)
+
+
+def test_corpus_rollback_steps_back_within_one_corpus_while_the_other_stays_live(world):
+    derive_corpus(world.v1, OTHER)
+    derive_other_v2(world)
+    world.publish("v1")
+    uuid_a1 = world.live()
+    world.publish("v2")
+    uuid_a2 = world.live()
+    submit_finish(world, OTHER, "v1")
+    b1_live = live_of(world, OTHER)
+    submit_finish(world, OTHER, "v2")
+    b2_live, b2_marker = live_of(world, OTHER), world.step.release_marker(world.ctx, OTHER)
+    assert b2_live != b1_live
+    assert world.pubstore.pointer(world.target).snapshot_ref == f"{OTHER}/v2"
+
+    live = world.pub.live_versions(world.ctx, world.target)
+    assert {c: (v.snapshot_ref, v.pointer_version) for c, v in live.items()} == {
+        SCOPE: (f"{SCOPE}/v2", 2), OTHER: (f"{OTHER}/v2", 4)}
+    # The agreement check compares each corpus's marker with that corpus's own live version.
+    assert world.agree() == {"agree": True, "pointer_snapshot_id": "v2", "marker_snapshot_id": "v2"}
+    assert world.pub.verify_agreement(world.ctx, world.target, OTHER)["agree"]
+
+    # Corpus A back one version: A/v2 -> A/v1; B (the last activated) is untouched.
+    a_job = world.finish(world.pub.rollback_replacement(world.ctx, world.target, reason="A back",
+                                                        corpus=SCOPE).job_id)
+    assert world.live() == uuid_a1, "A's v1 records are live again (same UUIDs)"
+    assert live_of(world, OTHER) == b2_live and world.step.release_marker(world.ctx, OTHER) == b2_marker
+    pointer = world.pubstore.pointer(world.target)
+    assert (pointer.version, pointer.snapshot_ref) == (5, f"{SCOPE}/v1"), "the pointer is 'last activated'"
+    assert world.pubstore.pointer_history(world.target)[-1]["action"] == "rollback"
+    assert world.agree() == {"agree": True, "pointer_snapshot_id": "v1", "marker_snapshot_id": "v1"}
+    assert world.pub.verify_agreement(world.ctx, world.target, OTHER) == {
+        "agree": True, "pointer_snapshot_id": "v2", "marker_snapshot_id": "v2"}, "B is judged against B's own version"
+    live = world.pub.live_versions(world.ctx, world.target)
+    assert live[SCOPE].snapshot_ref == f"{SCOPE}/v1" and live[OTHER].snapshot_ref == f"{OTHER}/v2"
+    assert world.store.stage(a_job, "receipt").result["report"]["revived_entities"] == 2
+
+    # B back one version: B/v2 -> B/v1 while A stays at v1.
+    world.finish(world.pub.rollback_replacement(world.ctx, world.target, reason="B back", corpus=OTHER).job_id)
+    assert live_of(world, OTHER) == b1_live and world.live() == uuid_a1
+    live = world.pub.live_versions(world.ctx, world.target)
+    assert {c: (v.snapshot_ref, v.pointer_version) for c, v in live.items()} == {
+        SCOPE: (f"{SCOPE}/v1", 5), OTHER: (f"{OTHER}/v1", 6)}
+    assert all(world.pub.verify_agreement(world.ctx, world.target, c)["agree"] for c in (SCOPE, OTHER))
+    # Toggle per corpus: asking for A again names A/v2 (a roll-forward); A/v2 records come back.
+    world.finish(world.pub.rollback_replacement(world.ctx, world.target, reason="A fwd", corpus=SCOPE).job_id)
+    assert world.live() == uuid_a2 and live_of(world, OTHER) == b1_live
+
+
+def test_corpus_rollback_is_refused_with_a_typed_error_without_an_earlier_version_or_live_corpus(world):
+    derive_corpus(world.v1, OTHER)
+    world.publish("v1")
+    submit_finish(world, OTHER, "v1")
+    for corpus, code, reason in ((SCOPE, ErrorCode.CONFLICT, "no_previous_corpus_version"),
+                                 (OTHER, ErrorCode.CONFLICT, "no_previous_corpus_version"),
+                                 ("neverpublished", ErrorCode.NOT_FOUND, "corpus_not_live")):
+        with pytest.raises(ContractError) as err:
+            world.pub.rollback_replacement(world.ctx, world.target, reason="x", corpus=corpus)
+        assert err.value.code is code and err.value.reason == reason and err.value.retryable is False
+    assert world.pubstore.pointer(world.target).version == 2, "nothing was submitted or moved"
+    assert world.service.store.list_jobs() and len(world.service.store.list_jobs()) == 2
+
+
+def test_rollback_without_corpus_still_means_the_previous_pointer(world):
+    """Backward compatible: with two corpora live, ``corpus=None`` steps back one pointer of any corpus."""
+    derive_corpus(world.v1, OTHER)
+    world.publish("v1")
+    world.publish("v2")
+    submit_finish(world, OTHER, "v1")
+    handle = world.pub.rollback_replacement(world.ctx, world.target, reason="legacy meaning")
+    assert world.work() == (handle.job_id, JobState.AWAITING_REVIEW)
+    assert world.pub.current_plan(world.ctx, handle.job_id).corpus_scope == (SCOPE,)  # previous pointer = A/v2
+
+
+def test_live_versions_follow_corpus_removal_and_markers(world):
+    derive_corpus(world.v1, OTHER)
+    world.publish("v1")
+    submit_finish(world, OTHER, "v1")
+    retire = world.pub.submit_retire(world.ctx, SCOPE, world.target, confirm_scope=SCOPE)
+    assert world.work() == (retire.job_id, JobState.AWAITING_REVIEW)
+    world.approve(retire.job_id)
+    assert world.work() == (retire.job_id, JobState.SUCCEEDED)
+    assert world.pubstore.pointer(world.target) is None
+    assert list(world.pub.live_versions(world.ctx, world.target)) == [OTHER], "B is live although the pointer is None"
+    assert world.agree() == {"agree": True, "pointer_snapshot_id": None, "marker_snapshot_id": None}
+    assert world.pub.verify_agreement(world.ctx, world.target, OTHER)["pointer_snapshot_id"] == "v1"
+    # A marker that no longer names the version history says is live drops it from the view.
+    world.step.release_marker = lambda ctx, scope: {"snapshot_id": "v9"}  # type: ignore[method-assign]
+    assert world.pub.live_versions(world.ctx, world.target) == {}
+
+
+# --- zero-operation rollback auto-approval (owner decision 2026-11-09: :local only) -----------------------
+
+def local_approver(world):
+    from app.api.post_extraction import noop_rollback_auto_approver
+
+    return noop_rollback_auto_approver(world.settings, clock=world.step_clock)
+
+
+@pytest.fixture()
+def auto_world(tmp_path, registry, fingerprints):
+    v1 = build_v1(tmp_path, registry)
+    derive(v1, "v2", revise=2, add=1)
+    derive_corpus(v1, OTHER)
+    w = RWorld(tmp_path, v1, fingerprints)
+    w.pub.deps.auto_approve = local_approver(w)
+    return w
+
+
+def test_noop_rollback_is_auto_approved_on_local_with_an_auto_safe_plan_record(auto_world):
+    world = auto_world
+    world.publish("v1")
+    world.finish(world.pub.submit(world.ctx, f"{OTHER}/v1", world.target).job_id)
+    before, n_writes = counts(world), len(world.client.writes)
+    handle = world.pub.rollback_replacement(world.ctx, world.target, reason="back to A")
+    assert world.work() == (handle.job_id, JobState.SUCCEEDED), "no human approval step"
+    plan = world.pubstore.current_plan(handle.job_id).plan
+    assert (plan.creates, plan.links, plan.supersessions) == (0, 0, 0)
+    approval = world.pubstore.get_approval(world.store.stage(handle.job_id, "import").result["approval_id"])
+    assert approval.reason == "auto_safe_plan" and approval.plan_sha256 == plan.plan_sha256
+    assert approval.operation_id == handle.job_id and approval.target == world.target
+    assert approval.profile.value == "local" and approval.requested_by == approval.approved_by == "local-operator"
+    assert approval.executed_as == "f2w-writer"
+    assert world.pubstore.pointer(world.target).snapshot_ref == f"{SCOPE}/v1"
+    assert counts(world) == before and len(world.client.writes) == n_writes
+    # A human approval of the same kind of plan carries no reason, so the two are told apart.
+    human = world.finish(world.pub.submit(world.ctx, f"{OTHER}/v1", world.target).job_id)
+    assert world.pubstore.get_approval(world.store.stage(human, "import").result["approval_id"]).reason is None
+
+
+def test_non_empty_rollback_plan_still_needs_the_human_approval_on_local(auto_world):
+    world = auto_world
+    world.publish("v1")
+    world.publish("v2")
+    handle = world.pub.rollback_replacement(world.ctx, world.target, reason="real change")
+    assert world.work() == (handle.job_id, JobState.AWAITING_REVIEW)
+    plan = world.pub.current_plan(world.ctx, handle.job_id)
+    assert plan.supersessions > 0 or plan.creates > 0
+    assert world.pubstore.valid_approvals(handle.job_id, plan) == []
+    world.approve(handle.job_id)
+    assert world.work() == (handle.job_id, JobState.SUCCEEDED)
+    # A plain (non-rollback) publication whose plan is empty is not covered by this decision either.
+    again = world.pub.submit(world.ctx, f"{SCOPE}/v1", world.target)
+    assert world.work() == (again.job_id, JobState.AWAITING_REVIEW)
+
+
+def test_noop_rollback_waits_for_a_human_on_any_other_profile(auto_world):
+    from app.api.post_extraction import noop_rollback_auto_approver
+    from app.modules.security.authorization import DeploymentSettings
+
+    world = auto_world
+    als = DeploymentSettings.for_disposable_test_target("als-dev", tiled_target="http://127.0.0.1:59872",
+                                                        writer_identity="f2w-writer")
+    hook = noop_rollback_auto_approver(als, clock=world.step_clock)
+    world.pub.deps.auto_approve = hook
+    world.publish("v1")
+    world.finish(world.pub.submit(world.ctx, f"{OTHER}/v1", world.target).job_id)
+    handle = world.pub.rollback_replacement(world.ctx, world.target, reason="back to A")
+    assert world.work() == (handle.job_id, JobState.AWAITING_REVIEW)
+    plan = world.pub.current_plan(world.ctx, handle.job_id)
+    assert plan.creates == plan.links == plan.supersessions == 0
+    assert hook(plan, handle.job_id) is None, "the policy itself refuses off :local"
+    assert world.pubstore.valid_approvals(handle.job_id, plan) == []
+    world.approve(handle.job_id)  # the human route is unchanged
+    assert world.work() == (handle.job_id, JobState.SUCCEEDED)
+
+
+def test_no_auto_approver_is_wired_by_default(world):
+    derive_corpus(world.v1, OTHER)
+    world.publish("v1")
+    world.finish(world.pub.submit(world.ctx, f"{OTHER}/v1", world.target).job_id)
+    handle = world.pub.rollback_replacement(world.ctx, world.target, reason="back to A")
+    assert world.work() == (handle.job_id, JobState.AWAITING_REVIEW)

@@ -46,6 +46,8 @@ class RollbackRequest(BaseModel):
 
     target: str = Field(min_length=1, max_length=1000)
     reason: str = Field(min_length=1, max_length=300)
+    #: Model C (owner decision 2026-11-09): roll back this corpus to *its* previous published version.
+    corpus: str | None = Field(default=None, min_length=1, max_length=200, pattern=r"^[^/]+$")
 
 
 class CorpusRetireRequest(BaseModel):
@@ -82,22 +84,29 @@ def install(app: FastAPI) -> FastAPI:
     @router.get("/pointer")
     def pointer(request: Request, target: str = Query(min_length=1, max_length=1000),
                 ctx: RequestContext = Depends(context)) -> dict[str, Any]:
-        """The active publication pointer of ``target`` (``pointer: null`` when nothing is active)."""
-        return project_dict(request, {"pointer": operations(request).publication_pointer(ctx, target)})
+        """The active publication pointer of ``target`` (``pointer: null`` when nothing is active).
+
+        ``corpora`` maps each corpus live on the target to ``{snapshot_ref, version_of_pointer_that_activated_it,
+        receipt_id}``; the pointer itself stays the last activated version of any corpus.
+        """
+        ops = operations(request)
+        return project_dict(request, {"pointer": ops.publication_pointer(ctx, target),
+                                      "corpora": ops.publication_corpora(ctx, target)})
 
     @router.post("/rollback")
     def rollback(request: Request, body: RollbackRequest,
                  ctx: RequestContext = Depends(context)) -> dict[str, Any]:
-        """Restore the previous active pointer; candidates and history are kept."""
-        restored = operations(request).rollback_publication(ctx, body.target, reason=body.reason)
+        """Restore the previous active pointer (of ``corpus`` when named); candidates and history are kept."""
+        restored = operations(request).rollback_publication(ctx, body.target, reason=body.reason,
+                                                          corpus=body.corpus)
         return project_dict(request, {"pointer": restored})
 
     @router.post("/rollback-replacement")
     def rollback_replacement(request: Request, body: RollbackRequest,
                              ctx: RequestContext = Depends(context)) -> dict[str, Any]:
-        """Roll back (or forward) as a replacement plan to the previous pointer's version; approve the plan next."""
+        """Roll back (or forward) as a replacement plan to the previous version (of ``corpus`` when named); approve next."""
         return project_dict(request, dump(operations(request).rollback_publication_replacement(
-            ctx, body.target, reason=body.reason)))
+            ctx, body.target, reason=body.reason, corpus=body.corpus)))
 
     @router.post("/corpus-retire")
     def corpus_retire(request: Request, body: CorpusRetireRequest,

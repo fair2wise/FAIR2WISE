@@ -112,8 +112,8 @@ All 65 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` reso
 | V16 | POST /v1/publications | `graph.publish` | frozen snapshot; H5 gate |
 | V17 | GET /v1/publications/{id}/plan | signed in | job visibility |
 | V18 | POST /v1/publications/{id}/approval | `curation.approve` | `create_approval` for the exact `plan_sha256` shown, approver's own credential; H5 gate |
-| V19 | GET /v1/publications/pointer | `chat.read_support` | active pointer of one target |
-| V20 | POST /v1/publications/rollback | `graph.publish` | human only, audited; H5 gate |
+| V19 | GET /v1/publications/pointer | `chat.read_support` | active pointer of one target (the last activated version) plus the additive `corpora` map: the live version of every corpus on the target (Model C, 3.2) |
+| V20 | POST /v1/publications/rollback | `graph.publish` | human only, audited; H5 gate; optional `corpus` (Model C, 3.2) |
 | V21 | GET /v1/audit/status | `jobs.admin` | `AuditRecorder.status` with `degraded` |
 | V22 | GET /v1/ops/status | `jobs.admin` | O-07 monitor DTO |
 | V23 | GET /v1/validation/judge-model | `settings.global` | deployment-wide validation judge (owner O-U2) plus the provider's live model list; added by T11B |
@@ -133,7 +133,7 @@ All 65 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` reso
 | V41 | GET /v1/folders/index?root=L&path=P | `ingest.acquire`, `:local` only | bounded recursive PDF inventory (5000 documents, 20000 folders) without following links; read only: starting an ingest over it stays a job (`POST /v1/jobs`) |
 | V42 | GET /v1/jobs/{id}/logs?after=&limit= | signed in | T33: per-job free-text log lines (`{job_id, logs:[{seq, at, level, stage, message}]}`), same visibility as V03; messages scrubbed and cut to 400 characters, 2000 lines kept per job; `/stream` also sends `event: job_log` frames (no `id:`, resume with `?logs_after=` or `/logs?after=`) |
 | V50-V52 | POST /v1/jobs/enrichment, /topic-sweep, /pdf-parse | `jobs.admin` | T10B (B5/J-11, RT-27..RT-32): job kinds `enrichment`, `topic_sweep`, `pdf_parse`; status is V03, stop is V08; fresh role check; admin-only on ALS |
-| V53 | POST /v1/publications/rollback-replacement | `graph.publish` | T10B: rollback as a replacement plan to the previous pointer's version (revive); returns the job; approval is V18; human only; H5 gate |
+| V53 | POST /v1/publications/rollback-replacement | `graph.publish` | T10B: rollback as a replacement plan to the previous pointer's version, or with the optional `corpus` to that corpus's previous version (revive); returns the job; approval is V18; human only; H5 gate |
 | V54 | POST /v1/publications/corpus-retire | `graph.publish` | T10B: corpus removal plan, corpus name typed in as `confirm_scope`; approval via V18; H5 gate |
 | V55 | POST /v1/publications/corpus-purge | `graph.publish` | T10B: purge plan of retired records (`include_previous` is the explicit second choice after a removal); own approval via V18 (Q3); H5 gate |
 | V56 | GET /v1/library | `library.read`, `:local` only | T35 (A8): `{mounted, paper_count, indexed_count, quota_open}` over `F2W_LIBRARY_DIR`; a cheap walk (no hashing or parsing); `mounted=false` without the mount; absent (404) on ALS |
@@ -149,6 +149,38 @@ All 65 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` reso
 | V81 | POST /v1/curation/merges/apply | `graph.publish` | T07B (owner go 2026-11-06): `{corpus, route: apply_migration\|apply_cleanup\|apply_campaign, dry_run: true, plan_sha256}`; human only, fresh role check. A dry run (default) reads the ACCEPTED cases of the corpus (`unresolved_term` with a `resolved` verdict, `graph_proposal` of kind `canonical_merge`), plans them over the live graph (source revision) and the governed vocabulary (vocabulary revision) and returns the report (`merges`, `held`, `planned`, `plan_held`, `unresolved_visible`, `false_merges` and `false_splits` separately, `candidates_considered`, `model_calls = 0`). A real apply names the shown `plan_sha256`; the gate is checked first (closed until the owner's C4 rerun: `501 unsupported_capability`, reason `gate_closed`, nothing recorded), then `create_approval` (`curation.approve`) binds a human approval to that hash and the route runs under the audit guard; writes are `node_patch` journal edits through the Save port. Not wired (no target/vocabulary): `501`. See `docs/migration/reviews/H4/apply_adapters.md` |
 
 Every admin capability is held only by verified Tiled admins on ALS, so all privileged `/v1` actions are admin-only there and trusted on `:local`.
+
+## 3.2 Publication pointer Model C: last activated plus a per-corpus live view (owner decision 2026-11-09)
+
+The owner chose Model C of `reviews/H5/pointer_model_memo.md`. There is still **one pointer per target**, and it means
+"last activated" (any corpus). No table was added: `PublishStore.live_by_corpus(target)` derives, from
+`pub_pointer_history`, the live version of every corpus (each row's `snapshot_ref` is `<corpus>/<vN>`; the last
+`activate` or `rollback` row naming a corpus wins; a `retire` row removes the corpus named by `corpus=<scope>` in its
+reason, or, in rows written before this change, the corpus of its record). `Publication.live_versions(ctx, target)`
+additionally keeps a corpus only while its Tiled release marker names the version history says is live.
+
+* **V19** `GET /v1/publications/pointer?target=` keeps `pointer` unchanged and adds a top-level `corpora` map
+  `{corpus: {snapshot_ref, version_of_pointer_that_activated_it, receipt_id}}` (`{}` when nothing is live). It can be
+  non-empty while `pointer` is `null` (a corpus removal clears the pointer even when another corpus stays live).
+* **V53 and V20** take an optional `corpus`. With it, "previous version" is the latest earlier published version *of
+  that corpus* that differs from its live one (from the history, other corpora ignored, never across a removal of that
+  corpus); the toggle (B28) therefore works per corpus: asking again names the version rolled back from. The pointer then
+  moves to that corpus, as "last activated"; other corpora's records, markers and live versions are untouched. A corpus
+  with no earlier version is refused with 409 `conflict`, `reason = "no_previous_corpus_version"` (not retryable); a
+  corpus with no live version with 404 `not_found`, `reason = "corpus_not_live"`. V20 stays refused on a replacement
+  deployment (`rollback_replacement_required`) whatever `corpus` says.
+* **Without `corpus` nothing changes**: the previous pointer of any corpus (B28). **With several corpora live that is
+  ambiguous** (it can be a no-op that only moves the pointer, 3.1); it is *not* refused. Whether to refuse it is the
+  memo's open question 2 and is **owner-gated**.
+* `Publication.verify_agreement(ctx, target, scope)` compares the corpus's marker with that corpus's live version, not
+  the target pointer (a false disagreement before).
+* Job `ui_state`: `published` while the job's receipt is the live version of its own corpus, `superseded` only when another
+  version of the **same corpus** is live (publishing another corpus no longer supersedes it).
+* Save (`LocalSaveProvider.resolve(corpus=None)`): the default stays the pointer's corpus; naming a corpus selects its
+  live version. No route or UI selector uses the parameter (the UI is frozen).
+* Open owner questions (memo 8): 3 which corpus Save edits when several are live, 4 whether Save and the pointer move to X
+  after a corpus-X rollback (implemented as proposed: they do), 5 approval of a no-op rollback (decided, 3.1), 6 per-corpus
+  toggle (implemented as proposed), 7 `superseded` meaning (implemented as proposed); 1 and 2 are open as stated above.
 
 ## 3.1 Rollback, replacement and the two-pointer toggle (T10B, owner decisions B28, B27, Q14, Q15)
 
@@ -191,8 +223,17 @@ A quarantine row (`pub_quarantine`) only annotates that job's view (`ui_state = 
 submission, approval or activation on the target. A rollback re-submitted with the *same* reason is the same job
 (idempotent job identity: kind, snapshot, target, pointer version, reason) and stays failed, and `resume` does not
 heal it either (the completed `import` stage is reused, so `verify` fails again): submit the rollback again with
-another reason, which is a new job. *Owner question (not decided here):* whether a no-op rollback should still require the
-V18 approval or may fall under the `:local` safe-plan auto-approval (a no-op plan is `safe` by construction).
+another reason, which is a new job. *Owner decision 2026-11-09 (fourteenth set), "Auto-approve on :local only":* a
+**zero-operation rollback plan is approved automatically on the `:local` profile only**. The publication job's
+`review` stage offers a rollback job's plan to the deployment's `PublicationDeps.auto_approve` policy only when
+`ReplacementPublishStep.plan_is_noop(plan)` holds (no creates, links or supersessions, no boundary links or legacy
+adoption, the scope still at the plan's base revision, and a covering replacement receipt valid now). On `:local` the
+policy (`post_extraction.noop_rollback_auto_approver`, wired by `build_local_publication`) makes the same
+plan-hash-, job-, target- and profile-bound approval of the local operator that a person's approval is, verified by the
+same `verify_approval`, stored with `record_approval`, and marked `reason = "auto_safe_plan"` (the T18E marker; a human
+approval has `reason = null`), so the audit trail names it as a policy decision, never as a human one. On any other
+profile the policy answers nothing and the job waits for the V18 approval; every non-empty plan, every non-rollback
+publication, and a deployment without the policy (the default of `PublicationDeps`) still wait for the human route.
 
 **Reviewed resolutions (Q15, T23C).** A rollback below a snapshot that carries a `reconciled` edit is refused at plan
 time unless each such edit has a reviewed `ConflictResolution` (`discarded` or `carried`) passed as

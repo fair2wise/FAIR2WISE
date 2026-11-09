@@ -303,8 +303,8 @@ class F2WOperations:
         ``ui_state`` is one of ``queued``, ``running``, ``paused``, ``awaiting_review``,
         ``staged`` (a publication plan waits for approval), ``approved`` (a valid approval is
         recorded for the current plan and nothing is imported yet), ``published`` (receipted and
-        the active pointer),
-        ``superseded`` (receipted but no longer the active pointer), ``completed``,
+        the live version of its corpus),
+        ``superseded`` (receipted, but another version of the *same corpus* is live now), ``completed``,
         ``failed``, ``cancelled`` and ``quarantined``. Staged never reads as published.
         """
         handle = self.jobs.get(ctx, job_id)
@@ -340,9 +340,9 @@ class F2WOperations:
                                    for a in valid]
             receipt = store.receipt_for(plan.plan_sha256, plan.target)
             if receipt is not None:
-                pointer = store.pointer(plan.target)
                 detail["receipt_id"] = receipt.receipt_id
-                detail["active"] = bool(pointer and pointer.receipt_id == receipt.receipt_id)
+                live = store.live_by_corpus(plan.target).get(plan.corpus_scope[0]) if plan.corpus_scope else None
+                detail["active"] = bool(live and live.receipt_id == receipt.receipt_id)
             if state is JobState.AWAITING_REVIEW:
                 view["ui_state"] = "approved" if valid else "staged"
             elif state is JobState.QUEUED and valid and receipt is None:
@@ -759,15 +759,26 @@ class F2WOperations:
             return None
         return {"target": pointer.name, "version": pointer.version, **pointer.as_dict()}
 
-    def rollback_publication(self, ctx: RequestContext, target: str, *, reason: str) -> dict[str, Any]:
-        """Restore the previous active pointer of a rehearsal target (human, ``graph.publish``)."""
+    def publication_corpora(self, ctx: RequestContext, target: str) -> dict[str, dict[str, Any]]:
+        """The live version of every corpus on ``target`` (the additive ``corpora`` field of V19)."""
+        require(ctx, "chat.read_support")
+        live = self._publication().live_versions(ctx, target)
+        return {corpus: version.as_dict() for corpus, version in sorted(live.items())}
+
+    def rollback_publication(self, ctx: RequestContext, target: str, *, reason: str,
+                             corpus: str | None = None) -> dict[str, Any]:
+        """Restore the previous active pointer of a rehearsal target (human, ``graph.publish``).
+
+        With ``corpus``: that corpus's previous published version.
+        """
         require(ctx, "graph.publish")
         pub = self._publication()
         self.gate.check(target, self.settings)
-        pointer = pub.rollback(ctx, target, reason=reason)
+        pointer = pub.rollback(ctx, target, reason=reason, corpus=corpus)
         return {"target": pointer.name, "version": pointer.version, **pointer.as_dict()}
 
-    def rollback_publication_replacement(self, ctx: RequestContext, target: str, *, reason: str) -> JobHandle:
+    def rollback_publication_replacement(self, ctx: RequestContext, target: str, *, reason: str,
+                                         corpus: str | None = None) -> JobHandle:
         """Roll back (or, repeated, forward) as a replacement plan to the previous pointer's version (T10B).
 
         Returns the publication job; it plans, waits for ``/v1/publications/{job_id}/approval`` and then
@@ -776,7 +787,7 @@ class F2WOperations:
         require(ctx, "graph.publish")
         pub = self._publication()
         self.gate.check(target, self.settings)
-        return pub.rollback_replacement(ctx, target, reason=reason)
+        return pub.rollback_replacement(ctx, target, reason=reason, corpus=corpus)
 
     def submit_corpus_retire(self, ctx: RequestContext, scope: str, target: str, *, confirm_scope: str,
                              resolutions: Sequence[Mapping[str, Any]] = ()) -> JobHandle:
