@@ -44,7 +44,7 @@ Run these entry points from the repository root with `python3 -m`, for example
 | `api.py` | React-facing FastAPI models/routes and persistent `AgentPipelineService` |
 | `cli.py` | Parser and `status`/`ask`/`chat`/`api` dispatch |
 | `coordinator.py` | Configuration, session artifacts, CLI adapter, retained low-level loops |
-| `orchestrator_agent.py` | Turn routing, LLM decision, deterministic validation/fallback |
+| `orchestrator_agent.py` | Deprecated facade over `agent_runtime/routing.py` (turn routing, LLM decision, deterministic validation/fallback) |
 | `retrieval_agent.py` | KG search, evidence test, context, strict sufficiency judge |
 | `download_agent.py` | OpenAlex/arXiv search, ranking, URL resolution, PDF download/validation |
 | `extractor_agent.py` | Async Academy wrapper around local full/targeted extraction |

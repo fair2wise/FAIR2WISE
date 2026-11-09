@@ -318,6 +318,12 @@ def create_api_app(
             harvester=app.state.f2w_harvest)
     register_library_jobs(operations.jobs, settings, handlers=library_handlers_)
     app.state.f2w_operations = operations
+    if operations.curation is not None:
+        # T17B P2 (owner decision 2026-11-09): the orchestrator's model calls count against the curation budgets.
+        from ..modules.curation.agent_budget import LedgerAgentBudget
+
+        app.state.f2w_agent_service.attach_llm_budget(
+            LedgerAgentBudget(operations.curation.ledger, control_path=operations.control_path))
     runtime.on_scope_change(operations.notify_scope_change)
 
     jobs.install(app, poll_seconds=sse_poll_seconds, max_stream_seconds=sse_max_seconds)

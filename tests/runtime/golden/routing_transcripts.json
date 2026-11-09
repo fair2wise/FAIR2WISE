@@ -1,0 +1,1285 @@
+{
+ "agent_available_filter_ok": {
+  "calls": [],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "classification": "scientific_or_uncertain",
+   "paper_id": null,
+   "reason": "Any scientific or uncertain turn must be checked against the KG first."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "agent_unavailable_retrieval": {
+  "calls": [],
+  "decision": {
+   "action": "stop_insufficient",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "paper_id": null,
+   "reason": "The required next agent or state transition is unavailable."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "fresh_direct_response_agent_unavailable": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 60,
+     "trace_label": "orchestrator-classify"
+    },
+    "prompt": "You classify fresh turns for FAIR2WISE. Do not select workflow actions. Conversation/workflow memory may resolve references but is never scientific evidence.\nReturn ONLY JSON with keys classification and reason.\nclassification must be exactly one of:\n- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions that are not follow-ups to a scientific ask. Not used for topical questions, including off-topic ones.\n- irrelevant_non_scientific: a topical question that is clearly outside materials science (for example pets, restaurants, sports). This still retrieves the KG and offers paper ingest; never refuse or topic-police. Prefer scientific_or_uncertain when unsure.\n- scientific_or_uncertain: EVERY question that asks about a topic \u2014 any discipline, materials science, off-graph concepts, scientific code or methods, papers/citations/evidence, KG requests, requests to download or fetch papers, technical factual questions, contextual follow-ups, and every ambiguous turn that might need evidence \u2014 except hardware-layout questions, which are ops_layout.\n- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline layout, what comes after a device, or optical topology. These retrieve the ops KG first and must not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\nHard rule: never refuse a user question as out of scope. Off-topic asks still search the KG and papers.\nHard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as mundane or irrelevant merely because general model knowledge could answer it.\nHard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that continue a prior scientific, code, or analysis question are scientific_or_uncertain, not mundane. They mean re-answer the previous question with looser grounding.\n\nSTATE: {\"phase\": \"idle\", \"current_topic\": null, \"has_active_extracted_paper\": false, \"active_paper_title\": null}\nUSER_TURN: hi there"
+   }
+  ],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "classification": "scientific_or_uncertain",
+   "paper_id": null,
+   "reason": "Any scientific or uncertain turn must be checked against the KG first."
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "lbl/cborg-chat"
+   }
+  ],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "fresh_download_request": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 60,
+     "trace_label": "orchestrator-classify"
+    },
+    "prompt": "You classify fresh turns for FAIR2WISE. Do not select workflow actions. Conversation/workflow memory may resolve references but is never scientific evidence.\nReturn ONLY JSON with keys classification and reason.\nclassification must be exactly one of:\n- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions that are not follow-ups to a scientific ask. Not used for topical questions, including off-topic ones.\n- irrelevant_non_scientific: a topical question that is clearly outside materials science (for example pets, restaurants, sports). This still retrieves the KG and offers paper ingest; never refuse or topic-police. Prefer scientific_or_uncertain when unsure.\n- scientific_or_uncertain: EVERY question that asks about a topic \u2014 any discipline, materials science, off-graph concepts, scientific code or methods, papers/citations/evidence, KG requests, requests to download or fetch papers, technical factual questions, contextual follow-ups, and every ambiguous turn that might need evidence \u2014 except hardware-layout questions, which are ops_layout.\n- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline layout, what comes after a device, or optical topology. These retrieve the ops KG first and must not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\nHard rule: never refuse a user question as out of scope. Off-topic asks still search the KG and papers.\nHard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as mundane or irrelevant merely because general model knowledge could answer it.\nHard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that continue a prior scientific, code, or analysis question are scientific_or_uncertain, not mundane. They mean re-answer the previous question with looser grounding.\n\nSTATE: {\"phase\": \"idle\", \"current_topic\": null, \"has_active_extracted_paper\": false, \"active_paper_title\": null}\nUSER_TURN: Download a paper about GISAXS from arXiv"
+   }
+  ],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "classification": "scientific_or_uncertain",
+   "paper_id": null,
+   "reason": "because"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "lbl/cborg-chat"
+   }
+  ],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "fresh_followup_be_more_general": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 60,
+     "trace_label": "orchestrator-classify"
+    },
+    "prompt": "You classify fresh turns for FAIR2WISE. Do not select workflow actions. Conversation/workflow memory may resolve references but is never scientific evidence.\nReturn ONLY JSON with keys classification and reason.\nclassification must be exactly one of:\n- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions that are not follow-ups to a scientific ask. Not used for topical questions, including off-topic ones.\n- irrelevant_non_scientific: a topical question that is clearly outside materials science (for example pets, restaurants, sports). This still retrieves the KG and offers paper ingest; never refuse or topic-police. Prefer scientific_or_uncertain when unsure.\n- scientific_or_uncertain: EVERY question that asks about a topic \u2014 any discipline, materials science, off-graph concepts, scientific code or methods, papers/citations/evidence, KG requests, requests to download or fetch papers, technical factual questions, contextual follow-ups, and every ambiguous turn that might need evidence \u2014 except hardware-layout questions, which are ops_layout.\n- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline layout, what comes after a device, or optical topology. These retrieve the ops KG first and must not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\nHard rule: never refuse a user question as out of scope. Off-topic asks still search the KG and papers.\nHard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as mundane or irrelevant merely because general model knowledge could answer it.\nHard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that continue a prior scientific, code, or analysis question are scientific_or_uncertain, not mundane. They mean re-answer the previous question with looser grounding.\n\nSTATE: {\"phase\": \"idle\", \"current_topic\": \"RSoXS\", \"has_active_extracted_paper\": false, \"active_paper_title\": null}\nUSER_TURN: be more general"
+   }
+  ],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "classification": "scientific_or_uncertain",
+   "paper_id": null,
+   "reason": "because"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "lbl/cborg-chat"
+   }
+  ],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "fresh_greeting_llm_mundane": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 60,
+     "trace_label": "orchestrator-classify"
+    },
+    "prompt": "You classify fresh turns for FAIR2WISE. Do not select workflow actions. Conversation/workflow memory may resolve references but is never scientific evidence.\nReturn ONLY JSON with keys classification and reason.\nclassification must be exactly one of:\n- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions that are not follow-ups to a scientific ask. Not used for topical questions, including off-topic ones.\n- irrelevant_non_scientific: a topical question that is clearly outside materials science (for example pets, restaurants, sports). This still retrieves the KG and offers paper ingest; never refuse or topic-police. Prefer scientific_or_uncertain when unsure.\n- scientific_or_uncertain: EVERY question that asks about a topic \u2014 any discipline, materials science, off-graph concepts, scientific code or methods, papers/citations/evidence, KG requests, requests to download or fetch papers, technical factual questions, contextual follow-ups, and every ambiguous turn that might need evidence \u2014 except hardware-layout questions, which are ops_layout.\n- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline layout, what comes after a device, or optical topology. These retrieve the ops KG first and must not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\nHard rule: never refuse a user question as out of scope. Off-topic asks still search the KG and papers.\nHard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as mundane or irrelevant merely because general model knowledge could answer it.\nHard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that continue a prior scientific, code, or analysis question are scientific_or_uncertain, not mundane. They mean re-answer the previous question with looser grounding.\n\nSTATE: {\"phase\": \"idle\", \"current_topic\": null, \"has_active_extracted_paper\": false, \"active_paper_title\": null}\nUSER_TURN: hi there friend"
+   }
+  ],
+  "decision": {
+   "action": "direct_response",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "classification": "mundane_conversation",
+   "paper_id": null,
+   "reason": "greeting"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "lbl/cborg-chat"
+   }
+  ],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "fresh_hello_regex_fallback_llm_fails": {
+  "calls": [],
+  "decision": {
+   "action": "direct_response",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "classification": "mundane_conversation",
+   "paper_id": null,
+   "reason": "A mundane conversational or UI turn needs no evidence agents."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "fresh_json_wrapped_in_prose": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 60,
+     "trace_label": "orchestrator-classify"
+    },
+    "prompt": "You classify fresh turns for FAIR2WISE. Do not select workflow actions. Conversation/workflow memory may resolve references but is never scientific evidence.\nReturn ONLY JSON with keys classification and reason.\nclassification must be exactly one of:\n- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions that are not follow-ups to a scientific ask. Not used for topical questions, including off-topic ones.\n- irrelevant_non_scientific: a topical question that is clearly outside materials science (for example pets, restaurants, sports). This still retrieves the KG and offers paper ingest; never refuse or topic-police. Prefer scientific_or_uncertain when unsure.\n- scientific_or_uncertain: EVERY question that asks about a topic \u2014 any discipline, materials science, off-graph concepts, scientific code or methods, papers/citations/evidence, KG requests, requests to download or fetch papers, technical factual questions, contextual follow-ups, and every ambiguous turn that might need evidence \u2014 except hardware-layout questions, which are ops_layout.\n- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline layout, what comes after a device, or optical topology. These retrieve the ops KG first and must not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\nHard rule: never refuse a user question as out of scope. Off-topic asks still search the KG and papers.\nHard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as mundane or irrelevant merely because general model knowledge could answer it.\nHard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that continue a prior scientific, code, or analysis question are scientific_or_uncertain, not mundane. They mean re-answer the previous question with looser grounding.\n\nSTATE: {\"phase\": \"idle\", \"current_topic\": null, \"has_active_extracted_paper\": false, \"active_paper_title\": null}\nUSER_TURN: Explain CyRSoXS"
+   }
+  ],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "classification": "scientific_or_uncertain",
+   "paper_id": null,
+   "reason": "Classified fresh user turn."
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "lbl/cborg-chat"
+   }
+  ],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "fresh_llm_raises": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 60,
+     "trace_label": "orchestrator-classify"
+    },
+    "prompt": "You classify fresh turns for FAIR2WISE. Do not select workflow actions. Conversation/workflow memory may resolve references but is never scientific evidence.\nReturn ONLY JSON with keys classification and reason.\nclassification must be exactly one of:\n- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions that are not follow-ups to a scientific ask. Not used for topical questions, including off-topic ones.\n- irrelevant_non_scientific: a topical question that is clearly outside materials science (for example pets, restaurants, sports). This still retrieves the KG and offers paper ingest; never refuse or topic-police. Prefer scientific_or_uncertain when unsure.\n- scientific_or_uncertain: EVERY question that asks about a topic \u2014 any discipline, materials science, off-graph concepts, scientific code or methods, papers/citations/evidence, KG requests, requests to download or fetch papers, technical factual questions, contextual follow-ups, and every ambiguous turn that might need evidence \u2014 except hardware-layout questions, which are ops_layout.\n- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline layout, what comes after a device, or optical topology. These retrieve the ops KG first and must not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\nHard rule: never refuse a user question as out of scope. Off-topic asks still search the KG and papers.\nHard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as mundane or irrelevant merely because general model knowledge could answer it.\nHard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that continue a prior scientific, code, or analysis question are scientific_or_uncertain, not mundane. They mean re-answer the previous question with looser grounding.\n\nSTATE: {\"phase\": \"idle\", \"current_topic\": null, \"has_active_extracted_paper\": false, \"active_paper_title\": null}\nUSER_TURN: Explain CyRSoXS"
+   }
+  ],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "classification": "scientific_or_uncertain",
+   "paper_id": null,
+   "reason": "Any scientific or uncertain turn must be checked against the KG first."
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "lbl/cborg-chat"
+   }
+  ],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ],
+   [
+    "note_error",
+    "WorkflowOrchestratorAgent.decide",
+    "timeout"
+   ]
+  ]
+ },
+ "fresh_llm_retrieval_agent_unavailable": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 60,
+     "trace_label": "orchestrator-classify"
+    },
+    "prompt": "You classify fresh turns for FAIR2WISE. Do not select workflow actions. Conversation/workflow memory may resolve references but is never scientific evidence.\nReturn ONLY JSON with keys classification and reason.\nclassification must be exactly one of:\n- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions that are not follow-ups to a scientific ask. Not used for topical questions, including off-topic ones.\n- irrelevant_non_scientific: a topical question that is clearly outside materials science (for example pets, restaurants, sports). This still retrieves the KG and offers paper ingest; never refuse or topic-police. Prefer scientific_or_uncertain when unsure.\n- scientific_or_uncertain: EVERY question that asks about a topic \u2014 any discipline, materials science, off-graph concepts, scientific code or methods, papers/citations/evidence, KG requests, requests to download or fetch papers, technical factual questions, contextual follow-ups, and every ambiguous turn that might need evidence \u2014 except hardware-layout questions, which are ops_layout.\n- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline layout, what comes after a device, or optical topology. These retrieve the ops KG first and must not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\nHard rule: never refuse a user question as out of scope. Off-topic asks still search the KG and papers.\nHard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as mundane or irrelevant merely because general model knowledge could answer it.\nHard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that continue a prior scientific, code, or analysis question are scientific_or_uncertain, not mundane. They mean re-answer the previous question with looser grounding.\n\nSTATE: {\"phase\": \"idle\", \"current_topic\": null, \"has_active_extracted_paper\": false, \"active_paper_title\": null}\nUSER_TURN: What is RSoXS?"
+   }
+  ],
+  "decision": {
+   "action": "stop_insufficient",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "paper_id": null,
+   "reason": "The proposed and fallback transitions were unavailable."
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "lbl/cborg-chat"
+   }
+  ],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "fresh_missing_reason": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 60,
+     "trace_label": "orchestrator-classify"
+    },
+    "prompt": "You classify fresh turns for FAIR2WISE. Do not select workflow actions. Conversation/workflow memory may resolve references but is never scientific evidence.\nReturn ONLY JSON with keys classification and reason.\nclassification must be exactly one of:\n- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions that are not follow-ups to a scientific ask. Not used for topical questions, including off-topic ones.\n- irrelevant_non_scientific: a topical question that is clearly outside materials science (for example pets, restaurants, sports). This still retrieves the KG and offers paper ingest; never refuse or topic-police. Prefer scientific_or_uncertain when unsure.\n- scientific_or_uncertain: EVERY question that asks about a topic \u2014 any discipline, materials science, off-graph concepts, scientific code or methods, papers/citations/evidence, KG requests, requests to download or fetch papers, technical factual questions, contextual follow-ups, and every ambiguous turn that might need evidence \u2014 except hardware-layout questions, which are ops_layout.\n- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline layout, what comes after a device, or optical topology. These retrieve the ops KG first and must not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\nHard rule: never refuse a user question as out of scope. Off-topic asks still search the KG and papers.\nHard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as mundane or irrelevant merely because general model knowledge could answer it.\nHard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that continue a prior scientific, code, or analysis question are scientific_or_uncertain, not mundane. They mean re-answer the previous question with looser grounding.\n\nSTATE: {\"phase\": \"idle\", \"current_topic\": null, \"has_active_extracted_paper\": false, \"active_paper_title\": null}\nUSER_TURN: Explain CyRSoXS"
+   }
+  ],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "classification": "scientific_or_uncertain",
+   "paper_id": null,
+   "reason": "Classified fresh user turn."
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "lbl/cborg-chat"
+   }
+  ],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "fresh_mundane_llm_scientific": {
+  "calls": [],
+  "decision": {
+   "action": "direct_response",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "classification": "mundane_conversation",
+   "paper_id": null,
+   "reason": "A mundane conversational or UI turn needs no evidence agents."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "fresh_non_json_reply": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 60,
+     "trace_label": "orchestrator-classify"
+    },
+    "prompt": "You classify fresh turns for FAIR2WISE. Do not select workflow actions. Conversation/workflow memory may resolve references but is never scientific evidence.\nReturn ONLY JSON with keys classification and reason.\nclassification must be exactly one of:\n- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions that are not follow-ups to a scientific ask. Not used for topical questions, including off-topic ones.\n- irrelevant_non_scientific: a topical question that is clearly outside materials science (for example pets, restaurants, sports). This still retrieves the KG and offers paper ingest; never refuse or topic-police. Prefer scientific_or_uncertain when unsure.\n- scientific_or_uncertain: EVERY question that asks about a topic \u2014 any discipline, materials science, off-graph concepts, scientific code or methods, papers/citations/evidence, KG requests, requests to download or fetch papers, technical factual questions, contextual follow-ups, and every ambiguous turn that might need evidence \u2014 except hardware-layout questions, which are ops_layout.\n- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline layout, what comes after a device, or optical topology. These retrieve the ops KG first and must not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\nHard rule: never refuse a user question as out of scope. Off-topic asks still search the KG and papers.\nHard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as mundane or irrelevant merely because general model knowledge could answer it.\nHard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that continue a prior scientific, code, or analysis question are scientific_or_uncertain, not mundane. They mean re-answer the previous question with looser grounding.\n\nSTATE: {\"phase\": \"idle\", \"current_topic\": null, \"has_active_extracted_paper\": false, \"active_paper_title\": null}\nUSER_TURN: Explain CyRSoXS"
+   }
+  ],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "classification": "scientific_or_uncertain",
+   "paper_id": null,
+   "reason": "Any scientific or uncertain turn must be checked against the KG first."
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "lbl/cborg-chat"
+   }
+  ],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "fresh_offtopic": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 60,
+     "trace_label": "orchestrator-classify"
+    },
+    "prompt": "You classify fresh turns for FAIR2WISE. Do not select workflow actions. Conversation/workflow memory may resolve references but is never scientific evidence.\nReturn ONLY JSON with keys classification and reason.\nclassification must be exactly one of:\n- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions that are not follow-ups to a scientific ask. Not used for topical questions, including off-topic ones.\n- irrelevant_non_scientific: a topical question that is clearly outside materials science (for example pets, restaurants, sports). This still retrieves the KG and offers paper ingest; never refuse or topic-police. Prefer scientific_or_uncertain when unsure.\n- scientific_or_uncertain: EVERY question that asks about a topic \u2014 any discipline, materials science, off-graph concepts, scientific code or methods, papers/citations/evidence, KG requests, requests to download or fetch papers, technical factual questions, contextual follow-ups, and every ambiguous turn that might need evidence \u2014 except hardware-layout questions, which are ops_layout.\n- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline layout, what comes after a device, or optical topology. These retrieve the ops KG first and must not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\nHard rule: never refuse a user question as out of scope. Off-topic asks still search the KG and papers.\nHard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as mundane or irrelevant merely because general model knowledge could answer it.\nHard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that continue a prior scientific, code, or analysis question are scientific_or_uncertain, not mundane. They mean re-answer the previous question with looser grounding.\n\nSTATE: {\"phase\": \"idle\", \"current_topic\": null, \"has_active_extracted_paper\": false, \"active_paper_title\": null}\nUSER_TURN: tell me about dogs"
+   }
+  ],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "classification": "irrelevant_non_scientific",
+   "paper_id": null,
+   "reason": "because"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "lbl/cborg-chat"
+   }
+  ],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "fresh_ops_layout_llm_fails": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 60,
+     "trace_label": "orchestrator-classify"
+    },
+    "prompt": "You classify fresh turns for FAIR2WISE. Do not select workflow actions. Conversation/workflow memory may resolve references but is never scientific evidence.\nReturn ONLY JSON with keys classification and reason.\nclassification must be exactly one of:\n- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions that are not follow-ups to a scientific ask. Not used for topical questions, including off-topic ones.\n- irrelevant_non_scientific: a topical question that is clearly outside materials science (for example pets, restaurants, sports). This still retrieves the KG and offers paper ingest; never refuse or topic-police. Prefer scientific_or_uncertain when unsure.\n- scientific_or_uncertain: EVERY question that asks about a topic \u2014 any discipline, materials science, off-graph concepts, scientific code or methods, papers/citations/evidence, KG requests, requests to download or fetch papers, technical factual questions, contextual follow-ups, and every ambiguous turn that might need evidence \u2014 except hardware-layout questions, which are ops_layout.\n- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline layout, what comes after a device, or optical topology. These retrieve the ops KG first and must not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\nHard rule: never refuse a user question as out of scope. Off-topic asks still search the KG and papers.\nHard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as mundane or irrelevant merely because general model knowledge could answer it.\nHard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that continue a prior scientific, code, or analysis question are scientific_or_uncertain, not mundane. They mean re-answer the previous question with looser grounding.\n\nSTATE: {\"phase\": \"idle\", \"current_topic\": null, \"has_active_extracted_paper\": false, \"active_paper_title\": null}\nUSER_TURN: what comes after the monochromator in the beam path"
+   }
+  ],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "classification": "ops_layout",
+   "paper_id": null,
+   "reason": "Hardware layout / beam-path questions use the 11.0.1.2 ops KG first."
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "lbl/cborg-chat"
+   }
+  ],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ],
+   [
+    "note_error",
+    "WorkflowOrchestratorAgent.decide",
+    "llm down"
+   ]
+  ]
+ },
+ "fresh_ops_layout_overrides_llm": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 60,
+     "trace_label": "orchestrator-classify"
+    },
+    "prompt": "You classify fresh turns for FAIR2WISE. Do not select workflow actions. Conversation/workflow memory may resolve references but is never scientific evidence.\nReturn ONLY JSON with keys classification and reason.\nclassification must be exactly one of:\n- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions that are not follow-ups to a scientific ask. Not used for topical questions, including off-topic ones.\n- irrelevant_non_scientific: a topical question that is clearly outside materials science (for example pets, restaurants, sports). This still retrieves the KG and offers paper ingest; never refuse or topic-police. Prefer scientific_or_uncertain when unsure.\n- scientific_or_uncertain: EVERY question that asks about a topic \u2014 any discipline, materials science, off-graph concepts, scientific code or methods, papers/citations/evidence, KG requests, requests to download or fetch papers, technical factual questions, contextual follow-ups, and every ambiguous turn that might need evidence \u2014 except hardware-layout questions, which are ops_layout.\n- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline layout, what comes after a device, or optical topology. These retrieve the ops KG first and must not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\nHard rule: never refuse a user question as out of scope. Off-topic asks still search the KG and papers.\nHard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as mundane or irrelevant merely because general model knowledge could answer it.\nHard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that continue a prior scientific, code, or analysis question are scientific_or_uncertain, not mundane. They mean re-answer the previous question with looser grounding.\n\nSTATE: {\"phase\": \"idle\", \"current_topic\": null, \"has_active_extracted_paper\": false, \"active_paper_title\": null}\nUSER_TURN: how is all of the hardware connected at 11.0.1.2, in order"
+   }
+  ],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "classification": "ops_layout",
+   "paper_id": null,
+   "reason": "LLM said science"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "lbl/cborg-chat"
+   }
+  ],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "fresh_science_llm_scientific": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 60,
+     "trace_label": "orchestrator-classify"
+    },
+    "prompt": "You classify fresh turns for FAIR2WISE. Do not select workflow actions. Conversation/workflow memory may resolve references but is never scientific evidence.\nReturn ONLY JSON with keys classification and reason.\nclassification must be exactly one of:\n- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions that are not follow-ups to a scientific ask. Not used for topical questions, including off-topic ones.\n- irrelevant_non_scientific: a topical question that is clearly outside materials science (for example pets, restaurants, sports). This still retrieves the KG and offers paper ingest; never refuse or topic-police. Prefer scientific_or_uncertain when unsure.\n- scientific_or_uncertain: EVERY question that asks about a topic \u2014 any discipline, materials science, off-graph concepts, scientific code or methods, papers/citations/evidence, KG requests, requests to download or fetch papers, technical factual questions, contextual follow-ups, and every ambiguous turn that might need evidence \u2014 except hardware-layout questions, which are ops_layout.\n- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline layout, what comes after a device, or optical topology. These retrieve the ops KG first and must not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\nHard rule: never refuse a user question as out of scope. Off-topic asks still search the KG and papers.\nHard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as mundane or irrelevant merely because general model knowledge could answer it.\nHard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that continue a prior scientific, code, or analysis question are scientific_or_uncertain, not mundane. They mean re-answer the previous question with looser grounding.\n\nSTATE: {\"phase\": \"idle\", \"current_topic\": null, \"has_active_extracted_paper\": false, \"active_paper_title\": null}\nUSER_TURN: What is RSoXS?"
+   }
+  ],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "classification": "scientific_or_uncertain",
+   "paper_id": null,
+   "reason": "because"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "lbl/cborg-chat"
+   }
+  ],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "fresh_unknown_label": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 60,
+     "trace_label": "orchestrator-classify"
+    },
+    "prompt": "You classify fresh turns for FAIR2WISE. Do not select workflow actions. Conversation/workflow memory may resolve references but is never scientific evidence.\nReturn ONLY JSON with keys classification and reason.\nclassification must be exactly one of:\n- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions that are not follow-ups to a scientific ask. Not used for topical questions, including off-topic ones.\n- irrelevant_non_scientific: a topical question that is clearly outside materials science (for example pets, restaurants, sports). This still retrieves the KG and offers paper ingest; never refuse or topic-police. Prefer scientific_or_uncertain when unsure.\n- scientific_or_uncertain: EVERY question that asks about a topic \u2014 any discipline, materials science, off-graph concepts, scientific code or methods, papers/citations/evidence, KG requests, requests to download or fetch papers, technical factual questions, contextual follow-ups, and every ambiguous turn that might need evidence \u2014 except hardware-layout questions, which are ops_layout.\n- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline layout, what comes after a device, or optical topology. These retrieve the ops KG first and must not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\nHard rule: never refuse a user question as out of scope. Off-topic asks still search the KG and papers.\nHard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as mundane or irrelevant merely because general model knowledge could answer it.\nHard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that continue a prior scientific, code, or analysis question are scientific_or_uncertain, not mundane. They mean re-answer the previous question with looser grounding.\n\nSTATE: {\"phase\": \"idle\", \"current_topic\": null, \"has_active_extracted_paper\": false, \"active_paper_title\": null}\nUSER_TURN: Ambiguous technical request"
+   }
+  ],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "classification": "scientific_or_uncertain",
+   "paper_id": null,
+   "reason": "Any scientific or uncertain turn must be checked against the KG first."
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "lbl/cborg-chat"
+   }
+  ],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "fresh_with_extracted_paper_state": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 60,
+     "trace_label": "orchestrator-classify"
+    },
+    "prompt": "You classify fresh turns for FAIR2WISE. Do not select workflow actions. Conversation/workflow memory may resolve references but is never scientific evidence.\nReturn ONLY JSON with keys classification and reason.\nclassification must be exactly one of:\n- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions that are not follow-ups to a scientific ask. Not used for topical questions, including off-topic ones.\n- irrelevant_non_scientific: a topical question that is clearly outside materials science (for example pets, restaurants, sports). This still retrieves the KG and offers paper ingest; never refuse or topic-police. Prefer scientific_or_uncertain when unsure.\n- scientific_or_uncertain: EVERY question that asks about a topic \u2014 any discipline, materials science, off-graph concepts, scientific code or methods, papers/citations/evidence, KG requests, requests to download or fetch papers, technical factual questions, contextual follow-ups, and every ambiguous turn that might need evidence \u2014 except hardware-layout questions, which are ops_layout.\n- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline layout, what comes after a device, or optical topology. These retrieve the ops KG first and must not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\nHard rule: never refuse a user question as out of scope. Off-topic asks still search the KG and papers.\nHard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as mundane or irrelevant merely because general model knowledge could answer it.\nHard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that continue a prior scientific, code, or analysis question are scientific_or_uncertain, not mundane. They mean re-answer the previous question with looser grounding.\n\nSTATE: {\"phase\": \"idle\", \"current_topic\": \"foo\", \"has_active_extracted_paper\": true, \"active_paper_title\": \"Beamline calibration for x-ray scattering\"}\nUSER_TURN: Something unrelated entirely"
+   }
+  ],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "classification": "scientific_or_uncertain",
+   "paper_id": null,
+   "reason": "because"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "lbl/cborg-chat"
+   }
+  ],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "hint_direct_response": {
+  "calls": [],
+  "decision": {
+   "action": "direct_response",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "classification": "mundane_conversation",
+   "paper_id": null,
+   "reason": "The turn does not require scientific evidence agents."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "hint_query_extracted_paper": {
+  "calls": [],
+  "decision": {
+   "action": "query_extracted_paper",
+   "agent": "PaperEvidenceAgent",
+   "candidate_index": null,
+   "paper_id": "p1",
+   "reason": "The turn refers to the active extracted paper."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "hint_query_paper_without_paper": {
+  "calls": [],
+  "decision": {
+   "action": "stop_insufficient",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "paper_id": null,
+   "reason": "The required next agent or state transition is unavailable."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "hint_report_extraction": {
+  "calls": [],
+  "decision": {
+   "action": "report_extraction",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "paper_id": "p1",
+   "reason": "The turn asks for terms produced by the active paper extraction."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ]
+  ]
+ },
+ "hint_retrieve_kg_after_extraction": {
+  "calls": [],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "paper_id": null,
+   "reason": "Extraction completed; re-check the original query against the updated KG."
+  },
+  "factory_calls": [],
+  "notes": []
+ },
+ "hint_retrieve_kg_idle": {
+  "calls": [],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "classification": "scientific_or_uncertain",
+   "paper_id": null,
+   "reason": "Any scientific or uncertain turn must be checked against the KG first."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "max_steps_reached": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 60,
+     "trace_label": "orchestrator-classify"
+    },
+    "prompt": "You classify fresh turns for FAIR2WISE. Do not select workflow actions. Conversation/workflow memory may resolve references but is never scientific evidence.\nReturn ONLY JSON with keys classification and reason.\nclassification must be exactly one of:\n- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions that are not follow-ups to a scientific ask. Not used for topical questions, including off-topic ones.\n- irrelevant_non_scientific: a topical question that is clearly outside materials science (for example pets, restaurants, sports). This still retrieves the KG and offers paper ingest; never refuse or topic-police. Prefer scientific_or_uncertain when unsure.\n- scientific_or_uncertain: EVERY question that asks about a topic \u2014 any discipline, materials science, off-graph concepts, scientific code or methods, papers/citations/evidence, KG requests, requests to download or fetch papers, technical factual questions, contextual follow-ups, and every ambiguous turn that might need evidence \u2014 except hardware-layout questions, which are ops_layout.\n- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline layout, what comes after a device, or optical topology. These retrieve the ops KG first and must not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\nHard rule: never refuse a user question as out of scope. Off-topic asks still search the KG and papers.\nHard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as mundane or irrelevant merely because general model knowledge could answer it.\nHard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that continue a prior scientific, code, or analysis question are scientific_or_uncertain, not mundane. They mean re-answer the previous question with looser grounding.\n\nSTATE: {\"phase\": \"idle\", \"current_topic\": null, \"has_active_extracted_paper\": false, \"active_paper_title\": null}\nUSER_TURN: anything"
+   }
+  ],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "classification": "scientific_or_uncertain",
+   "paper_id": null,
+   "reason": "because"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "lbl/cborg-chat"
+   }
+  ],
+  "notes": []
+ },
+ "paper_followup_generic": {
+  "calls": [],
+  "decision": {
+   "action": "query_extracted_paper",
+   "agent": "PaperEvidenceAgent",
+   "candidate_index": null,
+   "paper_id": "p1",
+   "reason": "The turn refers to the active extracted paper."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    true
+   ]
+  ]
+ },
+ "paper_followup_title_tokens": {
+  "calls": [],
+  "decision": {
+   "action": "query_extracted_paper",
+   "agent": "PaperEvidenceAgent",
+   "candidate_index": null,
+   "paper_id": "p1",
+   "reason": "The turn refers to the active extracted paper."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    true
+   ]
+  ]
+ },
+ "paper_followup_topic_mismatch": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 60,
+     "trace_label": "orchestrator-classify"
+    },
+    "prompt": "You classify fresh turns for FAIR2WISE. Do not select workflow actions. Conversation/workflow memory may resolve references but is never scientific evidence.\nReturn ONLY JSON with keys classification and reason.\nclassification must be exactly one of:\n- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions that are not follow-ups to a scientific ask. Not used for topical questions, including off-topic ones.\n- irrelevant_non_scientific: a topical question that is clearly outside materials science (for example pets, restaurants, sports). This still retrieves the KG and offers paper ingest; never refuse or topic-police. Prefer scientific_or_uncertain when unsure.\n- scientific_or_uncertain: EVERY question that asks about a topic \u2014 any discipline, materials science, off-graph concepts, scientific code or methods, papers/citations/evidence, KG requests, requests to download or fetch papers, technical factual questions, contextual follow-ups, and every ambiguous turn that might need evidence \u2014 except hardware-layout questions, which are ops_layout.\n- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline layout, what comes after a device, or optical topology. These retrieve the ops KG first and must not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\nHard rule: never refuse a user question as out of scope. Off-topic asks still search the KG and papers.\nHard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as mundane or irrelevant merely because general model knowledge could answer it.\nHard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that continue a prior scientific, code, or analysis question are scientific_or_uncertain, not mundane. They mean re-answer the previous question with looser grounding.\n\nSTATE: {\"phase\": \"idle\", \"current_topic\": \"lithium battery dendrite growth\", \"has_active_extracted_paper\": true, \"active_paper_title\": \"Beamline calibration for x-ray scattering\"}\nUSER_TURN: What did it say?"
+   }
+  ],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "classification": "scientific_or_uncertain",
+   "paper_id": null,
+   "reason": "because"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "lbl/cborg-chat"
+   }
+  ],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "pending_download_approved": {
+  "calls": [],
+  "decision": {
+   "action": "download_selected",
+   "agent": "DownloadAgent",
+   "candidate_index": 0,
+   "paper_id": null,
+   "reason": "A matching one-use download approval is present."
+  },
+  "factory_calls": [],
+  "notes": []
+ },
+ "pending_download_candidate_unavailable": {
+  "calls": [],
+  "decision": {
+   "action": "stop_insufficient",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "paper_id": null,
+   "reason": "The required next agent or state transition is unavailable."
+  },
+  "factory_calls": [],
+  "notes": []
+ },
+ "pending_download_index_out_of_range": {
+  "calls": [],
+  "decision": {
+   "action": "stop_insufficient",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "paper_id": null,
+   "reason": "The required next agent or state transition is unavailable."
+  },
+  "factory_calls": [],
+  "notes": []
+ },
+ "pending_download_unapproved": {
+  "calls": [],
+  "decision": {
+   "action": "request_download_approval",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "paper_id": null,
+   "reason": "A paper download requires explicit approval."
+  },
+  "factory_calls": [],
+  "notes": []
+ },
+ "pending_download_wrong_token": {
+  "calls": [],
+  "decision": {
+   "action": "request_download_approval",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "paper_id": null,
+   "reason": "A paper download requires explicit approval."
+  },
+  "factory_calls": [],
+  "notes": []
+ },
+ "pending_extraction_approved": {
+  "calls": [],
+  "decision": {
+   "action": "extract_selected",
+   "agent": "ExtractorAgent",
+   "candidate_index": null,
+   "paper_id": "p9",
+   "reason": "A matching one-use extraction approval is present."
+  },
+  "factory_calls": [],
+  "notes": []
+ },
+ "pending_extraction_approved_wrong_paper_state": {
+  "calls": [],
+  "decision": {
+   "action": "stop_insufficient",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "paper_id": null,
+   "reason": "The required next agent or state transition is unavailable."
+  },
+  "factory_calls": [],
+  "notes": []
+ },
+ "pending_extraction_unapproved": {
+  "calls": [],
+  "decision": {
+   "action": "request_extraction_approval",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "paper_id": "p9",
+   "reason": "PDF extraction requires explicit approval."
+  },
+  "factory_calls": [],
+  "notes": []
+ },
+ "pending_unknown_kind": {
+  "calls": [],
+  "decision": {
+   "action": "stop_insufficient",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "paper_id": null,
+   "reason": "The required next agent or state transition is unavailable."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "phase_answered_followup_needs_llm_free": {
+  "calls": [],
+  "decision": {
+   "action": "direct_response",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "classification": "mundane_conversation",
+   "paper_id": null,
+   "reason": "A mundane conversational or UI turn needs no evidence agents."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "phase_candidate_selected": {
+  "calls": [],
+  "decision": {
+   "action": "request_download_approval",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "paper_id": null,
+   "reason": "The selected paper requires download approval."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "phase_candidates_found": {
+  "calls": [],
+  "decision": {
+   "action": "consult_debate",
+   "agent": "EvidenceDebateAgent",
+   "candidate_index": null,
+   "paper_id": null,
+   "reason": "Candidate papers need specialist ranking."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "phase_paper_downloaded": {
+  "calls": [],
+  "decision": {
+   "action": "request_extraction_approval",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "paper_id": "p3",
+   "reason": "The downloaded paper requires extraction approval."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "phase_paper_extracted": {
+  "calls": [],
+  "decision": {
+   "action": "retrieve_kg",
+   "agent": "RetrievalAgent",
+   "candidate_index": null,
+   "paper_id": null,
+   "reason": "Re-check the original query against the updated KG."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "phase_post_extraction_insufficient": {
+  "calls": [],
+  "decision": {
+   "action": "stop_insufficient",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "paper_id": null,
+   "reason": "Extraction did not make the original query answerable."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "phase_retrieval_insufficient": {
+  "calls": [],
+  "decision": {
+   "action": "search_candidates",
+   "agent": "DownloadAgent",
+   "candidate_index": null,
+   "paper_id": null,
+   "reason": "KG evidence is insufficient; search paper metadata."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "phase_terminal_error": {
+  "calls": [],
+  "decision": {
+   "action": "stop_insufficient",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "paper_id": null,
+   "reason": "The workflow reached a fail-closed terminal state."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    false
+   ],
+   [
+    "note_precheck",
+    "_paper_reference_followup",
+    false
+   ]
+  ]
+ },
+ "terms_followup": {
+  "calls": [],
+  "decision": {
+   "action": "report_extraction",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "paper_id": "micro",
+   "reason": "The turn asks for terms produced by the active paper extraction."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    true
+   ]
+  ]
+ },
+ "terms_followup_exact_phrase": {
+  "calls": [],
+  "decision": {
+   "action": "report_extraction",
+   "agent": "WorkflowOrchestratorAgent",
+   "candidate_index": null,
+   "paper_id": "p1",
+   "reason": "The turn asks for terms produced by the active paper extraction."
+  },
+  "factory_calls": [],
+  "notes": [
+   [
+    "note_precheck",
+    "_extracted_terms_followup",
+    true
+   ]
+  ]
+ }
+}
