@@ -81,7 +81,7 @@ non-loopback connects; real disposable server: `als-prod` rules, receipts `recei
 3. **The mount must include the flat compat copy.** Import refuses a mounted snapshot without
    `storage/kg/matkg_<corpus>_<id>.json` ("compat copy ... is missing"). The descriptor's artifact list includes it, so
    `f2w-kg-release export` mounts it. A hand-rolled export of only graph/manifest/validation fails.
-4. **A corpus absent from the commit is `missing`, not a layout error.** `.env`/`papers/...` paths that do not exist at
+4. **A path absent at the commit is `missing`, not a layout error.** `.env`/`papers/...` paths that do not exist at
    the commit report `missing`; committed ones report `layout`. Both are typed refusals and nothing is exported.
 5. Approvals: a production-profile plan needs its own verified-admin approval per target and per plan; nothing here
    weakens that (the approval is `DENIED` across targets and `STALE_APPROVAL` across plans).
