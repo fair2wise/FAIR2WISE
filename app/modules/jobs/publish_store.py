@@ -11,16 +11,21 @@ rebuilding anything. Until a new triple is activated the old one stays in place.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
+import re
 from typing import Any, cast
 
 from ..contracts.changes import ApprovalRecord, ChangePlan, ImportReceipt
 from ..contracts.errors import ContractError, ErrorCode
 from .keys import canonical_json
 from .sqlite import OperationalDB
+
+#: ``ContractError.reason`` of a corpus rollback with no earlier version / of a corpus that is not live.
+NO_PREVIOUS_CORPUS_VERSION = "no_previous_corpus_version"
+CORPUS_NOT_LIVE = "corpus_not_live"
 
 SCHEMA = (
     "CREATE TABLE IF NOT EXISTS pub_plans (plan_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, plan TEXT NOT NULL, "
@@ -72,6 +77,69 @@ class Pointer:
             "receipt_id": self.receipt_id,
             "index_ref": self.index_ref,
         }
+
+
+@dataclass(frozen=True)
+class LiveVersion:
+    """The version of one corpus that is live on a target, derived from the pointer history (Model C)."""
+
+    corpus: str
+    snapshot_ref: str
+    snapshot_sha256: str
+    receipt_id: str
+    index_ref: str
+    pointer_version: int
+
+    def as_dict(self) -> dict[str, Any]:
+        """The additive ``corpora`` entry of ``GET /v1/publications/pointer``."""
+        return {
+            "snapshot_ref": self.snapshot_ref,
+            "version_of_pointer_that_activated_it": self.pointer_version,
+            "receipt_id": self.receipt_id,
+        }
+
+
+_RETIRED_CORPUS = re.compile(r"\bcorpus=(\S+)$")
+
+
+def corpus_of(snapshot_ref: str) -> str:
+    """The corpus of a ``<corpus>/<vN>`` snapshot reference."""
+    return snapshot_ref.partition("/")[0]
+
+
+def _live_from_rows(rows: Sequence[Mapping[str, Any]]) -> dict[str, LiveVersion]:
+    live: dict[str, LiveVersion] = {}
+    for row in rows:
+        record = json.loads(row["record"])
+        corpus = corpus_of(str(record["snapshot_ref"]))
+        if row["action"] == "retire":
+            named = _RETIRED_CORPUS.search(str(row["reason"]))
+            live.pop(named.group(1) if named else corpus, None)
+            continue
+        live[corpus] = LiveVersion(
+            corpus, record["snapshot_ref"], record["snapshot_sha256"], record["receipt_id"],
+            record["index_ref"], int(row["version"]),
+        )
+    return live
+
+
+def _previous_in_corpus(rows: Sequence[Mapping[str, Any]], corpus: str) -> dict[str, Any] | None:
+    """The record of the latest earlier version of ``corpus`` that differs from its live one (never across a removal)."""
+    live = _live_from_rows(rows).get(corpus)
+    if live is None:
+        return None
+    for row in reversed(rows):
+        record = json.loads(row["record"])
+        if corpus_of(str(record["snapshot_ref"])) != corpus:
+            continue
+        if row["action"] == "retire":
+            named = _RETIRED_CORPUS.search(str(row["reason"]))
+            if (named.group(1) if named else corpus) == corpus:
+                return None
+            continue
+        if record["snapshot_ref"] != live.snapshot_ref:
+            return cast(dict[str, Any], record)
+    return None
 
 
 class PublishStore:
@@ -302,12 +370,30 @@ class PublishStore:
             )
         return Pointer(name, version, **record)
 
-    def previous_record(self, name: str) -> dict[str, Any] | None:
+    def _history_rows(self, name: str) -> list[Any]:
+        return list(self.db.query(
+            "SELECT version, record, action, reason FROM pub_pointer_history WHERE name=? ORDER BY version", (name,)
+        ))
+
+    def live_by_corpus(self, name: str) -> dict[str, LiveVersion]:
+        """The live version of every corpus on target ``name``, derived from the pointer history (Model C).
+
+        The last ``activate``/``rollback`` row naming a corpus is its live version; a ``retire`` row removes the corpus
+        it names (``corpus=<scope>`` in its reason, else the corpus of its record). Release markers are checked by
+        :meth:`Publication.live_versions`, not here.
+        """
+        return _live_from_rows(self._history_rows(name))
+
+    def previous_record(self, name: str, corpus: str | None = None) -> dict[str, Any] | None:
         """The pointer record one step back (what a rollback toggle restores), or ``None``.
 
         The toggle is over the last two pointers (owner decision B28): after a rollback, asking again names the
-        pointer that was rolled back from, so a second rollback is a roll-forward.
+        pointer that was rolled back from, so a second rollback is a roll-forward. With ``corpus`` the step is
+        within that corpus's own versions (the latest earlier one that differs from its live version), so another
+        corpus published in between does not count; ``None`` when there is none or the corpus is not live.
         """
+        if corpus is not None:
+            return _previous_in_corpus(self._history_rows(name), corpus)
         row = self.db.one("SELECT version FROM pub_pointers WHERE name=?", (name,))
         if row is None:
             return None
@@ -317,8 +403,13 @@ class PublishStore:
         )
         return cast(dict[str, Any], json.loads(hist["record"])) if hist else None
 
-    def rollback(self, name: str, *, actor: str, reason: str) -> Pointer:
-        """Restore the previous pointer (new candidate packages, receipts and history are retained)."""
+    def rollback(self, name: str, *, actor: str, reason: str, corpus: str | None = None) -> Pointer:
+        """Restore the previous pointer (new candidate packages, receipts and history are retained).
+
+        With ``corpus`` the pointer moves to that corpus's previous version (see :meth:`previous_record`).
+        """
+        if corpus is not None:
+            return self._rollback_corpus(name, corpus, actor=actor, reason=reason)
         with self.db.tx() as con:
             row = con.execute("SELECT version FROM pub_pointers WHERE name=?", (name,)).fetchone()
             if row is None:
@@ -340,7 +431,28 @@ class PublishStore:
             )
         return Pointer(name, version, **json.loads(history["record"]))
 
-    def clear_pointer(self, name: str, *, actor: str, reason: str) -> Pointer | None:
+    def _rollback_corpus(self, name: str, corpus: str, *, actor: str, reason: str) -> Pointer:
+        with self.db.tx() as con:
+            rows = con.execute(
+                "SELECT version, record, action, reason FROM pub_pointer_history WHERE name=? ORDER BY version", (name,)
+            ).fetchall()
+            if corpus not in _live_from_rows(rows):
+                raise ContractError(ErrorCode.NOT_FOUND, f"corpus {corpus!r} has no live version on this target",
+                                    retryable=False, reason=CORPUS_NOT_LIVE)
+            record = _previous_in_corpus(rows, corpus)
+            if record is None:
+                raise ContractError(ErrorCode.CONFLICT, f"corpus {corpus!r} has no earlier version to roll back to",
+                                    retryable=False, reason=NO_PREVIOUS_CORPUS_VERSION)
+            version = max(int(r["version"]) for r in rows) + 1
+            blob = canonical_json(record)
+            con.execute("INSERT OR REPLACE INTO pub_pointers VALUES (?, ?, ?)", (name, version, blob))
+            con.execute(
+                "INSERT INTO pub_pointer_history VALUES (?, ?, ?, 'rollback', ?, ?, ?)",
+                (name, version, blob, reason[:300], actor, self.clock()),
+            )
+        return Pointer(name, version, **record)
+
+    def clear_pointer(self, name: str, *, actor: str, reason: str, corpus: str | None = None) -> Pointer | None:
         """Point ``name`` at nothing after a corpus removal (T08D); history keeps the retired record.
 
         Returns the pointer that was active, or ``None`` when nothing was (then nothing is recorded). A later
@@ -349,15 +461,31 @@ class PublishStore:
         """
         with self.db.tx() as con:
             row = con.execute("SELECT version, record FROM pub_pointers WHERE name=?", (name,)).fetchone()
-            if row is None:
+            tagged = f"{reason[:250]} corpus={corpus}" if corpus is not None else reason
+            if row is not None:
+                version = row["version"] + 1
+                con.execute("DELETE FROM pub_pointers WHERE name=?", (name,))
+                con.execute(
+                    "INSERT INTO pub_pointer_history VALUES (?, ?, ?, 'retire', ?, ?, ?)",
+                    (name, version, row["record"], tagged[:300], actor, self.clock()),
+                )
+                return Pointer(name, row["version"], **json.loads(row["record"]))
+            if corpus is None:
                 return None
-            version = row["version"] + 1
-            con.execute("DELETE FROM pub_pointers WHERE name=?", (name,))
-            con.execute(
-                "INSERT INTO pub_pointer_history VALUES (?, ?, ?, 'retire', ?, ?, ?)",
-                (name, version, row["record"], reason[:300], actor, self.clock()),
-            )
-        return Pointer(name, row["version"], **json.loads(row["record"]))
+            rows = con.execute(
+                "SELECT version, record, action, reason FROM pub_pointer_history WHERE name=? ORDER BY version", (name,)
+            ).fetchall()
+            live = _live_from_rows(rows).get(corpus)
+            if live is not None:
+                # Another removal already cleared the pointer, but this corpus is still live in the history view.
+                record = {"snapshot_ref": live.snapshot_ref, "snapshot_sha256": live.snapshot_sha256,
+                          "receipt_id": live.receipt_id, "index_ref": live.index_ref}
+                con.execute(
+                    "INSERT INTO pub_pointer_history VALUES (?, ?, ?, 'retire', ?, ?, ?)",
+                    (name, max(int(r["version"]) for r in rows) + 1, canonical_json(record), tagged[:300], actor,
+                     self.clock()),
+                )
+        return None
 
     def pointer_history(self, name: str) -> list[dict[str, Any]]:
         """All pointer movements for ``name``."""
@@ -372,4 +500,5 @@ def utc(moment: float) -> datetime:
     return datetime.fromtimestamp(moment, tz=UTC)
 
 
-__all__ = ("PlanRecord", "Pointer", "PublishStore", "SCHEMA", "utc")
+__all__ = ("CORPUS_NOT_LIVE", "LiveVersion", "NO_PREVIOUS_CORPUS_VERSION", "PlanRecord", "Pointer", "PublishStore",
+           "SCHEMA", "corpus_of", "utc")

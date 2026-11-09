@@ -44,7 +44,7 @@ from ..modules.graph.imports.corpus_scope import ReleaseState, scope_dir
 from ..modules.graph.imports.tiled_json import Clock
 from ..modules.graph.legacy_save import SaveTarget, TiledSaveBackend
 from ..modules.graph.ports import ContractError, ErrorCode
-from ..modules.jobs.publish_store import PublishStore
+from ..modules.jobs.publish_store import Pointer, PublishStore
 from ..modules.security.authorization import DeploymentSettings
 
 #: File name of the per-corpus edit journal under the scope's state directory.
@@ -101,14 +101,24 @@ class LocalSaveProvider:
     def __repr__(self) -> str:  # never show the client (it holds the credential provider)
         return f"LocalSaveProvider(target={self.target!r}, state_dir={str(self.state_dir)!r})"
 
-    def resolve(self) -> SaveTarget:
+    def resolve(self, corpus: str | None = None) -> SaveTarget:
         """The Save target of the active publication, built from the current state (no caching of the decision).
+
+        Without ``corpus`` the corpus is the active pointer's (the last activated one). Naming a ``corpus`` selects
+        that corpus's live version from the per-corpus view instead (Model C); no route or UI selector uses it yet.
 
         Raises:
             SaveUnavailable: No publication is active yet, the pointer's corpus is outside the deployment's corpus
                 scope, the importer's release record disagrees with the pointer, or the frozen graph is missing.
         """
         pointer = self.store.pointer(self.target)
+        if corpus is not None:
+            named = self.store.live_by_corpus(self.target).get(corpus)
+            if named is None:
+                raise SaveUnavailable("corpus_not_live", f"corpus {corpus!r} has no live publication on this "
+                                      "deployment's Tiled")
+            pointer = Pointer(self.target, named.pointer_version, named.snapshot_ref, named.snapshot_sha256,
+                              named.receipt_id, named.index_ref)
         if pointer is None:
             raise SaveUnavailable("no_publication", "no publication is active on this deployment's Tiled yet; "
                                   "publish a snapshot first")
@@ -132,13 +142,13 @@ class LocalSaveProvider:
                           base_graph_sha256=pointer.snapshot_sha256, namespace=self.namespace,
                           access_blob=self.access_blob or None)
 
-    def backend(self) -> TiledSaveBackend:
+    def backend(self, corpus: str | None = None) -> TiledSaveBackend:
         """The Save backend for the current publication (one instance per ``(corpus, snapshot, sha256)``).
 
         Raises:
             SaveUnavailable: As :meth:`resolve`.
         """
-        target = self.resolve()
+        target = self.resolve(corpus)
         key = (target.scope, target.base_snapshot_id, target.base_graph_sha256)
         with self._lock:
             if self._cached is None or self._cached[0] != key:

@@ -91,7 +91,7 @@ class DirSnapshots:
 class RWorld:
     """Job service, publication and the real replacement importer over an in-memory Tiled."""
 
-    def __init__(self, tmp_path: Path, v1: Path, fingerprints: Any) -> None:
+    def __init__(self, tmp_path: Path, v1: Path, fingerprints: Any, *, auto_approve: Any = None) -> None:
         self.v1, self.fp = v1, fingerprints
         self.tmp_path = tmp_path
         self.client = MemoryTiled()
@@ -115,7 +115,8 @@ class RWorld:
         self.deps = PublicationDeps(
             snapshots=self.snapshots, step=self.step, index=self.index, probe=self.probe, store=self.pubstore,
             audit=self.audit, ctx_for=lambda job: worker_context(self.ctx, run_id=job.job_id), clock=self.clock,
-            verify_approval=lambda a, p, at: verify_approval(a, p, self.settings, at=at))
+            verify_approval=lambda a, p, at: verify_approval(a, p, self.settings, at=at),
+            auto_approve=auto_approve)
         self.pub = Publication(self.service, self.deps)
 
     # -- job helpers -------------------------------------------------------------------------------

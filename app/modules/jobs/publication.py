@@ -46,7 +46,14 @@ from .publish_ports import (
     RevisionProbe,
     SnapshotSource,
 )
-from .publish_store import PlanRecord, Pointer, PublishStore
+from .publish_store import (
+    CORPUS_NOT_LIVE,
+    NO_PREVIOUS_CORPUS_VERSION,
+    LiveVersion,
+    PlanRecord,
+    Pointer,
+    PublishStore,
+)
 from .service import JobService
 from .store import JobRecord
 
@@ -63,6 +70,8 @@ OPERATION_STAGES = ("plan", "review", "apply", "record")
 PUBLISH_STAGES = ("plan", "review", "revalidate", "import", "verify", "receipt", "activate")
 ApprovalVerifier = Callable[[ApprovalRecord, ChangePlan, datetime], ApprovalRecord]
 PackageCheck = Callable[[FrozenSnapshot], Sequence[PackageProblem]]
+#: Deployment policy: ``(plan, job_id) -> approval`` for a plan it may approve for the local operator, else ``None``.
+AutoApprover = Callable[[ChangePlan, str], ApprovalRecord | None]
 
 
 def default_approval_verifier(approval: ApprovalRecord, plan: ChangePlan, at: datetime) -> ApprovalRecord:
@@ -92,6 +101,9 @@ class PublicationDeps:
         ctx_for: Builds the worker :class:`RequestContext` for a job (``actor_kind=worker``).
         packages: Optional completeness check of the packages a snapshot was built from.
         verify_approval: Approval verifier (profile, issuer, writer identity); default checks the binding only.
+        auto_approve: Optional policy that approves a *zero-operation rollback* plan on ``:local`` (owner decision
+            2026-11-09); ``None`` (the default) means every plan waits for a human. It is consulted for rollback jobs
+            whose plan the importer reports as a no-op (``plan_is_noop``) and for nothing else.
         clock: Epoch seconds.
         owner: Lease owner name for the per-target publisher lease.
     """
@@ -107,6 +119,7 @@ class PublicationDeps:
     packages: PackageCheck | None = None
     verify_approval: ApprovalVerifier = default_approval_verifier
     owner: str = "publisher"
+    auto_approve: AutoApprover | None = None
 
 
 def operation_id(plan: ChangePlan) -> str:
@@ -279,7 +292,32 @@ class Publication:
                 return self.deps.verify_approval(approval, record.plan, now)
             except ContractError as exc:
                 self.store.invalidate_approvals(reason=f"{exc.code.value}: {exc}"[:200], job_id=sc.job.job_id)
+        auto = self._auto_approve(sc, record)
+        if auto is not None:
+            return auto
         raise AwaitReview(f"approval required for plan {record.plan.plan_sha256[:12]} on {record.plan.target}")
+
+    def _auto_approve(self, sc: StageContext, record: PlanRecord) -> ApprovalRecord | None:
+        """The ``:local`` auto-approval of a zero-operation rollback plan (owner decision 2026-11-09), else ``None``.
+
+        Only a rollback job whose plan the importer reports as a no-op (no creates, links or supersessions and a
+        covering receipt valid now) is offered to the deployment's policy; the policy decides on the profile. The
+        approval it returns is verified like a human's, bound to the plan and job, and recorded as one.
+        """
+        policy = self.deps.auto_approve
+        is_noop = getattr(self.deps.step, "plan_is_noop", None)
+        if policy is None or is_noop is None or not self.replacement or not self._params(sc).get("rollback"):
+            return None
+        if not is_noop(record.plan):
+            return None
+        approval = policy(record.plan, sc.job.job_id)
+        if approval is None:
+            return None
+        verified = self.deps.verify_approval(approval, record.plan, datetime.fromtimestamp(self.deps.clock(), tz=UTC))
+        self.store.record_approval(sc.job.job_id, verified)
+        sc.log(f"zero-operation rollback plan {record.plan.plan_sha256[:12]} approved by policy "
+               f"({verified.reason}) on the local profile")
+        return verified
 
     def _review(self, sc: StageContext) -> StageResult:
         record = self.store.current_plan(sc.job.job_id)
@@ -502,13 +540,14 @@ class Publication:
             raise QuarantineStage("release marker and pointer would disagree; the previous pointer stays active")
 
     def verify_agreement(self, ctx: RequestContext, target: str, scope: str) -> dict[str, Any]:
-        """Whether F2W's pointer and the Tiled release marker name the same version (TIL-14).
+        """Whether F2W's live version of ``scope`` and that corpus's Tiled release marker agree (TIL-14).
 
-        Returns ``{"agree", "pointer_snapshot_id", "marker_snapshot_id"}``; both ``None`` (and ``agree``)
+        The corpus's live version comes from the pointer history (Model C), not from the target pointer, which names
+        whichever corpus was activated last. Returns ``{"agree", "pointer_snapshot_id", "marker_snapshot_id"}`` (``pointer_snapshot_id`` is the corpus's live version); both ``None`` (and ``agree``)
         when nothing is live (before the first publication or after a corpus removal).
         """
-        pointer = self.store.pointer(target)
-        pointer_id = pointer.snapshot_ref.split("/")[-1] if pointer else None
+        live = self.store.live_by_corpus(target).get(scope)
+        pointer_id = live.snapshot_ref.split("/")[-1] if live else None
         marker = self.deps.step.release_marker(ctx, scope) if self.replacement else None  # type: ignore[attr-defined]
         marker_id = marker.get("snapshot_id") if marker else None
         return {"agree": pointer_id == marker_id, "pointer_snapshot_id": pointer_id, "marker_snapshot_id": marker_id}
@@ -578,7 +617,8 @@ class Publication:
                     ctx, plan, approval, guard=guard,
                     pointer_to_none=(
                         (lambda: self.store.clear_pointer(plan.target, actor=sc.job.created_by,
-                                                          reason=f"corpus removal {plan.plan_sha256[:12]}"))
+                                                          reason=f"corpus removal {plan.plan_sha256[:12]}",
+                                                          corpus=plan.corpus_scope[0]))
                         if sc.job.kind == RETIRE_KIND else None
                     ),
                 )
@@ -754,8 +794,43 @@ class Publication:
         """The active publication pointer of ``target``."""
         return self.store.pointer(target)
 
-    def rollback(self, ctx: RequestContext, target: str, *, reason: str) -> Pointer:
-        """Restore the previous active pointer (human, ``graph.publish``, audited). Candidates are retained."""
+    def live_versions(self, ctx: RequestContext, target: str) -> dict[str, LiveVersion]:
+        """The live version of every corpus on ``target`` (Model C), from the pointer history and the release markers.
+
+        With a replacement importer a corpus counts only while its Tiled release marker names the version the history
+        says is live (a removed corpus has no marker); without markers the history alone decides.
+        """
+        live = self.store.live_by_corpus(target)
+        if not self.replacement:
+            return live
+        out: dict[str, LiveVersion] = {}
+        for corpus, version in live.items():
+            marker = self.deps.step.release_marker(ctx, corpus)  # type: ignore[attr-defined]
+            if marker is not None and marker.get("snapshot_id") == version.snapshot_ref.split("/")[-1]:
+                out[corpus] = version
+        return out
+
+    def _previous_for(self, target: str, corpus: str | None) -> dict[str, Any]:
+        if corpus is None:
+            previous = self.store.previous_record(target)
+            if previous is None:
+                raise ContractError(ErrorCode.CONFLICT, "there is no previous pointer to roll back to")
+            return previous
+        if corpus not in self.store.live_by_corpus(target):
+            raise ContractError(ErrorCode.NOT_FOUND, f"corpus {corpus!r} has no live version on this target",
+                                retryable=False, reason=CORPUS_NOT_LIVE)
+        previous = self.store.previous_record(target, corpus=corpus)
+        if previous is None:
+            raise ContractError(ErrorCode.CONFLICT, f"corpus {corpus!r} has no earlier version to roll back to",
+                                retryable=False, reason=NO_PREVIOUS_CORPUS_VERSION)
+        return previous
+
+    def rollback(self, ctx: RequestContext, target: str, *, reason: str, corpus: str | None = None) -> Pointer:
+        """Restore the previous active pointer (human, ``graph.publish``, audited). Candidates are retained.
+
+        With ``corpus`` the pointer moves to that corpus's previous published version (not the previous pointer of
+        any corpus); a corpus with no earlier version is refused (``no_previous_corpus_version``).
+        """
         if ctx.actor_kind not in (ActorKind.INTERACTIVE, ActorKind.CLI) or not ctx.has("graph.publish"):
             raise ContractError(ErrorCode.DENIED, "rollback requires a human with graph.publish")
         if self.replacement:
@@ -772,28 +847,35 @@ class Publication:
             operation_id=f"rollback-{target}-{int(self.deps.clock())}",
             actor=ctx.principal.subject,
             target=target,
-            payload={"reason": reason},
-            mutation=lambda: self.store.rollback(target, actor=ctx.principal.subject, reason=reason),
+            payload={"reason": reason, "corpus": corpus} if corpus else {"reason": reason},
+            mutation=lambda: self.store.rollback(target, actor=ctx.principal.subject, reason=reason, corpus=corpus),
         )
 
-    def rollback_replacement(self, ctx: RequestContext, target: str, *, reason: str) -> JobHandle:
+    def rollback_replacement(
+        self, ctx: RequestContext, target: str, *, reason: str, corpus: str | None = None
+    ) -> JobHandle:
         """Roll back (or, a second time, forward) as a replacement plan to the previous pointer's version.
 
         The toggle is over the last two pointers (B28): the version named by the pointer one step back becomes
         the replacement source, so the importer revives its retired records (same Tiled UUIDs) and the marker
         and pointer move together. The job still plans, waits for approval, imports, verifies and activates.
 
+        With ``corpus`` (Model C) "previous" is the previous published version *of that corpus* (the latest earlier
+        one that differs from its live version, from the pointer history), whatever other corpora were activated in
+        between; the pointer then moves to that corpus ("last activated"). Without ``corpus`` the behaviour is the
+        B28 toggle over the last two pointers of any corpus; with several corpora live that is ambiguous, and
+        whether to refuse it is an open owner question (pointer memo, question 2).
+
         Raises:
             ContractError: ``DENIED`` (human with ``graph.publish`` required); ``CONFLICT`` when there is no
-                previous pointer or this deployment keeps no release marker.
+                previous pointer (``no_previous_corpus_version`` for a named corpus) or this deployment keeps no
+                release marker; ``NOT_FOUND`` (``corpus_not_live``) for a corpus with no live version.
         """
         if ctx.actor_kind not in (ActorKind.INTERACTIVE, ActorKind.CLI) or not ctx.has("graph.publish"):
             raise ContractError(ErrorCode.DENIED, "rollback requires a human with graph.publish")
         if not self.replacement:
             raise ContractError(ErrorCode.CONFLICT, "this deployment has no replacement importer; use rollback")
-        previous = self.store.previous_record(target)
-        if previous is None:
-            raise ContractError(ErrorCode.CONFLICT, "there is no previous pointer to roll back to")
+        previous = self._previous_for(target, corpus)
         return self.submit(ctx, str(previous["snapshot_ref"]), target, rollback_reason=reason)
 
     def _on_scope_change(self, change: Mapping[str, Any]) -> None:

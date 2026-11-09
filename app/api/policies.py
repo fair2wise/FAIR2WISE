@@ -77,8 +77,8 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
     _v("V17", "GET", "/publications/{job_id}/plan", note=_OBJ),
     _v("V18", "POST", "/publications/{job_id}/approval", "curation.approve",
        note="security.authorization.create_approval bound to the exact plan_sha256 shown; H5 gate"),
-    _v("V19", "GET", "/publications/pointer", "chat.read_support", note="active pointer of one target"),
-    _v("V20", "POST", "/publications/rollback", "graph.publish", note="human only; audited; H5 gate"),
+    _v("V19", "GET", "/publications/pointer", "chat.read_support", note="active pointer of one target (last activated) plus the per-corpus `corpora` live view"),
+    _v("V20", "POST", "/publications/rollback", "graph.publish", note="human only; audited; H5 gate; optional corpus"),
     # audit and operations status
     _v("V21", "GET", "/audit/status", "jobs.admin", note="AuditRecorder.status with the degraded flag"),
     _v("V22", "GET", "/ops/status", "jobs.admin", note="ingestion monitor DTO (O-07): jobs, review queue, audit"),
@@ -128,7 +128,7 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
     _v("V52", "POST", "/jobs/pdf-parse", "jobs.admin", note="pdf_parse job (J-11); admin-only on ALS" + _FRESH),
     # rollback and corpus operations as publication jobs (T10B); approval is V18 (curation.approve)
     _v("V53", "POST", "/publications/rollback-replacement", "graph.publish",
-       note="rollback = replacement plan to the previous pointer's version (revive); human only; H5 gate"),
+       note="rollback = replacement plan to the previous version (of `corpus` if named; revive); human only; H5 gate"),
     _v("V54", "POST", "/publications/corpus-retire", "graph.publish",
        note="corpus removal plan, corpus name typed in; approval via V18; H5 gate"),
     _v("V55", "POST", "/publications/corpus-purge", "graph.publish",

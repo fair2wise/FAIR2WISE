@@ -90,6 +90,15 @@ not heal it (its completed `import` stage is reused, so `verify` fails again; ch
 fix is deployed, submit the rollback again with another reason. That new job plans the same zero-operation plan, waits
 for approval, writes the thin receipt and activates `e2e_demo/v1` as pointer version 3 without touching Tiled.
 
+## Pointer Model C (owner decision 2026-11-09)
+
+The per-target pointer stays "last activated"; a per-corpus live-version view is derived from the pointer history
+(`GET /v1/publications/pointer` gains `corpora`), `rollback-replacement` and `rollback` take an optional `corpus` (the
+previous version of that corpus), `verify_agreement` and the job `ui_state` compare per corpus. Details, errors and the
+owner-gated open questions (corpus-less rollback with several corpora live; which corpus Save edits) are in
+`docs/migration/api/README.md` section 3.2. Tests: `tests/jobs/test_replacement_publication.py` (two corpora, two
+versions each, rollback of A while B stays live, rollback of B) and `tests/api_v1/test_v1_corpus_pointer.py`.
+
 ## Not done / follow-ups for the owner
 
 - The vocabulary revision on `:local` is the fixed label `local-unversioned` (no separately versioned vocabulary
