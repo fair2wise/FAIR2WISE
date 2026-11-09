@@ -221,9 +221,7 @@ python -m evals.binary.runner --out-dir <out> --basename binary_report_h4 \
 Add `--subject-snapshot storage/kg/<corpus>/<id>` once the pilot's frozen JSON exists, so the report binds to it. One
 run, no retry. Then review the report; recording the gate stays with the owner (`python -m evals.binary.approve`).
 Before relying on a manifest, `python -m evals.binary.import_companion --check` must be clean (run for this packet: "up to date").
-The C4 measurement itself (about 98 free-tier CBORG calls) is not re-run by a command I could find: the script that
-produced `measurement_report_c4_real` (harness `t07-measure-1+c4-real-encoder-judge`) is not in the repository
-(no file under it mentions that harness name). Re-running C4 needs that script recovered or re-created first.
+The C4 measurement itself (about 98 free-tier CBORG calls) re-runs with `scripts/h3/c4_real_measurement.py <judge-model> <out-dir> [--dry-run]` (judge must be the free `lbl/cborg-deepthought`; it reads the key from the environment and never logs it; run it from a clean export with the project interpreter, the real encoder cached offline, and `PYTHONPATH` at the export root). The labelling run is `scripts/h3/label_live.py` with the labelling CLI arguments. Both scripts were recovered from the run scratch area and committed on 2026-11-09; the committed C4 reports came from exactly these files.
 
 ## 6. Rollback and what this packet changed
 
