@@ -23,6 +23,7 @@ import { loadAgentSettings } from './agentSettings';
 import { canEditNode } from './capabilitiesApi';
 import { GraphSourceSelect } from './GraphSourceSelect';
 import { graphSourceFromPath, useGraphSourceState } from './graphSourceStore';
+import { useGraphSources } from './graphSourcesHooks';
 import { useCapabilities } from './capabilitiesHooks';
 import {
   fetchGraphNeighborhood,
@@ -670,9 +671,14 @@ function NodeDetailPanel({
   const [targetSearchError, setTargetSearchError] = useState<string | null>(null);
   const color = node.color;
   const capabilities = useCapabilities();
-  const canEdit = canEditNode(loadAgentSettings().graphSource, capabilities);
-  // A graph source is read-only: no Edit control, and node reads carry the source the viewer shows.
+  // Node reads and edits carry the source the viewer shows. A source is editable only when the server lists it
+  // `read_only: false` (a Tiled graph whose corpus is live on the Save target); Save then edits that corpus.
   const viewerSource = graphSourceFromPath(graphSourcePath);
+  const sourceListing = useGraphSources({ enabled: viewerSource !== null });
+  const sourceEditable = viewerSource !== null
+    && sourceListing.data?.sources.some(source => source.id === viewerSource && !source.read_only) === true;
+  const canEdit = canEditNode(loadAgentSettings().graphSource, capabilities);
+  const canEditShown = canEdit && (viewerSource === null || sourceEditable);
 
   useEffect(() => {
     let cancelled = false;
@@ -816,8 +822,8 @@ function NodeDetailPanel({
         })),
         relationship_updates: relationshipUpdates,
       };
-      const updated = await updateGraphNode(node.id, payload);
-      const refreshedGraph = await fetchLiveGraph();
+      const updated = await updateGraphNode(node.id, payload, viewerSource);
+      const refreshedGraph = await fetchLiveGraph(viewerSource);
       setDetail(updated);
       onNodeUpdated?.(updated, refreshedGraph);
       setEditing(false);
@@ -947,7 +953,7 @@ function NodeDetailPanel({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {canEdit && viewerSource === null && !editing && (
+          {canEditShown && !editing && (
             <button
               type="button"
               aria-label="Edit properties"

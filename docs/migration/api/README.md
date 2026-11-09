@@ -176,11 +176,26 @@ additionally keeps a corpus only while its Tiled release marker names the versio
   the target pointer (a false disagreement before).
 * Job `ui_state`: `published` while the job's receipt is the live version of its own corpus, `superseded` only when another
   version of the **same corpus** is live (publishing another corpus no longer supersedes it).
-* Save (`LocalSaveProvider.resolve(corpus=None)`): the default stays the pointer's corpus; naming a corpus selects its
-  live version. No route or UI selector uses the parameter (the UI is frozen).
-* Open owner questions (memo 8): 3 which corpus Save edits when several are live, 4 whether Save and the pointer move to X
-  after a corpus-X rollback (implemented as proposed: they do), 5 approval of a no-op rollback (decided, 3.1), 6 per-corpus
-  toggle (implemented as proposed), 7 `superseded` meaning (implemented as proposed); 1 and 2 are open as stated above.
+* **Save edits the corpus shown in the graph view** (owner decision 2026-11-09, eighteenth set; memo question 3).
+  `PATCH /graph/node/{id}` (frozen legacy route; body and status codes unchanged) takes, besides `source`, an optional
+  query `corpus`, recorded in the OpenAPI fixtures the way `source` was. The rule, in order:
+  - `source=tiled:<corpus>` is **editable iff `<corpus>` is live on the deployment's Save target** (the Model C
+    per-corpus view through `LocalSaveProvider.available(corpus)`; the snapshot, release record and scope checks of
+    `resolve` apply); the edit then goes to that corpus's live version through `LocalSaveProvider.resolve(corpus)`,
+    its own per-corpus journal and the import-time conflict block of that corpus. `GET /v1/graph/sources` lists such a
+    source `read_only: false`; the UI (`GraphMockup`, `liveAgent.updateGraphNode(id, body, source)`) shows Edit for it
+    and sends the viewer's `source` on Save and on the reload after it. After the Save the server drops its cached
+    Tiled scan so the next read of the source shows the edit.
+  - every `json:` source, and a `tiled:` source whose corpus is not live, stays `400 read_only_source` (unchanged).
+  - without a `source`, `corpus=<name>` names a live corpus directly (a non-live corpus is the typed 501, as before the
+    first publication; a malformed name is 400) and must agree with `source` when both are given (400 otherwise).
+  - with neither, the edit goes to **the active publication the editable default shows** (the pointer's corpus), exactly
+    as before. When the corpus edited is not the one the session graph shows, the effective record is materialized to a
+    scratch file (`<workdir>/kg.edit.<corpus>.json`) so the view on screen and retrieval over it are untouched.
+  - `can_save` keeps its meaning ("a Save target is reachable now": the pointer's corpus resolves).
+* Open owner questions (memo 8): 4 whether Save and the pointer move to X after a corpus-X rollback (implemented as
+  proposed: they do), 5 approval of a no-op rollback (decided, 3.1), 6 per-corpus toggle (implemented as proposed),
+  7 `superseded` meaning (implemented as proposed); 3 is decided above; 1 and 2 are open as stated above.
 
 ## 3.1 Rollback, replacement and the two-pointer toggle (T10B, owner decisions B28, B27, Q14, Q15)
 

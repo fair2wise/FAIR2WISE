@@ -433,3 +433,26 @@ def test_als_non_admin_cannot_edit_and_a_source_does_not_change_that(als):
     resp = als.client("user").patch("/graph/node/matkg:TermA", params={"source": "json:contract_v1"},
                                     json={"label": "x"})
     assert resp.status_code == 403                                              # the capability check answers first
+
+
+def test_the_editable_source_rule_marks_live_tiled_corpora_and_nothing_else(tmp_path):
+    """Owner decision 2026-11-09 (eighteenth set): ``tiled:<corpus>`` is editable iff the corpus is live on the Save target."""
+    sources = make_sources(tmp_path, FakeScanner(*seed_rows()))
+    assert sources.editable(f"tiled:{GID}") is False, "no rule wired: every source is read-only"
+    sources.set_editable(lambda corpus: corpus == GID)
+    rows = {s["id"]: s for s in sources.listing().as_json()["sources"]}
+    assert rows[f"tiled:{GID}"]["read_only"] is False
+    assert rows["tiled:other_corpus"]["read_only"] is True and rows["json:one"]["read_only"] is True
+    assert sources.editable(f"tiled:{GID}") is True
+    assert not any(sources.editable(sid) for sid in ("json:one", "json:" + GID, "tiled:other_corpus",
+                                                      f"tiled:{GID}/v1", "tiled:../x", "x", None))
+    assert gs.read_only_error("json:one").detail()["code"] == gs.read_only_error("tiled:other_corpus").detail()["code"] == "read_only_source"
+    assert "not a live publication" in gs.read_only_error("tiled:other_corpus").message
+
+    def broken(_corpus: str) -> bool:
+        raise RuntimeError("store down")
+    sources.set_editable(broken)
+    assert sources.editable(f"tiled:{GID}") is False, "a failing rule means read-only, never a listing failure"
+    assert sources.listing().as_json()["sources"][1]["read_only"] is True
+    sources.set_editable(None)
+    assert sources.editable(f"tiled:{GID}") is False

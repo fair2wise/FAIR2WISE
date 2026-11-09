@@ -61,6 +61,7 @@ from .download_agent import (
 )
 from .extractor_agent import ExtractorAgent
 from .graph_sources import (
+    CORPUS_NAME_RE,
     MAX_HOPS,
     NEIGHBORHOOD_MAX_NODES,
     GraphSources,
@@ -2675,12 +2676,12 @@ class SaveBackendProvider(Protocol):
     answers the typed 501 and ``available()`` makes ``can_save`` false, so the frozen UI hides the Save controls.
     """
 
-    def backend(self) -> TiledSaveBackend:
-        """The backend of the active publication, or raise ``UNSUPPORTED_CAPABILITY``."""
+    def backend(self, corpus: str | None = None) -> TiledSaveBackend:
+        """The backend of the active publication (or of ``corpus``'s live version), or raise ``UNSUPPORTED_CAPABILITY``."""
         ...
 
-    def available(self) -> bool:
-        """Whether :meth:`backend` would succeed now."""
+    def available(self, corpus: str | None = None) -> bool:
+        """Whether :meth:`backend` would succeed now (with ``corpus``: the editable-source rule of that corpus)."""
         ...
 
 
@@ -3434,18 +3435,40 @@ class AgentPipelineService:
         self._sync_session_graph_from_splash()
         self._rebuild_agents()
 
-    def _save_backend(self) -> TiledSaveBackend | None:
+    def _save_backend(self, corpus: str | None = None) -> TiledSaveBackend | None:
         """The Tiled Save backend: the fixed one, the lazily resolved one, or ``None`` (the legacy Splash path).
 
+        ``corpus`` names the corpus shown in the graph view (owner decision 2026-11-09, eighteenth set): the lazily
+        resolved provider then hands back that corpus's live version; the fixed backend accepts only its own scope.
+
         Raises:
-            ContractError: ``UNSUPPORTED_CAPABILITY`` when a provider is attached but no publication is active
-                (the route answers 501 and ``can_save`` is false; never a 500).
+            ContractError: ``UNSUPPORTED_CAPABILITY`` when a provider is attached but no publication is active, or
+                the named corpus is not live (the route answers 501 and ``can_save`` is false; never a 500).
         """
         if self.tiled_save is not None:
+            if corpus is not None and corpus != self.tiled_save.t.scope:
+                raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
+                                    f"corpus {corpus!r} is not the Save target of this deployment", retryable=False)
             return self.tiled_save
         if self.tiled_save_provider is not None:
-            return self.tiled_save_provider.backend()
+            return self.tiled_save_provider.backend(corpus)
         return None
+
+    def corpus_editable(self, corpus: str) -> bool:
+        """The editable-source rule of the graph view.
+
+        The Tiled graph source ``tiled:<corpus>`` may be edited iff ``corpus`` is live on this deployment's Save
+        target (``LocalSaveProvider.available(corpus)``), or is the fixed target's scope.
+        """
+        if self.tiled_save is not None:
+            return corpus == self.tiled_save.t.scope
+        if self.tiled_save_provider is None:
+            return False
+        return self.tiled_save_provider.available(corpus)
+
+    def _corpus_edit_path(self, corpus: str) -> Path:
+        """Scratch file of the effective record of a corpus edited through a graph source while another is shown."""
+        return self.coord.session_kg.with_name(f"kg.edit.{corpus}.json")
 
     def save_available(self) -> bool:
         """Whether a Save could reach its target now (``can_save`` of ``GET /v1/capabilities``)."""
@@ -3479,13 +3502,19 @@ class AgentPipelineService:
             _GRAPH_JSON_CACHE.pop(str(graph_path), None)
 
     async def update_graph_node(
-        self, node_id: str, update: GraphNodeUpdateRequest, ctx: RequestContext | None = None,
+        self, node_id: str, update: GraphNodeUpdateRequest, ctx: RequestContext | None = None, *,
+        corpus: str | None = None,
     ) -> GraphNode:
         """Patch a splash-mode node, its snippets, and incident relationships.
 
         With a Tiled save target (T18D) this is a journaled multi-write on Tiled with no Splash call:
         authorization, the switch refusal and the recovery of earlier half-done Saves come first, the diff is
         journaled and written to Tiled, and the request returns only after the Tiled effect (Q12).
+
+        ``corpus`` is the corpus shown in the graph view (owner decision 2026-11-09): ``None`` edits the active
+        publication the editable default shows; a corpus other than the shown one is edited through its own live
+        backend and per-corpus journal, over a scratch copy of its effective record, so the session graph on screen
+        (and retrieval over it) is left untouched.
 
         Raises:
             ValueError: JSON graph mode, or ``code_snippet`` set on a non-CodeSnippet node, or an
@@ -3498,11 +3527,20 @@ class AgentPipelineService:
         if self.runtime.graph_source == "json":
             raise ValueError("Editing node properties requires splash graph mode")
 
-        tiled = self._save_backend()     # :local before the first publication: UNSUPPORTED_CAPABILITY (the route's 501)
+        tiled = self._save_backend(corpus)   # :local before the first publication: UNSUPPORTED_CAPABILITY (501)
         graph_path = self.graph_path()
+        shown = True            # whether the edited corpus is the one the session graph shows
         if tiled is not None:
             if ctx is None:
                 raise ContractError(ErrorCode.DENIED, "no server-resolved request context")
+            if corpus is not None:
+                try:
+                    default = self._save_backend()
+                except ContractError:
+                    default = None
+                shown = default is not None and default.t.scope == tiled.t.scope
+                if not shown:
+                    graph_path = self._corpus_edit_path(corpus)
             await asyncio.to_thread(tiled.prepare, ctx)
             self._materialize_effective_graph(graph_path, tiled)
         data = _load_session_graph(graph_path)
@@ -3570,7 +3608,8 @@ class AgentPipelineService:
             self._materialize_effective_graph(graph_path, tiled)
         else:
             _save_session_graph(graph_path, data)
-        await self.retrieval.reload_kg(str(graph_path), graph_source=self._loader_source("splash"))
+        if shown:
+            await self.retrieval.reload_kg(str(graph_path), graph_source=self._loader_source("splash"))
 
         node = graph_node_from_file(graph_path, node_id)
         if node is None:
@@ -7281,16 +7320,33 @@ def create_app(
             raise HTTPException(status_code=404, detail=f"Node not found: {node_id}")
         return node
 
+    async def _editable_corpus(source: str | None, corpus: str | None) -> str | None:
+        """The corpus a PATCH edits (owner decision 2026-11-09: the corpus shown in the graph view).
+
+        ``source=tiled:<corpus>`` is editable iff that corpus is live on the Save target (``read_only_source`` 400
+        otherwise, as for every ``json:`` source); an explicit ``corpus`` must then agree with it. Without a source,
+        ``corpus`` names a live corpus directly and ``None`` is the active publication the editable default shows.
+        """
+        if source:
+            if not await asyncio.to_thread(_sources().editable, source):
+                raise HTTPException(status_code=400, detail=read_only_error(source).detail())
+            name = source.partition(":")[2]
+            if corpus is not None and corpus != name:
+                raise HTTPException(status_code=400, detail="corpus does not name the graph source's corpus")
+            return name
+        if corpus is not None and not CORPUS_NAME_RE.match(corpus):
+            raise HTTPException(status_code=400, detail="Invalid corpus name")
+        return corpus
+
     @app.patch("/graph/node/{node_id}", response_model=GraphNode)
     async def patch_graph_node(
-        node_id: str, req: GraphNodeUpdateRequest, source: str | None = None,
+        node_id: str, req: GraphNodeUpdateRequest, source: str | None = None, corpus: str | None = None,
         ctx: RequestContext = Depends(ui_context),
     ) -> GraphNode:
-        """Patch a splash-mode graph node; a graph source is read-only and refuses every edit."""
-        if source:
-            raise HTTPException(status_code=400, detail=read_only_error().detail())
+        """Patch a node of the corpus shown in the graph view: the editable default, or an editable Tiled source."""
+        corpus = await _editable_corpus(source, corpus)
         try:
-            node = await service.update_graph_node(node_id, req, ctx)
+            node = await service.update_graph_node(node_id, req, ctx, corpus=corpus)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except ValueError as exc:
@@ -7307,6 +7363,8 @@ def create_app(
         except Exception as exc:
             raise HTTPException(status_code=502,
                                 detail=f"Splash update failed: {guard.error_detail(ctx, exc)}") from exc
+        if source:
+            _sources().invalidate_tiled()      # the next read of the Tiled source shows the edit
         return cast(GraphNode, guard.project_route(ctx, "PATCH", "/graph/node/" + node_id, _model_to_jsonable(node)))
 
     @app.post("/graph/upload", response_model=GraphUploadResponse)

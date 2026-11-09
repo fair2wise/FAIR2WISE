@@ -290,6 +290,9 @@ def create_api_app(
             # T18D on :local (owner decision 2026-11-04, tenth set): the UI Save target is resolved lazily, per
             # request, from the active publication; before the first publication Save is the typed 501.
             app.state.f2w_agent_service.attach_tiled_save_provider(wired.save_provider)
+            # Owner decision 2026-11-09 (eighteenth set): Save edits the corpus shown in the graph view, so a Tiled
+            # graph source whose corpus is live on that Save target is editable (listed ``read_only: false``).
+            app.state.f2w_graph_sources.set_editable(app.state.f2w_agent_service.corpus_editable)
     if local_publication:
         app.state.f2w_agent_service.finish_startup_sync()      # no-op when a Tiled save target is attached
     if knowledge_operations is not None and operations.knowledge is not None:

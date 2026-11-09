@@ -42,13 +42,17 @@ to the legacy service by `create_api_app(local_publication=True)` unless an expl
 resolves the target **per Save request** from the deployment's own publication state:
 
 - Target: the one Tiled the `:local` gate allows (same trust condition as the publication).
-- Corpus rule (one target, possibly several corpora): the corpus named by the **active publication pointer** of
-  that target (`PublishStore.pointer(target).snapshot_ref = "<corpus>/<vN>"`, the last publication activated on the
-  image). The session graph the UI edits in its editable (`splash`-labelled) mode is that corpus's effective record
-  (active snapshot plus in-flight journal entries), so the node being edited is a node of that corpus; a node of
-  another corpus is the legacy 404, and the UI's selectable graph sources stay read-only (`source` -> 400). With
-  `F2W_CORPUS_SCOPE` set, the pointer's corpus must be in scope (defence in depth: the publication job already
-  refuses out-of-scope corpora).
+- Corpus rule (one target, possibly several corpora): **the corpus shown in the graph view** (owner decision
+  2026-11-09, eighteenth set). Without a selected graph source that is the corpus named by the **active publication
+  pointer** of that target (`PublishStore.pointer(target).snapshot_ref = "<corpus>/<vN>"`, the last publication
+  activated on the image): the session graph the UI edits in its editable (`splash`-labelled) mode is that corpus's
+  effective record (active snapshot plus in-flight journal entries). With a Tiled graph source selected the UI sends
+  `PATCH /graph/node/{id}?source=tiled:<corpus>` and the edit goes to that corpus's live version
+  (`LocalSaveProvider.resolve(corpus)`, its own journal): a `tiled:<corpus>` source is **editable iff the corpus is
+  live on this Save target** (listed `read_only: false`); `json:` sources and non-live Tiled graphs stay
+  `400 read_only_source`. A node of another corpus is the legacy 404. With `F2W_CORPUS_SCOPE` set, the corpus must
+  be in scope (defence in depth: the publication job already refuses out-of-scope corpora). Details and the
+  optional `corpus` query parameter: `docs/migration/api/README.md` section 3.2.
 - Base snapshot: `<workdir>/storage_kg/<corpus>/<vN>/graph.json` with the pointer's recorded `snapshot_sha256`;
   the importer's own `release.json` of that corpus must name the same snapshot as live. `TiledSaveBackend`
   hash-checks the base on every read (a mismatch is its `CONFLICT`, the route's 502, never a 500); `StaleSave`

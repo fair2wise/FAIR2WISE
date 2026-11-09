@@ -209,15 +209,19 @@ publication:
   Edit/Save controls are hidden and a PATCH is the typed 501 (below). After a
   publication the graph view shows that corpus's effective record (active
   snapshot plus in-flight edits).
-- The Save target is resolved **per request** from the active publication
-  pointer: the corpus the last publication activated. Nothing is bound at
-  startup (`app/api/local_save.py`).
+- The Save target is resolved **per request** and edits **the corpus shown in
+  the graph view**: with no graph source selected, the active publication
+  pointer's corpus (the one the last publication activated, which the editable
+  default shows); with a Tiled graph source selected (**Source** control of the
+  KG viewer), that graph's corpus, provided it is live on this image. Nothing is
+  bound at startup (`app/api/local_save.py`).
 - Before the first publication, or when a check fails, `PATCH /graph/node/{id}`
   answers `501 unsupported_capability` ("JSON available, Tiled unavailable: ...")
   and `GET /v1/capabilities` reports `can_save: false`, so the UI hides Save.
   Nothing is written and Splash is never called.
-- A node of another corpus is a 404; the UI's read-only graph sources never
-  reach Save.
+- A node of another corpus is a 404. A Tiled graph source whose corpus is live
+  is editable (the source listing says `read_only: false`); JSON sources and
+  Tiled graphs that are not live stay read-only (`400 read_only_source`).
 - Edits are journaled per corpus. A later publication of an edited corpus is
   refused with `CONFLICT` until the edit is reconciled or a reviewed resolution
   is attached (the import-time conflict block).

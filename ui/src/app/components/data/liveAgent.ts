@@ -787,12 +787,18 @@ export interface GraphNodeUpdatePayload {
   relationship_updates?: GraphRelationshipUpdate[];
 }
 
+/**
+ * `PATCH /graph/node/{id}`. `source` is the graph source the viewer shows (`tiled:<corpus>`): the server then
+ * edits that corpus (owner decision 2026-11-09: Save edits the corpus shown in the graph view). Without it the
+ * active publication of the editable default is edited and no `source` parameter is sent.
+ */
 export async function updateGraphNode(
   nodeId: string,
   update: GraphNodeUpdatePayload,
+  source?: string | null,
 ): Promise<LiveGraphNode> {
   const response = await fetch(
-    `${AGENT_API_BASE}/graph/node/${encodeURIComponent(nodeId)}`,
+    withQuery(`${AGENT_API_BASE}/graph/node/${encodeURIComponent(nodeId)}`, graphSourceQuery(source)),
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -801,6 +807,7 @@ export async function updateGraphNode(
   );
 
   if (!response.ok) {
+    if (source) throw new Error(await graphErrorText(response));
     const detail = await response.text();
     throw new Error(detail || `Agent API returned ${response.status}`);
   }

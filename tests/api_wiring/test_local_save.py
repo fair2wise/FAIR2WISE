@@ -359,3 +359,107 @@ def test_wiring_against_a_real_loopback_tiled(monkeypatch, tmp_path, template, r
     names = {e["name"] for e in inst.graphql("{ entities(limit: 500, offset: 0) { id name } }")["entities"]}
     assert "Term A on the image's Tiled" in names
     assert w.journal_path().exists() and w.splash_calls() == {}
+
+
+# ------------------------------------------------------------- the corpus shown in the graph view (owner, 2026-11-09)
+
+OTHER = "othercorpus"
+
+
+def freeze_as(w, corpus, snapshot_id, payload):
+    """Freeze ``payload`` as ``<corpus>/<snapshot_id>`` (a second corpus next to ``contract``)."""
+    src = snapshot_with_graph(w.template, w.tmp / "snap" / corpus / snapshot_id, corpus, snapshot_id, payload)
+    shutil.copytree(src, w.storage_kg / corpus / snapshot_id)
+
+
+def publish_as(w, corpus, snapshot_id="v1"):
+    ctx = w.ops.cli_context()
+    handle = w.ops.submit_publication(ctx, f"{corpus}/{snapshot_id}", w.target)
+    assert w.ops.jobs.work_one("w1") == (handle.job_id, JobState.AWAITING_REVIEW)
+    w.ops.approve_publication(ctx, handle.job_id, w.ops.current_plan(ctx, handle.job_id).plan_sha256)
+    assert w.ops.jobs.work_one("w1") == (handle.job_id, JobState.SUCCEEDED)
+
+
+def renamed(payload, prefix):
+    """The payload with every node id prefixed (so a node of one corpus is not a node of the other)."""
+    data = json.loads(json.dumps(payload))
+    rename = {t["id"]: f"{prefix}:{t['id'].split(':', 1)[-1]}" for t in data["things"]}
+    for t in data["things"]:
+        t["id"] = rename[t["id"]]
+    for a in data.get("associations", []):
+        a["subject"], a["object"] = rename.get(a["subject"], a["subject"]), rename.get(a["object"], a["object"])
+    return data
+
+
+def journal_records(w, corpus):
+    path = cs.scope_dir(w.state_dir, w.target, corpus) / ls.JOURNAL_FILENAME
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()] if path.exists() else []
+
+
+def sources(w):
+    return {s["id"]: s for s in w.client.get("/v1/graph/sources").json()["sources"]}
+
+
+def test_before_a_publication_a_tiled_source_is_read_only_not_501(w):
+    w.editable()
+    resp = w.client.patch(f"/graph/node/{NODE}", params={"source": f"tiled:{SCOPE}"}, json={"label": "x"})
+    assert resp.status_code == 400 and resp.json()["detail"]["code"] == "read_only_source"
+    assert w.client.get("/v1/graph/sources").json()["tiled"]["status"] == "ok"
+    assert w.client.patch(f"/graph/node/{NODE}", params={"corpus": SCOPE}, json={"label": "x"}).status_code == 501
+
+
+def test_a_tiled_source_whose_corpus_is_live_is_editable_and_save_edits_that_corpus(w):
+    w.freeze("v1", w.payload)
+    w.publish("v1")
+    freeze_as(w, OTHER, "v1", renamed(w.payload, OTHER))
+    publish_as(w, OTHER)
+    assert w.provider.resolve().scope == OTHER, "the pointer is 'last activated': the editable default shows B"
+    w.editable()
+    listed = sources(w)
+    assert listed[f"tiled:{SCOPE}"]["read_only"] is False and listed[f"tiled:{OTHER}"]["read_only"] is False
+    assert all(s["read_only"] is True for sid, s in listed.items() if sid.startswith("json:"))
+    shown_before = w.client.get("/graph").json()
+    assert {n["id"] for n in shown_before["nodes"]} >= {f"{OTHER}:TermA"}
+
+    # Save with the Tiled source of corpus A shown: A's live version is edited, A's journal records it.
+    resp = w.client.patch(f"/graph/node/{NODE}", params={"source": f"tiled:{SCOPE}"},
+                          json={"label": "Term A via its source"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["id"] == NODE and resp.json()["label"] == "Term A via its source"
+    assert live_nodes(w.tiled())[NODE]["name"] == "Term A via its source"
+    assert journal_records(w, SCOPE)[-1]["scope"] == [SCOPE] and journal_records(w, OTHER) == []
+    # The Tiled source shows the edit at once; the editable default (corpus B) is untouched.
+    picked = w.client.get("/graph", params={"source": f"tiled:{SCOPE}"}).json()
+    assert {n["id"]: n for n in picked["nodes"]}[NODE]["label"] == "Term A via its source"
+    assert w.client.get("/graph").json() == shown_before
+    assert w.splash_calls() == {}
+
+    # The node of corpus A is not a node of corpus B's source (the legacy 404), and vice versa.
+    assert w.client.patch(f"/graph/node/{NODE}", params={"source": f"tiled:{OTHER}"},
+                          json={"label": "wrong corpus"}).status_code == 404
+    resp = w.client.patch(f"/graph/node/{OTHER}:TermA", params={"source": f"tiled:{OTHER}"},
+                          json={"label": "Term A of B"})
+    assert resp.status_code == 200, resp.text
+    assert journal_records(w, OTHER)[-1]["scope"] == [OTHER]
+    assert {n["id"]: n for n in w.client.get("/graph").json()["nodes"]}[f"{OTHER}:TermA"]["label"] == "Term A of B"
+
+    # The explicit corpus parameter names a live corpus directly; it must agree with a source when both are given.
+    resp = w.client.patch(f"/graph/node/{NODE}", params={"corpus": SCOPE}, json={"label": "Term A by corpus"})
+    assert resp.status_code == 200 and live_nodes(w.tiled())[NODE]["name"] == "Term A by corpus"
+    assert w.client.patch(f"/graph/node/{NODE}", params={"source": f"tiled:{SCOPE}", "corpus": OTHER},
+                          json={"label": "x"}).status_code == 400
+    assert w.client.patch(f"/graph/node/{NODE}", params={"corpus": "../etc"}, json={"label": "x"}).status_code == 400
+    assert w.client.patch(f"/graph/node/{NODE}", params={"corpus": "neverlive"},
+                          json={"label": "x"}).status_code == 501
+    assert w.can_save() is True
+
+
+def test_json_and_non_live_tiled_sources_stay_read_only(w):
+    w.freeze("v1", w.payload)
+    w.publish("v1")
+    w.editable()
+    listed = sources(w)
+    for sid in [s for s in listed if s.startswith("json:")] + ["tiled:notlive", "tiled:../x"]:
+        resp = w.client.patch(f"/graph/node/{NODE}", params={"source": sid}, json={"label": "x"})
+        assert resp.status_code == 400 and resp.json()["detail"]["code"] == "read_only_source", sid
+    assert journal_records(w, SCOPE) == [] and live_nodes(w.tiled())[NODE]["name"] != "x"
