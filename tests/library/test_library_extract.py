@@ -366,8 +366,9 @@ def test_per_bundle_lock_allows_one_extraction_and_frees_on_exit(tmp_path):
         with bundle_lock(world.store, "other"):  # a different bundle is independent
             pass
         handle, state = world.run(world.params(names))
-        assert state is JobState.FAILED and world.factory_calls == []
-        assert "another extraction is running" in world.job_error(handle)
+        # a busy bundle held by another job is transient: the job requeues (bounded) instead of failing
+        assert state is JobState.QUEUED and world.factory_calls == []
+        assert any("another extraction is running" in s.error for s in world.jobs.store.stages(handle.job_id))
     _, state = world.run(world.params(names), nonce="2")
     assert state is JobState.SUCCEEDED
 
@@ -394,7 +395,8 @@ def test_a_busy_log_capture_is_a_retryable_conflict(tmp_path):
     finally:
         release.set()
         thread.join()
-    assert state is JobState.FAILED and "already being captured" in world.job_error(handle)
+    assert state is JobState.QUEUED  # transient: requeued, not failed
+    assert any("already being captured" in s.error for s in world.jobs.store.stages(handle.job_id))
 
 
 def test_the_stub_remains_without_an_extractor(tmp_path):
@@ -461,3 +463,43 @@ def test_a_run_that_lost_its_lease_records_nothing_and_stops_calling_the_llm(tmp
     assert json.loads(world.bundle().file(B.PROCESSED_FILE).read_text()) == ["a.pdf"]
     record = world.jobs.store.get(handle.job_id)
     assert record.state is JobState.RUNNING  # still the new owner's: the stale one never marked it failed
+
+
+def test_a_taken_over_run_writes_no_term_records_after_the_takeover(tmp_path):
+    clock = Clock()
+
+    def hook(orch: FakeOrchestrator, name: str) -> None:
+        if name == "b.pdf":
+            clock.advance(61)
+            assert world.jobs.store.claim_next("w2") is not None  # another process owns the job now
+            # the page threads of this stale run keep going until their call ends: none of it may land
+            orch.store.upsert(TermRecord(term="STALE", definition="d", category="Thing", pages=[1], source_papers=[name]))
+            orch.store.add_code_snippets([{"language": "py", "code": "x", "source_paper": name, "page": 1}])
+
+    world = World(tmp_path, hook=hook, clock=clock)
+    names = _three(world)
+    handle = world.submit(world.params(names))
+    assert world.jobs.work_one("w") == (handle.job_id, None)
+    saved = json.loads(world.bundle().file(B.TERMS_FILE).read_text())
+    found = {t["term"] for t in saved["terms"]}
+    assert "STALE" not in found and "PCBM" not in found  # the file keeps only what the run wrote before the takeover
+    assert saved["code_snippets"] == []
+    assert "STALE" not in {r.term for r in FakeOrchestrator.instances[0].store.all_records()}
+
+
+def test_a_term_store_with_a_tripped_fence_ignores_every_write(tmp_path):
+    out = tmp_path / "terms.json"
+    store = TermStore(str(out))
+    store.upsert(TermRecord(term="A", definition="d", category="Thing", pages=[1], source_papers=["a.pdf"]))
+    store.save()
+    fenced = [False]
+    store.write_fence = lambda: fenced[0]
+    store.upsert(TermRecord(term="B", definition="d", category="Thing", pages=[1], source_papers=["a.pdf"]))
+    fenced[0] = True
+    key, modified = store.upsert(TermRecord(term="C", definition="d", category="Thing", pages=[1], source_papers=["a.pdf"]))
+    assert modified is False and store.get(key) is None
+    assert store.add_code_snippets([{"language": "py", "code": "x", "source_paper": "a.pdf", "page": 1}]) is False
+    store.save()
+    assert {t["term"] for t in json.loads(out.read_text())["terms"]} == {"A"}  # B was in memory only, C refused
+    fenced[0] = False  # latched: once fenced the store stays fenced
+    assert store.upsert(TermRecord(term="D", definition="d", category="Thing", pages=[1], source_papers=["a.pdf"]))[1] is False

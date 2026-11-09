@@ -243,6 +243,19 @@ class JobStore:
         with self.db.tx(immediate=False) as con:
             self._check_lease(con, lease)
 
+    def lease_superseded(self, lease: Lease) -> bool:
+        """Whether another owner holds a newer generation of the lease (token or fence differ).
+
+        Expiry is ignored on purpose: a lease that merely lapsed (a suspended host) is still this run's and
+        the heartbeat revives it, so only a takeover fences the run out.
+        """
+        try:
+            with self.db.tx() as con:
+                self._check_lease(con, lease, allow_expired=True)
+        except LeaseLost:
+            return True
+        return False
+
     def renew_lease(self, lease: Lease, ttl: float | None = None, *, allow_expired: bool = False) -> Lease:
         """Extend the lease; refused once expired or superseded (a stale owner cannot revive it).
 

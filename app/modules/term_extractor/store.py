@@ -1,5 +1,6 @@
 """Thread-safe in-memory store of extracted terms and code snippets, persisted to JSON."""
 
+from collections.abc import Callable
 import datetime
 import json
 import logging
@@ -41,6 +42,11 @@ class TermStore:
         self._state_lock = threading.Lock()
         self._save_lock = threading.Lock()
         self._tl = threading.local()
+        #: Returns ``True`` once the run owning this store was fenced out (another owner took its job over).
+        #: From then on every write is ignored and the answer is latched: the stale run's page threads may
+        #: still be mid-call, but nothing they produce may reach memory or the shared terms file.
+        self.write_fence: Callable[[], bool] | None = None
+        self._fenced = False
         self.metadata: dict[str, Any] = {
             "extraction_date": datetime.datetime.now(datetime.UTC).replace(tzinfo=None).isoformat() + "Z",
             "processed_files": 0,
@@ -50,6 +56,16 @@ class TermStore:
         }
         Path(os.path.abspath(output_file)).parent.mkdir(parents=True, exist_ok=True)  # noqa: PTH100 - lexical abspath, not resolve()
         self._load()
+
+    def _is_fenced(self) -> bool:
+        """Whether writes are refused (the fence tripped at any earlier point stays tripped)."""
+        if self._fenced:
+            return True
+        fence = self.write_fence
+        if fence is not None and fence():
+            self._fenced = True
+            logger.warning("term store %s fenced: the owning run lost its job; writes are ignored", self.output_file)
+        return self._fenced
 
     # ------------------------------------------------------------------
     # Persistence
@@ -97,6 +113,8 @@ class TermStore:
 
     def save(self) -> None:
         """Write current state to disk. Thread-safe; takes a snapshot under the state lock."""
+        if self._is_fenced():
+            return
         with self._state_lock:
             self._sync_publications_locked()
             terms_out = [r.to_dict() for r in self._records.values()]
@@ -159,6 +177,8 @@ class TermStore:
         - Chemical fields (formula, smiles, etc.) fill in only if currently None.
         """
         key = self.normalize(record.term)
+        if self._is_fenced():
+            return key, False
         with self._state_lock:
             if key not in self._records:
                 self._records[key] = record
@@ -229,6 +249,8 @@ class TermStore:
 
     def attach_property(self, key: str, prop: PropertyRecord) -> bool:
         """Append a property to an existing term if not already present. Returns True if added."""
+        if self._is_fenced():
+            return False
         with self._state_lock:
             record = self._records.get(key)
             if record is None:
@@ -254,7 +276,7 @@ class TermStore:
         Publication fields come only from ``pub_meta`` (PDF-derived); never from
         the term LLM. Returns True if any snippet was added or updated.
         """
-        if not snips:
+        if not snips or self._is_fenced():
             return False
         _pm = pub_meta or {}
         updated = False
@@ -294,7 +316,7 @@ class TermStore:
 
         Returns True if anything changed.
         """
-        if not source_paper or not pub_meta:
+        if not source_paper or not pub_meta or self._is_fenced():
             return False
         updated = False
         with self._state_lock:
