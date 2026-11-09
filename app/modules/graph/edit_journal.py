@@ -229,5 +229,5 @@ def check_import(journal: EditJournal | None, *, target: str, scope: Sequence[st
         raise ContractError(ErrorCode.CONFLICT,
                             f"import would lose {len(missing)} acknowledged edit(s) not reconciled into the "
                             f"snapshot lineage: {missing[:10]}; reconcile into a new snapshot or attach a "
-                            "reviewed conflict resolution")
+                            "reviewed conflict resolution", retryable=False)  # needs a human, not a retry
     return [r for r in open_edits]
