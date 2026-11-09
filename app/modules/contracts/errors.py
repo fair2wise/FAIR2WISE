@@ -20,7 +20,10 @@ class ErrorCode(StrEnum):
         UNAVAILABLE: A dependency (provider, Tiled, parser) is down; retryable.
         UNSUPPORTED_CAPABILITY: The backend cannot perform the operation safely.
         NOT_FOUND: The addressed record does not exist in the authorized scope.
-        CONFLICT: A revision, lease or approval no longer matches current state.
+        CONFLICT: A revision, lease or approval no longer matches current state; not retryable by default
+            (most conflicts need a human or a changed input). A transient conflict (a busy lock, a lease
+            another run holds, a read that raced a writer) passes ``retryable=True`` explicitly, and only
+            those requeue a job or retry an idempotent tool.
         STALE_APPROVAL: An approval was granted for a different plan or revision.
         BUDGET_EXHAUSTED: A configured time, cost or call budget is used up.
         CANCELLED: The caller or operator cancelled the work.
@@ -43,7 +46,10 @@ class ErrorCode(StrEnum):
     WRITER_UNAUTHORIZED = "writer_unauthorized"
 
 
-RETRYABLE_CODES = frozenset({ErrorCode.UNAVAILABLE, ErrorCode.CONFLICT})
+#: Codes whose errors are retryable unless the raise site says otherwise. ``CONFLICT`` is deliberately absent
+#: (owner decision 2026-11-09, ``docs/migration/reviews/H5/conflict_retryability.md``): a transient conflict
+#: states ``retryable=True`` at its raise site.
+RETRYABLE_CODES = frozenset({ErrorCode.UNAVAILABLE})
 
 
 class ContractError(Exception):
@@ -52,7 +58,8 @@ class ContractError(Exception):
     Args:
         code: The stable error code.
         message: Human-readable summary, safe to show to the caller.
-        retryable: Override for the code's default retryability.
+        retryable: Override for the code's default retryability (``code in RETRYABLE_CODES``). A ``CONFLICT``
+            is permanent unless this is ``True``.
         reason: Optional stable sub-code under ``code`` (for example ``rollback_replacement_required`` under
             ``conflict``); the HTTP error body carries it as ``reason`` only when set, so the envelope of every
             other error is unchanged.

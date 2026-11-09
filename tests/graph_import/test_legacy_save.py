@@ -182,7 +182,9 @@ def test_q8_a_save_during_a_switch_is_refused_before_anything_is_journaled(world
     n = len(env.writes())
     with pytest.raises(ContractError) as err:
         backend.prepare(env.ctx)
-    assert err.value.code is ErrorCode.CONFLICT and err.value.retryable
+    # CONFLICT is permanent by default; _refuse_during_switch says retryable=True because the switch ends and
+    # is_switch_refusal (the UI's "try again shortly" path) reads exactly that flag
+    assert err.value.code is ErrorCode.CONFLICT and err.value.retryable is True
     with pytest.raises(ContractError) as err:
         backend.save(env.ctx, base, edited(base, node, others))
     assert err.value.code is ErrorCode.CONFLICT and "republished" in str(err.value)
