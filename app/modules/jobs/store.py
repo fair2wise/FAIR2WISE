@@ -425,6 +425,7 @@ class JobStore:
         outcome: StageOutcome = StageOutcome.PENDING,
         reason: str = "",
         error_code: ErrorCode | None = None,
+        detail: Mapping[str, Any] | None = None,
     ) -> JobRecord:
         """Move the job to ``new`` under ``lease`` (validated against :data:`TRANSITIONS`)."""
         with self.db.tx() as con:
@@ -437,8 +438,25 @@ class JobStore:
                 "UPDATE jobs SET state=?, updated_at=?, revision=revision+1, pause_reason=? WHERE job_id=?",
                 (new.value, self.clock(), reason if new is not JobState.RUNNING else "", job_id),
             )
-            self._emit(con, job_id, stage, outcome, new, error_code=error_code, detail={"reason": reason})
+            self._emit(con, job_id, stage, outcome, new, error_code=error_code,
+                       detail={**dict(detail or {}), "reason": reason})
         return self.get(job_id)
+
+    def conflict_requeues(self, job_id: str) -> int:
+        """Times the job went back to ``queued`` for a busy resource since its last failure or resume.
+
+        Counted from the durable event log (``conflict_requeue`` marker), so the bound holds across processes
+        and restarts.
+        """
+        rows = self.db.query("SELECT event, detail FROM job_events WHERE job_id=? ORDER BY sequence DESC", (job_id,))
+        count = 0
+        for row in rows:
+            state = json.loads(row["event"]).get("state")
+            if state in (JobState.FAILED.value, JobState.SUCCEEDED.value):
+                break
+            if json.loads(row["detail"]).get("conflict_requeue"):
+                count += 1
+        return count
 
     def release_to_queue(self, lease: Lease, job_id: str, reason: str) -> None:
         """Give a running job back (graceful shutdown): ``running -> queued`` and release the lease."""

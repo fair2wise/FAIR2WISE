@@ -340,8 +340,11 @@ class JobService:
         beat.set()
         self.store.release_lease(lease)
         if state is JobState.QUEUED and not self.interrupt.is_set() and self.requeue_backoff > 0:
+            # Repeated busy requeues back off exponentially (capped); other requeues use the base delay.
+            streak = self.store.conflict_requeues(job.job_id)
+            delay = self.requeue_backoff * 2 ** min(max(streak - 1, 0), 4)
             with self._claim_lock:
-                self._backoff_until[job.job_id] = time.monotonic() + self.requeue_backoff
+                self._backoff_until[job.job_id] = time.monotonic() + delay
         return job.job_id, state
 
     def _finish_job(self, job_id: str) -> None:

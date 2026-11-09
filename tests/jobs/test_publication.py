@@ -274,10 +274,27 @@ def test_competing_publisher_for_the_same_target_is_refused(w):
     job_id = to_review(w)
     w.approve(job_id)
     held = w.jobs_store.acquire_lease("publish:" + TARGET, "another-publisher")
-    assert w.work() == (job_id, JobState.FAILED)  # single-writer lease: the second publisher does not write
+    # single-writer lease: the second publisher does not write; the conflict is transient, so the job requeues
+    assert w.work() == (job_id, JobState.QUEUED)
     assert w.tiled.writes == [] and w.step.apply_calls == 0
-    row = w.jobs_store.stage(job_id, "import")
-    assert row.error_code is ErrorCode.CONFLICT
+    w.jobs_store.release_lease(held)
+    w.service._backoff_until.clear()
+    assert w.work() == (job_id, JobState.SUCCEEDED)
+
+
+def test_a_publisher_lease_that_never_frees_fails_the_job_after_the_bounded_retries(w):
+    from app.modules.jobs.pipeline import MAX_CONFLICT_REQUEUES
+
+    job_id = to_review(w)
+    w.approve(job_id)
+    held = w.jobs_store.acquire_lease("publish:" + TARGET, "another-publisher")
+    for _ in range(MAX_CONFLICT_REQUEUES):
+        w.service._backoff_until.clear()
+        assert w.work() == (job_id, JobState.QUEUED)
+    w.service._backoff_until.clear()
+    assert w.work() == (job_id, JobState.FAILED)
+    assert w.jobs_store.stage(job_id, "import").error_code is ErrorCode.CONFLICT
+    assert w.tiled.writes == []
     w.jobs_store.release_lease(held)
     w.service.resume(w.ctx, job_id)
     assert w.work() == (job_id, JobState.SUCCEEDED)
