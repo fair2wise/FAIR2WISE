@@ -18,7 +18,7 @@ import os
 from pathlib import Path
 import re
 import time
-from typing import Any, cast
+from typing import Any
 from urllib.parse import parse_qs, quote, urlparse
 
 import requests
@@ -806,21 +806,17 @@ def fetch_crossref_tdm_pdfs(doi: str, *, timeout: float = 15.0) -> tuple[list[st
     return select_crossref_tdm_pdfs(body)
 
 
-def search_arxiv(keyword: str, max_results: int) -> Iterable[Any]:  # Any: arxiv.Result (imported lazily)
-    """Search arXiv using arxiv.py wrapper.
+def search_arxiv(keyword: str, max_results: int) -> Iterable[Any]:  # Any: ArxivHit (imported lazily, legacy_download imports this module)
+    """Search arXiv (relevance, descending) through the hardened Atom helper.
 
-    Returns a list of arxiv.Result objects.
+    Same request strategy as the old ``arxiv.Client()`` defaults (100 per page, 3 s between pages, 3 retries).
+    Returns objects with ``doi``, ``pdf_url`` and ``get_short_id()``, like ``arxiv.Result``.
     """
-    import arxiv
+    from .legacy_download import ArxivHit, arxiv_results, hardened_get_bytes
 
-    client = arxiv.Client()
-    search = arxiv.Search(
-        query=keyword,
-        max_results=max_results,
-        sort_by=arxiv.SortCriterion.Relevance,
-        sort_order=arxiv.SortOrder.Descending
-    )
-    return cast(Iterable[Any], client.results(search))
+    return (ArxivHit.from_entry(entry)
+            for entry in arxiv_results(keyword, max_results, page_size=100, delay_seconds=3.0, retries=3,
+                                            get_bytes=hardened_get_bytes))
 
 
 def _cleanup_partial(path: Path) -> None:
@@ -918,21 +914,27 @@ def run_openalex_workflow(keyword: str, target_dir: str, max_results: int) -> No
     Works without a DOI or primary-location PDF URL are skipped, as are
     files that already exist.
     """
-    from pyalex import Works
+    from .legacy_download import hardened_get_json, openalex_pages
 
     Path(target_dir).mkdir(parents=True, exist_ok=True)
-    works = Works().search(title=keyword).per_page(max_results).execute()
-    for item in works:
-        doi = item.doi.replace('/', '_') if item.doi else None
-        url = item.primary_location.pdf_url if item.primary_location else None
+    works: list[dict[str, Any]] = []
+    for page in openalex_pages(filters={"title": {"search": keyword}}, per_page=min(max(max_results, 1), 200),
+                               n_max=max_results, get_json=hardened_get_json):
+        works.extend(page)
+        if len(works) >= max_results:
+            break
+    for item in works[:max_results]:
+        doi = str(item["doi"]).replace('/', '_') if item.get("doi") else None
+        location = item.get("primary_location")
+        url = location.get("pdf_url") if isinstance(location, dict) else None
         if not doi or not url:
-            logging.debug(f"Skipping missing DOI/pdf: {item.id}")
+            logging.debug(f"Skipping missing DOI/pdf: {item.get('id')}")
             continue
         target_file = Path(target_dir) / f"{doi}.pdf"
         filename = str(target_file)
         if target_file.exists():
             continue
-        download_pdf(url, filename)
+        download_pdf(str(url), filename)
         time.sleep(1)
 
 

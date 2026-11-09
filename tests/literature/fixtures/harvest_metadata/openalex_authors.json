@@ -1,0 +1,8 @@
+{
+  "meta": {"count": 2, "db_response_time_ms": 12, "page": 1, "per_page": 25},
+  "results": [
+    {"id": "https://openalex.org/A5100000001", "display_name": "Cheng Wang", "works_count": 212,
+     "last_known_institutions": [{"id": "https://openalex.org/I1", "display_name": "Lawrence Berkeley National Laboratory"}]},
+    {"id": "https://openalex.org/A5100000002", "display_name": "Cheng Wang", "works_count": 40, "last_known_institutions": []}
+  ]
+}

@@ -281,47 +281,54 @@ def test_arxiv_workflow_names_files_skips_existing_and_logs_failures(monkeypatch
 
 
 def test_search_arxiv_builds_relevance_query(monkeypatch):
+    # Repointed from a fake ``arxiv`` package to the hardened helper ``legacy_download.arxiv_results`` (T17B P1
+    # follow-on): same query, result cap and relevance sort; the old ``arxiv.Client()`` defaults (100 per page, 3 s
+    # between pages, 3 retries) are passed explicitly.
+    from datetime import UTC, datetime
+
+    from app.modules.literature import legacy_download
+
     captured = {}
 
-    class Client:
-        def results(self, search):
-            captured["search"] = search
-            return iter(["r"])
+    def fake_results(query, max_results, **kw):
+        captured.update(query=query, max_results=max_results, **kw)
+        yield {"short_id": "2101.1", "pdf_url": "https://arxiv.org/pdf/2101.1", "doi": "10.1/a", "title": "t",
+               "summary": "s", "year": 2021, "published": datetime(2021, 1, 1, tzinfo=UTC)}
 
-    fake = SimpleNamespace(Client=Client, Search=lambda **kw: SimpleNamespace(**kw),
-                           SortCriterion=SimpleNamespace(Relevance="rel"), SortOrder=SimpleNamespace(Descending="desc"))
-    monkeypatch.setitem(sys.modules, "arxiv", fake)
-    assert list(dp.search_arxiv("polymers", 7)) == ["r"]
-    assert (captured["search"].query, captured["search"].max_results, captured["search"].sort_by) == ("polymers", 7, "rel")
+    monkeypatch.setattr(legacy_download, "arxiv_results", fake_results)
+    (hit,) = list(dp.search_arxiv("polymers", 7))
+    assert (hit.get_short_id(), hit.doi, hit.pdf_url) == ("2101.1", "10.1/a", "https://arxiv.org/pdf/2101.1")
+    assert (captured["query"], captured["max_results"]) == ("polymers", 7)
+    assert "sort_by" not in captured  # relevance is the helper's default
+    assert (captured["page_size"], captured["delay_seconds"], captured["retries"]) == (100, 3.0, 3)
 
 
 def test_openalex_workflow_skips_incomplete_and_existing_works(monkeypatch, tmp_path):
-    items = [SimpleNamespace(id="W1", doi="10.1/a", primary_location=SimpleNamespace(pdf_url="https://x/a.pdf")),
-             SimpleNamespace(id="W2", doi=None, primary_location=SimpleNamespace(pdf_url="https://x/b.pdf")),
-             SimpleNamespace(id="W3", doi="10.1/c", primary_location=None),
-             SimpleNamespace(id="W4", doi="10.1/d", primary_location=SimpleNamespace(pdf_url="https://x/d.pdf"))]
+    # Repointed from a fake ``pyalex.Works`` to ``legacy_download.openalex_pages`` (T17B P1 follow-on). The old
+    # ``Works().search(title=..).per_page(n).execute()`` chain does not exist in pyalex 0.21 (TypeError), so the
+    # workflow was dead; it now runs a title search over the hardened cursor walk.
+    from app.modules.literature import legacy_download
 
-    class Query:
-        def per_page(self, n):
-            return self
+    items = [{"id": "W1", "doi": "10.1/a", "primary_location": {"pdf_url": "https://x/a.pdf"}},
+             {"id": "W2", "doi": None, "primary_location": {"pdf_url": "https://x/b.pdf"}},
+             {"id": "W3", "doi": "10.1/c", "primary_location": None},
+             {"id": "W4", "doi": "10.1/d", "primary_location": {"pdf_url": "https://x/d.pdf"}}]
+    seen = {}
 
-        def execute(self):
-            return items
+    def fake_pages(**kw):
+        seen.update(kw)
+        yield items
 
-    class Works:
-        def search(self, title):
-            return Query()
-
-    import pyalex
-
-    monkeypatch.setattr(pyalex, "Works", Works)
+    monkeypatch.setattr(legacy_download, "openalex_pages", fake_pages)
     target = tmp_path / "t"
     target.mkdir()
     (target / "10.1_d.pdf").write_bytes(b"%PDF")
     got = []
     monkeypatch.setattr(dp, "download_pdf", lambda url, dest: got.append(Path(dest).name) or True)
+    monkeypatch.setattr(dp.time, "sleep", lambda s: None)
     dp.run_openalex_workflow("kw", str(target), 10)
     assert got == ["10.1_a.pdf"]
+    assert seen["filters"] == {"title": {"search": "kw"}} and seen["per_page"] == 10 and seen["n_max"] == 10
 
 
 def test_main_dispatches_on_source(monkeypatch):

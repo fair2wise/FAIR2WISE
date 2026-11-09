@@ -1,0 +1,17 @@
+{
+  "meta": {"count": 3, "db_response_time_ms": 30, "page": null, "per_page": 2, "next_cursor": null},
+  "results": [
+    {
+      "id": "https://openalex.org/W3100000003",
+      "doi": "https://doi.org/10.1103/physrevmaterials.5.000003",
+      "display_name": "Soft X-ray tensor scattering of oriented polymer films",
+      "title": "Soft X-ray tensor scattering of oriented polymer films",
+      "publication_year": 2019,
+      "abstract_inverted_index": {"Tensor": [0], "scattering": [1]},
+      "open_access": {"is_oa": false, "oa_url": null},
+      "best_oa_location": null,
+      "primary_location": {"is_oa": false, "pdf_url": null, "landing_page_url": "https://doi.org/10.1103/physrevmaterials.5.000003"},
+      "locations": []
+    }
+  ]
+}

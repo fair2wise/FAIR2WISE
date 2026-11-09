@@ -46,6 +46,7 @@ from ..graph.backends.tiled_lookup import (
 )
 from ..graph.legacy_save import SaveTarget, StaleSave, TiledSaveBackend
 from ..hybrid_rag.pipeline import hybrid_rag_enabled
+from ..literature.legacy_download import hardened_get_json, openalex_search
 from ..project_config import config_value, get_config
 from ..runtime_bridge.selection import attach_read_path, attach_summary_path
 from ..security.authorization import SETTINGS_DEPLOYMENT_FIELDS, StartupConfigError
@@ -2569,21 +2570,14 @@ def _openalex_work_to_publication(work: dict[str, Any]) -> dict[str, Any]:
 
 def _search_openalex_publications(query: str, max_results: int) -> list[dict[str, Any]]:
     """Search OpenAlex for works matching the query."""
-    try:
-        from pyalex import Works
-        from pyalex import config as pyalex_config
-    except Exception:
-        logger.debug("pyalex unavailable; no OpenAlex publication search", exc_info=True)
-        return []
-
     mailto = os.environ.get("OPENALEX_EMAIL")
-    if mailto:
-        pyalex_config.email = mailto
     try:
-        works = (
-            Works()
-            .search(_sanitize_openalex_search(query))
-            .get(per_page=min(max_results * 2, 50))
+        works = openalex_search(
+            _sanitize_openalex_search(query),
+            min(max_results * 2, 50),
+            oa_only=False,
+            mailto=mailto,
+            get_json=hardened_get_json,
         )
     except Exception as exc:
         logger.warning("OpenAlex publication search failed: %s", type(exc).__name__)

@@ -1,4 +1,4 @@
-"""harvest_rsoxs (T27f), part 1: text helpers, manifest merge, arXiv and OpenAlex searches (fake ``arxiv``/``pyalex``)."""
+"""harvest_rsoxs (T27f), part 1: text helpers, manifest merge, arXiv and OpenAlex searches (fake hardened arXiv/OpenAlex helpers)."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -287,16 +287,16 @@ def oa_work(title: str = GOOD_TITLE, doi: str | None = "https://doi.org/10.1/a",
 def test_paginate_works_pages_get_fallback_and_failure(monkeypatch):
     world = OpenAlexWorld().install(monkeypatch)
     world.works["q"] = [{"n": i} for i in range(7)]
-    query = sys.modules["pyalex"].Works().search("q")
+    query = hv.Works().search("q")
     assert len(hv._paginate_works(query, 4)) == 4 and len(hv._paginate_works(query, 50)) == 7
     world.fail_paginate = True
-    assert len(hv._paginate_works(sys.modules["pyalex"].Works().search("q"), 3)) == 3  # get() after paginate fails
+    assert len(hv._paginate_works(hv.Works().search("q"), 3)) == 3  # get() after paginate fails
     world.fail_paginate, world.no_paginate = False, True
-    assert len(hv._paginate_works(sys.modules["pyalex"].Works().search("q"), 5)) == 5
+    assert len(hv._paginate_works(hv.Works().search("q"), 5)) == 5
     world.fail_get = True
-    assert hv._paginate_works(sys.modules["pyalex"].Works().search("q"), 5) == []
+    assert hv._paginate_works(hv.Works().search("q"), 5) == []
     world.fail_paginate, world.no_paginate = True, False
-    assert hv._paginate_works(sys.modules["pyalex"].Works().search("q"), 5) == []
+    assert hv._paginate_works(hv.Works().search("q"), 5) == []
 
 
 def test_normalize_openalex_work_rebuilds_abstract_and_rejects_tier_c():

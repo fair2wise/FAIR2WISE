@@ -557,7 +557,7 @@ def _mute_extra_oa(monkeypatch):
         "app.modules.commands.harvest_rsoxs.dl.fetch_europepmc_search_oa_pdfs", lambda doi: ([], [])
     )
     monkeypatch.setattr("app.modules.commands.harvest_rsoxs.dl.fetch_crossref_tdm_pdfs", lambda doi: ([], []))
-    monkeypatch.setattr("app.modules.commands.harvest_rsoxs.dl.fetch_unpaywall_oa_pdfs", lambda *a, **k: ([], []))
+    monkeypatch.setattr("app.modules.commands.harvest_rsoxs.unpaywall_oa_pdfs", lambda *a, **k: ([], []))
 
 
 def test_missing_pdf_dois_skips_existing_files_and_does_not_invent(monkeypatch):
@@ -667,7 +667,7 @@ def test_resolve_oa_falls_back_to_osti_when_empty(monkeypatch):
         "app.modules.commands.harvest_rsoxs.dl.fetch_europepmc_search_oa_pdfs", lambda doi: ([], [])
     )
     monkeypatch.setattr("app.modules.commands.harvest_rsoxs.dl.fetch_crossref_tdm_pdfs", lambda doi: ([], []))
-    monkeypatch.setattr("app.modules.commands.harvest_rsoxs.dl.fetch_unpaywall_oa_pdfs", lambda *a, **k: ([], []))
+    monkeypatch.setattr("app.modules.commands.harvest_rsoxs.unpaywall_oa_pdfs", lambda *a, **k: ([], []))
     urls, sources = _resolve_oa_pdfs(paper, mailto="dev@localhost")
     assert urls == ["https://www.osti.gov/servlets/purl/1656507"]
     assert sources == ["osti"]
@@ -688,42 +688,30 @@ def test_arxiv_throttle_detects_429_and_503():
 
 def test_search_arxiv_retries_same_query_after_429(monkeypatch):
     from datetime import datetime, timezone
-    from types import SimpleNamespace
 
     sleeps: list[float] = []
     monkeypatch.setattr("app.modules.commands.harvest_rsoxs.time.sleep", lambda secs: sleeps.append(secs))
+    calls: list[tuple[str, str]] = []
 
-    class _FakeResult:
-        pdf_url = "https://arxiv.org/pdf/2401.00001"
-        title = "Resonant soft X-ray scattering of a conjugated polymer"
-        summary = "RSoXS of P3HT:PCBM at a synchrotron beamline."
-        published = datetime(2024, 1, 15, tzinfo=timezone.utc)
-        doi = ""
+    # Repointed from a fake ``arxiv`` package to the hardened helper ``arxiv_results`` (T17B P1 follow-on): the first
+    # request is answered with a 429 (as ``JSONFetchError("HTTP 429")`` would be), the retry returns one entry.
+    def fake_results(query, max_results, *, sort_by="relevance", **kwargs):
+        calls.append((query, sort_by))
+        if len(calls) == 1:
+            raise RuntimeError("HTTP 429")
+        yield {
+            "short_id": "2401.00001",
+            "pdf_url": "https://arxiv.org/pdf/2401.00001",
+            "doi": "",
+            "title": "Resonant soft X-ray scattering of a conjugated polymer",
+            "summary": "RSoXS of P3HT:PCBM at a synchrotron beamline.",
+            "year": 2024,
+            "published": datetime(2024, 1, 15, tzinfo=timezone.utc),
+        }
 
-        def get_short_id(self):
-            return "2401.00001"
-
-    class _FakeClient:
-        def __init__(self, *args, **kwargs):
-            self.calls = 0
-
-        def results(self, search):
-            self.calls += 1
-            if self.calls == 1:
-                raise RuntimeError(
-                    "Page request resulted in HTTP 429 "
-                    "(https://export.arxiv.org/api/query)"
-                )
-            return [_FakeResult()]
-
-    fake_arxiv = SimpleNamespace(
-        Client=_FakeClient,
-        Search=lambda **kwargs: SimpleNamespace(**kwargs),
-        SortCriterion=SimpleNamespace(SubmittedDate="SubmittedDate"),
-        SortOrder=SimpleNamespace(Descending="Descending"),
-    )
-    monkeypatch.setitem(__import__("sys").modules, "arxiv", fake_arxiv)
+    monkeypatch.setattr("app.modules.commands.harvest_rsoxs.arxiv_results", fake_results)
     hits = search_arxiv(['all:"RSoXS"'], per_query=5, classifier=lambda *a: "A")
     assert sleeps == [60.0]
+    assert calls == [('all:"RSoXS"', "submittedDate")] * 2
     assert len(hits) == 1
     assert hits[0]["id"] == "https://arxiv.org/abs/2401.00001"

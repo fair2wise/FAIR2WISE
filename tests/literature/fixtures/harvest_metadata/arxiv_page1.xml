@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom">
+  <title type="html">ArXiv Query: search_query=all:RSoXS</title>
+  <id>http://arxiv.org/api/Zz0AbCdEfGhIjKlMnOpQrStUvWx</id>
+  <updated>2026-11-06T00:00:00-05:00</updated>
+  <opensearch:totalResults>3</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <opensearch:itemsPerPage>2</opensearch:itemsPerPage>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00001v1</id>
+    <updated>2024-01-16T09:00:00Z</updated>
+    <published>2024-01-15T12:30:00Z</published>
+    <title>Resonant soft X-ray scattering of a
+  conjugated polymer</title>
+    <summary>RSoXS of P3HT:PCBM at a synchrotron beamline.</summary>
+    <author><name>A. Author</name></author>
+    <link href="http://arxiv.org/abs/2401.00001v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2401.00001v1" rel="related" type="application/pdf"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2312.09999v2</id>
+    <updated>2024-01-02T09:00:00Z</updated>
+    <published>2023-12-15T08:00:00Z</published>
+    <title>Molecular orientation from RSoXS</title>
+    <summary>We measure orientation.</summary>
+    <author><name>B. Author</name></author>
+    <arxiv:doi>10.1021/acs.macromol.3c09999</arxiv:doi>
+    <link href="http://arxiv.org/abs/2312.09999v2" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2312.09999v2" rel="related" type="application/pdf"/>
+  </entry>
+</feed>

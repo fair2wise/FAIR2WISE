@@ -1,0 +1,29 @@
+{
+  "meta": {"count": 3, "db_response_time_ms": 38, "page": null, "per_page": 2, "next_cursor": "IlsxNzAxMDAwMDAwMDAwLCAnaHR0cHM6Ly9vcGVuYWxleC5vcmcvVzMxMDAwMDAwMDInXSI="},
+  "results": [
+    {
+      "id": "https://openalex.org/W3100000001",
+      "doi": "https://doi.org/10.1021/acs.macromol.1c00001",
+      "display_name": "Resonant soft X-ray scattering of P3HT:PCBM blends",
+      "title": "Resonant soft X-ray scattering of P3HT:PCBM blends",
+      "publication_year": 2021,
+      "abstract_inverted_index": {"RSoXS": [0], "maps": [1], "domain": [2], "purity.": [3]},
+      "open_access": {"is_oa": true, "oa_url": "https://arxiv.org/pdf/2101.00001"},
+      "best_oa_location": {"is_oa": true, "pdf_url": "https://arxiv.org/pdf/2101.00001", "landing_page_url": "https://arxiv.org/abs/2101.00001"},
+      "primary_location": {"is_oa": false, "pdf_url": null, "landing_page_url": "https://doi.org/10.1021/acs.macromol.1c00001"},
+      "locations": [{"is_oa": true, "pdf_url": "https://arxiv.org/pdf/2101.00001", "landing_page_url": "https://arxiv.org/abs/2101.00001"}]
+    },
+    {
+      "id": "https://openalex.org/W3100000002",
+      "doi": null,
+      "display_name": "Beamline 11.0.1.2 polarised soft X-ray scattering endstation",
+      "title": "Beamline 11.0.1.2 polarised soft X-ray scattering endstation",
+      "publication_year": 2020,
+      "abstract_inverted_index": null,
+      "open_access": {"is_oa": true, "oa_url": "https://zenodo.org/record/6000000/files/e.pdf"},
+      "best_oa_location": {"is_oa": true, "pdf_url": "https://zenodo.org/record/6000000/files/e.pdf", "landing_page_url": "https://zenodo.org/record/6000000"},
+      "primary_location": null,
+      "locations": []
+    }
+  ]
+}
