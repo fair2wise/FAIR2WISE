@@ -265,7 +265,8 @@ def read_state(client: TiledMutationClient, graph_id: str, *, double_read: bool 
     if double_read:
         again_e, again_l = client.scan_entities(), client.scan_links()
         if _sha([entities, links]) != _sha([again_e, again_l]):
-            raise ContractError(ErrorCode.CONFLICT, "the target changed while it was being read; retry")
+            raise ContractError(ErrorCode.CONFLICT, "the target changed while it was being read; retry",
+                                retryable=True)
     return classify_state(graph_id, entities, links)
 
 

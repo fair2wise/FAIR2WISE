@@ -78,12 +78,12 @@ class Lease:
             try:
                 fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
             except FileExistsError:
-                raise ContractError(ErrorCode.CONFLICT, "another import holds the lease") from None
+                raise ContractError(ErrorCode.CONFLICT, "another import holds the lease", retryable=True) from None
             os.close(fd)
             self._write(1)
             return self
         if datetime.fromisoformat(current["expires_at"]) > self.clock():
-            raise ContractError(ErrorCode.CONFLICT, "another import holds the lease")
+            raise ContractError(ErrorCode.CONFLICT, "another import holds the lease", retryable=True)
         self._write(int(current.get("generation", 0)) + 1)
         return self
 
@@ -91,7 +91,7 @@ class Lease:
         """Renew; raise ``CONFLICT`` if this owner no longer holds the lease."""
         current = self._read()
         if current is None or current.get("token") != self.token:
-            raise ContractError(ErrorCode.CONFLICT, "the import lease was taken over; stopping")
+            raise ContractError(ErrorCode.CONFLICT, "the import lease was taken over; stopping", retryable=True)
         self._write(int(current["generation"]))
 
     def release(self) -> None:

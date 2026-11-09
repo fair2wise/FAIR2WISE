@@ -252,7 +252,8 @@ def read_scope_state(client: TiledMutationClient, scope: str, *, adopted: Sequen
     if double_read:
         again_e, again_l = client.scan_entities(), client.scan_links()
         if _sha([entities, links]) != _sha([again_e, again_l]):
-            raise ContractError(ErrorCode.CONFLICT, "the target changed while it was being read; retry")
+            raise ContractError(ErrorCode.CONFLICT, "the target changed while it was being read; retry",
+                                retryable=True)
     return classify_scope(scope, entities, links, adopted)
 
 
@@ -600,7 +601,8 @@ def plan_replacement(source: Source, *, client: TiledMutationClient, settings: D
         entities, links = client.scan_entities(), client.scan_links()
         again = (client.scan_entities(), client.scan_links())
         if _sha([entities, links]) != _sha(list(again)):
-            raise ContractError(ErrorCode.CONFLICT, "the target changed while it was being read; retry")
+            raise ContractError(ErrorCode.CONFLICT, "the target changed while it was being read; retry",
+                                retryable=True)
         legacy = legacy_graph_ids(entities, scope)
         if legacy and not adopt_legacy:
             raise ContractError(ErrorCode.CONFLICT,

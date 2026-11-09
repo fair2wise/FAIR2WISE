@@ -96,7 +96,8 @@ class TiledMutationClient(TiledGraphClient):
                 raise TruncatedGraphRead(f"tiled.{key} scan", max_rows)
             page = self.query(document, {**dict(variables or {}), "l": limit, "o": len(rows)}).get(key) or []
             if any(r["id"] in seen for r in page):
-                raise ContractError(ErrorCode.CONFLICT, f"the {key} listing changed while it was read")
+                raise ContractError(ErrorCode.CONFLICT, f"the {key} listing changed while it was read",
+                                    retryable=True)
             seen.update(r["id"] for r in page)
             rows.extend(page)
             if len(page) < limit:
