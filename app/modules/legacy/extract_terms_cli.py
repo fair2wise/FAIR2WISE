@@ -1562,7 +1562,7 @@ Output JSON:
                     "unit": p["normalized_unit"],
                     "uncertainty": p.get("uncertainty_value"),
                     "context": p["context"],
-                    "verified": not p["unit_conversion_failed"]
+                    "verified": bool(p.get("verified", True)) and not p["unit_conversion_failed"]
                 })
                 logger.info(f"Attached property '{p['property']}' to material '{mat}'")
                 updated = True
