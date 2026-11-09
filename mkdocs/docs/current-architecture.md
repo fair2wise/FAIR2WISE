@@ -31,7 +31,7 @@ kept only as the legacy editable mode until its approved retirement gate
 `docs/migration/reviews/H8/splash_retirement.md` and nothing is deleted yet.
 On `:local` the UI Save is wired lazily to the Tiled-backed target of the
 active publication: before a first publication Save answers the typed 501 and
-writes nothing, and with the default `--kg-mode json` Save is off (see
+writes nothing, and the image starts in the editable mode (`--kg-mode splash`, backed by Tiled) so Save is available as soon as a publication exists (see
 [Save on `:local`](local-image.md#save-on-local)). On a Tiled-only ALS
 deployment Save still fails safely with the legacy 502 (T18C F1); the broader
 edit design is pending owner decision (OPEN_DECISIONS A4; Q1-Q16 of

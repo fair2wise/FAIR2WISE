@@ -198,11 +198,17 @@ Dockerfile; each launcher runs the image's Python in isolated mode and adds
 Editing a node and pressing Save works on `:local` only after a first
 publication:
 
-- The image starts the API with `--kg-mode json` (`docker/profiles/local.json`),
-  which is read-only: Save is off, and the Edit control is hidden. To edit,
-  choose the editable source in **Settings > Knowledge graph source**
-  (the legacy `splash_links` option; on the image it is backed by Tiled, not
-  Splash).
+- The image starts the API in the **editable** KG mode (`--kg-mode splash` in
+  `docker/profiles/local.json`; `splash` is only the legacy wire token of that
+  mode, on the image it is backed by Tiled and the graph view reads JSON, and
+  no Splash service is ever contacted). Nothing needs switching: Save is
+  available as soon as a publication exists. Choosing the `json` source in
+  **Settings > Knowledge graph source** is the read-only view (Save answers the
+  legacy 400).
+- Before a first publication the graph view shows the image's JSON graph, the
+  Edit/Save controls are hidden and a PATCH is the typed 501 (below). After a
+  publication the graph view shows that corpus's effective record (active
+  snapshot plus in-flight edits).
 - The Save target is resolved **per request** from the active publication
   pointer: the corpus the last publication activated. Nothing is bound at
   startup (`app/api/local_save.py`).

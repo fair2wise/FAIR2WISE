@@ -136,7 +136,7 @@
         "--model",
         "${F2W_MODEL}",
         "--kg-mode",
-        "json",
+        "splash",
         "--graph",
         "${F2W_GRAPH}",
         "--schema",
