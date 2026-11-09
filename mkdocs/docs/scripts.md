@@ -34,7 +34,12 @@ names.
 | `f2w-download-pdfs` | `literature.download_pdfs` | Search arXiv/OpenAlex and download PDFs |
 | `f2w-kg-snapshot` | `commands.build_kg_snapshot` | Freeze a versioned JSON KG snapshot |
 | `f2w-kg-release` | `commands.prepare_kg_release` | Prepare, verify and export a KG release (never commits or pushes) |
-| `f2w-kg-adopt` | `commands.adopt_legacy_kg` | Adopt legacy flat KG files as releases |
+| `f2w-kg-adopt` | `commands.adopt_legacy_kg` | `adopt` (flat `matkg_*.json` to `<corpus>/v<N>/` releases; `--dry-run`, `--only`, `--code-commit`) and `descriptor` (candidate data-release descriptor from Git objects); no Git write, no network, no Tiled |
+
+In the images the project is not pip-installed, so the same ten commands are installed as launchers in
+`/usr/local/bin` at build time (`docker/entrypoint/install_console_scripts.py`, one launcher per
+`[project.scripts]` entry, running the image's Python with `/app` on the path); `docker exec f2w-local f2w-kg-adopt --help`
+works in a running `:local` container. See [The `:local` image](local-image.md#console-scripts-in-the-image).
 
 `harvest_rsoxs`, `harvest_xray` and `harvest_tomo` download PDFs through the hardened fetcher
 (`literature.legacy_download.hardened_download_pdf`, the one `DownloadAgent` uses) and read Crossref and OpenAlex
@@ -50,6 +55,10 @@ start with `%PDF-`; metadata answers are capped at 8 MiB; refused or non-PDF ans
 | `scripts/run.py` | Local modular term extraction |
 | `app/run_pipeline_cborg.py` | Incremental 25/50/75/100-paper evaluation |
 
+Operations CLI (`python -m app.api.cli --root DIR jobs|cases|audit|ops ...`, local profile only):
+`ops list` names the operations, graph ids and corpus names; `ops summarize` summarizes one extracted paper;
+see [Operations tab, CLI and SDK](ui-operations.md).
+
 Agent launcher subcommands are `status`, `ask`, `chat`, and `api`. Global
 options configure the model, graph, session, workflow, literature, and
 extraction behavior.
@@ -62,6 +71,7 @@ extraction behavior.
 | `start_rsoxs_stack.sh` | Daemonize RSoXS JSON agent+UI (5175/8090); `stop` does not kill extract |
 | `start_agent_backend.sh` | Resolve `F2W_*` variables and run the packaged agent API launcher |
 | `start_agent_frontend.sh` | Validate npm/Vite and run the Vite dev server (default port 5175) |
+| `run_local_container.sh` | Start the `:local` image on `127.0.0.1:8080` with `CBORG_API_KEY` from a dotenv file and the papers folder mounted as the Library ([The `:local` image](local-image.md)) |
 | `install_pixi.sh` | Install Pixi if absent and initialize Splash |
 | `test_compose.sh` | Isolated Splash-stack smoke test (`compose.splash.yaml`) |
 

@@ -16,7 +16,8 @@ pixi run -e dev test-slow    # only the tests marked slow
 - `-n` is deliberately not in `pytest.ini`: debug one test serially with
   `python -m pytest path::test -p no:cacheprovider`, and run coverage without `-n`.
 - Run pytest from a clean export of the tree, not from a checkout holding a `.env`
-  (entry points load it); CI uses `env -i` with a private `HOME`.
+  (entry points load it at import); CI uses `env -i` with a private `HOME`. The recipe
+  is [below](#clean-export-recipe-and-the-tiled-backed-tests).
 - Scale tests (`tests/operations/test_scale_*.py`, `test_figure_evidence.py`,
   `test_repeated_works.py`, `test_no_code_generation.py`) run on populations one tenth of
   the full size by default; every bound (scan bound, inline result bound, prompt budget) is scaled
@@ -27,6 +28,68 @@ pixi run -e dev test-slow    # only the tests marked slow
   stop, restart or kill a server, or need an auth/ACL variant, start their own.
 - Tests must be xdist-safe: no fixed ports, no shared fixed file paths (use `tmp_path`); a subprocess
   with a private `HOME` should pass `MPLCONFIGDIR` through, or it rebuilds matplotlib's font cache.
+
+## Fast, slow and nightly
+
+| Run | What it runs | Where |
+|---|---|---|
+| fast (default) | everything except `@pytest.mark.slow`: `-m "not slow"` | `pixi run -e dev test`; the `python-baseline-suite` and `python-tiled-suites` CI jobs |
+| slow | only the full-size scale tests (`tests/operations`, parameter id `full`: 60k-entity populations, a 15k-entity disposable Tiled server) | `pixi run -e dev test-slow` |
+| full | fast and slow | `pixi run -e dev test-full` |
+| nightly | the slow tests with a Tiled server, at 06:17 UTC and on manual dispatch | job `python-slow-suite` of `.github/workflows/forge-merge-ci.yml` |
+
+`-n auto` uses every core. On a shared machine pass a count instead, for example `-n 8`
+(pytest-xdist). Tests must stay xdist-safe, so any `-n` value is valid.
+
+## Clean export recipe and the tiled-backed tests
+
+Run from a `git archive` export placed outside the repository, under `env -i`, with the
+variables written **inline** on the command line:
+
+```bash
+EXPORT=$(mktemp -d)                      # not under the repository: no .env in any parent
+git -C /path/to/repo archive HEAD | tar -x -C "$EXPORT" && mkdir "$EXPORT/home" && cd "$EXPORT"
+env -i HOME="$EXPORT/home" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+  F2W_TILED_PYTHON=/path/to/tiled-server/bin/python \
+  /path/to/dev/bin/python -m pytest -n 8 -p no:cacheprovider -q -m "not slow" --ignore=tests/deepeval
+```
+
+With the pixi environments the two interpreters are
+`.pixi/envs/dev/bin/python` and `.pixi/envs/tiled-server/bin/python`
+(`pixi install --locked -e dev` and `-e tiled-server`). Use the interpreter
+as `python -m pytest`, never a `bin/pytest` script.
+
+About 260 to 270 tests (the CI comment says ~260; the owner counted ~270) use the
+disposable Tiled server of `tests/fixtures/tiled_server.py`. Without `F2W_TILED_PYTHON` they
+**skip**, each with the reason "F2W_TILED_PYTHON is not set"; with it set, a server that
+fails to start fails the test. The variable names an isolated `tiled[server]==0.2.18`
+interpreter, never the app environment.
+
+!!! warning "zsh does not word-split variables"
+
+    Do not put the assignments in a shell variable (`ENVV="F2W_TILED_PYTHON=... python"`
+    then `env -i $ENVV -m pytest`). zsh passes that variable as one word, so
+    `F2W_TILED_PYTHON` is silently dropped (or the command fails) while bash would
+    have split it. The symptom is a green run with about 270 skips. Check the summary
+    line: if the Tiled tests were meant to run, the skipped count must be small.
+
+## Documentation and CI-script checks
+
+```bash
+env -i HOME="$EXPORT/home" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+  F2W_TILED_PYTHON=/path/to/tiled-server/bin/python \
+  /path/to/dev/bin/python -m pytest -n 4 -p no:cacheprovider -q tests/docs tests/ci
+/path/to/dev/bin/python -m evals.binary.import_companion --check
+mkdocs build -f mkdocs/mkdocs.yml --strict
+```
+
+`tests/docs` pins the user-facing docs to the Dockerfile and the image README (the
+gateway port, the three build commands, no page calling Splash the default source) and to
+`docs/migration/task_status.json`; `tests/ci` checks the workflows, the release scripts and
+the docstring style. `import_companion --check` exits 1 when the generated binary-eval case files are out of
+date; the case manifest hashes the oracle source files, so editing a hashed file makes it stale.
+Regenerate with `python -m evals.binary.import_companion` from the clean export and copy the
+changed JSON back.
 
 ## Root Python suite
 

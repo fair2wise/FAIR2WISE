@@ -19,14 +19,22 @@ loads. Every supported launch path sets `KG_RAG_GRAPH_SOURCE=json` and
 
 Tiled Graph is the experiment-identity source (live GraphQL) and the
 publication target. Publishing an approved JSON snapshot into Tiled is a
-separate, gated job (`POST /v1/publications`, approval for the exact plan,
-gated at H5): extraction never writes to Tiled as a side effect (H1-5).
+separate job (`POST /v1/publications`, approval for the exact plan): extraction
+never writes to Tiled as a side effect (H1-5). On `:local` the one allowed
+target is the image's own Tiled (`app/api/local_publication.py`); every other
+target and every ALS profile stays gated at H5. The walk-through is
+[The `:local` image, end to end](local-image.md).
 
 Splash (`splash_links/`, `F2W_KG_MODE=splash`) is deprecated (D03/D16) and is
 kept only as the legacy editable mode until its approved retirement gate
-(T16B/H7 or H8). Tiled-backed editing is not built: on a Tiled-only deployment
-a graph Save fails safely with the legacy 502 and writes nothing (T18C F1);
-the edit design is pending owner decision (OPEN_DECISIONS A4; Q1-Q16 of
+(T16B/H7 or H8); the retirement packet is
+`docs/migration/reviews/H8/splash_retirement.md` and nothing is deleted yet.
+On `:local` the UI Save is wired lazily to the Tiled-backed target of the
+active publication: before a first publication Save answers the typed 501 and
+writes nothing, and with the default `--kg-mode json` Save is off (see
+[Save on `:local`](local-image.md#save-on-local)). On a Tiled-only ALS
+deployment Save still fails safely with the legacy 502 (T18C F1); the broader
+edit design is pending owner decision (OPEN_DECISIONS A4; Q1-Q16 of
 `docs/migration/ui_contracts/tiled_graph_editing_plan.md`).
 
 ## Three images, one gateway
@@ -34,7 +42,7 @@ the edit design is pending owner decision (OPEN_DECISIONS A4; Q1-Q16 of
 ```mermaid
 flowchart TB
     Browser[Browser] -->|"0.0.0.0:8080 (F2W_GATEWAY_PORT)"| GW["nginx gateway /fair2wise<br/>UI, MkDocs, /fair2wise/api, /fair2wise/healthz"]
-    GW -->|127.0.0.1:8090| API["API (uvicorn, root_path /fair2wise/api)<br/>19 UI routes + 24 /v1 routes"]
+    GW -->|127.0.0.1:8090| API["API (uvicorn, root_path /fair2wise/api)<br/>19 UI routes + 65 /v1 routes (48 on ALS)"]
     API --> Worker[worker process]
     API -->|":local only, 127.0.0.1:8765"| Tiled[managed Tiled 0.2.18]
     API -->|"ALS images"| Central[(central Tiled<br/>tiled-staging.als.lbl.gov / tiled.als.lbl.gov)]
@@ -78,9 +86,10 @@ Any other value is a startup error (`config_rejected`).
 - `python -m app.modules.f2w_agent.cli api` serves the 19 frozen UI routes
   (`create_app`, D11).
 - `python -m app.modules.f2w_agent.cli api --jobs-api` serves
-  `app.api.main.create_api_app`: the same UI routes plus the 24 `/v1` jobs,
-  review, publication, status and validation routes, the origin gate and the
-  body cap. The images run this factory. Route policies and the service
+  `app.api.main.create_api_app`: the same UI routes plus the 65 `/v1` routes (48 on an ALS profile: the
+  folder and library routes are `:local` only) for jobs, review, publication,
+  status, validation, operations, capabilities and graph sources, the origin
+  gate and the body cap. The images run this factory. Route policies and the service
   contract are in `docs/migration/api/README.md`.
 - `python -m app.api.cli --root DIR jobs|cases|audit|ops ...` is the operations
   CLI (local profile only).
@@ -97,8 +106,10 @@ owner O-U2); each report records the judge used.
 
 ## Pending owner decisions that affect operation
 
-- Approval TTL: the code applies 1 h on every profile; the recommendation is
-  none on `:local`, 24 h on ALS (OPEN_DECISIONS B14, D3.5, D3.8).
-- Tiled graph editing (OPEN_DECISIONS A4) and the Splash retirement gate.
+- Tiled graph editing on ALS (OPEN_DECISIONS A4) and the Splash retirement gate.
+
+Decided, for reference: publication approvals never expire on `:local` and
+expire after 24 h on ALS (owner O-T2; `default_approval_ttl` in
+`app/api/operations.py`).
 - Image publishing tag rules (OPEN_DECISIONS D2) and paper snippets in images
   (D3.1).

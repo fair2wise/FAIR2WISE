@@ -65,8 +65,8 @@ There are three FastAPI surfaces:
    React application. It owns workflow state, graph editing, settings,
    publication search, and SSE progress (the 19 frozen UI routes, D11).
 2. **Jobs API** (`... cli api --jobs-api`, `app.api.main.create_api_app`): the
-   same UI routes plus the 24 `/v1` jobs, review, publication, status and
-   validation routes. The images run this factory; see
+   same UI routes plus the 65 `/v1` routes (48 on ALS) for jobs, review, publication,
+   status, validation, operations and graph sources. The images run this factory; see
    `docs/migration/api/README.md`.
 3. **KG-RAG compatibility API** (`kg_rag_api.py --api`, normally port `11435`)
    mimics Ollama/OpenAI endpoints for OpenWebUI clients. It does not provide the

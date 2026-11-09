@@ -37,3 +37,5 @@ OpenAlex needs `OPENALEX_API_KEY` in the server environment; without it only arX
 | `POST /v1/library/harvest/candidates/{id}/pdf`, `.../dismiss` | complete or dismiss a paywalled paper |
 
 The full route table with capabilities is in `docs/migration/api/README.md`. All of these need the local-operator `library.*` capabilities.
+
+To turn a harvested and extracted KG into a published graph, continue with [The `:local` image, end to end](local-image.md).

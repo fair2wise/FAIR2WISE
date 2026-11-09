@@ -43,7 +43,7 @@ flowchart LR
     T --> C[json2kg conversion]
     C --> J[Versioned MatKG JSON in storage/kg]
     J --> R[KG retrieval]
-    J -->|approved plan, H5-gated publication| TG[(Tiled Graph)]
+    J -->|approved plan, gated publication| TG[(Tiled Graph)]
     J -.->|legacy editable mode| I[Splash Links import]
     R --> A[Agent API]
     A --> U[React UI]
@@ -74,6 +74,9 @@ flowchart LR
 - Start with [Getting started](getting-started.md).
 - Follow [Fresh-machine deployment](deployment.md) for `.env`, CBORG/IPv6,
   first start, upgrades, and rollback.
+- Running the `:local` image? Follow [The `:local` image, end to end](local-image.md):
+  start script, harvest, extraction, export, adoption, publication, approval and
+  rollback.
 - Use the [end-to-end tutorials](tutorials.md) to move from a grounded question
   through approved extraction and graph inspection.
 - Read [Current architecture](current-architecture.md) and then
