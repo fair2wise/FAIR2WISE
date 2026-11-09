@@ -150,3 +150,9 @@ not the other": confirmed (the plan's scope was e2e_demo only and bl1101's recor
 | Image `--kg-mode` default on `:local` | "Default to editable on :local" (UI Save becomes available as soon as a publication exists; the lazy target still answers the typed 501 before one; edits block the next publication of that corpus until reconciled) |
 | H4 gate packet | "Yes, prepare it (Recommended)" (assemble from the C4 report, the provisional B4 binary report, T07B's design and the owner-gated items; nothing marked approved) |
 | Legacy `splash` enum value after the compatibility window (packet Q8) | "Accept but alias to json/tiled (Recommended)" (the token is accepted as the editable-graph alias and never contacts a Splash service) |
+
+## Sixteenth set (2026-11-09)
+
+| Question | Owner answer |
+|---|---|
+| UI: pending approvals | "I think we need another page in the UI left side bar for \"Pending Approvals\" that show up in :local mode and in the :als-dev and :als-prod images when an admin is logged in" (read as: a new sidebar page listing the items awaiting a human approval, visible on `:local` to the local operator and on the ALS images only to a signed-in admin; approvals go through the existing approval routes and role checks, never a new approval path) |
