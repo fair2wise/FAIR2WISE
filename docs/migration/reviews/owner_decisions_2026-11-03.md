@@ -132,3 +132,12 @@ not the other": confirmed (the plan's scope was e2e_demo only and bl1101's recor
 | Paid CBORG model run (C4 rerun, B4 labelling) | "for the paid cborg run, let's just use the best cborg model available that is free" (2026-11-06) |
 
 | Suspected bugs B1-B13 of the T27 read-through (`reviews/H7/readthrough_F25_F38.md`) | "let's fix these bugs" (B11, B3, the dead `missing_ok`, the Tiled neighborhood ignoring `hops`, the stale `_skipped` reset, and the others listed there) (2026-11-06) |
+
+## Fourteenth set (2026-11-09)
+
+| Question | Owner answer |
+|---|---|
+| Publication pointer model (memo `reviews/H5/pointer_model_memo.md`) | "Model C (Recommended)" (per-target pointer stays 'last activated'; add a per-corpus live-version view; rollback and the pointer read take an optional corpus) |
+| P2 agent base for the orchestrator and debate agents | "LangGraph, via agent_runtime.admission (Recommended)" (LLM calls through admission and counted against curation budgets) |
+| Fate of `splash_links/` at cutover (packet Q1-Q3) | "Delete, keep an archive tag (Recommended)" (tag the last commit containing it, delete at cutover after one canary cycle; its `_tests` go with it; the wire tokens stay) |
+| Approval of a zero-operation rollback plan | "Auto-approve on :local only" (zero-operation rollback plans on the `:local` profile may skip the human approval step; every other profile and every non-empty plan still needs it) |
