@@ -174,3 +174,12 @@ not the other": confirmed (the plan's scope was e2e_demo only and bl1101's recor
 | Corpus removal and the target pointer under Model C | "Move the pointer to a still-live corpus (Recommended)" |
 | T12 pilot size | "Yes, three papers satisfy T12 (Recommended)" (the three-paper pilot A, B, C satisfies T12 for H4; the 13 label cases rest on them) |
 | T27 small items: docstring-style CI gate; 500-node cap on the Tiled neighbourhood route | "Keep the CI gate. I need more information about the Tiled neighborhood decision. Is that for testing, or during normal usage? I am tempted to forgoe the limits and maybe do a performance evaluation to determine if we need a cap" (CI gate kept; the cap is left as is pending a performance evaluation on the real graphs; not decided) |
+
+## Nineteenth set (2026-11-09)
+
+| Question | Owner answer |
+|---|---|
+| Pointer memo Q2: corpus-less rollback while several corpora are live | "Refuse when several corpora are live (Recommended)" (409 `corpus_required` naming the live corpora; a single live corpus works as today) |
+| Splash packet Q5-Q7: remaining Splash-era defaults | "Flip all three now (Recommended)" (config.yml and .env.example default `graph_source` to json; the UI Settings text corrected; NERSC scripts default to json with the path a parameter; wire tokens stay) |
+| Harvest politeness (arXiv 3 s spacing; honour 429 Retry-After) | "Add the 3 s arXiv pause and honour Retry-After (Recommended)" |
+| OpenAlex API key use | "Yes, header-only when exported (Recommended)" (read from the process environment only, never `.env`, never logged, never in a URL) |
