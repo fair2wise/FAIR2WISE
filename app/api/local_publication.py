@@ -60,7 +60,7 @@ from ..modules.security.authorization import (
 from ..modules.security.tiled_identity import normalize_tiled_target
 from .local_save import LocalSaveProvider, local_edit_journal
 from .operations import F2WOperations, PublicationGate
-from .post_extraction import PostExtractionPublisher, snapshot_freezer
+from .post_extraction import PostExtractionPublisher, noop_rollback_auto_approver, snapshot_freezer
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +229,8 @@ def build_local_publication(jobs: JobService, settings: DeploymentSettings, mana
         snapshots=DirectorySnapshotSource(storage_kg), step=step, index=LocalIndexBuilder(storage_kg),
         probe=LocalRevisionProbe(fingerprints), store=store, audit=recorder,
         ctx_for=lambda job: worker_context(operator, run_id=job.job_id), clock=epoch,
-        verify_approval=lambda approval, plan, at: verify_approval(approval, plan, settings, at=at))
+        verify_approval=lambda approval, plan, at: verify_approval(approval, plan, settings, at=at),
+        auto_approve=noop_rollback_auto_approver(settings, clock=now))
     save_provider = LocalSaveProvider(settings=settings, managed=managed, target=target, storage_kg=storage_kg,
                                       state_dir=state_dir, store=store, clock=now, namespace=step.namespace,
                                       access_blob=step.access_blob)

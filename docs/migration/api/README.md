@@ -223,8 +223,17 @@ A quarantine row (`pub_quarantine`) only annotates that job's view (`ui_state = 
 submission, approval or activation on the target. A rollback re-submitted with the *same* reason is the same job
 (idempotent job identity: kind, snapshot, target, pointer version, reason) and stays failed, and `resume` does not
 heal it either (the completed `import` stage is reused, so `verify` fails again): submit the rollback again with
-another reason, which is a new job. *Owner question (not decided here):* whether a no-op rollback should still require the
-V18 approval or may fall under the `:local` safe-plan auto-approval (a no-op plan is `safe` by construction).
+another reason, which is a new job. *Owner decision 2026-11-09 (fourteenth set), "Auto-approve on :local only":* a
+**zero-operation rollback plan is approved automatically on the `:local` profile only**. The publication job's
+`review` stage offers a rollback job's plan to the deployment's `PublicationDeps.auto_approve` policy only when
+`ReplacementPublishStep.plan_is_noop(plan)` holds (no creates, links or supersessions, no boundary links or legacy
+adoption, the scope still at the plan's base revision, and a covering replacement receipt valid now). On `:local` the
+policy (`post_extraction.noop_rollback_auto_approver`, wired by `build_local_publication`) makes the same
+plan-hash-, job-, target- and profile-bound approval of the local operator that a person's approval is, verified by the
+same `verify_approval`, stored with `record_approval`, and marked `reason = "auto_safe_plan"` (the T18E marker; a human
+approval has `reason = null`), so the audit trail names it as a policy decision, never as a human one. On any other
+profile the policy answers nothing and the job waits for the V18 approval; every non-empty plan, every non-rollback
+publication, and a deployment without the policy (the default of `PublicationDeps`) still wait for the human route.
 
 **Reviewed resolutions (Q15, T23C).** A rollback below a snapshot that carries a `reconciled` edit is refused at plan
 time unless each such edit has a reviewed `ConflictResolution` (`discarded` or `carried`) passed as

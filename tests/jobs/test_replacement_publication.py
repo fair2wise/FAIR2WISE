@@ -402,3 +402,87 @@ def test_live_versions_follow_corpus_removal_and_markers(world):
     # A marker that no longer names the version history says is live drops it from the view.
     world.step.release_marker = lambda ctx, scope: {"snapshot_id": "v9"}  # type: ignore[method-assign]
     assert world.pub.live_versions(world.ctx, world.target) == {}
+
+
+# --- zero-operation rollback auto-approval (owner decision 2026-11-09: :local only) -----------------------
+
+def local_approver(world):
+    from app.api.post_extraction import noop_rollback_auto_approver
+
+    return noop_rollback_auto_approver(world.settings, clock=world.step_clock)
+
+
+@pytest.fixture()
+def auto_world(tmp_path, registry, fingerprints):
+    v1 = build_v1(tmp_path, registry)
+    derive(v1, "v2", revise=2, add=1)
+    derive_corpus(v1, OTHER)
+    w = RWorld(tmp_path, v1, fingerprints)
+    w.pub.deps.auto_approve = local_approver(w)
+    return w
+
+
+def test_noop_rollback_is_auto_approved_on_local_with_an_auto_safe_plan_record(auto_world):
+    world = auto_world
+    world.publish("v1")
+    world.finish(world.pub.submit(world.ctx, f"{OTHER}/v1", world.target).job_id)
+    before, n_writes = counts(world), len(world.client.writes)
+    handle = world.pub.rollback_replacement(world.ctx, world.target, reason="back to A")
+    assert world.work() == (handle.job_id, JobState.SUCCEEDED), "no human approval step"
+    plan = world.pubstore.current_plan(handle.job_id).plan
+    assert (plan.creates, plan.links, plan.supersessions) == (0, 0, 0)
+    approval = world.pubstore.get_approval(world.store.stage(handle.job_id, "import").result["approval_id"])
+    assert approval.reason == "auto_safe_plan" and approval.plan_sha256 == plan.plan_sha256
+    assert approval.operation_id == handle.job_id and approval.target == world.target
+    assert approval.profile.value == "local" and approval.requested_by == approval.approved_by == "local-operator"
+    assert approval.executed_as == "f2w-writer"
+    assert world.pubstore.pointer(world.target).snapshot_ref == f"{SCOPE}/v1"
+    assert counts(world) == before and len(world.client.writes) == n_writes
+    # A human approval of the same kind of plan carries no reason, so the two are told apart.
+    human = world.finish(world.pub.submit(world.ctx, f"{OTHER}/v1", world.target).job_id)
+    assert world.pubstore.get_approval(world.store.stage(human, "import").result["approval_id"]).reason is None
+
+
+def test_non_empty_rollback_plan_still_needs_the_human_approval_on_local(auto_world):
+    world = auto_world
+    world.publish("v1")
+    world.publish("v2")
+    handle = world.pub.rollback_replacement(world.ctx, world.target, reason="real change")
+    assert world.work() == (handle.job_id, JobState.AWAITING_REVIEW)
+    plan = world.pub.current_plan(world.ctx, handle.job_id)
+    assert plan.supersessions > 0 or plan.creates > 0
+    assert world.pubstore.valid_approvals(handle.job_id, plan) == []
+    world.approve(handle.job_id)
+    assert world.work() == (handle.job_id, JobState.SUCCEEDED)
+    # A plain (non-rollback) publication whose plan is empty is not covered by this decision either.
+    again = world.pub.submit(world.ctx, f"{SCOPE}/v1", world.target)
+    assert world.work() == (again.job_id, JobState.AWAITING_REVIEW)
+
+
+def test_noop_rollback_waits_for_a_human_on_any_other_profile(auto_world):
+    from app.api.post_extraction import noop_rollback_auto_approver
+    from app.modules.security.authorization import DeploymentSettings
+
+    world = auto_world
+    als = DeploymentSettings.for_disposable_test_target("als-dev", tiled_target="http://127.0.0.1:59872",
+                                                        writer_identity="f2w-writer")
+    hook = noop_rollback_auto_approver(als, clock=world.step_clock)
+    world.pub.deps.auto_approve = hook
+    world.publish("v1")
+    world.finish(world.pub.submit(world.ctx, f"{OTHER}/v1", world.target).job_id)
+    handle = world.pub.rollback_replacement(world.ctx, world.target, reason="back to A")
+    assert world.work() == (handle.job_id, JobState.AWAITING_REVIEW)
+    plan = world.pub.current_plan(world.ctx, handle.job_id)
+    assert plan.creates == plan.links == plan.supersessions == 0
+    assert hook(plan, handle.job_id) is None, "the policy itself refuses off :local"
+    assert world.pubstore.valid_approvals(handle.job_id, plan) == []
+    world.approve(handle.job_id)  # the human route is unchanged
+    assert world.work() == (handle.job_id, JobState.SUCCEEDED)
+
+
+def test_no_auto_approver_is_wired_by_default(world):
+    derive_corpus(world.v1, OTHER)
+    world.publish("v1")
+    world.finish(world.pub.submit(world.ctx, f"{OTHER}/v1", world.target).job_id)
+    handle = world.pub.rollback_replacement(world.ctx, world.target, reason="back to A")
+    assert world.work() == (handle.job_id, JobState.AWAITING_REVIEW)
