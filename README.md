@@ -21,7 +21,7 @@ This branch carries the FORGE-to-F2W migration (`docs/migration/plan.md`,
 
 | Topic | Current state |
 |---|---|
-| Graph source | **JSON KG by default.** Every supported launch path sets `KG_RAG_GRAPH_SOURCE=json` / `F2W_KG_MODE=json` (`compose.yaml`, `scripts/start_agent_backend.sh`, `scripts/start_rsoxs_stack.sh`, the three images). Only the bare `kg_rag_api.py` CLI still falls back to `config.yml`'s legacy `splash` default. Tiled Graph is the experiment-identity source and the publication target; Splash is legacy (D03/D16). |
+| Graph source | **JSON KG by default.** Every supported launch path sets `KG_RAG_GRAPH_SOURCE=json` / `F2W_KG_MODE=json` (`compose.yaml`, `scripts/start_agent_backend.sh`, `scripts/start_rsoxs_stack.sh`, the three images). `config.yml` and `scripts/.env.example` default `KG_RAG_GRAPH_SOURCE` to `json` as well (owner decision 2026-11-09, Splash packet Q5); `splash` stays an accepted value for the legacy editable mode. Tiled Graph is the experiment-identity source and the publication target; Splash is legacy (D03/D16). |
 | Images | Three targets from the root `Dockerfile`: `:local` bundles a managed **Tiled 0.2.18** server (owner exception O-T1 to the plan's 0.2.19 pin), the UI, MkDocs and the API/worker; `:als-dev` and `:als-prod` carry no Tiled and use the central servers (`https://tiled-staging.als.lbl.gov`, `https://tiled.als.lbl.gov`). The legacy `agent` compose target still exists and is not one of the three images. |
 | Ingress | One gateway (nginx, unprivileged uid 10001) on **port 8080** (`F2W_GATEWAY_PORT`), serving the UI, MkDocs and the same-origin API under **`/fair2wise`** (`/fair2wise/api`, `/fair2wise/healthz`). The API binds `127.0.0.1:8090` inside the container and is not published by the images. |
 | Runtime | `F2W_RUNTIME=legacy` (default) keeps the existing F2W read path; `F2W_RUNTIME=langgraph` enables the scoped LangGraph runtime, where `F2W_QA_ROUTE=supervisor` (default) routes UI QA turns through the planning supervisor and `F2W_QA_ROUTE=direct` calls `answer_from_knowledge` directly (owner H2 Q1, O-R1 fallback). |
@@ -438,7 +438,7 @@ python3 app/modules/json2kg.py \
 > OPEN_DECISIONS A4) and until the Splash retirement gate (T16B/H7 or H8).
 > Every supported launch path runs the JSON KG; the images contain no Splash.
 
-In Splash mode (`KG_RAG_GRAPH_SOURCE=splash`, the bare `kg_rag_api.py` CLI's `config.yml` default) KG-RAG loads from the `splash_links` graph database. **After every KG JSON rebuild or metadata fix, you must re-import into splash_links and restart KG-RAG.** The splash DB is not updated automatically when `storage/kg/*.json` changes.
+In Splash mode (`KG_RAG_GRAPH_SOURCE=splash`; the `config.yml` default is `json` since the 2026-11-09 owner decision, Splash packet Q5) KG-RAG loads from the `splash_links` graph database. **After every KG JSON rebuild or metadata fix, you must re-import into splash_links and restart KG-RAG.** The splash DB is not updated automatically when `storage/kg/*.json` changes.
 
 The vendored [`splash_links`](splash_links/) service is the graph persistence
 layer used by FAIR2WISE. It stores nodes as entities and relationships as
@@ -730,7 +730,7 @@ Runs the full question set from `storage/competency_questions/thomas_f.txt`. Res
 
 | Argument | Default | Description |
 |---|---|---|
-| `--graph-source` | `splash` (legacy `config.yml` default; every supported launcher passes `json`) | KG source (`json` file, or the legacy `splash` database) |
+| `--graph-source` | `json` (`config.yml` default; `splash` is the legacy database) | KG source (`json` file, or the legacy `splash` database) |
 | `--splash-uri` | `splash://localhost:8081` | `splash_links` service URI |
 | `--splash-page-size` | `1000` | GraphQL page size for database graph loading |
 | `--graph` | `KG_RAG_GRAPH` env | Path to KG JSON file when `--graph-source json` |
@@ -1008,7 +1008,7 @@ Open the UI at `http://localhost:8080`. First startup may take a minute to downl
 
 ### 3. Start the KG-RAG API server
 
-In a separate terminal (outside the Open WebUI venv). Pass `--graph-source json` (the bare CLI's `config.yml` default is still the legacy `splash`, which needs a running splash-links server, see **Step 4**):
+In a separate terminal (outside the Open WebUI venv). `--graph-source json` is the `config.yml` default; the legacy `splash` source needs a running splash-links server, see **Step 4**:
 
 ```bash
 cd /path/to/FAIRtoWISE-FORUM-AI

@@ -6,18 +6,18 @@ usage() {
 Run the full FAIR2WISE 3-agent loop on NERSC.
 
 Required env:
-  NERSC_USER=mateo
-  NERSC_REPO=/pscratch/sd/m/mateo/f2wlocal
+  NERSC_USER=<username>
+  NERSC_REPO=/pscratch/sd/<first-letter>/<username>/f2wlocal
 
 Optional env:
   NERSC_HOST=perlmutter.nersc.gov
   SSH_OPTS="-o PubkeyAuthentication=no"
   F2W_BACKEND=cborg
   F2W_MODEL=lbl/cborg-chat
-  F2W_KG_MODE=splash
+  F2W_KG_MODE=json              # json (default, read-only) or the legacy editable splash
   F2W_GRAPH=storage/kg/matkg_xray_papers_cborg_chat.json
   F2W_SEED_TERMS=storage/terminology/extracted_terms_xray_papers_cborg_chat.json
-  SPLASH_LINKS_REPO=/pscratch/sd/m/mateo/splash_links
+  SPLASH_LINKS_REPO=/path/to/splash_links   # required only with F2W_KG_MODE=splash
   F2W_WORKDIR=runs/nersc_3agent
   F2W_MAX_ROUNDS=3
   F2W_MAX_PAPERS=3
@@ -78,7 +78,7 @@ REMOTE="${NERSC_USER}@${NERSC_HOST}"
 
 F2W_BACKEND="${F2W_BACKEND:-cborg}"
 F2W_MODEL="${F2W_MODEL:-lbl/cborg-chat}"
-F2W_KG_MODE="${F2W_KG_MODE:-splash}"
+F2W_KG_MODE="${F2W_KG_MODE:-json}"
 F2W_GRAPH="${F2W_GRAPH:-storage/kg/matkg_xray_papers_cborg_chat.json}"
 F2W_SEED_TERMS="${F2W_SEED_TERMS:-storage/terminology/extracted_terms_xray_papers_cborg_chat.json}"
 F2W_WORKDIR="${F2W_WORKDIR:-runs/nersc_3agent}"
@@ -86,7 +86,12 @@ F2W_MAX_ROUNDS="${F2W_MAX_ROUNDS:-3}"
 F2W_MAX_PAPERS="${F2W_MAX_PAPERS:-3}"
 F2W_CANDIDATE_POOL="${F2W_CANDIDATE_POOL:-25}"
 F2W_WORKERS="${F2W_WORKERS:-4}"
-SPLASH_LINKS_REPO="${SPLASH_LINKS_REPO:-/pscratch/sd/m/mateo/splash_links}"
+# JSON (read-only, no Splash service) is the default; the legacy editable mode needs
+# F2W_KG_MODE=splash together with SPLASH_LINKS_REPO (owner decision 2026-11-09, Q7).
+if [[ "$F2W_KG_MODE" == "splash" && -z "${SPLASH_LINKS_REPO:-}" ]]; then
+  echo "error: F2W_KG_MODE=splash needs SPLASH_LINKS_REPO=/path/to/splash_links (or use F2W_KG_MODE=json)" >&2
+  exit 2
+fi
 
 CMD="cd $(shell_quote "$NERSC_REPO")"
 CMD+=" && source .venv/bin/activate"
@@ -98,7 +103,9 @@ CMD+=" --kg-mode $(shell_quote "$F2W_KG_MODE")"
 CMD+=" --graph $(shell_quote "$F2W_GRAPH")"
 CMD+=" --seed-terms $(shell_quote "$F2W_SEED_TERMS")"
 CMD+=" --workdir $(shell_quote "$F2W_WORKDIR")"
-CMD+=" --splash-repo $(shell_quote "$SPLASH_LINKS_REPO")"
+if [[ "$F2W_KG_MODE" == "splash" ]]; then
+  CMD+=" --splash-repo $(shell_quote "$SPLASH_LINKS_REPO")"
+fi
 CMD+=" --max-rounds $(shell_quote "$F2W_MAX_ROUNDS")"
 CMD+=" --max-papers $(shell_quote "$F2W_MAX_PAPERS")"
 CMD+=" --candidate-pool $(shell_quote "$F2W_CANDIDATE_POOL")"

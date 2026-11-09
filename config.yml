@@ -55,7 +55,7 @@ kg_rag:
   retrieval:
     graph_source:
       env: KG_RAG_GRAPH_SOURCE
-      default: splash
+      default: json  # legacy editable mode: splash (owner decision 2026-11-09, Q5)
     splash_uri:
       env:
         - KG_RAG_SPLASH_URI
@@ -241,7 +241,7 @@ docker_env:
   PIP_NO_CACHE_DIR: "1"
   KG_RAG_BACKEND: cborg
   KG_RAG_CBORG_MODEL: lbl/cborg-chat
-  KG_RAG_GRAPH_SOURCE: splash
+  KG_RAG_GRAPH_SOURCE: json
   KG_RAG_SPLASH_URI: splash://localhost:8081
   KG_RAG_GRAPH: storage/kg/matkg_xray_papers_cborg_chat.json
   KG_RAG_RETRIEVAL_BACKEND: lexical

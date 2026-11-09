@@ -10,6 +10,10 @@ H8 cutover:
   ``splash_links`` package or its own dependencies; the legacy Splash GraphQL client exists in
   exactly the two modules the deletion list names; the Tiled Save stand-in covers every client
   call the UI Save path makes; every supported launcher defaults to JSON / Tiled.
+* the Splash-era defaults are flipped (owner decision 2026-11-09, nineteenth set, packet Q5-Q7):
+  ``config.yml`` and ``scripts/.env.example`` default ``graph_source`` to ``json``; the NERSC scripts
+  default to ``json`` with the checkout path required and no personal path; the UI Settings text
+  describes the editable Tiled-backed mode and the read-only JSON mode without a Splash server.
 * packaging carries no Splash dependency, and the packet's inventory names every code/config
   file that still mentions Splash (so the deletion list cannot be shorter than reality).
 
@@ -184,6 +188,43 @@ def test_every_supported_launcher_defaults_to_json_or_tiled_not_splash():
     runtime_part = dockerfile.split("FROM runtime-base AS agent", 1)[0].split("# Splash/pixi for the legacy", 1)[0]
     instructions = "\n".join(line for line in runtime_part.splitlines() if not line.lstrip().startswith("#"))
     assert "splash" not in instructions.lower()
+
+
+def test_public_defaults_are_json_not_splash():
+    """Owner decision 2026-11-09 (Q5, Q7): the Splash-era defaults are flipped; the ``splash`` tokens stay accepted."""
+    config = (REPO_ROOT / "config.yml").read_text(encoding="utf-8")
+    assert re.search(r"graph_source:\n\s+env: KG_RAG_GRAPH_SOURCE\n\s+default: json\b", config)
+    assert "KG_RAG_GRAPH_SOURCE: json" in config and "KG_RAG_GRAPH_SOURCE: splash" not in config
+    env_example = (REPO_ROOT / "scripts/.env.example").read_text(encoding="utf-8")
+    assert "\nKG_RAG_GRAPH_SOURCE=json\n" in env_example
+    assert not re.search(r"^KG_RAG_GRAPH_SOURCE=splash", env_example, re.MULTILINE)
+    from app.modules import kg_rag_api
+
+    source = (REPO_ROOT / "app/modules/kg_rag_api.py").read_text(encoding="utf-8")
+    assert 'config_value("kg_rag.retrieval.graph_source", "json")' in source
+    assert kg_rag_api.GRAPH_SOURCE in {"json", "splash"}  # the loader still accepts both spellings' family
+    for name in ("f2w_nersc_api.sh", "f2w_nersc_smoke.sh", "run_nersc_3agent.sh", "deploy_nersc.sh"):
+        script = (REPO_ROOT / "scripts" / name).read_text(encoding="utf-8")
+        assert "pscratch/sd/m/" not in script, name                       # no personal path
+        assert ":-splash}" not in script, name                             # no Splash default
+        assert not re.search(r"SPLASH_LINKS_REPO:-[^}]", script), name      # the path has no (non-empty) default
+    for name in ("f2w_nersc_api.sh", "f2w_nersc_smoke.sh", "run_nersc_3agent.sh"):
+        script = (REPO_ROOT / "scripts" / name).read_text(encoding="utf-8")
+        assert 'F2W_KG_MODE="${F2W_KG_MODE:-json}"' in script, name
+    for name, var in (("f2w_nersc_api.sh", "F2W_REPO"), ("f2w_nersc_smoke.sh", "F2W_REPO"),
+                      ("run_nersc_3agent.sh", "NERSC_REPO"), ("deploy_nersc.sh", "NERSC_REPO")):
+        script = (REPO_ROOT / "scripts" / name).read_text(encoding="utf-8")
+        assert f'-z "${{{var}:-}}"' in script or f"need_env {var}" in script, (name, var)
+
+
+def test_ui_settings_text_describes_tiled_and_json_modes_without_a_splash_server():
+    """Owner decision 2026-11-09 (Q6): description text only; the ``splash_links``/``json`` ids and labels stay."""
+    tsx = (REPO_ROOT / "ui/src/app/components/AppSettingsButton.tsx").read_text(encoding="utf-8")
+    assert 'id="splash_links"' in tsx and 'label="splash_links"' in tsx
+    assert 'id="json"' in tsx and 'label="JSON"' in tsx
+    assert "requires a running splash server" not in tsx
+    assert "Editable knowledge graph backed by Tiled Graph" in tsx
+    assert "Read-only: load MatKG JSON files from storage/kg" in tsx
 
 
 def test_packaging_carries_no_splash_dependency():
