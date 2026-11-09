@@ -25,23 +25,12 @@ import uuid
 import yaml
 
 from . import json2kg
-from .bl1101_ingest import (
-    KG_DIR,
-    REPO_ROOT,
-    SCHEMA_PATH,
-    TERMS_DIR,
-    _rel,
-    _rel_to_repo,
-    beam_id,
-    make_term,
-    next_snapshot_version,
-    snapshot_paths,
-    sort_graph,
-    utc_now,
-    write_kg_snapshot,
-)
 from .cli_output import output
+from .graph.imports.bl1101.common import _rel_to_repo, beam_id, utc_now
+from .graph.imports.bl1101.paths import KG_DIR, REPO_ROOT, SCHEMA_PATH, TERMS_DIR
+from .graph.imports.bl1101.snapshot import next_snapshot_version, snapshot_paths, write_kg_snapshot
 from .graph.imports.bl1101.specs import BEAMLINE_ID, NAMESPACE
+from .graph.imports.bl1101.terms import _rel, make_term, sort_graph
 
 LOGGER = logging.getLogger("tiled_sim")
 

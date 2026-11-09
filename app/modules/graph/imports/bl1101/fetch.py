@@ -7,11 +7,14 @@ from pathlib import Path
 import subprocess
 from typing import Any
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 from .common import LOGGER, sha256_bytes, utc_now
 from .paths import REPO_ROOT
 from .specs import USER_AGENT, RepoSpec
+
+ALLOWED_SCHEMES = frozenset({"http", "https"})
 
 
 def fetch_url(url: str, dest: Path, timeout: int = 45) -> dict[str, Any]:
@@ -26,8 +29,12 @@ def fetch_url(url: str, dest: Path, timeout: int = 45) -> dict[str, Any]:
         On success, a snapshot record with ``status`` ``"ok"``, ``fetched_at``,
         repo-relative ``path``, ``sha256``, ``http_status`` and ``bytes``. On an
         HTTP, URL, timeout or OS error, ``{"url", "status": "failed", "reason"}``;
-        the error is logged and not raised and ``dest`` is not written.
+        the error is logged and not raised and ``dest`` is not written. A URL whose
+        scheme is not ``http`` or ``https`` (``file:``, ``ftp:``) is refused the same way.
     """
+    if urlsplit(url).scheme not in ALLOWED_SCHEMES:
+        LOGGER.warning("Refusing to fetch %s: scheme is not http or https", url)
+        return {"url": url, "status": "failed", "reason": "unsupported URL scheme"}
     dest.parent.mkdir(parents=True, exist_ok=True)
     request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml"})
     try:

@@ -202,7 +202,7 @@ def collect_ops_docs(*, root: Path | None = None) -> list[dict[str, Any]]:
         )
 
     try:
-        from ..bl1101_ingest import REPO_SPECS
+        from ..graph.imports.bl1101.specs import REPO_SPECS
     except Exception:
         logger.debug("bl1101 repo specs unavailable", exc_info=True)
         REPO_SPECS = ()

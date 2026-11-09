@@ -170,7 +170,7 @@ def test_patch_does_not_touch_modules_binding_a_different_object() -> None:
 
 
 # ----------------------------------------------------------------------------- boundaries
-def test_only_fetch_touches_network_or_subprocess() -> None:
+def test_only_fetch_touches_network_and_git() -> None:
     offenders: dict[str, set[str]] = {}
     for file in sorted(PKG.glob("*.py")):
         tree = ast.parse(file.read_text(encoding="utf-8"))
@@ -183,4 +183,5 @@ def test_only_fetch_touches_network_or_subprocess() -> None:
         hit = found & {"subprocess", "urllib", "requests", "httpx", "socket"}
         if hit:
             offenders[file.name] = hit
-    assert offenders == {"fetch.py": {"subprocess", "urllib"}}
+    # fetch.py owns git and HTTP; cli.py only catches the subprocess errors that fetch.sync_repo/git_sha raise.
+    assert offenders == {"fetch.py": {"subprocess", "urllib"}, "cli.py": {"subprocess"}}
