@@ -64,3 +64,34 @@ def test_the_cborg_client_bounds_a_stream_that_never_ends(monkeypatch):
     monkeypatch.setattr(clients, "LLM_MAX_RETRIES", 0)
     with pytest.raises(TimeoutError):
         client.chat("hi", timeout=0.1)
+
+
+def _llm_threads() -> int:
+    return sum(1 for t in threading.enumerate() if t.name == "llm-call" and t.is_alive())
+
+
+def test_abandoned_calls_are_bounded_and_the_slots_come_back(monkeypatch):
+    monkeypatch.setattr(cborg_http, "LLM_MAX_ABANDONED", 3)
+    hang = threading.Event()
+    before = _llm_threads()
+    for _ in range(3):
+        with pytest.raises(TimeoutError, match="deadline"):
+            cborg_http.call_with_deadline(lambda: hang.wait(30), 0.05)
+    assert _llm_threads() == before + 3
+    started = time.monotonic()
+    with pytest.raises(TimeoutError, match="abandoned"):  # refused at once: no fourth thread is spawned
+        cborg_http.call_with_deadline(lambda: hang.wait(30), 5)
+    assert time.monotonic() - started < 1 and _llm_threads() == before + 3
+    hang.set()  # the hung transports finally return: their slots are free again
+    end = time.monotonic() + 5
+    while _llm_threads() > before and time.monotonic() < end:
+        time.sleep(0.01)
+    assert cborg_http.call_with_deadline(lambda: 7, 5) == 7
+    assert cborg_http.abandoned_calls() == 0
+
+
+def test_a_call_that_finishes_in_time_never_counts_as_abandoned(monkeypatch):
+    monkeypatch.setattr(cborg_http, "LLM_MAX_ABANDONED", 1)
+    for _ in range(5):
+        assert cborg_http.call_with_deadline(lambda: 1, 5) == 1
+    assert cborg_http.abandoned_calls() == 0
