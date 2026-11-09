@@ -126,7 +126,8 @@ def execute_save(ctx: RequestContext, record: ej.EditRecord, *, journal: ej.Edit
     _check_client(client, settings, target)
     current = journal.latest().get(record.edit_id)
     if current is None or current.state != "recorded":
-        raise ContractError(ErrorCode.CONFLICT, f"edit {record.edit_id} is not a recorded, unapplied edit")
+        raise ContractError(ErrorCode.CONFLICT, f"edit {record.edit_id} is not a recorded, unapplied edit",
+            retryable=False)
     root = scope_dir(state_dir, target, scope)
     if ReleaseState(root / "release.json").switching:
         raise ContractError(ErrorCode.CONFLICT, "the graph is being republished; try again", retryable=True)
@@ -332,7 +333,8 @@ def _recover_one(record: ej.EditRecord, journal: ej.EditJournal, client: TiledMu
             restored = retired_old["id"]
         elif final is None:
             raise ContractError(ErrorCode.CONFLICT,
-                                f"cannot revert Save {record.edit_id}: no revision of {node_id!r} to restore")
+                                f"cannot revert Save {record.edit_id}: no revision of {node_id!r} to restore",
+                                retryable=False)
         outcome = "reverted"
         detail = {"removed_links": removed_links, "restored_tiled_id": restored or (final or {}).get("id"),
                   "staged_kept_as_retired": kept_staged}

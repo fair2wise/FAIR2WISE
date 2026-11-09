@@ -587,7 +587,8 @@ class Harvester:
         if row is None:
             raise ContractError(ErrorCode.NOT_FOUND, "candidate not found")
         if row["status"] != "paywalled":
-            raise ContractError(ErrorCode.CONFLICT, f"candidate is {row['status']}, not paywalled")
+            raise ContractError(ErrorCode.CONFLICT, f"candidate is {row['status']}, not paywalled",
+                retryable=False)
         return row
 
 

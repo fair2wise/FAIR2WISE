@@ -217,7 +217,8 @@ class TiledSaveBackend:
         except OSError:
             raise ContractError(ErrorCode.UNAVAILABLE, "the active snapshot graph is unavailable") from None
         if hashlib.sha256(blob).hexdigest() != self.t.base_graph_sha256:
-            raise ContractError(ErrorCode.CONFLICT, "the active snapshot graph does not match its recorded hash")
+            raise ContractError(ErrorCode.CONFLICT, "the active snapshot graph does not match its recorded hash",
+                retryable=False)
         data = json.loads(blob.decode("utf-8"))
         if not isinstance(data, dict):
             raise ContractError(ErrorCode.INVALID_INPUT, "the active snapshot graph is not a KG document")

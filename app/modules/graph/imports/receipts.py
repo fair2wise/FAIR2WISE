@@ -105,7 +105,8 @@ class ReceiptStore:
         text = artifact.model_dump_json(indent=2)
         if path.exists():
             if self.read(artifact.receipt.receipt_id).receipt_sha256 != artifact.receipt_sha256:
-                raise ContractError(ErrorCode.CONFLICT, "a different receipt with this id already exists")
+                raise ContractError(ErrorCode.CONFLICT, "a different receipt with this id already exists",
+                    retryable=False)
             return path
         tmp = path.with_name(path.name + ".tmp")
         with tmp.open("w", encoding="utf-8") as handle:

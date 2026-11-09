@@ -157,7 +157,7 @@ class IdentityLedger:
         _check(tiled_id, "tiled_id")
         if self._forward.get(key, tiled_id) != tiled_id or self._reverse.get(tiled_id, key) != key:
             raise ContractError(ErrorCode.CONFLICT,
-                                f"identity {key!r} / {tiled_id!r} is already bound differently")
+                                f"identity {key!r} / {tiled_id!r} is already bound differently", retryable=False)
         self._forward[key] = tiled_id
         self._reverse[tiled_id] = key
 

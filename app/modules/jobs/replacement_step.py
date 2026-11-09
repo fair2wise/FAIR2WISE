@@ -259,12 +259,14 @@ class ReplacementPublishStep:
         cover = self._covering(plan, scope, state.revision)
         if cover is None:
             raise ContractError(ErrorCode.CONFLICT,
-                                "the plan has no operations but no verified receipt covers this version as read back now")
+                                "the plan has no operations but no verified receipt covers this version as read back now",
+                                retryable=False)
         ledger = IdentityLedger()
         for node_id, row in state.final.items():
             ledger.bind(scope, node_id, row["id"])
         if ledger.sha256() != cover.receipt.id_mapping_sha256:
-            raise ContractError(ErrorCode.CONFLICT, "the live records are not the ones the covering receipt verified")
+            raise ContractError(ErrorCode.CONFLICT, "the live records are not the ones the covering receipt verified",
+                retryable=False)
         counts = {"staged_entities": 0, "promoted_entities": 0, "revived_entities": 0, "retired_entities": 0,
                   "created_links": 0, "deleted_links": 0,
                   "unchanged_entities": int(detail["counts"]["unchanged_entities"]),
