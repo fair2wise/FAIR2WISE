@@ -94,6 +94,10 @@ class JobService:
         self.interrupt = threading.Event()
         #: Seconds a job that went back to ``queued`` (busy resource) is left alone by this service's claims.
         self.requeue_backoff = 5.0
+        #: Longest pause (seconds) between heartbeat clock checks; bounds how late a beat fires after a suspend.
+        self.heartbeat_tick = 1.0
+        #: Monotonic clock of the heartbeat (a seam for tests); the wall clock is the store's own.
+        self._monotonic: Callable[[], float] = time.monotonic
         self._claim_lock = threading.Lock()
         self._running_jobs: set[str] = set()  # jobs this service is running right now (never re-claimed here)
         self._backoff_until: dict[str, float] = {}  # job id -> time.monotonic() deadline
@@ -365,8 +369,19 @@ class JobService:
             return done
 
         def beat() -> None:
-            while not done.wait(interval):
+            # The monotonic clock may stand still while the host sleeps (macOS), yet the lease runs on the wall
+            # clock. Wait in short ticks and renew when *either* clock says an interval passed, so a beat that
+            # would have fired late fires at the first tick after waking. One renewal per due interval: the
+            # reference times reset after every attempt, so a jump never causes a second renewal.
+            tick = min(interval, self.heartbeat_tick)
+            last_mono, last_wall = self._monotonic(), self.store.clock()
+            while not done.wait(tick):
+                mono, wall = self._monotonic(), self.store.clock()
+                if mono - last_mono < interval and wall - last_wall < interval:
+                    continue
+                last_mono, last_wall = mono, wall
                 try:
+                    # allow_expired only revives a lapsed lease nobody took over; a taken one raises LeaseLost.
                     self.store.renew_lease(lease, allow_expired=True)
                 except LeaseLost:
                     logger.warning("heartbeat stopped: lease on %s was taken over by another owner", lease.resource)
