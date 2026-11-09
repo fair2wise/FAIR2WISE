@@ -165,3 +165,12 @@ not the other": confirmed (the plan's scope was e2e_demo only and bl1101's recor
 | bl1101 `fetch.py` on the hardened getter (P3 gated item 1) | "Yes, move to hardened getter (Recommended)" (the two retained tests are rewritten to fake the hardened getter) |
 | bl1101 snapshot writer for new versions (P3 gated item 2) | "Standard create_snapshot from v10 on (Recommended)" (v1-v9 bytes stay identical) |
 | P2 budget accounting (flat 0.05 USD reservation; cost-control enabled switch) | "we should only allow free models via CBORG at the moment. We get 50 free usage credits per month (mileage varies per model) on CBORG, so I want to avoid using those" (read as a model policy: every CBORG call path accepts only the free LBL-hosted model ids and refuses any other id with a typed error; model pickers show only free ids; LLM use by the chat helper agents is minimised, with the deterministic path as the default and model calls opt-in; the flat reservation and the enabled switch stay as implemented) |
+
+## Eighteenth set (2026-11-09)
+
+| Question | Owner answer |
+|---|---|
+| Pointer memo Q3: which corpus UI Save edits when several are live | "The corpus shown in the graph view (Recommended)" |
+| Corpus removal and the target pointer under Model C | "Move the pointer to a still-live corpus (Recommended)" |
+| T12 pilot size | "Yes, three papers satisfy T12 (Recommended)" (the three-paper pilot A, B, C satisfies T12 for H4; the 13 label cases rest on them) |
+| T27 small items: docstring-style CI gate; 500-node cap on the Tiled neighbourhood route | "Keep the CI gate. I need more information about the Tiled neighborhood decision. Is that for testing, or during normal usage? I am tempted to forgoe the limits and maybe do a performance evaluation to determine if we need a cap" (CI gate kept; the cap is left as is pending a performance evaluation on the real graphs; not decided) |

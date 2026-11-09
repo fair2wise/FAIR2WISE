@@ -223,6 +223,8 @@ run, no retry. Then review the report; recording the gate stays with the owner (
 Before relying on a manifest, `python -m evals.binary.import_companion --check` must be clean (run for this packet: "up to date").
 The C4 measurement itself (about 98 free-tier CBORG calls) re-runs with `scripts/h3/c4_real_measurement.py <judge-model> <out-dir> [--dry-run]` (judge must be the free `lbl/cborg-deepthought`; it reads the key from the environment and never logs it; run it from a clean export with the project interpreter, the real encoder cached offline, and `PYTHONPATH` at the export root). The labelling run is `python -m evals.binary.labeling.label_live` with the labelling CLI arguments (it lives under `evals/` because application paths must not import the binary suite). Both scripts were recovered from the run scratch area and committed on 2026-11-09; the committed C4 reports came from exactly these files.
 
+> Owner decision 2026-11-09 (eighteenth set, `reviews/owner_decisions_2026-11-03.md`): the three-paper pilot (A, B, C) satisfies T12 for H4. The other decisions in this packet (C1, the four apply gates, B4 promotion) are still open.
+
 ## 6. Rollback and what this packet changed
 
 Docs only: this file on branch `forge_merge-H4-packet`. Nothing under `app/` or `tests/`, no frozen doc, no
