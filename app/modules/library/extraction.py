@@ -327,6 +327,9 @@ class LibraryExtractor:
                 return True
             return False
 
+        # Writes stop at once for a run another owner took over (a lapsed-but-untaken lease keeps writing): the
+        # page threads of a stale run may be mid-call, and nothing they produce may reach the shared bundle.
+        orch.store.write_fence = lambda: ctx.store.lease_superseded(ctx.lease)
         orch.cancel_check = lost  # a stale or stopped run must not keep spending LLM calls on its pages
         by_id = {r["id"]: r for r in todo}
         counts = {"extracted": 0, "pages": 0, "pages_with_terms": 0}

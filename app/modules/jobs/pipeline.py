@@ -70,6 +70,10 @@ class StageBusy(StagePause):
     state = JobState.QUEUED
 
 
+#: Most times a job is requeued for a retryable ``CONFLICT`` (since its last failure) before the conflict fails it.
+MAX_CONFLICT_REQUEUES = 5
+
+
 class AwaitReview(StagePause):
     """A human decision is required: job -> ``awaiting_review``."""
 
@@ -292,6 +296,9 @@ class StageContext:
         mid-effect: ``reconcile`` (when given) inspects the world and returns the result if the
         effect actually landed; otherwise ``effect`` runs again, which must be idempotent.
         """
+        # Fence first: a run another process took over must learn it here, even when the effect is already
+        # recorded ``done`` (by the new owner) and nothing below would write.
+        self.guard()
         found = self.store.effect(self.job.job_id, self.stage, effect_id)
         if found is not None and found[0] == "done":
             return dict(found[1] or {})
@@ -398,7 +405,10 @@ class PipelineRunner:
                 error=pause.reason,
                 job_state=pause.state,
             )
-            self.store.set_state(lease, job_id, pause.state, stage=stage_name, reason=pause.reason)
+            self.store.set_state(
+                lease, job_id, pause.state, stage=stage_name, reason=pause.reason,
+                detail={"conflict_requeue": True} if isinstance(pause, StageBusy) else None,
+            )
             return pause.state
 
     def _run_stages(self, lease: Lease, job: JobRecord, keys: dict[str, str],
@@ -528,6 +538,8 @@ class PipelineRunner:
             )
             raise _Ended(JobState.FAILED) from exc
         except ContractError as exc:
+            if exc.code is ErrorCode.CONFLICT and exc.retryable and self._requeue_for_conflict(lease, job_id):
+                raise StageBusy(str(exc)[:300]) from exc
             if exc.code is ErrorCode.DENIED:
                 self._deny(lease, job, spec, exc)
             else:
@@ -564,6 +576,18 @@ class PipelineRunner:
                 error_code=ErrorCode.INTERNAL,
             )
             raise _Ended(JobState.FAILED) from exc
+
+    def _requeue_for_conflict(self, lease: Lease, job_id: str) -> bool:
+        """Whether a retryable ``CONFLICT`` should requeue the job: only while this run still owns the lease.
+
+        Another process or run holding a resource is transient. The job goes back to ``queued`` (the service
+        backs off) up to :data:`MAX_CONFLICT_REQUEUES` times; after that the conflict is treated as real.
+
+        Raises:
+            LeaseLost: The lease was taken over; the new owner decides, this run changes nothing more.
+        """
+        self.store.check_lease(lease)
+        return self.store.conflict_requeues(job_id) < MAX_CONFLICT_REQUEUES
 
     def _deny(self, lease: Lease, job: JobRecord, spec: StageSpec, exc: ContractError) -> None:
         """Authority revoked or insufficient: stop permanently and invalidate dependent approvals."""
@@ -612,6 +636,7 @@ __all__ = (
     "AwaitReview",
     "JobInterrupted",
     "JobStopped",
+    "MAX_CONFLICT_REQUEUES",
     "PauseBudget",
     "PauseProvider",
     "Pipeline",

@@ -196,3 +196,74 @@ def test_a_busy_stage_requeues_the_job_and_backs_off(tmp_path):
     busy[0] = False
     service._backoff_until.clear()
     assert service.work_one() == (job_id, JobState.SUCCEEDED)
+
+
+def test_a_heartbeat_waiting_on_a_stalled_monotonic_clock_fires_after_a_wall_clock_jump(tmp_path):
+    """Suspend: time.monotonic may not advance while the wall clock jumps hours. The beat must not wait it out."""
+    clock = Clock()
+    store = JobStore(tmp_path / "j.sqlite3", lease_seconds=60, clock=clock)
+    renewals: list[bool] = []
+    real = store.renew_lease
+
+    def counting(lease, ttl=None, **kw):
+        result = real(lease, ttl, **kw)
+        renewals.append(kw.get("allow_expired", False))
+        return result
+
+    store.renew_lease = counting  # type: ignore[method-assign]
+    entered, release = threading.Event(), threading.Event()
+
+    def handler(sc):
+        entered.set()
+        release.wait(10)
+        return StageResult()
+
+    service = service_over(store, handler, heartbeat_interval=30)  # real seconds: far longer than this test
+    service.heartbeat_tick = 0.01
+    job_id = service.submit(local_ctx(), "ingest", inputs()).job_id
+    runner = threading.Thread(target=service.work_one)
+    runner.start()
+    assert entered.wait(5)
+    try:
+        time.sleep(0.1)
+        assert renewals == []  # nothing is due yet
+        clock.advance(3600)  # the host slept
+        assert wait_for(lambda: len(renewals) >= 1, 2)  # renewed promptly, not 30 s later
+        assert renewals == [True]  # via the allow_expired path
+        assert store.lease_holder(store.job_resource(job_id)) is not None
+        time.sleep(0.3)
+        assert renewals == [True]  # one renewal per jump: not renewed again while nothing is due
+    finally:
+        release.set()
+        runner.join(5)
+    assert store.get(job_id).state is JobState.SUCCEEDED
+
+
+def test_a_late_heartbeat_after_a_jump_never_revives_a_lease_another_process_took(tmp_path):
+    clock = Clock()
+    store = JobStore(tmp_path / "j.sqlite3", lease_seconds=60, clock=clock)
+    entered, release = threading.Event(), threading.Event()
+    taken: list[object] = []
+
+    def handler(sc):
+        clock.advance(3600)  # the host slept; another process claims before the (late) beat's next tick
+        taken.append(store.claim_next("w2"))
+        entered.set()
+        release.wait(10)
+        return StageResult()
+
+    service = service_over(store, handler, heartbeat_interval=30)
+    service.heartbeat_tick = 0.25
+    job_id = service.submit(local_ctx(), "ingest", inputs()).job_id
+    runner = threading.Thread(target=service.work_one)
+    runner.start()
+    assert entered.wait(5)
+    try:
+        assert taken[0] is not None
+        time.sleep(0.6)  # the late beat fires at least once and must be refused
+        row = store.db.one("SELECT owner, token, fence FROM leases WHERE resource=?", (store.job_resource(job_id),))
+        assert row["owner"] == "w2" and row["token"] == taken[0][0].token  # type: ignore[index]
+        assert store.lease_holder(store.job_resource(job_id)) is not None  # the new owner's, unchanged
+    finally:
+        release.set()
+        runner.join(5)

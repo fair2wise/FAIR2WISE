@@ -151,26 +151,62 @@ def llm_timeout() -> httpx.Timeout:
     return httpx.Timeout(LLM_READ_TIMEOUT, connect=LLM_CONNECT_TIMEOUT)
 
 
+#: Most calls that outlived their deadline and still run (a transport hung past its socket timeout) at once.
+#: A new call is refused beyond it, so a dead provider cannot pile up unbounded threads.
+LLM_MAX_ABANDONED = 32
+_abandoned = 0
+_abandoned_lock = threading.Lock()
+
+
+def abandoned_calls() -> int:
+    """Calls past their deadline whose thread is still running (diagnostics and tests)."""
+    with _abandoned_lock:
+        return _abandoned
+
+
 def call_with_deadline[T](call: Callable[[], T], seconds: float = LLM_TOTAL_DEADLINE) -> T:
     """Run ``call`` and return its result, or raise ``TimeoutError`` once ``seconds`` have passed.
 
     The call runs on a daemon thread so a hung transport cannot block the caller (a worker that must keep
-    renewing its lease); the abandoned thread ends when its own socket timeout fires.
+    renewing its lease).
+
+    Residual risk: a blocking call cannot be cancelled from outside. After the deadline the thread is
+    abandoned and ends only when its own socket timeout fires (``LLM_READ_TIMEOUT`` per phase, so normally
+    within minutes); it holds its socket and memory until then, and its result is discarded. The number of
+    such abandoned threads is capped at :data:`LLM_MAX_ABANDONED`: beyond it a new call is refused at once
+    with ``TimeoutError`` instead of spawning another thread, and every thread that finally returns frees
+    its slot.
     """
+    global _abandoned  # noqa: PLW0603 - module-level count of threads that outlived their deadline
+    with _abandoned_lock:
+        if _abandoned >= LLM_MAX_ABANDONED:
+            raise TimeoutError(
+                f"LLM call refused: {_abandoned} earlier calls are abandoned and still hung (provider unreachable?)"
+            )
     box: dict[str, Any] = {}  # Any: the result or exception of an arbitrary callable
     finished = threading.Event()
+    state = {"abandoned": False}
 
     def runner() -> None:
+        global _abandoned  # noqa: PLW0603
         try:
             box["value"] = call()
         except BaseException as exc:  # noqa: BLE001 - re-raised in the caller's thread
             box["error"] = exc
         finally:
-            finished.set()
+            with _abandoned_lock:
+                finished.set()
+                if state["abandoned"]:
+                    _abandoned -= 1  # the hung call finally returned: its slot is free
 
     threading.Thread(target=runner, name="llm-call", daemon=True).start()
     if not finished.wait(seconds):
-        raise TimeoutError(f"LLM call exceeded its {seconds:g}s deadline")
+        with _abandoned_lock:
+            if not finished.is_set():  # decided under the lock, so the runner and this count cannot disagree
+                state["abandoned"] = True
+                _abandoned += 1
+        if state["abandoned"]:
+            raise TimeoutError(f"LLM call exceeded its {seconds:g}s deadline")
     if "error" in box:
         raise box["error"]
     value: T = box["value"]
