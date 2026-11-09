@@ -780,7 +780,8 @@ def contract_error(exc: ApplyRefused) -> ContractError:
         "plan_tampered": ErrorCode.CONFLICT,
         "node_missing": ErrorCode.CONFLICT,
     }.get(exc.code, ErrorCode.INVALID_INPUT)
-    return ContractError(code, str(exc), reason=exc.code)
+    # every refusal needs a changed input or a human (a stale source or plan hash does not heal on retry)
+    return ContractError(code, str(exc), retryable=False, reason=exc.code)
 
 
 __all__ = (

@@ -229,7 +229,8 @@ class BundleStore:
         try:
             directory.mkdir()
         except FileExistsError:
-            raise ContractError(ErrorCode.CONFLICT, "a KG bundle with this name already exists") from None
+            raise ContractError(ErrorCode.CONFLICT, "a KG bundle with this name already exists",
+                retryable=False) from None
         now = self._clock()
         manifest = {
             "version": MANIFEST_VERSION, "name": name, "topic": topic or None, "schema": manifest_schema_block(schema),
@@ -262,7 +263,7 @@ class BundleStore:
         ensure_schema_locked(source.manifest, schema_id)
         validate_name(name)
         if name == parent:
-            raise ContractError(ErrorCode.CONFLICT, "a KG bundle with this name already exists")
+            raise ContractError(ErrorCode.CONFLICT, "a KG bundle with this name already exists", retryable=False)
         return self.create(
             name, schema=source.manifest["schema"], topic=topic or source.manifest.get("topic"),
             model=source.manifest.get("model"), backend=source.manifest.get("backend"),
@@ -310,7 +311,7 @@ def continue_from_kg(store: BundleStore, kg_path: Path, name: str, *, schema: Ma
 
     validate_name(name)
     if store.exists(name):
-        raise ContractError(ErrorCode.CONFLICT, "a KG bundle with this name already exists")
+        raise ContractError(ErrorCode.CONFLICT, "a KG bundle with this name already exists", retryable=False)
     try:
         if kg_path.stat().st_size > MAX_KG_BYTES:
             raise ContractError(ErrorCode.INVALID_INPUT, "KG file is too large to continue")
@@ -361,7 +362,7 @@ def export_bundle(bundle: Bundle, release_dir: Path, schema: Mapping[str, Any] |
     if target.resolve().parent != release_dir.resolve():
         raise ContractError(ErrorCode.INVALID_INPUT, "export target is outside the release directory")
     if target.is_symlink():
-        raise ContractError(ErrorCode.CONFLICT, "the export target is a link")
+        raise ContractError(ErrorCode.CONFLICT, "the export target is a link", retryable=False)
     if target.exists():
         try:
             existing = _read_json(target)
@@ -369,7 +370,8 @@ def export_bundle(bundle: Bundle, release_dir: Path, schema: Mapping[str, Any] |
         except (OSError, ValueError):
             owned = False
         if not owned:
-            raise ContractError(ErrorCode.CONFLICT, "a different KG file with this name exists in the release directory")
+            raise ContractError(ErrorCode.CONFLICT, "a different KG file with this name exists in the release directory",
+                retryable=False)
     kg = _read_json(bundle.file(KG_FILE))
     if not isinstance(kg, dict):
         raise ContractError(ErrorCode.INTERNAL, "bundle KG is not an object")

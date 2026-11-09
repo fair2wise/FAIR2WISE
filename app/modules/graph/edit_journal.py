@@ -145,9 +145,10 @@ class EditJournal:
         """Durably append (fsync) before the caller acknowledges anything."""
         current = self.latest().get(record.edit_id)
         if current is not None and record.seq != current.seq + 1:
-            raise ContractError(ErrorCode.CONFLICT, f"edit {record.edit_id} expects seq {current.seq + 1}")
+            raise ContractError(ErrorCode.CONFLICT, f"edit {record.edit_id} expects seq {current.seq + 1}",
+                retryable=False)
         if current is None and record.seq != 1:
-            raise ContractError(ErrorCode.CONFLICT, f"edit {record.edit_id} must start at seq 1")
+            raise ContractError(ErrorCode.CONFLICT, f"edit {record.edit_id} must start at seq 1", retryable=False)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(record.model_dump_json() + "\n")

@@ -277,7 +277,7 @@ def classify_state(graph_id: str, entities: list[dict[str, Any]], links: list[di
         try:
             kind = lw.classify_entity(row, graph_id)
         except ValueError as exc:
-            raise ContractError(ErrorCode.CONFLICT, str(exc)) from None
+            raise ContractError(ErrorCode.CONFLICT, str(exc), retryable=False) from None
         if kind is None or kind == lw.RELEASE:  # a T08C release marker is not a per-version record
             st.foreign["e:" + row["id"]] = _sha(row)
             continue
@@ -286,12 +286,14 @@ def classify_state(graph_id: str, entities: list[dict[str, Any]], links: list[di
         if kind == "final":
             if node in st.final:
                 raise ContractError(ErrorCode.CONFLICT,
-                                    f"two Tiled entities claim ({graph_id}, {node}); no upsert in 0.2.18")
+                                    f"two Tiled entities claim ({graph_id}, {node}); no upsert in 0.2.18",
+                                    retryable=False)
             st.final[node] = row
         else:
             slot = (st.pending if kind == lw.PENDING else st.retired).setdefault(_tag_of(row["uri"]), {})
             if node in slot:
-                raise ContractError(ErrorCode.CONFLICT, f"two {kind} revisions of ({graph_id}, {node})")
+                raise ContractError(ErrorCode.CONFLICT, f"two {kind} revisions of ({graph_id}, {node})",
+                    retryable=False)
             slot[node] = row
     for row in links:
         eid = lw.link_owned(row, graph_id)
@@ -618,7 +620,7 @@ def apply_import(ctx: RequestContext, plan: ImportPlan, approval: ApprovalRecord
     src = load_source(source, supported_schema_fingerprints=supported_schema_fingerprints)
     if src.graph_sha256 != change.input_sha256 or src.manifest_sha256 != plan.detail["manifest_sha256"] \
             or src.graph_id != graph_id:
-        raise ContractError(ErrorCode.CONFLICT, "the source snapshot no longer matches the plan")
+        raise ContractError(ErrorCode.CONFLICT, "the source snapshot no longer matches the plan", retryable=False)
 
     root = Path(state_dir) / _slug(change.target) / _slug(graph_id)
     run_dir = root / "plans" / plan.tag

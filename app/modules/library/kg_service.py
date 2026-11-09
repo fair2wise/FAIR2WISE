@@ -116,7 +116,8 @@ class KgLibrary:
             raise ContractError(ErrorCode.INVALID_INPUT, "give exactly one of source and parent")
         release = self.release_dir()
         if (release / B.export_file_name(name)).exists():
-            raise ContractError(ErrorCode.CONFLICT, "a KG with this name exists in the release directory")
+            raise ContractError(ErrorCode.CONFLICT, "a KG with this name exists in the release directory",
+                retryable=False)
         if parent is not None:
             bundle = self.store.fork(parent, name, schema_id=schema, topic=topic)
             return {**bundle.summary(), "warnings": []}

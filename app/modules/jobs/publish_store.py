@@ -420,7 +420,7 @@ class PublishStore:
                 (name, row["version"]),
             ).fetchone()
             if history is None:
-                raise ContractError(ErrorCode.CONFLICT, "there is no previous pointer to restore")
+                raise ContractError(ErrorCode.CONFLICT, "there is no previous pointer to restore", retryable=False)
             version = row["version"] + 1
             con.execute(
                 "UPDATE pub_pointers SET version=?, record=? WHERE name=?", (version, history["record"], name)

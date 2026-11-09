@@ -146,13 +146,13 @@ class TiledGraphBackend:
                 if literature_entity_key(row) != (graph_id, entity_id):
                     raise ContractError(ErrorCode.CONFLICT,
                                         f"Tiled entity {known} no longer carries identity "
-                                        f"({graph_id}, {entity_id})")
+                                        f"({graph_id}, {entity_id})", retryable=False)
                 return row
         matches = [row for row, node_id in self._scoped_rows(graph_id) if node_id == entity_id]
         if len(matches) > 1:
             raise ContractError(ErrorCode.CONFLICT,
                                 f"{len(matches)} Tiled entities claim ({graph_id}, {entity_id}); "
-                                "no upsert in 0.2.18")
+                                "no upsert in 0.2.18", retryable=False)
         if matches:
             self.ledger.bind(graph_id, entity_id, matches[0]["id"])
             return matches[0]

@@ -112,7 +112,8 @@ def load_snapshot(path: Path, *, graph_id: str | None = None) -> GraphSnapshot:
         except (OSError, ValueError, KeyError, TypeError):
             raise ContractError(ErrorCode.INVALID_INPUT, f"unreadable manifest for {path}") from None
         if expected != digest:
-            raise ContractError(ErrorCode.CONFLICT, f"{path} does not match its manifest graph.sha256")
+            raise ContractError(ErrorCode.CONFLICT, f"{path} does not match its manifest graph.sha256",
+                retryable=False)
     try:
         data = json.loads(blob.decode("utf-8"))
     except (UnicodeDecodeError, ValueError):

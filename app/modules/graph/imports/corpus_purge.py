@@ -94,7 +94,7 @@ def retired_rows(entities: Sequence[Mapping[str, Any]], scope: str) -> list[tupl
         try:
             kind = lw.classify_entity(row, cast(str, gid))
         except ValueError as exc:
-            raise ContractError(ErrorCode.CONFLICT, str(exc)) from None
+            raise ContractError(ErrorCode.CONFLICT, str(exc), retryable=False) from None
         if kind == lw.RETIRED:
             uri = str(row.get("uri") or "")
             out.append((dict(row), cast(str, gid), str(props.get(ida.ENTITY_KEY)), uri.rsplit("/", 1)[-1]))
@@ -493,7 +493,8 @@ def plan_retire_all(*, client: TiledMutationClient, settings: DeploymentSettings
         blocking = sorted(r.edit_id for r in open_edits if decided.get(r.edit_id) != "discarded")
         if blocking:
             raise ContractError(ErrorCode.CONFLICT, f"{len(blocking)} open edit(s) block the removal of {scope!r} "
-                                                    f"unless resolved as discarded: {blocking[:10]}")
+                                                    f"unless resolved as discarded: {blocking[:10]}",
+                                                    retryable=False)
     with _writer_errors():
         entities = client.scan_entities()
         legacy = legacy_graph_ids(entities, scope)

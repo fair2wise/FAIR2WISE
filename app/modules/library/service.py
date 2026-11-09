@@ -402,7 +402,7 @@ class LibraryService:
                     target = path
                     break
             if target is None:
-                raise ContractError(ErrorCode.CONFLICT, "no free file name for this upload")
+                raise ContractError(ErrorCode.CONFLICT, "no free file name for this upload", retryable=False)
             stat = target.stat()
             relpath = target.relative_to(root).as_posix()
             self._record(target, relpath, sha, stat.st_size, round(stat.st_mtime, 3), probe=True, result=result)

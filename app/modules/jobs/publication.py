@@ -814,7 +814,8 @@ class Publication:
         if corpus is None:
             previous = self.store.previous_record(target)
             if previous is None:
-                raise ContractError(ErrorCode.CONFLICT, "there is no previous pointer to roll back to")
+                raise ContractError(ErrorCode.CONFLICT, "there is no previous pointer to roll back to",
+                    retryable=False)
             return previous
         if corpus not in self.store.live_by_corpus(target):
             raise ContractError(ErrorCode.NOT_FOUND, f"corpus {corpus!r} has no live version on this target",
@@ -874,7 +875,8 @@ class Publication:
         if ctx.actor_kind not in (ActorKind.INTERACTIVE, ActorKind.CLI) or not ctx.has("graph.publish"):
             raise ContractError(ErrorCode.DENIED, "rollback requires a human with graph.publish")
         if not self.replacement:
-            raise ContractError(ErrorCode.CONFLICT, "this deployment has no replacement importer; use rollback")
+            raise ContractError(ErrorCode.CONFLICT, "this deployment has no replacement importer; use rollback",
+                retryable=False)
         previous = self._previous_for(target, corpus)
         return self.submit(ctx, str(previous["snapshot_ref"]), target, rollback_reason=reason)
 

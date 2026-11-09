@@ -193,7 +193,7 @@ def classify_scope(scope: str, entities: list[dict[str, Any]], links: list[dict[
             try:
                 kind = lw.classify_entity(row, gid)
             except ValueError as exc:
-                raise ContractError(ErrorCode.CONFLICT, str(exc)) from None
+                raise ContractError(ErrorCode.CONFLICT, str(exc), retryable=False) from None
             if kind is not None:
                 break
         if kind is None:
@@ -208,17 +208,20 @@ def classify_scope(scope: str, entities: list[dict[str, Any]], links: list[dict[
             continue  # legacy pending/retired/release rows are left exactly as they are
         if kind == lw.RELEASE:
             if st.release is not None:
-                raise ContractError(ErrorCode.CONFLICT, f"two live release markers for scope {scope!r}")
+                raise ContractError(ErrorCode.CONFLICT, f"two live release markers for scope {scope!r}",
+                    retryable=False)
             st.release = row
         elif kind == "final":
             if node in st.final:
                 raise ContractError(ErrorCode.CONFLICT,
-                                    f"two Tiled entities claim ({scope}, {node}); no upsert in 0.2.18")
+                                    f"two Tiled entities claim ({scope}, {node}); no upsert in 0.2.18",
+                                    retryable=False)
             st.final[node] = row
         else:
             slot = (st.pending if kind == lw.PENDING else st.retired).setdefault(_tag_of(row["uri"]), {})
             if node in slot:
-                raise ContractError(ErrorCode.CONFLICT, f"two {kind} revisions of ({scope}, {node})")
+                raise ContractError(ErrorCode.CONFLICT, f"two {kind} revisions of ({scope}, {node})",
+                    retryable=False)
             slot[node] = row
     for row in links:
         key = ida.literature_link_key(row)
@@ -602,7 +605,8 @@ def plan_replacement(source: Source, *, client: TiledMutationClient, settings: D
         if legacy and not adopt_legacy:
             raise ContractError(ErrorCode.CONFLICT,
                                 f"the target holds per-version imports of corpus {scope!r} ({legacy}); plan with "
-                                "adopt_legacy=True to retire them into the corpus scope (one-time adoption)")
+                                "adopt_legacy=True to retire them into the corpus scope (one-time adoption)",
+                                retryable=False)
         state = classify_scope(scope, entities, links, legacy if adopt_legacy else ())
         probes = read_probes(client, state)
     ops, counts, _ids = compute_ops(src, state)
@@ -673,7 +677,8 @@ class ReleaseState:
         """Record that plan ``tag`` has started its switch (idempotent)."""
         rec = self.read()
         if rec.get("switching") not in (None, tag):
-            raise ContractError(ErrorCode.CONFLICT, f"another plan ({rec['switching']}) is switching this scope")
+            raise ContractError(ErrorCode.CONFLICT, f"another plan ({rec['switching']}) is switching this scope",
+                retryable=False)
         self._write({**rec, "switching": tag})
 
     def set_live(self, *, receipt_id: str, snapshot_id: str, plan_sha256: str, at: datetime) -> None:
@@ -779,7 +784,7 @@ class PinnedReader:
         if props.get(ida.GRAPH_KEY) != self.scope or props.get(ida.ENTITY_KEY) != node_id \
                 or props.get(ida.OWNER_KEY) != ida.LITERATURE_OWNER:
             raise ContractError(ErrorCode.CONFLICT, f"Tiled entity {row.get('id')} no longer carries identity "
-                                                    f"({self.scope}, {node_id})")
+                                                    f"({self.scope}, {node_id})", retryable=False)
         data = ida.strip_reserved(props)
         return {"graph_id": self.scope, "id": node_id, "name": str(row.get("name") or ""),
                 "category": str(data.get("category") or data.get("entityType") or ""), "backend": "tiled",
@@ -792,7 +797,8 @@ class PinnedReader:
             return None
         row = self.client.entity(tiled_id)
         if row is None:
-            raise ContractError(ErrorCode.CONFLICT, f"pinned entity {tiled_id} vanished from Tiled")
+            raise ContractError(ErrorCode.CONFLICT, f"pinned entity {tiled_id} vanished from Tiled",
+                retryable=False)
         return self._record(node_id, row)
 
     def entities(self) -> list[dict[str, Any]]:
@@ -801,7 +807,8 @@ class PinnedReader:
         for _graph, node_id, tiled_id in sorted(g for g in self.ledger.to_json()["entities"] if g[0] == self.scope):
             row = self.client.entity(tiled_id)
             if row is None:
-                raise ContractError(ErrorCode.CONFLICT, f"pinned entity {tiled_id} vanished from Tiled")
+                raise ContractError(ErrorCode.CONFLICT, f"pinned entity {tiled_id} vanished from Tiled",
+                    retryable=False)
             out.append(self._record(node_id, row))
         return out
 
@@ -908,7 +915,7 @@ def apply_replacement(ctx: RequestContext, plan: ReplacementPlan, approval: Appr
     src = load_source(source, supported_schema_fingerprints=supported_schema_fingerprints)
     if src.graph_sha256 != change.input_sha256 or src.manifest_sha256 != plan.detail["manifest_sha256"] \
             or src.manifest.corpus != scope:
-        raise ContractError(ErrorCode.CONFLICT, "the source snapshot no longer matches the plan")
+        raise ContractError(ErrorCode.CONFLICT, "the source snapshot no longer matches the plan", retryable=False)
     root = scope_dir(state_dir, change.target, scope)
     run_dir = root / "plans" / plan.tag
     journal = ImportJournal(run_dir / "journal.jsonl", clock)
@@ -1203,7 +1210,8 @@ def abandon_plan(ctx: RequestContext, plan: ReplacementPlan, *, client: TiledMut
     root = scope_dir(state_dir, plan.change.target, scope)
     journal = ImportJournal(root / "plans" / tag / "journal.jsonl", clock)
     if any(r.get("event") == "switch_started" for r in journal.records()):
-        raise ContractError(ErrorCode.CONFLICT, "the switch of this plan has started; resume it instead of abandoning")
+        raise ContractError(ErrorCode.CONFLICT, "the switch of this plan has started; resume it instead of abandoning",
+            retryable=False)
     lease = Lease(root / "lease.json", clock, lease_seconds).acquire()
     report: dict[str, Any] = {"deleted_entities": 0, "deleted_links": 0, "skipped": []}
     try:

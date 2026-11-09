@@ -386,7 +386,8 @@ class CurationStore:
                     ErrorCode.STALE_APPROVAL, "the candidate, schema or vocabulary changed since this was reviewed"
                 )
             if row["state"] != CaseState.NEEDS_REVIEW.value:
-                raise ContractError(ErrorCode.CONFLICT, f"case is {row['state']}, not awaiting review")
+                raise ContractError(ErrorCode.CONFLICT, f"case is {row['state']}, not awaiting review",
+                    retryable=False)
             state = CaseState.RESOLVED if accept else CaseState.REJECTED
             con.execute(
                 "UPDATE uncertainty_cases SET state=?, resolution=?, resolved_by=?, needs_validation=?, "
