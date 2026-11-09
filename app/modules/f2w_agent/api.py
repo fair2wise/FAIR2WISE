@@ -2691,6 +2691,8 @@ class AgentPipelineService:
     tiled_save: TiledSaveBackend | None = None
     #: Lazily resolved Save backend (``:local`` after the first publication); ``None`` keeps the paths above.
     tiled_save_provider: SaveBackendProvider | None = None
+    #: The provider backend whose effective record the session graph last showed (``_refresh_session_graph``).
+    _shown_backend: TiledSaveBackend | None = None
 
     def __init__(self, cfg: CoordinatorConfig) -> None:
         """Initialize coordinator, session state, runtime settings, and agents."""
@@ -2760,7 +2762,7 @@ class AgentPipelineService:
         #: Curation budget for the orchestrator's model calls (T17B P2); attached by ``create_api_app``.
         self.llm_budget: BudgetPort | None = None
         self._rebuild_agents()
-        if self.runtime.graph_source == "splash":
+        if self.runtime.graph_source == "splash" and not getattr(cfg, "defer_session_sync", False):
             self._sync_session_graph_from_splash()
         # F2W_RUNTIME, read once at startup: None (default "legacy") keeps the path below unchanged.
         self._read_path = attach_read_path(self)
@@ -2850,6 +2852,43 @@ class AgentPipelineService:
             logger.warning("Failed to sync session KG from splash: %s", exc)
             return False
 
+    def finish_startup_sync(self) -> None:
+        """Run the startup session-graph sync that ``cfg.defer_session_sync`` postponed (no provider was attached).
+
+        ``create_api_app(local_publication=True)`` defers the sync past the wiring so that on ``:local`` the first
+        sync is the Tiled effective record (or nothing, before a publication) and never a Splash call. Every other
+        profile (ALS, no managed Tiled) runs here exactly what ``__init__`` would have run.
+        """
+        if self.runtime.graph_source == "splash" and self.tiled_save is None and self.tiled_save_provider is None:
+            self._sync_session_graph_from_splash()
+
+    def _loader_source(self, source: str) -> str:
+        """The graph source the retrieval loaders (``krag.KnowledgeGraph``) are given for the UI source ``source``.
+
+        The editable mode keeps its wire token ``splash`` everywhere the UI sees it, but with the ``:local`` Tiled
+        save provider attached its session graph is a JSON file (the effective record), so the loaders read it as
+        ``json``: the ``splash`` loader would query ``splash-links`` (a Splash HTTP call, and the wrong data).
+        Without a provider (ALS, library callers) the source is passed through unchanged.
+        """
+        return "json" if self.tiled_save_provider is not None and source == "splash" else source
+
+    def _refresh_session_graph(self) -> None:
+        """``:local`` editable mode: show the active publication's effective record, not the startup seed.
+
+        A cheap check per call (the provider resolves the pointer and the release record, and hands back one backend
+        per ``(corpus, snapshot, sha256)``); the session graph is rewritten only when that backend is not the one
+        last shown.
+        """
+        provider = self.tiled_save_provider
+        if provider is None or self.tiled_save is not None or self.runtime.graph_source == "json":
+            return
+        try:
+            backend = provider.backend()
+        except ContractError:
+            return                         # no publication yet: the JSON graph stays on screen
+        if backend is not self._shown_backend and self._sync_session_graph_from_splash():
+            self._shown_backend = backend
+
     def _active_model(self) -> str:
         """Return the resolved model name for the current backend."""
         return default_runtime_model(self.runtime.backend, self.runtime.model)
@@ -2861,7 +2900,7 @@ class AgentPipelineService:
         self.retrieval = RetrievalAgent(
             graph_file=graph_file,
             graph_files=self._runtime_json_paths() if self.runtime.graph_source == "json" else [graph_file],
-            graph_source=self.runtime.graph_source,
+            graph_source=self._loader_source(self.runtime.graph_source),
             backend=self.runtime.backend,
             model=model,
             kg_query_hops=self.runtime.kg_query_hops,
@@ -3251,6 +3290,7 @@ class AgentPipelineService:
 
     def graph_payload(self) -> GraphPayload:
         """Load the current graph as a GraphPayload, or an empty payload if missing."""
+        self._refresh_session_graph()
         path = self.graph_path()
         if not path.exists():
             return GraphPayload(nodes=[], edges=[], source_path=str(path))
@@ -3530,7 +3570,7 @@ class AgentPipelineService:
             self._materialize_effective_graph(graph_path, tiled)
         else:
             _save_session_graph(graph_path, data)
-        await self.retrieval.reload_kg(str(graph_path), graph_source="splash")
+        await self.retrieval.reload_kg(str(graph_path), graph_source=self._loader_source("splash"))
 
         node = graph_node_from_file(graph_path, node_id)
         if node is None:
@@ -3852,7 +3892,7 @@ class AgentPipelineService:
 
         def retrieve_node_ids() -> list[str]:
             """Retrieve KG node ids matching the publication search query."""
-            graph_source = "json" if self.runtime.graph_source == "json" else self.cfg.kg_mode
+            graph_source = "json" if self.runtime.graph_source == "json" else self._loader_source(self.cfg.kg_mode)
             kg = krag.KnowledgeGraph(str(graph_path), graph_source=graph_source)
             infos = krag.retrieve_nodes(query, kg)
             return [str(getattr(info, "id", info)) for info in infos]
@@ -3982,6 +4022,7 @@ class AgentPipelineService:
     ) -> dict[str, Any]:
         """Reload the retrieval agent KG, falling back if graph_files is unsupported."""
         reload = self.retrieval.reload_kg
+        graph_source = self._loader_source(graph_source)
         try:
             return await reload(graph_file, graph_source=graph_source, graph_files=graph_files)
         except TypeError:
@@ -5367,6 +5408,7 @@ class AgentPipelineService:
             active_graph_path = Path(resolved_files[0]) if resolved_files else self.graph_path()
             active_graph_source = "json"
         else:
+            self._refresh_session_graph()
             active_graph_path = self._session_graph_path()
             active_graph_source = "splash"
             resolved_files = [str(active_graph_path)]

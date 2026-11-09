@@ -63,8 +63,23 @@ resolves the target **per Save request** from the deployment's own publication s
   `can_save = false` (the frozen UI hides the Save controls) and no Splash call is made. After a publication the
   next Save resolves the new target without a restart; a later publication is resolved anew.
 
-Operator note: the image starts the API with `--kg-mode json` (read-only; Save is the legacy 400 there). To edit,
-switch Settings -> graph source to the editable mode; the session graph is then rebuilt from the active publication.
+Operator note (owner decision 2026-11-09, fifteenth set, "Default to editable on :local"): the image starts the API
+with `--kg-mode splash` (`docker/profiles/local.json`), the editable mode under its wire token; before this decision
+it was `--kg-mode json` (read-only, Save the legacy 400, switch needed in Settings). No switch is needed now: Save is
+available as soon as a publication exists, and the session graph follows the active publication (the graph view
+rebuilds it when the active snapshot changes). Before one the graph view shows the JSON graph, `can_save` is false and
+PATCH is the typed 501. The token never contacts a Splash service (owner choice "accept but alias to json/tiled"):
+
+- the startup session-graph sync is deferred past the wiring (`cfg.defer_session_sync`,
+  `AgentPipelineService.finish_startup_sync`), so with the provider attached it is the Tiled effective record (or
+  nothing) and never `kg_update.load_splash_graph`; without a provider (ALS, a `:local` without managed Tiled) the same
+  sync runs right after the wiring, as before;
+- with the provider attached the retrieval loaders (`krag.KnowledgeGraph`) get `json` for the `splash` source
+  (`AgentPipelineService._loader_source`), because the session graph is a JSON file; the `splash` loader would query
+  `splash-links` and prefer its data over the file;
+- ALS profiles keep `--kg-mode json`, and every path without a provider is unchanged.
+
+Rollback: set the `--kg-mode` value in `docker/profiles/local.json` back to `json`.
 
 Tests: `tests/api_wiring/test_local_save.py` (memory double and a real disposable Tiled).
 

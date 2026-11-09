@@ -177,7 +177,7 @@ def test_api_service_serves_the_jobs_api_under_the_prefix(tmp_path, monkeypatch)
             monkeypatch.setenv(key, value)
     monkeypatch.setenv("F2W_WORKDIR", str(tmp_path / "session"))
     monkeypatch.setenv("F2W_TRACE_DIR", str(tmp_path / "traces"))
-    argv = ["--backend", "cborg", "--model", "lbl/cborg-chat", "--kg-mode", "json",
+    argv = ["--backend", "cborg", "--model", "lbl/cborg-chat", "--kg-mode", "splash",
             "--graph", "storage/kg/matkg_rsoxs_v1.json", "--schema", "storage/schema/rsoxs_schema.yaml",
             "--workdir", str(tmp_path / "session"), "api", "--host", "127.0.0.1", "--port", "8090"]
     # C6: the service runs the CLI's own ``api --jobs-api`` path (app.api.main.run_api), which
@@ -186,8 +186,22 @@ def test_api_service_serves_the_jobs_api_under_the_prefix(tmp_path, monkeypatch)
 
     served = []
     monkeypatch.setattr(uvicorn, "run", lambda app, **kw: served.append((app, kw)))
+    # Owner decision 2026-11-09: the image's editable default must never reach a Splash service while starting.
+    import urllib.request
+
+    import requests
+
+    splash_hits: list[str] = []
+
+    def _splash_trip(request, *_a, **_k):
+        splash_hits.append(str(getattr(request, "full_url", None) or getattr(request, "url", request)))
+        raise OSError("no Splash service on :local")
+
+    monkeypatch.setattr(urllib.request, "urlopen", _splash_trip)
+    monkeypatch.setattr(requests.Session, "send", _splash_trip)
     assert api.command(argv, os.environ) == argv + ["--jobs-api"]
     assert api.main(argv) == 0
+    assert splash_hits == []
     ((app, options),) = served
     assert options == {"host": "127.0.0.1", "port": 8090, "root_path": "/fair2wise/api"}
     paths = {getattr(r, "path", "") for r in app.routes}

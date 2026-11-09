@@ -98,6 +98,9 @@ def test_api_worker_gateway_wiring(name):
     for graph in env["F2W_GRAPH"].split(","):
         assert (REPO / graph).is_file(), graph
     assert (REPO / env["F2W_SCHEMA"]).is_file()
+    # Owner decision 2026-11-09 (fifteenth set): ``:local`` defaults to the editable KG mode (wire token ``splash``;
+    # it never contacts a Splash service, see tests/api_wiring/test_local_editable_default.py). ALS stays on json.
+    assert api[api.index("--kg-mode") + 1] == ("splash" if name == "local" else "json")
     assert units["gateway"][0] == "nginx"
     health = {s.name: s.health for s in profile.services}
     assert profile.services[-1].health.http == "http://127.0.0.1:${F2W_GATEWAY_PORT}/fair2wise/healthz"

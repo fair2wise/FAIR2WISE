@@ -246,6 +246,10 @@ def create_api_app(
 
     if extraction_publisher is not None:
         cfg.extraction_publisher = extraction_publisher
+    if local_publication:
+        # The startup session-graph sync waits for the wiring below: on ``:local`` it is the Tiled effective record
+        # (never a Splash call); everywhere else ``finish_startup_sync`` runs the same sync afterwards.
+        cfg.defer_session_sync = True
     if tiled_save is not None:
         cfg.tiled_save = tiled_save     # read by the service before it builds its session graph (no Splash call)
     app = create_app(cfg, cors_origins=cors_origins, deployment=deployment, startup_config=startup_config,
@@ -286,6 +290,8 @@ def create_api_app(
             # T18D on :local (owner decision 2026-11-04, tenth set): the UI Save target is resolved lazily, per
             # request, from the active publication; before the first publication Save is the typed 501.
             app.state.f2w_agent_service.attach_tiled_save_provider(wired.save_provider)
+    if local_publication:
+        app.state.f2w_agent_service.finish_startup_sync()      # no-op when a Tiled save target is attached
     if knowledge_operations is not None and operations.knowledge is not None:
         raise StartupConfigError("config_rejected: knowledge_operations given but operations already carry one")
     if operations.knowledge is None:
