@@ -2885,6 +2885,7 @@ class AgentPipelineService:
         self.debate = EvidenceDebateAgent(
             backend=self.runtime.backend,
             model=model,
+            budget=self.llm_budget,
         )
         self.orchestrator = WorkflowOrchestratorAgent(
             backend=self.runtime.backend,
@@ -3374,7 +3375,7 @@ class AgentPipelineService:
         return graph_neighborhood_from_lookup(kg, node_id, hops)
 
     def attach_llm_budget(self, budget: BudgetPort) -> None:
-        """Count the orchestrator's model calls against the curation budget (``BudgetPort``; T17B P2)."""
+        """Count the orchestrator's and debate's model calls against the curation budget (``BudgetPort``; T17B P2)."""
         self.llm_budget = budget
         self._rebuild_agents()
 

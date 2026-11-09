@@ -129,7 +129,11 @@ wraps it unchanged), `openalex_search`, `openalex_work`, `arxiv_search` + `parse
   the cost-control spend. `f2w_agent/orchestrator_agent.py` is now a deprecated thin facade (real module, not a
   `sys.modules` alias: the legacy hooks it injects cannot be imported from `agent_runtime`, whose import
   boundary test forbids `app.modules` imports) and no longer subclasses the Academy `Agent`.
-- *Debate: pending* (`curation/evidence.py`).
+- *Debate: done.* Scoring, index parsing, summary, heuristic fallback, prompt and guard rails live in
+  `app/modules/curation/evidence.py` with a compiled LangGraph `ask -> resolve | fallback` graph (no Academy import);
+  the call goes through the same `AdmittedChat` and `LedgerAgentBudget`. `f2w_agent/debate_agent.py` is a deprecated
+  thin facade (same reason as the orchestrator) with `f2w_agent/admitted_chat.py` holding the shared legacy wiring.
+  Parity: `tests/curation/test_evidence_golden.py` replays 22 recorded cases.
 - Parity: `tests/runtime/test_routing_golden.py` replays 48 recorded fake-model cases (decision, exact prompt, call
   kwargs, precheck notes) captured from the legacy module before the port.
 

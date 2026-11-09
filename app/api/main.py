@@ -319,7 +319,7 @@ def create_api_app(
     register_library_jobs(operations.jobs, settings, handlers=library_handlers_)
     app.state.f2w_operations = operations
     if operations.curation is not None:
-        # T17B P2 (owner decision 2026-11-09): the orchestrator's model calls count against the curation budgets.
+        # T17B P2 (owner decision 2026-11-09): the orchestrator's and debate's model calls count against the curation budgets.
         from ..modules.curation.agent_budget import LedgerAgentBudget
 
         app.state.f2w_agent_service.attach_llm_budget(

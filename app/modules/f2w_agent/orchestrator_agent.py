@@ -14,7 +14,7 @@ from collections.abc import Iterable
 import os
 from typing import Any
 
-from ..agent_runtime.llm_gate import AGENT_ADMISSION_KEY, AdmittedChat, BudgetPort
+from ..agent_runtime.llm_gate import BudgetPort
 from ..agent_runtime.routing import (
     ACTION_AGENTS,
     ACTIONS,
@@ -31,6 +31,7 @@ from ..agent_runtime.routing import (
     fresh_turn_decision,
     validate_decision,
 )
+from .admitted_chat import legacy_admitted_chat
 from .retrieval_agent import _is_ops_layout_question
 from .trace import bind_context, note_error, note_precheck
 
@@ -46,31 +47,6 @@ HOOKS = RoutingHooks(
     note_error=note_error,
     bind_context=bind_context,
 )
-
-
-def legacy_admitted_chat(backend: str, model: str, budget: BudgetPort | None) -> AdmittedChat:
-    """An :class:`AdmittedChat` over ``term_extractor.clients.make_chat_client`` (looked up per call)."""
-    from ..cborg_http import call_with_deadline
-    from ..llm_admission import ProviderAdmission
-    from ..term_extractor import clients
-
-    def factory() -> Any:  # noqa: ANN401 - the chat client
-        return clients.make_chat_client(
-            backend=backend,
-            model=model,
-            cborg_base=os.environ.get("CBORG_BASE_URL"),
-            cborg_api_key=os.environ.get("CBORG_API_KEY"),
-        )
-
-    return AdmittedChat(
-        client_factory=factory,
-        model=model,
-        admission=ProviderAdmission(),
-        run_with_deadline=call_with_deadline,
-        budget=budget,
-        local=(backend or "").lower() == "ollama",
-        admission_key=AGENT_ADMISSION_KEY,
-    )
 
 
 class WorkflowOrchestratorAgent:

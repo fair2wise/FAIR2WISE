@@ -48,7 +48,7 @@ Run these entry points from the repository root with `python3 -m`, for example
 | `retrieval_agent.py` | KG search, evidence test, context, strict sufficiency judge |
 | `download_agent.py` | OpenAlex/arXiv search, ranking, URL resolution, PDF download/validation |
 | `extractor_agent.py` | Async Academy wrapper around local full/targeted extraction |
-| `debate_agent.py` | Evidence-gating decision and heuristic fallback |
+| `debate_agent.py` | Deprecated facade over `curation/evidence.py` (evidence-gating decision and heuristic fallback) |
 | `paper_evidence_agent.py` | Page-bounded answers over active downloaded PDFs |
 | `kg_update.py` | Terms-to-KG rebuild, post-extraction publication, Splash entity/link/export/load |
 | `session_memory.py` | Topic-aware durable conversational memory and compression |

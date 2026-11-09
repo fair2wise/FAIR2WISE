@@ -1,0 +1,757 @@
+{
+ "llm_answer_when_insufficient_becomes_stop": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 1\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": false, \"missing\": [\"x\", \"y\"], \"reason\": \"no snippets\"}\nCANDIDATES: []"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [],
+   "candidate_titles": [],
+   "hypothesis": "KG evidence is incomplete; title/abstract candidates may fill the gap.",
+   "objections": [],
+   "reason": "Evidence debate selected the next action.",
+   "refined_query": null,
+   "selected_action": "stop_insufficient"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": []
+ },
+ "llm_answer_when_sufficient": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 1\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": true}\nCANDIDATES: []"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [],
+   "candidate_titles": [],
+   "hypothesis": "KG evidence can answer the question.",
+   "objections": [],
+   "reason": "kg ok",
+   "refined_query": null,
+   "selected_action": "answer_from_kg"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": []
+ },
+ "llm_candidates_with_id_only": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 1\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": false, \"missing\": [\"x\", \"y\"], \"reason\": \"no snippets\"}\nCANDIDATES: [{\"index\": 0, \"title\": null, \"doi\": null, \"score\": 0.7, \"abstract\": \"\"}]"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [
+    0
+   ],
+   "candidate_titles": [
+    "W1"
+   ],
+   "hypothesis": "KG evidence is incomplete; title/abstract candidates may fill the gap.",
+   "objections": [],
+   "reason": "Evidence debate selected the next action.",
+   "refined_query": null,
+   "selected_action": "download_selected"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": []
+ },
+ "llm_compact_prompt_many_candidates": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 2\nQUESTION: what is X?\nRETRIEVAL_PROBE: {\"sufficient\": false, \"missing\": [\"x\", \"y\"], \"reason\": \"no snippets\"}\nCANDIDATES: [{\"index\": 0, \"title\": \"A\", \"doi\": \"10.1/a\", \"score\": 0.5, \"abstract\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}, {\"index\": 1, \"title\": \"T0\", \"doi\": null, \"score\": 0.4, \"abstract\": \"\"}, {\"index\": 2, \"title\": \"T1\", \"doi\": null, \"score\": 0.41000000000000003, \"abstract\": \"\"}, {\"index\": 3, \"title\": \"T2\", \"doi\": null, \"score\": 0.42000000000000004, \"abstract\": \"\"}, {\"index\": 4, \"title\": \"T3\", \"doi\": null, \"score\": 0.43000000000000005, \"abstract\": \"\"}, {\"index\": 5, \"title\": \"T4\", \"doi\": null, \"score\": 0.44, \"abstract\": \"\"}]"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [
+    1
+   ],
+   "candidate_titles": [
+    "T0"
+   ],
+   "hypothesis": "KG evidence is incomplete; title/abstract candidates may fill the gap.",
+   "objections": [],
+   "reason": "Evidence debate selected the next action.",
+   "refined_query": null,
+   "selected_action": "download_selected"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": []
+ },
+ "llm_download_low_score_vetoed": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 1\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": false, \"missing\": [\"x\", \"y\"], \"reason\": \"no snippets\"}\nCANDIDATES: [{\"index\": 0, \"title\": \"a\", \"doi\": null, \"score\": 0.01, \"abstract\": \"\"}]"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [],
+   "candidate_titles": [
+    "a"
+   ],
+   "hypothesis": "KG evidence is incomplete; title/abstract candidates may fill the gap.",
+   "objections": [],
+   "reason": "Evidence debate selected the next action.",
+   "refined_query": null,
+   "selected_action": "stop_insufficient"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": []
+ },
+ "llm_download_no_indices_defaults_first": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 1\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": false, \"missing\": [\"x\", \"y\"], \"reason\": \"no snippets\"}\nCANDIDATES: [{\"index\": 0, \"title\": \"a\", \"doi\": null, \"score\": 0.9, \"abstract\": \"\"}]"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [
+    0
+   ],
+   "candidate_titles": [
+    "a"
+   ],
+   "hypothesis": "KG evidence is incomplete; title/abstract candidates may fill the gap.",
+   "objections": [],
+   "reason": "Evidence debate selected the next action.",
+   "refined_query": null,
+   "selected_action": "download_selected"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": []
+ },
+ "llm_download_out_of_range": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 1\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": false, \"missing\": [\"x\", \"y\"], \"reason\": \"no snippets\"}\nCANDIDATES: [{\"index\": 0, \"title\": \"a\", \"doi\": null, \"score\": 0.9, \"abstract\": \"\"}]"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [
+    0
+   ],
+   "candidate_titles": [
+    "a"
+   ],
+   "hypothesis": "KG evidence is incomplete; title/abstract candidates may fill the gap.",
+   "objections": [],
+   "reason": "Evidence debate selected the next action.",
+   "refined_query": null,
+   "selected_action": "download_selected"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": []
+ },
+ "llm_download_valid": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 1\nQUESTION: what is X?\nRETRIEVAL_PROBE: {\"sufficient\": false, \"missing\": [\"x\", \"y\"], \"reason\": \"no snippets\"}\nCANDIDATES: [{\"index\": 0, \"title\": \"a\", \"doi\": null, \"score\": 0.3, \"abstract\": \"\"}, {\"index\": 1, \"title\": \"b\", \"doi\": null, \"score\": 0.8, \"abstract\": \"\"}]"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [
+    1
+   ],
+   "candidate_titles": [
+    "b"
+   ],
+   "hypothesis": "H",
+   "objections": [
+    "cost"
+   ],
+   "reason": "good",
+   "refined_query": null,
+   "selected_action": "download_selected"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": []
+ },
+ "llm_empty_reply": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 1\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": false, \"missing\": [\"x\", \"y\"], \"reason\": \"no snippets\"}\nCANDIDATES: []"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [],
+   "candidate_titles": [],
+   "hypothesis": "KG evidence is incomplete; title/abstract candidates may fill the gap.",
+   "objections": [
+    "Current KG evidence is insufficient.",
+    "Literature scout returned no usable candidates."
+   ],
+   "reason": "No OpenAlex title/abstract candidates with usable open-access PDF URLs were found.",
+   "refined_query": null,
+   "selected_action": "stop_insufficient"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": []
+ },
+ "llm_hypothesis_default_sufficient": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 1\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": true}\nCANDIDATES: [{\"index\": 0, \"title\": \"a\", \"doi\": null, \"score\": 0.5, \"abstract\": \"\"}]"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [],
+   "candidate_titles": [
+    "a"
+   ],
+   "hypothesis": "KG evidence can answer the question.",
+   "objections": [],
+   "reason": "Evidence debate selected the next action.",
+   "refined_query": null,
+   "selected_action": "answer_from_kg"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": []
+ },
+ "llm_not_json": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 1\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": false, \"missing\": [\"x\", \"y\"], \"reason\": \"no snippets\"}\nCANDIDATES: [{\"index\": 0, \"title\": \"a\", \"doi\": null, \"score\": 0.9, \"abstract\": \"\"}]"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [
+    0
+   ],
+   "candidate_titles": [
+    "a"
+   ],
+   "hypothesis": "KG evidence is incomplete; title/abstract candidates may fill the gap.",
+   "objections": [
+    "Full extraction cost is justified only for the selected candidate."
+   ],
+   "reason": "Best title/abstract candidate appears likely to fill the missing evidence gap.",
+   "refined_query": null,
+   "selected_action": "download_selected"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": []
+ },
+ "llm_probe_truncated_long": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 1\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": false, \"blob\": \"zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\nCANDIDATES: [{\"index\": 0, \"title\": \"a\", \"doi\": null, \"score\": 0.5, \"abstract\": \"\"}]"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [],
+   "candidate_titles": [
+    "a"
+   ],
+   "hypothesis": "KG evidence is incomplete; title/abstract candidates may fill the gap.",
+   "objections": [],
+   "reason": "Evidence debate selected the next action.",
+   "refined_query": null,
+   "selected_action": "refine_search"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": []
+ },
+ "llm_prose_wrapped_json": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 1\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": false, \"missing\": [\"x\", \"y\"], \"reason\": \"no snippets\"}\nCANDIDATES: [{\"index\": 0, \"title\": \"a\", \"doi\": null, \"score\": 0.4, \"abstract\": \"\"}]"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [],
+   "candidate_titles": [
+    "a"
+   ],
+   "hypothesis": "KG evidence is incomplete; title/abstract candidates may fill the gap.",
+   "objections": [],
+   "reason": "r",
+   "refined_query": null,
+   "selected_action": "stop_insufficient"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": []
+ },
+ "llm_raises_falls_back_download": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 3\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": false, \"missing\": [\"x\", \"y\"], \"reason\": \"no snippets\"}\nCANDIDATES: [{\"index\": 0, \"title\": \"a\", \"doi\": null, \"score\": 0.9, \"abstract\": \"\"}]"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [
+    0
+   ],
+   "candidate_titles": [
+    "a"
+   ],
+   "hypothesis": "KG evidence is incomplete; title/abstract candidates may fill the gap.",
+   "objections": [
+    "Full extraction cost is justified only for the selected candidate."
+   ],
+   "reason": "Best title/abstract candidate appears likely to fill the missing evidence gap.",
+   "refined_query": null,
+   "selected_action": "download_selected"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": [
+   [
+    "note_error",
+    "EvidenceDebateAgent.decide",
+    "llm down"
+   ]
+  ]
+ },
+ "llm_raises_falls_back_no_candidates": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 1\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": false, \"missing\": [\"x\", \"y\"], \"reason\": \"no snippets\"}\nCANDIDATES: []"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [],
+   "candidate_titles": [],
+   "hypothesis": "KG evidence is incomplete; title/abstract candidates may fill the gap.",
+   "objections": [
+    "Current KG evidence is insufficient.",
+    "Literature scout returned no usable candidates."
+   ],
+   "reason": "No OpenAlex title/abstract candidates with usable open-access PDF URLs were found.",
+   "refined_query": null,
+   "selected_action": "stop_insufficient"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": [
+   [
+    "note_error",
+    "EvidenceDebateAgent.decide",
+    "llm down"
+   ]
+  ]
+ },
+ "llm_raises_falls_back_sufficient": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 1\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": true}\nCANDIDATES: [{\"index\": 0, \"title\": \"a\", \"doi\": null, \"score\": 0.9, \"abstract\": \"\"}]"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [],
+   "candidate_titles": [],
+   "hypothesis": "KG evidence can answer the question.",
+   "objections": [],
+   "reason": "Strict retrieval judge marked the current KG evidence sufficient.",
+   "refined_query": null,
+   "selected_action": "answer_from_kg"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": [
+   [
+    "note_error",
+    "EvidenceDebateAgent.decide",
+    "llm down"
+   ]
+  ]
+ },
+ "llm_raises_falls_back_weak": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 1\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": false, \"missing\": [\"x\", \"y\"], \"reason\": \"no snippets\"}\nCANDIDATES: [{\"index\": 0, \"title\": \"w\", \"doi\": null, \"score\": 0.05, \"abstract\": \"\"}, {\"index\": 1, \"title\": \"w2\", \"doi\": null, \"score\": 0.01, \"abstract\": \"\"}]"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [],
+   "candidate_titles": [
+    "w",
+    "w2"
+   ],
+   "hypothesis": "KG evidence is incomplete; title/abstract candidates may fill the gap.",
+   "objections": [
+    "Current KG evidence is insufficient.",
+    "Top abstracts do not clearly address the missing topics."
+   ],
+   "reason": "Best OpenAlex candidate score 0.05 is below the extraction gate.",
+   "refined_query": null,
+   "selected_action": "stop_insufficient"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": [
+   [
+    "note_error",
+    "EvidenceDebateAgent.decide",
+    "llm down"
+   ]
+  ]
+ },
+ "llm_refine": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 2\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": false, \"missing\": [\"x\", \"y\"], \"reason\": \"no snippets\"}\nCANDIDATES: [{\"index\": 0, \"title\": \"a\", \"doi\": null, \"score\": 0.5, \"abstract\": \"\"}]"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [],
+   "candidate_titles": [
+    "a"
+   ],
+   "hypothesis": "KG evidence is incomplete; title/abstract candidates may fill the gap.",
+   "objections": [],
+   "reason": "Evidence debate selected the next action.",
+   "refined_query": "narrower",
+   "selected_action": "refine_search"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": []
+ },
+ "llm_stop": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 3\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": false, \"missing\": [\"x\", \"y\"], \"reason\": \"no snippets\"}\nCANDIDATES: [{\"index\": 0, \"title\": \"a\", \"doi\": null, \"score\": 0.9, \"abstract\": \"\"}]"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [],
+   "candidate_titles": [
+    "a"
+   ],
+   "hypothesis": "KG evidence is incomplete; title/abstract candidates may fill the gap.",
+   "objections": [
+    "a",
+    "3"
+   ],
+   "reason": "weak",
+   "refined_query": null,
+   "selected_action": "stop_insufficient"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": []
+ },
+ "llm_unicode_question": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 1\nQUESTION: Wie funktioniert RSoXS? \u00e9\u4e2d\nRETRIEVAL_PROBE: {\"sufficient\": false, \"missing\": [\"x\", \"y\"], \"reason\": \"no snippets\"}\nCANDIDATES: [{\"index\": 0, \"title\": \"\u00e9\", \"doi\": null, \"score\": 0.5, \"abstract\": \"\"}]"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [
+    0
+   ],
+   "candidate_titles": [
+    "\u00e9"
+   ],
+   "hypothesis": "KG evidence is incomplete; title/abstract candidates may fill the gap.",
+   "objections": [],
+   "reason": "Evidence debate selected the next action.",
+   "refined_query": null,
+   "selected_action": "download_selected"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": []
+ },
+ "llm_unknown_action_falls_back_answer": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 1\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": true}\nCANDIDATES: []"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [],
+   "candidate_titles": [],
+   "hypothesis": "KG evidence can answer the question.",
+   "objections": [],
+   "reason": "Strict retrieval judge marked the current KG evidence sufficient.",
+   "refined_query": null,
+   "selected_action": "answer_from_kg"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": []
+ },
+ "llm_unknown_action_falls_back_download": {
+  "calls": [
+   {
+    "kwargs": {
+     "temperature": 0.0,
+     "timeout": 120,
+     "trace_label": "evidence-debate"
+    },
+    "prompt": "You are an evidence-debate controller for a materials KG-RAG pipeline. Use three roles internally: Retrieval advocate, Literature scout, Critic. Do not write a transcript. Decide the cheapest safe next action.\n\nAllowed selected_action values:\n- answer_from_kg: only if retrieval_probe.sufficient is true.\n- refine_search: title/abstracts are weak but a narrower OpenAlex query may help.\n- download_selected: choose at most one candidate worth full PDF download/extraction.\n- stop_insufficient: evidence and candidates are too weak.\n\nReturn ONLY JSON with keys: hypothesis, objections, selected_action, reason, candidate_indices, refined_query.\n\nROUND: 1\nQUESTION: q\nRETRIEVAL_PROBE: {\"sufficient\": false, \"missing\": [\"x\", \"y\"], \"reason\": \"no snippets\"}\nCANDIDATES: [{\"index\": 0, \"title\": \"a\", \"doi\": null, \"score\": 0.9, \"abstract\": \"\"}]"
+   }
+  ],
+  "decision": {
+   "candidate_indices": [
+    0
+   ],
+   "candidate_titles": [
+    "a"
+   ],
+   "hypothesis": "KG evidence is incomplete; title/abstract candidates may fill the gap.",
+   "objections": [
+    "Full extraction cost is justified only for the selected candidate."
+   ],
+   "reason": "Best title/abstract candidate appears likely to fill the missing evidence gap.",
+   "refined_query": null,
+   "selected_action": "download_selected"
+  },
+  "factory_calls": [
+   {
+    "backend": "cborg",
+    "cborg_api_key": null,
+    "cborg_base": null,
+    "model": "m"
+   }
+  ],
+  "notes": []
+ }
+}
