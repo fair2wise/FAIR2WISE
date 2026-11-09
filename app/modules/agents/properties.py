@@ -95,6 +95,20 @@ class PhysicalPropertyExtractor:
         r'(?P<unit>%|°[CF]|[A-Za-zµμ°](?:[A-Za-zµμ°/\^\-_*·0-9²³⁰¹⁴⁵⁶⁷⁸⁹⁻]|\([^()\s]*\))*)'
     )
 
+    # Letters-only unit words the module knows (the spellings PropertyNormalizer converts, plus the
+    # efficiency fraction marker). A bare word after a number ("85 and", "0.85 was") is only a unit
+    # if it is listed here; units with a digit, "/", "°", "%" etc. are not word-like and pass.
+    KNOWN_WORD_UNITS = frozenset({
+        "ev", "mev", "k", "kelvin", "c", "gpa", "mpa", "fraction", "μb", "ub",
+    })
+
+    @classmethod
+    def _plausible_unit(cls, unit: str) -> bool:
+        """True unless ``unit`` is a letters-only word outside KNOWN_WORD_UNITS."""
+        if not unit.isalpha():
+            return True
+        return unit.lower().replace("µ", "μ") in cls.KNOWN_WORD_UNITS
+
     # Maximum number of characters between material and property phrase to be considered “proximal” 
     PROXIMITY_WINDOW = 30  # characters
 
@@ -182,6 +196,8 @@ class PhysicalPropertyExtractor:
                             flags=re.IGNORECASE,
                         )
                         for match in list(self.VALUE_UNIT_PATTERN.finditer(masked))[:1]:
+                            if not self._plausible_unit(match.group("unit")):
+                                break  # "85 and": a bare word is not a unit, keep it unverified
                             found_value = True
                             value = match.group("value")
                             unit = match.group("unit")
@@ -419,11 +435,13 @@ class PropertyNormalizer:
                         norm_val = val
                         unit = "%"
                         unc_norm = float(unc) if unc else None
-                    else:
-                        # assume fraction (e.g. 0.85 → 85%)
+                    elif raw_unit.strip().lower() in {"", "fraction"}:
+                        # explicit fraction marker (e.g. 0.85 → 85%)
                         norm_val = val * 100.0
                         unit = "%"
                         unc_norm = (float(unc) * 100.0) if unc else None
+                    else:
+                        raise ValueError(f"Unknown efficiency unit '{raw_unit}'")
 
                 # Thermal conductivity → W/(m*K)
                 elif prop == "thermal_conductivity":

@@ -379,3 +379,41 @@ def test_b13_unit_examples_from_other_properties():
 def test_b13_enclosing_parentheses_are_not_part_of_the_unit():
     raw, _ = _extract_norm("The band gap of Na3Bi (1.9 eV) is wide.")
     assert raw["raw_unit"] == "eV"
+
+
+# --- T27 props2: efficiency fraction only without unit / explicit marker; bare words are not units ---
+
+@pytest.mark.parametrize("unit", ["was", "and", "eV", "K", "fraction-ish"])
+def test_efficiency_non_percent_unit_is_never_a_silent_x100(unit):
+    out = _norm("efficiency", "0.85", unit)
+    assert out["unit_conversion_failed"] is True and out["normalized_value"] is None
+
+
+@pytest.mark.parametrize("unit", ["", "fraction", "Fraction"])
+def test_efficiency_fraction_markers_still_scale(unit):
+    out = _norm("efficiency", "0.85", unit)
+    assert out["unit_conversion_failed"] is False and out["normalized_value"] == pytest.approx(85.0)
+
+
+def test_efficiency_was_is_unverified_end_to_end():
+    (raw,) = PhysicalPropertyExtractor().extract("The efficiency of Na3Bi 0.85 was good.", ["Na3Bi"])
+    assert raw["raw_unit"] != "was" and raw["verified"] is False and raw["raw_value"] is None
+    (r2,) = PhysicalPropertyExtractor().extract("The efficiency of Na3Bi was 0.85 in tests.", ["Na3Bi"])
+    assert r2["verified"] is False and PropertyNormalizer().normalize([r2])[0]["normalized_value"] is None
+
+
+@pytest.mark.parametrize("text", [
+    "The band gap of Na3Bi is 85 and rising.",
+    "The efficiency of Na3Bi is 85 and rising.",
+    "The band gap of Na3Bi is 1.9 about right.",
+])
+def test_bare_word_after_number_is_not_a_unit(text):
+    raw = PhysicalPropertyExtractor().extract(text, ["Na3Bi"])
+    assert len(raw) == 1 and raw[0]["raw_unit"] is None and raw[0]["verified"] is False
+
+
+def test_known_word_units_and_percent_still_extract():
+    for text, unit in [("The band gap of Na3Bi is 1.9 eV.", "eV"), ("The efficiency of Na3Bi is 85%.", "%"),
+                       ("The efficiency of Na3Bi was 12.5 %.", "%"), ("The melting point of Na3Bi was 300 K.", "K")]:
+        r = PhysicalPropertyExtractor().extract(text, ["Na3Bi"])
+        assert any(x["raw_unit"] == unit and x["verified"] for x in r), text

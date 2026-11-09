@@ -76,7 +76,7 @@ def extract_and_attach_properties(text: str, store: TermStore, services: Service
             unit=p["normalized_unit"] or "",
             context=p["context"],
             uncertainty=p.get("uncertainty_value"),
-            verified=not p["unit_conversion_failed"],
+            verified=bool(p.get("verified", True)) and not p["unit_conversion_failed"],
         )
         if store.attach_property(key, prop):
             logger.info("Attached property '%s' to '%s'", p["property"], p["material"])
