@@ -3,7 +3,7 @@
   "kind": "f2w_task_status_overlay",
   "generated_on": "2026-10-29",
   "generated_by": "T28D (AUD-14)",
-  "note": "Status overlay for docs/migration/companion/task_graph.json, which stays byte-for-byte as supplied (every task there still reads not_started). merge_commit is the first-parent commit on forge_merge (git log --first-parent 222b1e7..HEAD) that brought the task in; two tasks may share a commit when they were merged together. gate is stop_before from the task graph, else the human gate that lists the task as evidence, else the gate after the task's gate dependency. status values: merged | open | blocked_on_owner. Gate approvals: H0-H3 approved (H3 on 2026-10-16); H4-H8 open. tests/docs/test_task_status.py checks that every task_graph id is present and every merged commit is on the first-parent log. H3 approval recorded in the evals store at 8c9a29046e33133dc8e4aed83dbb5f4bcfbc1746 (owner ran python -m evals.binary.approve on 2026-11-06 on the authority of reviews/H3/decision.json; 108/108 cases approved; rubrics stay draft; 13 label cases stay blocked on B4).",
+  "note": "Status overlay for docs/migration/companion/task_graph.json, which stays byte-for-byte as supplied (every task there still reads not_started). merge_commit is the first-parent commit on forge_merge (git log --first-parent 222b1e7..HEAD) that brought the task in; two tasks may share a commit when they were merged together. gate is stop_before from the task graph, else the human gate that lists the task as evidence, else the gate after the task's gate dependency. status values: merged | open | blocked_on_owner. Gate approvals: H0-H3 approved (H3 on 2026-10-16); H4-H8 open. tests/docs/test_task_status.py checks that every task_graph id is present and every merged commit is on the first-parent log. H3 approval recorded in the evals store at 8c9a29046e33133dc8e4aed83dbb5f4bcfbc1746 (owner ran python -m evals.binary.approve on 2026-11-06 on the authority of reviews/H3/decision.json; 108/108 cases approved; rubrics stay draft; 13 label cases stay blocked on B4). 2026-11-09: job runtime hardened (T-leasefix2 ac64644: bounded requeue of retryable CONFLICT for every job kind, fenced effects and term writes, bounded abandoned LLM calls, heartbeat across clock jumps); CONFLICT retryability audited (ab85304; 42 permanent sites now fail at once; recommendation to flip the default is in reviews/H5/conflict_retryability.md, not applied).",
   "baseline_commit": "222b1e7b130567dbf4a3242697ac2b465794a38d",
   "gates": {
     "H0": "approved",
@@ -105,7 +105,7 @@
       "gate": "H4",
       "status": "blocked_on_owner",
       "merge_commit": null,
-      "note": "apply adapters wait for the C4 paid real-model rerun (H3 decision: still_gated, owner go)"
+      "note": "apply adapters wait for the C4 paid real-model rerun (H3 decision: still_gated, owner go) 2026-11-09: apply adapters merged at 49571aa (accepted case -> scoped plan -> apply_migration/cleanup/campaign -> Save port; route V81 POST /v1/curation/merges/apply, owner capability choice graph.publish, fifteenth set; dry_run default; every gate closed, 501 gate_closed, V81 dry run also 501 on :local until a vocabulary is wired at H5). C4 real-model rerun (free lbl/cborg-deepthought judge) and provisional B4 labels committed at 1bfc929; H4 packet at 39f57f4 (reviews/H4/review_packet.md), nothing approved; owner decisions pending: C1, the four apply gates, B4 promotion."
     },
     {
       "id": "T08A",
@@ -177,7 +177,7 @@
       "gate": "H5",
       "status": "open",
       "merge_commit": null,
-      "note": "publication and rollback rehearsal; after H4 | :local-only publication into the container's own Tiled merged at 50b0c4cef7265c64d16b298cfbd5e9ebc08361ef (T-localpub, owner decision 2026-11-04; reviews/H5/local_publication.md); stays open, rehearsal and H5 approval still owner-gated | rehearsal in progress 2026-11-06: publications e2e_demo/v1 (job-9166b202380119cedfdf1dbc, 269 entities, 126 links) and bl1101/v4 completed into the :local container's own Tiled with owner approvals in the UI; rollback-replacement plan staged, awaiting owner approval (owner: rollback must touch one KG, not the other); not done, H5 still owner-gated"
+      "note": "publication and rollback rehearsal; after H4 | :local-only publication into the container's own Tiled merged at 50b0c4cef7265c64d16b298cfbd5e9ebc08361ef (T-localpub, owner decision 2026-11-04; reviews/H5/local_publication.md); stays open, rehearsal and H5 approval still owner-gated | rehearsal in progress 2026-11-06: publications e2e_demo/v1 (job-9166b202380119cedfdf1dbc, 269 entities, 126 links) and bl1101/v4 completed into the :local container's own Tiled with owner approvals in the UI; rollback-replacement plan staged, awaiting owner approval (owner: rollback must touch one KG, not the other); not done, H5 still owner-gated 2026-11-06/09: rollback-replacement rehearsal completed (job-59e3a33d, noop plan; Tiled unchanged; one KG untouched by the other's rollback); noop-receipt fix d25a32f; pointer Model C (per-corpus live view, optional corpus on V20/V53, owner fourteenth set) and :local-only auto-approval of zero-operation rollback plans merged at f06a1d5; T26C executable rehearsal on disposable targets (14 tests) and runbook merged at 9014bfb (reviews/H5/t26c_rehearsal.md). Remaining for H5: owner sign-off (reviews/H5/decision.json), the real production-profile target named by the owner, design gaps (data_commit null on the job path; edit reconciliation has no operator command)."
     },
     {
       "id": "T14",
@@ -213,7 +213,7 @@
       "gate": "H8",
       "status": "open",
       "merge_commit": null,
-      "note": "production cutover and approved retirement (Splash retirement gate: T16B/H7 or H8)"
+      "note": "production cutover and approved retirement (Splash retirement gate: T16B/H7 or H8) 2026-11-06/09: Splash retirement packet merged at 574dce5 (reviews/H8/splash_retirement.md; dead config removed; retirement-state tests). Owner decisions so far: delete splash_links/ at cutover with an archive tag after one canary cycle (fourteenth set); the splash enum stays accepted as the editable alias (fifteenth set). Cutover and deletion remain H8-gated."
     },
     {
       "id": "T17",
@@ -295,7 +295,7 @@
       "gate": "H6",
       "status": "open",
       "merge_commit": null,
-      "note": "agent/API/SDK/CLI part merged at e92eac38fd849c27802f3910198639731fbb3461 (2026-10-29); frontend part and T15-dependent closure still open"
+      "note": "agent/API/SDK/CLI part merged at e92eac38fd849c27802f3910198639731fbb3461 (2026-10-29); frontend part and T15-dependent closure still open 2026-11-09: closure merged at cb89b32 (read-only Operations tab behind can_run_operations, knowledge catalog on SDK/CLI, ops summarize, package exports; inventory reviews/H6/t19e_closure.md: 34 done / 13 missing / 3 n/a). Remaining: T15-dependent items and three surfaces needing new policy rows (owner)."
     },
     {
       "id": "T20A",
@@ -503,7 +503,7 @@
       "gate": "H8",
       "status": "open",
       "merge_commit": null,
-      "note": "steps 2-5 merged at 9d1012488 (2026-11-03, owner H4 approval): prov_o, extract_terms_cli, 9 promoted commands, harvest scripts on the hardened downloader. Open: 16-file retire list and (r) reclassification (owner review), and tiled_graph, orchestrator/debate agents, download_agent, kg_update, bl1101_ingest, which the audit got wrong (reviews/H8/legacy_audit.md section 8)"
+      "note": "steps 2-5 merged at 9d1012488 (2026-11-03, owner H4 approval): prov_o, extract_terms_cli, 9 promoted commands, harvest scripts on the hardened downloader. Open: 16-file retire list and (r) reclassification (owner review), and tiled_graph, orchestrator/debate agents, download_agent, kg_update, bl1101_ingest, which the audit got wrong (reviews/H8/legacy_audit.md section 8) 2026-11-06/09 real ports: tiled_graph -> graph/backends/tiled_lookup and kg_update -> graph/kg_update (T17B-ports merge); download_agent + harvest_rsoxs + download_pdfs + api.py metadata hops on the hardened helpers (9e5fe63, 798d5ff; pyalex gone from app/, arxiv only in library/harvest.py); bl1101_ingest fully ported to graph/imports/bl1101 (6a4bdaf, eab21be; two owner-gated items: hardened HTTP in fetch.py and the snapshot writer bytes); orchestrator/debate agents on LangGraph via agent_runtime.admission (ae0cb0b, owner fourteenth set). Legacy paths are alias shims/facades until the H8 shim removal. Plan and status: reviews/H8/legacy_ports_plan.md."
     },
     {
       "id": "T27",
@@ -512,7 +512,7 @@
       "gate": "H7",
       "status": "open",
       "merge_commit": null,
-      "note": "typing zero, ANN401 enforced (149 Any signatures kept with reasons), ruff/isort/mypy/pyflakes gated, coverage 93.2% with no module under 80%, sniff-list rows fixed or deferred per the owner reply of 2026-11-03; merged through f2deeae; F2.4, F2.5 and F3.8 closed with evidence on branch forge_merge-T27-sniff (2026-11-06: scripts/ci/docstring_style.py gate, reviews/H7/readthrough_F25_F38.md: 53 docstrings corrected, 58 constants hoisted, 13 suspected code bugs and 4 contract docstrings await the owner; H7 not approved) | isort/pyflakes gates restored by 25129e81ee36e4176ab13d293b16941c37c871f5 (2026-11-05: imports sorted in four files, unused/duplicate imports removed)"
+      "note": "typing zero, ANN401 enforced (149 Any signatures kept with reasons), ruff/isort/mypy/pyflakes gated, coverage 93.2% with no module under 80%, sniff-list rows fixed or deferred per the owner reply of 2026-11-03; merged through f2deeae; F2.4, F2.5 and F3.8 closed with evidence on branch forge_merge-T27-sniff (2026-11-06: scripts/ci/docstring_style.py gate, reviews/H7/readthrough_F25_F38.md: 53 docstrings corrected, 58 constants hoisted, 13 suspected code bugs and 4 contract docstrings await the owner; H7 not approved) | isort/pyflakes gates restored by 25129e81ee36e4176ab13d293b16941c37c871f5 (2026-11-05: imports sorted in four files, unused/duplicate imports removed) 2026-11-09: F2.4/F2.5/F3.8 closed with evidence (7461f6c; reviews/H7/readthrough_F25_F38.md); suspected bugs B1-B13 fixed (e30d311, 40d4421) plus two extractor residuals (3554604); load-flaky tests fixed (008441a); docstring-style CI gate added (owner to confirm keeping it). H7 approval stays the owner's."
     },
     {
       "id": "T22C",
@@ -605,7 +605,7 @@
       "status": "merged",
       "merge_commit": "317411bcbd911177a368b987aa064330b1c523db",
       "merge_commit_subject": "Merge T18D UI: Edit/Save controls hidden when the server reports can_save false",
-      "note": "T-savetarget merged at 7c2a84d (owner decision 2026-11-04, tenth set): the :local UI Save target is resolved lazily per request from the active publication pointer (corpus of the pointer; base = that release's graph.json, hash-checked; per-corpus edit journal; typed 501 and can_save=false before the first publication; the publication step reads the Save journals, so an edited corpus is refused CONFLICT until reconciled). Owner-gated follow-ups: image default --kg-mode json, multi-corpus Save target choice."
+      "note": "T-savetarget merged at 7c2a84d (owner decision 2026-11-04, tenth set): the :local UI Save target is resolved lazily per request from the active publication pointer (corpus of the pointer; base = that release's graph.json, hash-checked; per-corpus edit journal; typed 501 and can_save=false before the first publication; the publication step reads the Save journals, so an edited corpus is refused CONFLICT until reconciled). Owner-gated follow-ups: image default --kg-mode json, multi-corpus Save target choice. 2026-11-09: the :local image defaults to the editable KG mode (owner fifteenth set; 13999af): startup sync, retrieval loaders and graph view follow the Tiled save provider and never contact Splash; can_save false before the first publication; ALS unchanged."
     },
     {
       "id": "T18E",
