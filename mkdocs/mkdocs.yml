@@ -32,6 +32,7 @@ nav:
           - Knowledge graph UI: ui-knowledge-graph.md
           - Library and Harvester: ui-library.md
           - Extraction tab: ui-extraction.md
+          - Operations tab, CLI and SDK: ui-operations.md
           - UI architecture: ui-architecture.md
           - Agent API integration: ui-api.md
           - Development and testing: ui-development.md
@@ -46,6 +47,7 @@ nav:
       - Legacy code: legacy.md
   - Operations:
       - Fresh-machine deployment: deployment.md
+      - "The :local image, end to end": local-image.md
       - Local and Docker operation: operations.md
       - Release and maintenance: release.md
       - Performance guide: performance.md

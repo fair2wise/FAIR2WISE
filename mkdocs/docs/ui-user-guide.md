@@ -134,7 +134,7 @@ Preferences**. Closing without saving restores the last saved values.
 | Max pages per PDF | 1–100 | Page cap shown only for targeted extraction |
 | LLM backend | CBORG, Ollama | Choose hosted or local inference |
 | Model | Configured CBORG list or Ollama model text | Select the active model for the chosen backend |
-| KG source | `splash_links`, JSON | Choose the editable database or a read-only MatKG JSON file |
+| KG source | `splash_links`, JSON | Choose the editable source (legacy label; Tiled-backed on `:local` after a first publication) or a read-only MatKG JSON file (default) |
 | JSON graph file | Files reported from `storage/kg` | Select the retrieval graph when JSON mode is active |
 
 Saving updates backend runtime settings, saves browser preferences, and reloads
@@ -148,7 +148,7 @@ connected to the same agent can change them.
 | Backend | CBORG |
 | CBORG model | `lbl/cborg-chat` |
 | Ollama model | `deepseek-r1:70b` |
-| KG source | `splash_links` |
+| KG source | JSON |
 | Workflow | Agentic |
 | Extraction | Targeted |
 | Targeted page cap | 6 |
@@ -177,7 +177,8 @@ session delete API, not by clearing browser storage alone.
 | Settings endpoint not found | Restart an older backend so the current routes are loaded |
 | Agent run failed with CBORG 403 | Authorize the machine's outbound IP and verify `CBORG_IP_FAMILY` |
 | Empty graph after an answer | Confirm the selected graph source and inspect the agent/Splash health endpoints |
-| Editing controls absent | JSON mode is read-only; switch to `splash_links` |
+| Editing controls absent | JSON mode is read-only; switch the KG source to `splash_links`. On `:local` Save also needs a first publication ([Save on `:local`](local-image.md#save-on-local)); a graph picked in the **Source** selector is always read-only |
+| No Operations tab | The server did not report `can_run_operations` ([Operations tab](ui-operations.md)) |
 | No external paper results | Check backend internet access and OpenAlex configuration |
 | Browser history disappeared | Check whether site data was cleared or local storage is blocked |
 

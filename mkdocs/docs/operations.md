@@ -9,7 +9,9 @@ This page covers routine operation after installation.
     Routine operation of the `:local`, `:als-dev` and `:als-prod` images
     (start, stop with `--stop-timeout 120`, supervisor status in
     `/run/fair2wise/supervisor.json`, exit codes, mounts) is documented in
-    `docker/profiles/README.md`. This page covers running from source.
+    `docker/profiles/README.md`. This page covers running from source. The
+    `:local` image's start script, publication, approval and rollback flow is
+    [The `:local` image, end to end](local-image.md).
 
 ## Local launchers
 

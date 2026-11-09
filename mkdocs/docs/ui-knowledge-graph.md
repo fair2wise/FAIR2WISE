@@ -79,7 +79,21 @@ lists falls back to the default graph. When Tiled is down the control says
 **Tiled unavailable** and a read of a Tiled source shows the error instead of an
 empty or stale graph. Search, node details and neighborhoods all carry the same
 `source`. Source ids are opaque names listed by `GET /v1/graph/sources`; the server
-never accepts a path, URL or Tiled address. A graph is cut at 100,000 nodes and
+never accepts a path, URL or Tiled address. They look like:
+
+| Id | Meaning | Where |
+|---|---|---|
+| `json:<name>` | a `storage/kg/*.json` file, `<name>` being the file stem without `matkg_` (`json:rsoxs_v1`) | every profile |
+| `json:<corpus>/<vN>` | an adopted release snapshot `<workdir>/storage_kg/<corpus>/<vN>/graph.json` (`json:e2e_demo/v1`) | `:local` only |
+| `tiled:<graph_id>` | one F2W graph in the image's own Tiled (`tiled:e2e_demo`) | `:local` only |
+
+An unknown or malformed id is `404 unknown_source`. On an ALS image the
+listing reports Tiled as `not_offered` and only JSON files appear. The listing
+is read-only for both kinds (`read_only: true`); an edit that names a source is
+`400 read_only_source`. Search, node detail and neighborhood accept the same
+`source` parameter. Design and limits: `docs/migration/reviews/H8/ui_graph_sources.md`.
+To get a Tiled graph to show, publish it first
+([The `:local` image, end to end](local-image.md)). A graph is cut at 100,000 nodes and
 Tiled is scanned at most once every 20 seconds.
 
 ## Navigation and inspection
@@ -146,8 +160,16 @@ records can be bookmarked from the detail panel.
 
 ## Editing
 
-Editing is available only when the saved graph source is `splash_links`.
-Select **Edit** in a node detail panel to stage changes.
+Editing is available only when the saved graph source is the editable one
+(`splash_links` in Settings) and the server says Save is possible
+(`can_save` in `GET /v1/capabilities`). Select **Edit** in a node detail panel
+to stage changes. The graph **Source** selector above is always read-only.
+
+On the `:local` image the editable source is backed by Tiled, not Splash: the
+image starts in JSON mode (Save off), and after you choose the editable source
+Save works only once a first publication exists; before that the server answers
+`501` and the Save controls are hidden. See
+[Save on `:local`](local-image.md#save-on-local).
 
 ### Editable node data
 

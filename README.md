@@ -7,7 +7,7 @@ This repository builds materials-science knowledge graphs from research papers (
 1. Collect PDFs in the unified `papers/` input folder
 2. Extract schema-aligned terminology + publication metadata with an LLM → `storage/terminology/`
 3. Convert extracted terms JSON into a versioned MatKG graph JSON → `storage/kg/` (the JSON KG is the default graph source)
-4. Optionally publish an approved JSON snapshot into Tiled Graph through the gated `/v1/publications` path (H5-gated; the legacy `splash_links` import is kept only as the legacy editable mode, see [Step 4](#step-4--legacy-import-into-splash_links))
+4. Optionally publish an approved JSON snapshot into Tiled Graph through the `/v1/publications` path: on the `:local` image into the container's own Tiled (walk-through: [`mkdocs/docs/local-image.md`](mkdocs/docs/local-image.md)); every other target stays gated at H5. The legacy `splash_links` import is kept only as the legacy editable mode, see [Step 4](#step-4--legacy-import-into-splash_links)
 5. Query the graph via KG-RAG chat (web UI, CLI or Open WebUI)
 
 **Optional — automated agent pipeline:** [`app.modules.launchers.f2w_agent`](app/modules/launchers/f2w_agent.py) launches the Academy workflow that answers from the KG when evidence suffices and otherwise searches for papers, requests approval, extracts terms, rebuilds the KG, and re-queries. See **[3-Agent KG-RAG Pipeline](#3-agent-kg-rag-pipeline)**.
@@ -25,10 +25,12 @@ This branch carries the FORGE-to-F2W migration (`docs/migration/plan.md`,
 | Images | Three targets from the root `Dockerfile`: `:local` bundles a managed **Tiled 0.2.18** server (owner exception O-T1 to the plan's 0.2.19 pin), the UI, MkDocs and the API/worker; `:als-dev` and `:als-prod` carry no Tiled and use the central servers (`https://tiled-staging.als.lbl.gov`, `https://tiled.als.lbl.gov`). The legacy `agent` compose target still exists and is not one of the three images. |
 | Ingress | One gateway (nginx, unprivileged uid 10001) on **port 8080** (`F2W_GATEWAY_PORT`), serving the UI, MkDocs and the same-origin API under **`/fair2wise`** (`/fair2wise/api`, `/fair2wise/healthz`). The API binds `127.0.0.1:8090` inside the container and is not published by the images. |
 | Runtime | `F2W_RUNTIME=legacy` (default) keeps the existing F2W read path; `F2W_RUNTIME=langgraph` enables the scoped LangGraph runtime, where `F2W_QA_ROUTE=supervisor` (default) routes UI QA turns through the planning supervisor and `F2W_QA_ROUTE=direct` calls `answer_from_knowledge` directly (owner H2 Q1, O-R1 fallback). |
-| APIs | `python -m app.modules.f2w_agent.cli api` serves the 19 frozen UI routes; `api --jobs-api` serves the same routes plus the 24 `/v1` jobs, review, publication, status and validation routes (`docs/migration/api/README.md`). The images run the jobs API. Publication to any Tiled target stays gated at H5. |
+| APIs | `python -m app.modules.f2w_agent.cli api` serves the 19 frozen UI routes; `api --jobs-api` serves the same routes plus the 65 `/v1` routes (48 on an ALS profile; the folder and library routes are `:local` only) for jobs, review, publication, status, validation, operations, capabilities and graph sources (`docs/migration/api/README.md`). The images run the jobs API. On `:local` publication into the image's own Tiled is wired (`app/api/local_publication.py`); every other target stays gated at H5. |
 | Judge model | The validation judge for the binary suite is a deployment-wide setting chosen in the settings panel from the provider's live model list (`GET/PUT /v1/validation/judge-model`, owner O-U2); it never runs inside chat. |
 | Access | `:local`: trusted local operator, no sign-in (D34). ALS images: Tiled sign-in; only verified Tiled admins may ingest, approve, publish or edit (D30). |
-| Splash | The legacy editable mode (`F2W_KG_MODE=splash`, `compose.splash.yaml`, `splash_links/`). It stays until its approved retirement gate (T16B/H7 or H8, `plan_addenda.md` A2). Tiled-backed editing is not built: on a Tiled-only deployment a graph Save fails safely with the legacy 502 and writes nothing (T18C F1); the edit design is pending owner decision (OPEN_DECISIONS A4, Q1-Q16 of `docs/migration/ui_contracts/tiled_graph_editing_plan.md`). |
+| Graph view and UI Save | The KG viewer has a read-only **Source** selector (`json:<name>`, `json:<corpus>/<vN>`, `tiled:<graph_id>`; `GET /v1/graph/sources`, [`ui-knowledge-graph.md`](mkdocs/docs/ui-knowledge-graph.md)). A read-only **Operations** tab shows only when `GET /v1/capabilities` reports `can_run_operations` ([`ui-operations.md`](mkdocs/docs/ui-operations.md)). On `:local`, Save is wired lazily to the active publication: the image starts with `--kg-mode json` (Save off until you choose the editable source), and before a first publication Save answers a typed 501 and writes nothing ([`local-image.md`](mkdocs/docs/local-image.md#save-on-local)). |
+| Splash | The legacy editable mode (`F2W_KG_MODE=splash`, `compose.splash.yaml`, `splash_links/`). It stays until its approved retirement gate (T16B/H7 or H8, `plan_addenda.md` A2); the retirement packet is `docs/migration/reviews/H8/splash_retirement.md` and nothing is deleted yet. On a Tiled-only ALS deployment a graph Save fails safely with the legacy 502 and writes nothing (T18C F1); the broader edit design is pending owner decision (OPEN_DECISIONS A4, Q1-Q16 of `docs/migration/ui_contracts/tiled_graph_editing_plan.md`). |
+| KGs in images | KGs ship in the images as flat `storage/kg/matkg_*.json` copies only (owner exception E3, errata applied 2026-11-06); nested `<corpus>/v<N>/graph.json` copies, papers, `storage/source_index/` and secrets stay out (`Dockerfile`, `.dockerignore`). |
 
 ### Running the images
 
@@ -46,7 +48,25 @@ A running `:local` image answers at `http://127.0.0.1:8080/fair2wise/` with
 the API health at `http://127.0.0.1:8080/fair2wise/api/health`. Images are
 built by `.github/workflows/build-app.yml`; publishing (`publish-image.yml`)
 is manual and gated by the O06 tag rules (OPEN_DECISIONS D2). As of
-2026-10-29 only `:local` has been built and run, by the owner's machine.
+2026-10-29 only `:local` has been built and run, by the owner's machine; the
+2026-11-06 end-to-end rehearsal (publish, approve, roll back) ran on it.
+
+To start `:local` from a checkout with the papers folder as the Library and
+`CBORG_API_KEY` taken from `.env`:
+
+```sh
+scripts/run_local_container.sh [image] [dotenv-file]   # default image f2w:local
+```
+
+It publishes `127.0.0.1:8080` only, mounts the state and Tiled volumes
+(`f2w-local-state`, `f2w-local-tiled`), `papers/` read-only at `/data/papers`
+and as the read-write Library, and honors `F2W_KG_RELEASE_DIR`,
+`F2W_HOST_PORT`, `F2W_CONTAINER_NAME`, `F2W_PAPERS_DIR`,
+`F2W_LIBRARY_HOST_DIR` and `OPENALEX_API_KEY`. The whole flow (harvest,
+extraction, export, `f2w-kg-adopt`, publication, approval, rollback) is in
+[`mkdocs/docs/local-image.md`](mkdocs/docs/local-image.md). Every image also
+carries the `f2w-*` console commands of `pyproject.toml` (for example
+`docker exec f2w-local f2w-kg-adopt --help`).
 
 ### Running from source
 
@@ -1167,6 +1187,8 @@ Run the isolated clean-volume smoke test with:
 | `app.modules.launchers.f2w_agent` | Agent KG-RAG pipeline CLI/API launcher |
 | `scripts/start_rsoxs_stack.sh` | Daemonize RSoXS JSON agent+UI (5175/8090); does not stop extract |
 | `scripts/start_agent_backend.sh` | Start the agent API used by the UI |
+| `scripts/run_local_container.sh` | Start the `:local` image on `127.0.0.1:8080` with the papers folder as the Library |
+| `python -m app.api.cli --root DIR ops list\|summarize\|statistics\|...` | Knowledge operations on the CLI (local profile only), see [`ui-operations.md`](mkdocs/docs/ui-operations.md) |
 | `scripts/test_chat_apis.py` | Standalone CBORG API connectivity test |
 | `scripts/analyze_kgs.py` | Evaluate KG JSON files: node/edge counts, coverage, growth rates |
 | `scripts/get_pdf_years.py` | Estimate publication year for PDFs; writes `pdf_years.csv` |
@@ -1177,12 +1199,17 @@ Run the isolated clean-volume smoke test with:
 ## Tests
 
 ```bash
-python3 -m pytest
+pixi run -e dev test         # fast: pytest -n auto -m "not slow"
+pixi run -e dev test-slow    # the full-size scale tests (nightly in CI)
 ```
 
 Root tests live in `tests/`; the vendored Splash Links suite lives in
-`splash_links/_tests/`. The `json2kg.py` module also has inline pytest tests
-that validate ID generation, field retention, and CLI behavior.
+`splash_links/_tests/`. About 270 tests need an isolated Tiled 0.2.18 server and
+skip unless `F2W_TILED_PYTHON` is set. Run from a clean `git archive` export
+under `env -i` with the variables written inline (a shell variable holding the
+assignments is not word-split by zsh and silently drops `F2W_TILED_PYTHON`).
+The recipe, the zsh trap and the docs checks are in
+[`mkdocs/docs/testing.md`](mkdocs/docs/testing.md).
 
 ---
 
@@ -1307,6 +1334,9 @@ cd mkdocs
 mkdocs serve        # local preview
 mkdocs gh-deploy    # deploy to GitHub Pages (repo must be public)
 ```
+
+Check the site the way CI and the image build do with
+`mkdocs build -f mkdocs/mkdocs.yml --strict` from the repository root.
 
 Maintainers should use the MkDocs [contributor guide](mkdocs/docs/contributing.md)
 for branch, lock, validation, API/graph/agent/UI extension workflows; the

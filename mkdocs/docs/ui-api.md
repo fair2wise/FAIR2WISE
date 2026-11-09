@@ -43,6 +43,9 @@ Vite variables are compiled into browser assets. Changing the variable after
 | `GET` | `/graph/node/{id}` | `fetchGraphNodeDetail` | Node detail panel (optional `?source=`) |
 | `PATCH` | `/graph/node/{id}` | `updateGraphNode` | Splash node editor (refused with `400 read_only_source` for any `?source=`) |
 | `POST` | `/publications/search` | `searchPublications` | Paper-search sheet |
+| `GET` | `/graph/neighborhood/{id}` | `fetchGraphNeighborhood` | KG viewer neighborhood (optional `?source=`) |
+| `GET` | `/v1/capabilities` | `fetchCapabilities` | Hides Edit/Save (`can_edit`, `can_save`, `can_upload`) and the Operations tab (`can_run_operations`) |
+| `GET` | `/v1/operations/{statistics,compare,paper-subgraph,recent,corpus-audit}` | `runOperation` | Operations tab (read-only; see [Operations tab](ui-operations.md)) |
 
 The backend also exposes health, graph upload, and OpenAPI routes that the
 current UI client does not call directly.
