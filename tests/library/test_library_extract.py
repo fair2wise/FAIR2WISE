@@ -362,7 +362,8 @@ def test_per_bundle_lock_allows_one_extraction_and_frees_on_exit(tmp_path):
         with pytest.raises(ContractError) as err:
             with bundle_lock(world.store, "run1"):
                 pass
-        assert err.value.code is ErrorCode.CONFLICT and err.value.retryable
+        # CONFLICT is permanent by default; BundleBusy says retryable=True because the other run's lock ends
+        assert err.value.code is ErrorCode.CONFLICT and err.value.retryable is True
         with bundle_lock(world.store, "other"):  # a different bundle is independent
             pass
         handle, state = world.run(world.params(names))

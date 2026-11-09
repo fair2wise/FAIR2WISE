@@ -259,7 +259,7 @@ class TiledGraphBackend:
         for n in range(len(tiled_ids)):
             row = data.get(f"e{n}")
             if row is None:
-                raise ContractError(ErrorCode.CONFLICT, "an entity disappeared during traversal")
+                raise ContractError(ErrorCode.CONFLICT, "an entity disappeared during traversal", retryable=True)
             for alias, end in (("out", "object"), ("inc", "subject")):
                 links = row.get(alias)
                 if links is None:

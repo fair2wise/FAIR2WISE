@@ -1,13 +1,13 @@
-"""A permanent CONFLICT fails the job on its first run; a transient one still requeues (T-conflict-audit).
+"""A CONFLICT fails the job on its first run unless its raise site says ``retryable=True`` (T-conflict-default).
 
-``ErrorCode.CONFLICT`` is retryable by default and ``PipelineRunner`` requeues a job on any retryable conflict
-(``MAX_CONFLICT_REQUEUES`` times, with backoff). A conflict that needs a human or a changed input (a stale
-source or plan hash, an ownership or identity clash, an "already exists" state, an unreconciled edit) must say
-``retryable=False`` so it fails at once. Each cluster below drives the real raising code from a stage and
-asserts the first run ends ``FAILED`` with no ``conflict_requeue``; the transient clusters are the control and
-must still requeue. The AST audit at the end makes a new CONFLICT site state its retryability.
-
-The full table of sites is ``docs/migration/reviews/H5/conflict_retryability.md``.
+``ErrorCode.CONFLICT`` is permanent by default (it is not in ``RETRYABLE_CODES``; owner decision 2026-11-09 after
+the T-conflict-audit, ``docs/migration/reviews/H5/conflict_retryability.md``). ``PipelineRunner`` requeues a job
+(``MAX_CONFLICT_REQUEUES`` times, with backoff) only on a conflict raised with ``retryable=True``: a busy lock, a
+lease another run holds, a read that raced a writer. A conflict that needs a human or a changed input (a stale
+source or plan hash, an ownership or identity clash, an "already exists" state, an unreconciled edit) fails at once
+whether or not it spells out ``retryable=False``. Each permanent cluster below drives the real raising code from a
+stage and asserts the first run ends ``FAILED`` with no ``conflict_requeue``; the transient clusters are the
+control and must still requeue. The AST audit at the end makes a new transient CONFLICT site get reviewed.
 """
 
 from __future__ import annotations
@@ -182,23 +182,54 @@ def test_a_transient_conflict_still_requeues(tmp_path, name):
     assert requeues == 1
 
 
-#: CONFLICT sites that deliberately keep the default (retryable): a busy lock, a lease another run holds, or a
-#: read that raced a writer and succeeds on a re-read. ``(file under app/, function)`` -> number of sites.
-IMPLICIT_TRANSIENT = Counter({
-    ("modules/literature/staging.py", "_exclusive"): 1,
-    ("modules/literature/staging.py", "import_package"): 1,
+def _unmarked_conflict(_sc: Any) -> None:
+    raise ContractError(ErrorCode.CONFLICT, "a new site that forgot to decide")
+
+
+def test_an_unmarked_conflict_is_permanent_and_fails_the_job_at_once(tmp_path):
+    """The safe default: forgetting ``retryable=`` fails the job once with a clear message instead of bouncing it
+    ``MAX_CONFLICT_REQUEUES`` times over minutes; an operator can still retry by hand."""
+    assert ContractError(ErrorCode.CONFLICT, "x").retryable is False
+    assert ContractError(ErrorCode.CONFLICT, "x", retryable=True).retryable is True
+    assert ContractError(ErrorCode.UNAVAILABLE, "x").retryable is True  # the flip is CONFLICT-only
+    state, requeues, exc = run_once(tmp_path, _unmarked_conflict)
+    assert exc is not None and exc.code is ErrorCode.CONFLICT and exc.retryable is False
+    assert state is JobState.FAILED
+    assert requeues == 0
+
+
+#: CONFLICT sites reviewed as transient (``retryable=True``): a busy lock, a lease another run holds, a read that
+#: raced a writer, an optimistic-concurrency race the caller re-reads. ``(file under app/, function)`` -> number
+#: of sites. Permanent sites need no entry: with or without ``retryable=False`` they fail the job at once.
+EXPLICIT_TRANSIENT = Counter({
     ("modules/graph/backends/tiled.py", "TiledGraphBackend._one_hop"): 1,
     ("modules/graph/backends/tiled_mutations.py", "TiledMutationClient._scan"): 1,
+    ("modules/graph/imports/corpus_scope.py", "plan_replacement"): 1,
+    ("modules/graph/imports/corpus_scope.py", "read_scope_state"): 1,
     ("modules/graph/imports/journal.py", "Lease.acquire"): 2,
     ("modules/graph/imports/journal.py", "Lease.check"): 1,
-    ("modules/graph/imports/corpus_scope.py", "read_scope_state"): 1,
-    ("modules/graph/imports/corpus_scope.py", "plan_replacement"): 1,
+    ("modules/graph/imports/save_recovery.py", "execute_save"): 1,
+    ("modules/graph/imports/save_recovery.py", "recover_failed_saves"): 1,
+    ("modules/graph/imports/tiled_json.py", "ImportVerificationError.__init__"): 1,
     ("modules/graph/imports/tiled_json.py", "read_state"): 1,
+    ("modules/graph/legacy_save.py", "TiledSaveBackend._refuse_during_switch"): 1,
+    ("modules/jobs/publication.py", "Publication._activate"): 1,
+    ("modules/jobs/publication.py", "Publication._import"): 1,
+    ("modules/jobs/publication.py", "Publication._op_apply"): 1,
+    ("modules/jobs/publish_store.py", "PublishStore.activate"): 1,
+    ("modules/jobs/service.py", "JobService.cancel"): 1,
+    ("modules/jobs/store.py", "JobStore.transition_without_lease"): 2,
+    ("modules/library/extraction.py", "BundleBusy.__init__"): 1,
+    ("modules/library/extraction.py", "LibraryExtractor.run"): 1,
+    ("modules/literature/staging.py", "_exclusive"): 1,
+    ("modules/literature/staging.py", "import_package"): 1,
 })
 
 
-def _implicit_conflict_sites() -> Counter[tuple[str, str]]:
-    found: Counter[tuple[str, str]] = Counter()
+def _conflict_sites() -> tuple[Counter[tuple[str, str]], list[tuple[str, str, str]]]:
+    """``(sites with a literal retryable=True, sites whose retryable= is not a literal True/False/absent)``."""
+    transient: Counter[tuple[str, str]] = Counter()
+    computed: list[tuple[str, str, str]] = []
 
     def visit(node: ast.AST, scope: list[str], rel: str) -> None:
         for child in ast.iter_child_nodes(node):
@@ -207,17 +238,24 @@ def _implicit_conflict_sites() -> Counter[tuple[str, str]]:
                 inner = [*scope, child.name]
             if (isinstance(child, ast.Call) and child.args and isinstance(child.args[0], ast.Attribute)
                     and child.args[0].attr == "CONFLICT" and isinstance(child.args[0].value, ast.Name)
-                    and child.args[0].value.id == "ErrorCode"
-                    and not any(k.arg == "retryable" for k in child.keywords)):
-                found[(rel, ".".join(scope))] += 1
+                    and child.args[0].value.id == "ErrorCode"):
+                flags = [k.value for k in child.keywords if k.arg == "retryable"]
+                if flags and not (isinstance(flags[0], ast.Constant) and flags[0].value in (True, False)):
+                    computed.append((rel, ".".join(scope), ast.unparse(flags[0])))
+                elif flags and flags[0].value is True:  # type: ignore[attr-defined]
+                    transient[(rel, ".".join(scope))] += 1
             visit(child, inner, rel)
 
     for path in sorted(APP.rglob("*.py")):
         visit(ast.parse(path.read_text(encoding="utf-8")), [], path.relative_to(APP).as_posix())
-    return found
+    return transient, computed
 
 
-def test_every_conflict_site_states_its_retryability_or_is_a_known_transient():
-    """A new ``ContractError(ErrorCode.CONFLICT, ...)`` must pass ``retryable=`` (False when a human or a changed
-    input is needed, True when a re-run can succeed) or be added, with its reasoning, to the audit table."""
-    assert _implicit_conflict_sites() == IMPLICIT_TRANSIENT
+def test_every_transient_conflict_site_is_reviewed_and_no_site_computes_its_retryability():
+    """A ``ContractError(ErrorCode.CONFLICT, ...)`` is permanent unless it passes a literal ``retryable=True``,
+    and every such transient site is listed here with its reasoning in the audit table. A permanent site may say
+    ``retryable=False`` (clearer) or nothing (the default); a computed ``retryable=<expr>`` is refused because the
+    audit could not classify it."""
+    transient, computed = _conflict_sites()
+    assert computed == []
+    assert transient == EXPLICIT_TRANSIENT

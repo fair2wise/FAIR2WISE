@@ -203,7 +203,8 @@ def _exclusive(lock_path: Path) -> Iterator[None]:
             try:
                 fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except OSError as exc:
-                raise ContractError(ErrorCode.CONFLICT, "package import already running") from exc
+                raise ContractError(ErrorCode.CONFLICT, "package import already running",
+                                    retryable=True) from exc
         try:
             yield
         finally:
@@ -238,7 +239,8 @@ def import_package(
         if not result.get("record_id") or result.get("error"):
             raise ContractError(ErrorCode.INTERNAL, "publisher did not confirm the import")
         if _file_sha(path) != digest:
-            raise ContractError(ErrorCode.CONFLICT, "package changed during import; no receipt written")
+            raise ContractError(ErrorCode.CONFLICT, "package changed during import; no receipt written",
+                                retryable=True)
         receipt = {
             "status": "imported",
             "package_sha256": digest,

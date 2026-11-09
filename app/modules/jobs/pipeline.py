@@ -70,7 +70,8 @@ class StageBusy(StagePause):
     state = JobState.QUEUED
 
 
-#: Most times a job is requeued for a retryable ``CONFLICT`` (since its last failure) before the conflict fails it.
+#: Most times a job is requeued for an explicitly retryable ``CONFLICT`` (since its last failure) before the
+#: conflict fails it. A ``CONFLICT`` without ``retryable=True`` fails the job on its first run.
 MAX_CONFLICT_REQUEUES = 5
 
 
@@ -579,6 +580,8 @@ class PipelineRunner:
 
     def _requeue_for_conflict(self, lease: Lease, job_id: str) -> bool:
         """Whether a retryable ``CONFLICT`` should requeue the job: only while this run still owns the lease.
+
+        Only a conflict raised with ``retryable=True`` reaches here; the default for ``CONFLICT`` is permanent.
 
         Another process or run holding a resource is transient. The job goes back to ``queued`` (the service
         backs off) up to :data:`MAX_CONFLICT_REQUEUES` times; after that the conflict is treated as real.
