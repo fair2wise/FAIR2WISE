@@ -17,12 +17,9 @@ Usage (from repo root):
 from __future__ import annotations
 
 import argparse
-import ast
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
-import hashlib
-from html import unescape
+import hashlib as hashlib  # re-exported: tests reach bl1101_ingest.hashlib
 import json
 import logging
 from pathlib import Path
@@ -31,14 +28,66 @@ import shutil
 import subprocess
 import sys
 from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import urlopen as urlopen  # re-exported: tests patch bl1101_ingest.urlopen
 
-from lxml import html as lhtml
 import yaml
 
 from . import json2kg
 from .cli_output import output
+from .graph.imports.bl1101 import common as _common
+from .graph.imports.bl1101 import compat as _compat
+from .graph.imports.bl1101 import fetch as _fetch
+from .graph.imports.bl1101 import parse_als as _parse_als
+from .graph.imports.bl1101 import parse_blueprint as _parse_blueprint
+from .graph.imports.bl1101 import paths as _paths
+from .graph.imports.bl1101 import symbols as _symbols
+
+# Split modules (T17B/H8 P3): the legacy path re-exports every moved name, same objects.
+from .graph.imports.bl1101.common import LOGGER as LOGGER
+from .graph.imports.bl1101.common import _rel_to_repo as _rel_to_repo
+from .graph.imports.bl1101.common import _texts as _texts
+from .graph.imports.bl1101.common import _xp_elems as _xp_elems
+from .graph.imports.bl1101.common import _xp_strs as _xp_strs
+from .graph.imports.bl1101.common import beam_id as beam_id
+from .graph.imports.bl1101.common import is_secret_path as is_secret_path
+from .graph.imports.bl1101.common import sha256_bytes as sha256_bytes
+from .graph.imports.bl1101.common import sha256_file as sha256_file
+from .graph.imports.bl1101.common import should_skip_file as should_skip_file
+from .graph.imports.bl1101.common import slug as slug
+from .graph.imports.bl1101.common import strip_tags as strip_tags
+from .graph.imports.bl1101.common import utc_now as utc_now
+from .graph.imports.bl1101.fetch import _run_git as _run_git
+from .graph.imports.bl1101.fetch import fetch_url as fetch_url
+from .graph.imports.bl1101.fetch import git_sha as git_sha
+from .graph.imports.bl1101.fetch import sync_repo as sync_repo
+from .graph.imports.bl1101.parse_als import _clean_person_name as _clean_person_name
+from .graph.imports.bl1101.parse_als import _email_near as _email_near
+from .graph.imports.bl1101.parse_als import parse_als_contact_people as parse_als_contact_people
+from .graph.imports.bl1101.parse_als import parse_als_page as parse_als_page
+from .graph.imports.bl1101.parse_blueprint import _index_ci as _index_ci
+from .graph.imports.bl1101.parse_blueprint import _ophyd_name_from_handle as _ophyd_name_from_handle
+from .graph.imports.bl1101.parse_blueprint import _svg_coord as _svg_coord
+from .graph.imports.bl1101.parse_blueprint import canonical_stage_name as canonical_stage_name
+from .graph.imports.bl1101.parse_blueprint import ensure_m103_before_exit_slits as ensure_m103_before_exit_slits
+from .graph.imports.bl1101.parse_blueprint import finalize_beam_path as finalize_beam_path
+from .graph.imports.bl1101.parse_blueprint import parse_arrow_sequence as parse_arrow_sequence
+from .graph.imports.bl1101.parse_blueprint import parse_bcs2sim_beam_path as parse_bcs2sim_beam_path
+from .graph.imports.bl1101.parse_blueprint import parse_blueprint_html as parse_blueprint_html
+from .graph.imports.bl1101.parse_blueprint import parse_blueprint_people as parse_blueprint_people
+from .graph.imports.bl1101.parse_blueprint import parse_figcaption_beam_path as parse_figcaption_beam_path
+from .graph.imports.bl1101.parse_blueprint import parse_sheet_a_svg_order as parse_sheet_a_svg_order
+from .graph.imports.bl1101.parse_blueprint import resolve_beam_path_order as resolve_beam_path_order
+from .graph.imports.bl1101.paths import BLUEPRINT_PATH as BLUEPRINT_PATH
+from .graph.imports.bl1101.paths import CACHE_DIR as CACHE_DIR
+from .graph.imports.bl1101.paths import KG_DIR as KG_DIR
+from .graph.imports.bl1101.paths import MOTOR_STAGE_MAP_PATH as MOTOR_STAGE_MAP_PATH
+from .graph.imports.bl1101.paths import PAGES_DIR as PAGES_DIR
+from .graph.imports.bl1101.paths import READMES_DIR as READMES_DIR
+from .graph.imports.bl1101.paths import REPOS_DIR as REPOS_DIR
+from .graph.imports.bl1101.paths import REPO_ROOT as REPO_ROOT
+from .graph.imports.bl1101.paths import SCHEMA_PATH as SCHEMA_PATH
+from .graph.imports.bl1101.paths import TERMS_DIR as TERMS_DIR
+from .graph.imports.bl1101.paths import WORK_DIR as WORK_DIR
 from .graph.imports.bl1101.specs import ALS_PAGE_URL as ALS_PAGE_URL  # re-exported: the legacy path keeps these names
 from .graph.imports.bl1101.specs import ALS_SOURCE as ALS_SOURCE
 from .graph.imports.bl1101.specs import BCS2SIM_PATH_GLOBS as BCS2SIM_PATH_GLOBS
@@ -71,85 +120,14 @@ from .graph.imports.bl1101.specs import SNAPSHOT_RE as SNAPSHOT_RE
 from .graph.imports.bl1101.specs import SOFTWARE_ALIAS as SOFTWARE_ALIAS
 from .graph.imports.bl1101.specs import STAGE_NAME_ALIASES as STAGE_NAME_ALIASES
 from .graph.imports.bl1101.specs import USER_AGENT as USER_AGENT
-
-LOGGER = logging.getLogger("ingest_bl1101")
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_PATH = REPO_ROOT / "storage/schema/bl1101_schema.yaml"
-MOTOR_STAGE_MAP_PATH = REPO_ROOT / "storage/schema/bl1101_motor_stage_map.yaml"
-BLUEPRINT_PATH = (
-    REPO_ROOT / "papers/rsoxs/beamline_blueprint/blueprint_bl11012_version09092026.html"
-)
-KG_DIR = REPO_ROOT / "storage/kg"
-TERMS_DIR = REPO_ROOT / "storage/terminology"
-CACHE_DIR = REPO_ROOT / ".cache/bl1101"
-REPOS_DIR = CACHE_DIR / "repos"
-READMES_DIR = CACHE_DIR / "readmes"
-PAGES_DIR = CACHE_DIR / "pages"
-WORK_DIR = CACHE_DIR / "work"
-
-
-def _xp_elems(node: Any, query: str) -> list[Any]:  # noqa: ANN401  # Any: lxml element (untyped third-party object)
-    """Run an XPath that selects elements; lxml stubs type the result as a wide union."""
-    # Any: lxml-stubs return a union of bool/float/str/list for xpath(); element queries yield lists.
-    return list(node.xpath(query))
-
-
-def _xp_strs(node: Any, query: str) -> list[str]:  # noqa: ANN401  # Any: lxml element (untyped third-party object)
-    """Run an XPath that selects text nodes or attribute values (strings)."""
-    return [str(v) for v in node.xpath(query)]
-
-
-def _texts(node: Any) -> list[str]:  # noqa: ANN401  # Any: lxml element (untyped third-party object)
-    """Return the text fragments of an lxml element (``itertext`` is typed str | bytes)."""
-    return [str(t) for t in node.itertext()]
-
-
-
-
-def utc_now() -> str:
-    """Return the current UTC time as an ISO-8601 string with a ``Z`` suffix, truncated to seconds."""
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def sha256_bytes(data: bytes) -> str:
-    """Return the hex SHA-256 digest of ``data``."""
-    return hashlib.sha256(data).hexdigest()
-
-
-def sha256_file(path: Path) -> str:
-    """Return the hex SHA-256 digest of the file at ``path`` (read fully into memory)."""
-    return sha256_bytes(path.read_bytes())
-
-
-def slug(text: str) -> str:
-    """Collapse runs of non-alphanumeric characters in ``text`` to single hyphens.
-
-    Returns:
-        The slug with leading and trailing hyphens stripped, or ``"unnamed"`` if
-        nothing alphanumeric remains.
-    """
-    cleaned = re.sub(r"[^A-Za-z0-9]+", "-", (text or "").strip()).strip("-")
-    return cleaned or "unnamed"
-
-
-def beam_id(*parts: str) -> str:
-    """Build a ``beamline:`` node ID from name parts.
-
-    Args:
-        *parts: Name fragments. Falsy fragments are dropped and the rest are
-            slugged and joined with hyphens.
-
-    Returns:
-        An ID of the form ``beamline:<slug>-<slug>``.
-    """
-    local = "-".join(slug(p) for p in parts if p)
-    return f"beamline:{local}"
-
-
-def strip_tags(value: str) -> str:
-    """Remove HTML tags and entities from ``value`` and collapse whitespace to single spaces."""
-    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", unescape(value or ""))).strip()
+from .graph.imports.bl1101.symbols import _base_names as _base_names
+from .graph.imports.bl1101.symbols import _is_device_class as _is_device_class
+from .graph.imports.bl1101.symbols import _is_plan_function as _is_plan_function
+from .graph.imports.bl1101.symbols import expand_globs as expand_globs
+from .graph.imports.bl1101.symbols import extract_markdown_software as extract_markdown_software
+from .graph.imports.bl1101.symbols import extract_python_symbols as extract_python_symbols
+from .graph.imports.bl1101.symbols import extract_ts_fences as extract_ts_fences
+from .graph.imports.bl1101.symbols import parse_compose_services as parse_compose_services
 
 
 def next_snapshot_version(kg_dir: Path) -> int:
@@ -188,44 +166,10 @@ def snapshot_paths(
     )
 
 
-def _rel_to_repo(path: Path) -> str:
-    resolved = path.resolve()
-    try:
-        return str(resolved.relative_to(REPO_ROOT))
-    except ValueError:
-        return str(path)
 
 
-def is_secret_path(path: Path) -> bool:
-    """Report whether ``path`` looks like a secrets file that must never be ingested.
-
-    Matches exact names in ``SECRET_NAMES`` and names starting with
-    ``SECRET_PREFIXES``, except ``.env.example``.
-    """
-    name = path.name
-    if name in SECRET_NAMES:
-        return True
-    if name.startswith(SECRET_PREFIXES) and name != ".env.example":
-        return True
-    return False
 
 
-def should_skip_file(path: Path) -> bool:
-    """Report whether ingest must ignore ``path``.
-
-    True for secret files, skipped suffixes, and any path component that is a
-    skipped directory name or starts with a skipped directory prefix.
-    """
-    if is_secret_path(path):
-        return True
-    if path.suffix.lower() in SKIP_SUFFIXES:
-        return True
-    for part in path.parts:
-        if part in SKIP_DIR_NAMES:
-            return True
-        if any(part.startswith(prefix) for prefix in SKIP_DIR_PREFIXES):
-            return True
-    return False
 
 
 def _rel(term_id: str, relation: str, related_id: str, evidence: str | None = None) -> dict[str, Any]:
@@ -286,764 +230,66 @@ def make_term(
 # HTML / ALS / blueprint
 # ---------------------------------------------------------------------------
 
-def fetch_url(url: str, dest: Path, timeout: int = 45) -> dict[str, Any]:
-    """Download ``url`` to ``dest`` and describe the result.
-
-    Args:
-        url: Page to fetch.
-        dest: File to write. Parent directories are created.
-        timeout: Request timeout in seconds.
-
-    Returns:
-        On success, a snapshot record with ``status`` ``"ok"``, ``fetched_at``,
-        repo-relative ``path``, ``sha256``, ``http_status`` and ``bytes``. On an
-        HTTP, URL, timeout or OS error, ``{"url", "status": "failed", "reason"}``;
-        the error is logged and not raised and ``dest`` is not written.
-    """
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml"})
-    try:
-        with urlopen(request, timeout=timeout) as response:
-            body = response.read()
-            status = getattr(response, "status", 200)
-    except (HTTPError, URLError, TimeoutError, OSError) as exc:
-        LOGGER.warning("Failed to fetch %s: %s", url, exc)
-        return {"url": url, "status": "failed", "reason": str(exc)}
-    dest.write_bytes(body)
-    return {
-        "url": url,
-        "status": "ok",
-        "fetched_at": utc_now(),
-        "path": str(dest.relative_to(REPO_ROOT)),
-        "sha256": sha256_bytes(body),
-        "http_status": status,
-        "bytes": len(body),
-    }
 
 
-def parse_als_page(html_text: str) -> dict[str, Any]:
-    """Extract fact table + technique list from the public ALS beamline page."""
-    tree = lhtml.fromstring(html_text)
-    facts: dict[str, str] = {}
-    for row in _xp_elems(tree, "//tr"):
-        cells = [" ".join(_texts(cell)).strip() for cell in _xp_elems(row, "./th|./td")]
-        cells = [re.sub(r"\s+", " ", c) for c in cells if c]
-        if len(cells) >= 2:
-            facts[cells[0]] = " | ".join(cells[1:])
-    title = " ".join(_xp_strs(tree, "//h1//text()")).strip() or "Beamline 11.0.1.2"
-    paragraphs = [
-        re.sub(r"\s+", " ", " ".join(_texts(p)).strip())
-        for p in _xp_elems(tree, "//p")
-        if " ".join(_texts(p)).strip()
-    ]
-    techniques: list[str] = []
-    tech_blob = facts.get("Technique category") or facts.get("Techniques") or ""
-    for token in re.split(r"[|\n;/]+", tech_blob):
-        token = token.strip(" -")
-        if len(token) > 2:
-            techniques.append(token)
-    full_text = re.sub(r"\s+", " ", " ".join(_texts(tree)))
-    people = parse_als_contact_people(facts, full_text, source=ALS_PAGE_URL)
-    return {
-        "title": title,
-        "facts": facts,
-        "techniques": techniques,
-        "paragraphs": paragraphs[:8],
-        "text": full_text[:8000],
-        "people": people,
-    }
 
 
-def _clean_person_name(name: str) -> str:
-    cleaned = re.sub(r"\s+", " ", (name or "").strip(" ,;:()"))
-    if not cleaned or cleaned.casefold() in SKIP_PERSON_NAMES:
-        return ""
-    parts = cleaned.split()
-    if len(parts) < 2:
-        return ""
-    last = parts[-1].rstrip(".").casefold()
-    if last in PERSON_NAME_STOPWORDS or len(last) < 3:
-        return ""
-    return cleaned
 
 
-def _email_near(text: str, index: int, name: str) -> str:
-    window = (text or "")[index : index + max(len(name) + 80, 120)]
-    match = EMAIL_RE.search(window)
-    return match.group(0) if match else ""
 
 
-def parse_als_contact_people(
-    facts: dict[str, str],
-    text: str = "",
-    *,
-    source: str = ALS_PAGE_URL,
-) -> list[dict[str, str]]:
-    """Parse documented ALS 11.0.1.2 contacts. Does not invent names."""
-    blob = facts.get("Primary contact(s)") or facts.get("Primary contacts") or facts.get("Contacts") or ""
-    people: list[dict[str, str]] = []
-    seen = set()
-    chunks = re.split(r"[|;]+", blob) if blob else [text]
-    for chunk in chunks:
-        for match in PERSON_NAME_RE.finditer(chunk or ""):
-            name = _clean_person_name(match.group(1))
-            if not name or name.casefold() in seen:
-                continue
-            seen.add(name.casefold())
-            people.append(
-                {
-                    "name": name,
-                    "email": _email_near(chunk, match.start(), name),
-                    "role": "BeamlineScientist",
-                    "source": source,
-                    "evidence": f"ALS primary contact: {chunk.strip()[:240]}",
-                }
-            )
-    return people
 
 
-def parse_blueprint_people(blueprint: dict[str, Any], html_text: str = "") -> list[dict[str, str]]:
-    """Names the Gabe blueprint actually writes (e.g. reviewed with Thomas Ferron)."""
-    header = blueprint.get("header") or {}
-    blobs = [
-        header.get("sources") or "",
-        " ".join(str(v) for v in header.values()),
-        html_text,
-    ]
-    people: list[dict[str, str]] = []
-    seen = set()
-    for blob in blobs:
-        if not blob:
-            continue
-        for match in BLUEPRINT_PERSON_RE.finditer(blob):
-            name = _clean_person_name(match.group(1))
-            if not name or name.casefold() in seen:
-                continue
-            seen.add(name.casefold())
-            people.append(
-                {
-                    "name": name,
-                    "email": "",
-                    "role": "BeamlineScientist",
-                    "source": BLUEPRINT_PATH.name,
-                    "evidence": match.group(0).strip()[:240],
-                }
-            )
-    return people
 
 
-def _ophyd_name_from_handle(handle: str, fallback: str) -> tuple[str, str]:
-    match = re.search(r'd\.(\w+)\[\s*["\']([^"\']+)["\']\s*\]', handle or "")
-    if match:
-        return match.group(2), match.group(1)
-    return fallback, ""
 
 
-def canonical_stage_name(name: str) -> str:
-    """Map SVG / caption / prose aliases onto a stable BeamlineStage name."""
-    raw = re.sub(r"\s+", " ", (name or "").strip())
-    if not raw:
-        return ""
-    key = raw.casefold()
-    key = key.replace("kirkpatrick–baez", "m103").replace("kirkpatrick-baez", "m103")
-    return STAGE_NAME_ALIASES.get(key, raw)
 
 
-def _svg_coord(el: Any, attr: str) -> float:  # noqa: ANN401  # Any: lxml element (untyped third-party object)
-    try:
-        return float(el.get(attr) or 0.0)
-    except (TypeError, ValueError):
-        return 0.0
 
 
-def parse_sheet_a_svg_order(tree: object) -> list[str]:
-    """Sheet A SVG left-to-right, top-to-bottom. This is beam order, not A′ DOM."""
-    labels: list[tuple[float, float, str]] = []
-    for text_el in _xp_elems(tree, "//section[@id='sheet-a']//figure//svg//text[contains(@class,'big')]"):
-        name = canonical_stage_name(re.sub(r"\s+", " ", " ".join(_texts(text_el))).strip())
-        if not name:
-            continue
-        # "Sample · θ = 0" belongs to sheet B; ignore if it leaked.
-        if name.casefold().startswith("sample ·"):
-            continue
-        labels.append((_svg_coord(text_el, "y"), _svg_coord(text_el, "x"), name))
-    labels.sort(key=lambda item: (item[0], item[1]))
-    ordered: list[str] = []
-    seen = set()
-    for _, _, name in labels:
-        if name in seen:
-            continue
-        seen.add(name)
-        ordered.append(name)
-    return ordered
 
 
-def parse_arrow_sequence(text: str) -> list[str]:
-    """Pull a documented A → B → C beam-path chain out of prose or a figcaption."""
-    blob = re.sub(r"\s+", " ", unescape(text or ""))
-    blob = blob.replace("->", "→").replace("⟶", "→")
-    if "→" not in blob:
-        return []
-    match = re.search(r"((?:[^→]{1,60}→\s*){2,}[^→.]{1,60})", blob)
-    if not match:
-        return []
-    names: list[str] = []
-    seen = set()
-    for token in match.group(1).split("→"):
-        name = canonical_stage_name(token.strip(" :;,"))
-        if not name or name in seen:
-            continue
-        seen.add(name)
-        names.append(name)
-    return names
 
 
-def parse_figcaption_beam_path(tree: object) -> list[str]:
-    """Return the beam-path chain documented in the Sheet A figcaptions, or ``[]`` if none."""
-    captions = _xp_elems(tree, "//section[@id='sheet-a']//figcaption")
-    text = " ".join(re.sub(r"\s+", " ", " ".join(_texts(el))) for el in captions)
-    return parse_arrow_sequence(text)
 
 
-def parse_bcs2sim_beam_path(root: Path | None) -> list[str]:
-    """Reuse Gabe's map if bcs2sim checked in the same knowledge/blueprint text."""
-    if root is None or not root.exists():
-        return []
-    for pattern in BCS2SIM_PATH_GLOBS:
-        for path in sorted(root.glob(pattern)):
-            if not path.is_file() or should_skip_file(path):
-                continue
-            try:
-                text = path.read_text(encoding="utf-8", errors="replace")
-            except OSError as exc:
-                LOGGER.debug("unreadable file skipped while scanning for M103: %s", type(exc).__name__)
-                continue
-            if "M103" not in text or not re.search(r"exit\s+slits?", text, re.I):
-                continue
-            names = parse_arrow_sequence(text)
-            if names:
-                LOGGER.info("bcs2sim beam path from %s (%d stages)", path, len(names))
-                return names
-    return []
 
 
-def _index_ci(names: Sequence[str], needle: str) -> int:
-    target = needle.casefold()
-    for i, name in enumerate(names):
-        if target in name.casefold():
-            return i
-    return -1
 
 
-def ensure_m103_before_exit_slits(names: Sequence[str]) -> list[str]:
-    """Prose puts M103 between mono and the exit slits; A.5 before A.6 is not optical order."""
-    ordered = list(names)
-    i_m = _index_ci(ordered, "m103")
-    i_e = _index_ci(ordered, "exit slit")
-    if i_m >= 0 and i_e >= 0 and i_m > i_e:
-        item = ordered.pop(i_m)
-        ordered.insert(i_e, item)
-    return ordered
 
 
-def finalize_beam_path(names: Sequence[str]) -> list[str]:
-    """Prefix source/EPU/M101, replace a trailing Chamber with sample → detector."""
-    ordered = ensure_m103_before_exit_slits(names)
-    if not ordered:
-        return []
-    lowered = [n.casefold() for n in ordered]
-    prefix: list[str] = []
-    for name in BEAM_PATH_PREFIX:
-        if name.casefold() not in lowered:
-            prefix.append(name)
-        else:
-            break
-    ordered = prefix + ordered
-    if ordered and ordered[-1].casefold() == "chamber":
-        ordered = ordered[:-1]
-    lowered = [n.casefold() for n in ordered]
-    for name in BEAM_PATH_CHAMBER_TAIL:
-        if name.casefold() not in lowered:
-            ordered.append(name)
-    seen = set()
-    unique: list[str] = []
-    for name in ordered:
-        key = name.casefold()
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(name)
-    return ensure_m103_before_exit_slits(unique)
 
 
-def resolve_beam_path_order(
-    *,
-    svg_names: Sequence[str],
-    caption_names: Sequence[str],
-    bcs2sim_names: Sequence[str] = (),
-    stage_names: Sequence[str] = (),
-) -> list[str]:
-    """Prefer Sheet A SVG, then figcaption / bcs2sim. Never A′ DOM order as the path."""
-    if svg_names:
-        return finalize_beam_path(svg_names)
-    if caption_names:
-        return finalize_beam_path(caption_names)
-    if bcs2sim_names:
-        return finalize_beam_path(bcs2sim_names)
-    # stage_names is A′ DOM (A.5 exit slits before A.6 M103). Do not use it.
-    _ = stage_names
-    return []
 
 
-def parse_blueprint_html(html_text: str) -> dict[str, Any]:
-    """Parse Gabe's BL 11.0.1.2 device blueprint (titleblock, stages, sheet E, beam path)."""
-    tree = lhtml.fromstring(html_text)
-    header: dict[str, str] = {}
-    for block in _xp_elems(tree, "//header[contains(@class,'titleblock')]/div"):
-        key = " ".join(_xp_strs(block, ".//*[contains(@class,'k')]/text()")).strip()
-        val = " ".join(_xp_strs(block, ".//*[contains(@class,'v')]/text()")).strip()
-        if key:
-            header[key] = val
-    sources = " ".join(_xp_strs(tree, "//*[contains(@class,'sources')]//text()"))
-    header["sources"] = re.sub(r"\s+", " ", sources).strip()
-
-    devices: dict[str, BlueprintDevice] = {}
-    for row in _xp_elems(tree, "//table[@id='corr']//tr[@id]"):
-        dev_id = (row.get("id") or "").replace("dev-", "")
-        tds = _xp_elems(row, "./td")
-        if len(tds) < 6:
-            continue
-        drawn = " ".join(_texts(tds[0])).strip()
-        name = " ".join(_texts(tds[1])).strip()
-        ioc = " ".join(_texts(tds[2])).strip()
-        pv = " ".join(_xp_strs(tds[3], ".//span[contains(@class,'pv')]/text()")).strip()
-        handle = " ".join(_xp_strs(tds[4], ".//span[contains(@class,'hd')]/text()")).strip()
-        ophyd_class = " ".join(_texts(tds[5])).strip()
-        mapping = " ".join(_texts(tds[6])).strip() if len(tds) > 6 else ""
-        tip = unescape(" ".join(_xp_strs(tds[1], ".//*[@data-tip]/@data-tip")))
-        kind = strip_tags(
-            " ".join(re.findall(r'tip-k">([^<]+)', tip)) or ""
-        ).lower()
-        meaning = strip_tags(" ".join(re.findall(r'tip-m">([^<]+)', tip)))
-        if not kind:
-            if "detector" in (ophyd_class + name).lower():
-                kind = "detector"
-            elif "dio" in ophyd_class.lower() or "digital" in ophyd_class.lower():
-                kind = "digital i/o"
-            elif "ai" in ophyd_class.lower() or "analog" in ophyd_class.lower():
-                kind = "analog input"
-            else:
-                kind = "motor"
-        ophyd_name, collection = _ophyd_name_from_handle(handle, dev_id)
-        devices[dev_id] = BlueprintDevice(
-            dev_id=dev_id,
-            name=name or ophyd_name,
-            kind=kind,
-            category=KIND_CATEGORY.get(kind, "Device"),
-            pv=pv,
-            handle=handle,
-            ophyd_name=ophyd_name,
-            ophyd_class=ophyd_class,
-            ioc_record=ioc,
-            mapping_file=mapping,
-            drawn=drawn,
-            meaning=meaning,
-            collection=collection,
-        )
-
-    stages: list[BlueprintStage] = []
-    for stage_el in _xp_elems(tree, "//*[contains(@class,'stage')]"):
-        name = " ".join(_xp_strs(stage_el, ".//*[contains(@class,'stage-name')]/text()")).strip()
-        if not name:
-            continue
-        section = " ".join(_xp_strs(stage_el, ".//*[contains(@class,'stage-id')]/text()")).strip()
-        what = strip_tags(" ".join(_xp_strs(stage_el, ".//*[contains(@class,'stage-what')]//text()")))
-        does = strip_tags(" ".join(_xp_strs(stage_el, ".//*[contains(@class,'stage-does')]//text()")))
-        range_text = strip_tags(" ".join(_xp_strs(stage_el, ".//*[contains(@class,'stage-range')]//text()")))
-        hrefs = [h.replace("#dev-", "") for h in _xp_strs(stage_el, ".//a/@href") if h.startswith("#dev-")]
-        stages.append(
-            BlueprintStage(
-                name=name,
-                section=section,
-                what=what,
-                does=does,
-                range_text=range_text,
-                device_ids=sorted(set(hrefs)),
-            )
-        )
-
-    rules = []
-    for rule in _xp_elems(tree, "//*[contains(@class,'rule')]"):
-        key = " ".join(_xp_strs(rule, ".//*[contains(@class,'rule-k')]/text()")).strip()
-        body = strip_tags(" ".join(_xp_strs(rule, ".//text()")))
-        if key or body:
-            rules.append({"name": key, "text": body})
-
-    svg_names = parse_sheet_a_svg_order(tree)
-    caption_names = parse_figcaption_beam_path(tree)
-    beam_path = resolve_beam_path_order(
-        svg_names=svg_names,
-        caption_names=caption_names,
-        stage_names=[stage.name for stage in stages],
-    )
-    parsed_bp = {
-        "header": header,
-        "devices": devices,
-        "stages": stages,
-        "rules": rules,
-        "beam_note": header.get("sources", ""),
-        "beam_path": beam_path,
-        "beam_path_svg": svg_names,
-        "beam_path_caption": caption_names,
-    }
-    parsed_bp["people"] = parse_blueprint_people(parsed_bp, html_text)
-    return parsed_bp
 
 
 # ---------------------------------------------------------------------------
 # GitHub / Python / compose
 # ---------------------------------------------------------------------------
 
-def git_sha(path: Path) -> str:
-    """Return the HEAD commit SHA of the git checkout at ``path``.
-
-    Raises:
-        subprocess.CalledProcessError: If ``path`` is not a git checkout or git fails.
-    """
-    result = subprocess.run(
-        ["git", "-C", str(path), "rev-parse", "HEAD"],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return result.stdout.strip()
 
 
-def _run_git(args: Sequence[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        list(args),
-        cwd=str(cwd) if cwd else None,
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=180,
-    )
 
 
-def sync_repo(spec: RepoSpec, dest: Path) -> dict[str, Any]:
-    """Clone or update ``spec`` into ``dest`` and report the outcome.
-
-    An existing clone is fetched and hard-reset to ``FETCH_HEAD``. A new clone is
-    shallow, and sparse (README only) when ``spec.readme_only`` is set.
-
-    Args:
-        spec: Repo to sync.
-        dest: Clone directory. Its parent is created.
-
-    Returns:
-        On success, a record with ``status`` ``"ok"``, ``sha``, repo-relative
-        ``path`` and ``mode``. If git fails, times out or hits an OS error (for
-        example a private repo), ``status`` ``"skipped"`` with a ``reason``; nothing
-        is raised.
-    """
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        if (dest / ".git").exists():
-            _run_git(["git", "fetch", "--depth", "1", "origin"], cwd=dest)
-            _run_git(["git", "reset", "--hard", "FETCH_HEAD"], cwd=dest)
-        elif spec.readme_only:
-            _run_git(
-                [
-                    "git",
-                    "clone",
-                    "--depth",
-                    "1",
-                    "--filter=blob:none",
-                    "--sparse",
-                    spec.url,
-                    str(dest),
-                ]
-            )
-            try:
-                _run_git(["git", "sparse-checkout", "set", "--skip-checks", "README.md"], cwd=dest)
-            except subprocess.CalledProcessError:
-                LOGGER.info("%s sparse-checkout README skipped; using clone as-is", spec.name)
-        else:
-            _run_git(["git", "clone", "--depth", "1", spec.url, str(dest)])
-        sha = git_sha(dest)
-        LOGGER.info("Repo %s @ %s", spec.name, sha[:12])
-        return {
-            "name": spec.name,
-            "url": spec.url,
-            "status": "ok",
-            "sha": sha,
-            "path": str(dest.relative_to(REPO_ROOT)),
-            "mode": spec.mode,
-        }
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
-        detail = exc.stderr.strip() if isinstance(exc, subprocess.CalledProcessError) and exc.stderr else str(exc)
-        LOGGER.warning("Skipping private/unavailable repo %s: %s", spec.name, detail)
-        return {
-            "name": spec.name,
-            "url": spec.url,
-            "status": "skipped",
-            "reason": detail,
-            "mode": spec.mode,
-        }
 
 
-def expand_globs(root: Path, patterns: Sequence[str]) -> list[Path]:
-    """Expand ``patterns`` under ``root`` into a de-duplicated list of ingestable files.
-
-    Directories, secret files and skipped paths are dropped. Order follows the
-    pattern order, sorted within each pattern.
-    """
-    found: list[Path] = []
-    for pattern in patterns:
-        found.extend(sorted(root.glob(pattern)))
-    unique: list[Path] = []
-    seen = set()
-    for path in found:
-        if not path.is_file() or should_skip_file(path):
-            continue
-        if path.resolve() in seen:
-            continue
-        seen.add(path.resolve())
-        unique.append(path)
-    return unique
 
 
-def _base_names(node: ast.ClassDef) -> str:
-    chunks = []
-    for base in node.bases:
-        try:
-            chunks.append(ast.unparse(base))
-        except Exception:
-            chunks.append(getattr(base, "id", "") or "")
-    return " ".join(chunks)
 
 
-def _is_device_class(node: ast.ClassDef) -> bool:
-    if node.name.endswith(("Error", "Exception")):
-        return False
-    bases = _base_names(node)
-    if any(hint in bases for hint in DEVICE_BASE_HINTS):
-        return True
-    return bool(
-        re.match(r"^(Sim|Epics|AD|Replay)", node.name)
-        or node.name.endswith(("Device", "Motor", "Detector", "Endstation", "CCD", "Plan"))
-    )
 
 
-def _is_plan_function(node: ast.FunctionDef) -> bool:
-    if node.name.startswith("_"):
-        return False
-    if node.name in PUBLIC_FUNCTIONS:
-        return True
-    deco = " ".join(
-        ast.unparse(d) if not isinstance(d, ast.Name) else d.id for d in node.decorator_list
-    )
-    if "parameter_annotation" in deco or "plan" in deco.lower():
-        return True
-    try:
-        src = ast.unparse(node)
-    except Exception:
-        src = node.name
-    if "yield" in src and any(tok in node.name.lower() for tok in ("scan", "count", "replay")):
-        return True
-    return node.name in {"count", "scan", "rel_scan", "grid_scan"} or "scan" in node.name.lower()
 
 
-def extract_python_symbols(path: Path, repo_name: str, commit: str = "") -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Return (terms-like symbol records, curated code snippets) from one Python file."""
-    try:
-        source = path.read_text(encoding="utf-8")
-        tree = ast.parse(source)
-    except (OSError, SyntaxError) as exc:
-        LOGGER.warning("Skipping Python %s: %s", path, exc)
-        return [], []
-    lines = source.splitlines()
-    rel = path.name
-    snippets: list[dict[str, Any]] = []
-    symbols: list[dict[str, Any]] = []
-
-    def snippet_for(node: ast.AST, kind: str, function_name: str) -> dict[str, Any] | None:
-        start = getattr(node, "lineno", 1)
-        end = getattr(node, "end_lineno", start)
-        chunk = lines[start - 1 : end]
-        body = "\n".join(chunk[:MAX_SNIPPET_LINES])
-        if not body.strip():
-            return None
-        paper = f"{repo_name}:{path.name}:{function_name}"
-        return {
-            "id": beam_id("snippet", repo_name, function_name, str(start)),
-            "id_prefix": NAMESPACE,
-            "curated": True,
-            "function_name": function_name,
-            "code_snippet": body,
-            "code_language": "python",
-            "code_description": f"{kind} `{function_name}` from {repo_name} ({path.name}:{start}-{end})",
-            "source_paper": paper,
-            "page": start,
-            "source_type": "github",
-            "repo_name": repo_name,
-            "repo_url": f"https://github.com/als-computing/{repo_name}",
-            "repo_commit_sha": commit,
-            "source_file_path": rel,
-            "source_start_line": start,
-            "source_end_line": end,
-            "source_file_url": (
-                f"https://github.com/als-computing/{repo_name}/blob/{commit}/{rel}#L{start}-L{end}"
-                if commit
-                else ""
-            ),
-        }
-
-    for node in tree.body:
-        if isinstance(node, ast.ClassDef) and _is_device_class(node):
-            snip = snippet_for(node, "class", node.name)
-            if not snip:
-                continue
-            snippets.append(snip)
-            category = "Detector" if "detect" in node.name.lower() or "ccd" in node.name.lower() else "OphydDevice"
-            if node.name.lower().endswith("plan") or "scan" in node.name.lower():
-                category = "BlueskyPlan"
-            if node.name in {"Endstation"}:
-                category = "Endstation"
-            symbols.append(
-                {
-                    "id": beam_id("ophyd", node.name),
-                    "name": node.name,
-                    "category": category,
-                    "file": rel,
-                    "snippet_paper": snip["source_paper"],
-                    "start": snip["source_start_line"],
-                    "end": snip["source_end_line"],
-                }
-            )
-        elif isinstance(node, ast.FunctionDef) and _is_plan_function(node):
-            snip = snippet_for(node, "function", node.name)
-            if not snip:
-                continue
-            snippets.append(snip)
-            is_loader = node.name in PUBLIC_FUNCTIONS
-            symbols.append(
-                {
-                    "id": beam_id("plan" if not is_loader else "fn", node.name),
-                    "name": node.name,
-                    "category": "Method" if is_loader else "BlueskyPlan",
-                    "file": rel,
-                    "snippet_paper": snip["source_paper"],
-                    "start": snip["source_start_line"],
-                    "end": snip["source_end_line"],
-                }
-            )
-    return symbols, snippets
 
 
-def parse_compose_services(path: Path) -> list[dict[str, str]]:
-    """List the service names defined in a docker-compose file.
-
-    Uses the YAML ``services`` mapping. If the file is not valid YAML or has no
-    such mapping, falls back to a regex over two-space-indented keys, excluding
-    top-level section names such as ``networks`` and ``volumes``.
-
-    Returns:
-        ``{"name", "file"}`` dicts, with ``file`` the compose file's basename.
-    """
-    try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except yaml.YAMLError as exc:
-        LOGGER.warning("YAML parse failed for %s: %s", path, exc)
-        data = {}
-    services = data.get("services") if isinstance(data, dict) else None
-    names: list[str] = []
-    if isinstance(services, dict):
-        names = [str(k) for k in services.keys()]
-    else:
-        text = path.read_text(encoding="utf-8", errors="replace")
-        names = re.findall(r"(?m)^  ([A-Za-z0-9_-]+):\s*$", text)
-        skip = {"networks", "volumes", "configs", "secrets", "x-anchors"}
-        names = [n for n in names if n not in skip]
-    return [{"name": n, "file": path.name} for n in names]
 
 
-def extract_markdown_software(path: Path, repo_name: str, limit: int = 400) -> str:
-    """Return a short plain-text summary of a Markdown file.
-
-    Takes the first heading and the lines after it from the first 80 lines, drops
-    code fences, and collapses whitespace. Whole READMEs are deliberately never
-    copied into nodes.
-
-    Args:
-        path: Markdown file to read.
-        repo_name: Repo the file belongs to. Unused.
-        limit: Maximum characters returned.
-
-    Returns:
-        The summary, or ``""`` if the file cannot be read.
-    """
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return ""
-    # First heading + following paragraph; never dump whole READMEs into nodes.
-    lines = text.splitlines()
-    kept: list[str] = []
-    for line in lines[:80]:
-        if line.startswith("#") or kept:
-            kept.append(line)
-        if len(" ".join(kept)) > limit and line.strip() == "":
-            break
-    blob = " ".join(x.strip() for x in kept if x.strip() and not x.startswith("```"))
-    return re.sub(r"\s+", " ", blob)[:limit]
 
 
-def extract_ts_fences(path: Path, repo_name: str, commit: str = "") -> list[dict[str, Any]]:
-    """Extract the first Finch-config TypeScript fence from a Markdown file.
-
-    Only a ```` ```ts ````, ```` ```tsx ```` or ```` ```typescript ```` fence that mentions
-    ``FinchConfig`` or ``ophyd`` qualifies.
-
-    Args:
-        path: Markdown file to read.
-        repo_name: Repo name stamped on the snippet.
-        commit: Commit SHA stamped on the snippet.
-
-    Returns:
-        A list with at most one snippet record (body truncated to 4000 characters),
-        or an empty list if the file is unreadable or nothing matches.
-    """
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return []
-    snippets = []
-    for match in re.finditer(r"```(?:tsx|ts|typescript)\n(.*?)```", text, re.S):
-        body = match.group(1).strip()
-        if "FinchConfig" not in body and "ophyd" not in body.lower():
-            continue
-        start = text[: match.start()].count("\n") + 1
-        snippets.append(
-            {
-                "id": beam_id("snippet", repo_name, "FinchConfigProvider", str(start)),
-                "id_prefix": NAMESPACE,
-                "curated": True,
-                "function_name": "FinchConfigProvider",
-                "code_snippet": body[:4000],
-                "code_language": "typescript",
-                "code_description": f"Finch config snippet from {repo_name} README",
-                "source_paper": f"{repo_name}:README.md:FinchConfigProvider",
-                "page": start,
-                "source_type": "github",
-                "repo_name": repo_name,
-                "repo_commit_sha": commit,
-                "source_file_path": path.name,
-                "source_start_line": start,
-            }
-        )
-        break
-    return snippets
 
 
 # ---------------------------------------------------------------------------
@@ -2448,3 +1694,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+# A patch of a re-exported name (``monkeypatch.setattr(bl1101_ingest, ...)``) must also reach the split modules.
+_compat.install(sys.modules[__name__], (_common, _paths, _fetch, _parse_als, _parse_blueprint, _symbols))
