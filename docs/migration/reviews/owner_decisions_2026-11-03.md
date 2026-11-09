@@ -141,3 +141,12 @@ not the other": confirmed (the plan's scope was e2e_demo only and bl1101's recor
 | P2 agent base for the orchestrator and debate agents | "LangGraph, via agent_runtime.admission (Recommended)" (LLM calls through admission and counted against curation budgets) |
 | Fate of `splash_links/` at cutover (packet Q1-Q3) | "Delete, keep an archive tag (Recommended)" (tag the last commit containing it, delete at cutover after one canary cycle; its `_tests` go with it; the wire tokens stay) |
 | Approval of a zero-operation rollback plan | "Auto-approve on :local only" (zero-operation rollback plans on the `:local` profile may skip the human approval step; every other profile and every non-empty plan still needs it) |
+
+## Fifteenth set (2026-11-09)
+
+| Question | Owner answer |
+|---|---|
+| V81 capability (`POST /v1/curation/merges/apply`) | "graph.publish (Recommended)" (a real apply also needs `curation.approve` through `create_approval`) |
+| Image `--kg-mode` default on `:local` | "Default to editable on :local" (UI Save becomes available as soon as a publication exists; the lazy target still answers the typed 501 before one; edits block the next publication of that corpus until reconciled) |
+| H4 gate packet | "Yes, prepare it (Recommended)" (assemble from the C4 report, the provisional B4 binary report, T07B's design and the owner-gated items; nothing marked approved) |
+| Legacy `splash` enum value after the compatibility window (packet Q8) | "Accept but alias to json/tiled (Recommended)" (the token is accepted as the editable-graph alias and never contacts a Splash service) |
