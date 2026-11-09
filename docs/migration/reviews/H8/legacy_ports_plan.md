@@ -57,7 +57,7 @@ now pins the hop set as empty.
 
 **Remaining P3 (not started):** `fetch.py` (hardened fetch, `git` sync behind subprocess guards), `parse_als.py`, `parse_blueprint.py`, `symbols.py`, `terms.py` (`make_term`, `merge_terms`, `attach_repo_terms`, motor-stage linking), `snapshot.py` (via `graph.snapshot.create_snapshot`), `cli.py`, then the old path becomes the `sys.modules` alias shim, `hybrid_rag` repointed, and the v7 -> v8 `--from-graph` golden replay plus HTML fixture parser tests. Estimate now 3-4.5 days.
 
-## Proposals (owner scheduling needed; P1 is done, P3 slice a is done)
+## Proposals (owner scheduling needed; P1 and its follow-on are done, P3 slice a is done)
 
 ### P1. `download_agent` metadata hops onto `hardened_get_json` (DONE, branch `forge_merge-T17B-p1`, not merged)
 
@@ -100,11 +100,52 @@ wraps it unchanged), `openalex_search`, `openalex_work`, `arxiv_search` + `parse
   `OPENALEX_API_KEY` is a new secrets path and is owner-gated.
 - Quota/`Retry-After`: neither pyalex (`max_retries=0`) nor the agent handled them, and `hardened_get_json` does not expose response
   headers, so a 429 is a failed lookup (warning, fallback, empty), as before. Honouring `Retry-After` needs a getter variant returning headers: owner-gated.
-- Dependencies: `pyalex` and `arxiv` are NOT unused: `f2w_agent/api.py` (publication search), `commands/harvest_rsoxs.py`,
-  `library/harvest.py` and `literature/download_pdfs.py` still import them. `pixi.toml`/`pyproject.toml` unchanged, lock untouched.
+- Dependencies: `pyalex` and `arxiv` were NOT unused at that point: `f2w_agent/api.py` (publication search), `commands/harvest_rsoxs.py`,
+  `library/harvest.py` and `literature/download_pdfs.py` still imported them (moved by the follow-on below). `pixi.toml`/`pyproject.toml` unchanged, lock untouched.
 - Residual risks: the other pyalex/arxiv users above remain outside the hardened policy (follow-up ports, same helpers apply);
   `mailto` is sent to OpenAlex in the URL as well as the header; the arXiv terms ask for one request per 3 s and the agent keeps
   the previous no-pause behaviour (up to 5 queries x 3 tries per search).
+
+### P1b. P1 follow-on: `harvest_rsoxs`, `download_pdfs` and the f2w API on the same helpers (DONE, branch `forge_merge-T17B-p1b`, not merged)
+
+**Done (2026-11-09).** The remaining `pyalex`/`arxiv` users outside the Library feature now call the hardened helpers:
+
+| Module | Before | After |
+|---|---|---|
+| `commands/harvest_rsoxs.py` | `arxiv.Client/Search` (submittedDate, 50/page, 15 s delay, 1 retry; title lookup, relevance, 5/page); `pyalex.Works/Authors` incl. `paginate`; `dl.fetch_unpaywall_oa_pdfs` (`requests`) | `arxiv_results`, a thin chainable `_OpenAlexQuery` (`Works()`/`Authors()`, same `.search/.filter/.get/.paginate/[id]` call shape) over `openalex_get`/`openalex_pages`/`openalex_work`, and `unpaywall_oa_pdfs`; every call passes `get_json=hardened_get_json` / `get_bytes=hardened_get_bytes` from the module globals |
+| `literature/download_pdfs.py` | `search_arxiv` on `arxiv.Client()` defaults; `run_openalex_workflow` on `pyalex.Works` | `search_arxiv` on `arxiv_results` (100/page, 3 s delay, 3 retries, lazy like before); `run_openalex_workflow` on `openalex_pages` (lazy imports, because `legacy_download` imports this module) |
+| `f2w_agent/api.py` | `_search_openalex_publications` on `pyalex.Works` | `openalex_search(..., oa_only=False, get_json=hardened_get_json)`; failure is still a logged miss (`[]`) |
+
+New in `legacy_download.py`: `openalex_get` (any list endpoint, pyalex's parameter order, nested filters flattened as pyalex does, next cursor
+returned), `openalex_pages` (pyalex's cursor walk, `n_max` 10000), `arxiv_results` (lazy generator: `page_size`, `sortBy`, `delay_seconds`, retries
+including an empty later page, next page while `start < totalResults`), `parse_arxiv_feed` (entries plus `opensearch:totalResults`),
+`ArxivHit` (the `arxiv.Result` attributes the scripts read). `openalex_search` and `arxiv_search` are now thin wrappers; `ArxivEntry` gained `published`.
+
+- Parity (`tests/literature/test_harvest_metadata_parity.py`, fixtures in `tests/literature/fixtures/harvest_metadata/`): real pyalex driven
+  offline: cursor pagination (`cursor=%2A`, then the token; pages and URLs equal), filter-before-search order for author works, `Authors().search().get()`,
+  `Works()[doi-url]`, the old `_paginate_works` run verbatim on real pyalex queries against the new one (per_query 1, 2, 3, 50; URLs equal), DOI/title lookup,
+  author search URLs and `_search_openalex_publications`. Real `arxiv.Client` driven offline: two-page walk for `SubmittedDate` and `Relevance` (byte-identical URLs,
+  entries equal field by field including `published`, 15 s delay sleep equal), stop at `max_results` without another request, 503-then-ok retry, permanent 429
+  (same attempt count; the error text still trips `_arxiv_is_throttle`), empty later page (same attempts, page one delivered first), empty first page, and
+  `_work_from_arxiv_result` equal on package results and `ArxivHit`s. Unpaywall: `_resolve_oa_pdfs` old step (`requests`) versus new, byte-identical URL and tuples.
+- Egress pins: `tests/literature/test_harvest_modules_egress.py` (no `pyalex`/`arxiv`/`feedparser`/`lxml` import anywhere in the three modules, lazy ones included;
+  every helper call passes its getter; harvest/api import no `requests`; the `requests` call sites left in `download_pdfs` are pinned to `fetch_unpaywall_oa_pdfs`,
+  `_oa_get`, `_oa_post`, `download_pdf`).
+- Tests repointed (fakes now stand in for the helpers, scripted behaviour unchanged): `tests/coverage_t27/harvest_fakes.py` (`ArxivWorld`/`OpenAlexWorld` patch
+  `harvest_rsoxs.arxiv_results` and `Works`/`Authors` instead of `sys.modules["arxiv"/"pyalex"]`), `test_command_harvest_search.py` (`hv.Works()` for `sys.modules["pyalex"].Works()`),
+  `test_command_harvest_flows.py` and `tests/test_harvest_rsoxs.py` (Unpaywall fake on `hv.unpaywall_oa_pdfs`; the 429 retry test on `arxiv_results`),
+  `test_download_pdfs_resolvers.py` (`search_arxiv`, `run_openalex_workflow`). The frozen UI contract tests are untouched.
+- Differences, all deliberate: (1) as in P1, OpenAlex requests carry `mailto=` as well as the `From` header, and pyalex's process-global `config.email` side effect is gone
+  (each query carries its own address). (2) The arXiv `User-Agent` is the harvest one, not the package's. (3) **`run_openalex_workflow` was dead code**: it called
+  `Works().search(title=..).per_page(n).execute()`, which raises `TypeError` on pyalex 0.21 (checked); there is nothing to compare. It now does a `title.search` filter over the
+  cursor walk (stops at `max_results`), which is what its docstring said. (4) A failure mid-walk keeps the pages already consumed, as with the packages.
+- OpenAlex API key: none of these modules ever set one (pyalex `api_key` unset, no env read) and none does now (`api_key` is not passed anywhere); no key path added.
+- Not moved (outside the three lookups): `download_pdfs` still uses `requests` for OSTI, CORE, Europe PMC, Crossref TDM and Semantic Scholar lookups and for its `download_pdf` oracle;
+  `harvest_rsoxs` reaches those through `dl.fetch_*`. They are the same class of hop and could be ported with `hardened_get_json`; not requested here.
+- Dependencies: the only remaining `import arxiv` in `app/` is `app/modules/library/harvest.py` (owned by the Library/Harvester session). `pyalex` has no `app/` user left.
+  `pyalex` can leave the runtime dependencies (`pyproject.toml` `dependencies`, `pixi.toml` default `[pypi-dependencies]`) but has to stay in the dev/test environment
+  while the parity tests drive the real client as the oracle (and the `pyalex.*` mypy override can go with it only if the tests are typed separately). `arxiv` has to stay until
+  `library/harvest.py` is ported, then likewise remains a test-only oracle dependency. `pixi.lock` is not edited here.
 
 ### P2. `orchestrator_agent.py` + `debate_agent.py` -> `agent_runtime/` and `curation/`
 

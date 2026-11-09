@@ -1,9 +1,13 @@
-"""Offline doubles for ``app.modules.commands.harvest_rsoxs`` tests: fake ``arxiv``, ``pyalex`` and PDF downloads."""
+"""Offline doubles for ``app.modules.commands.harvest_rsoxs`` tests: fake arXiv / OpenAlex helpers and PDF downloads.
+
+The doubles used to replace the ``arxiv`` and ``pyalex`` packages in ``sys.modules``; harvest_rsoxs now calls the hardened
+helpers (``legacy_download.arxiv_results``, the ``Works``/``Authors`` query builders), so they replace those instead
+(T17B P1 follow-on). The scripted behaviour (``table``, ``works``, ``authors``, failures) is unchanged.
+"""
 from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-import sys
 import types
 from typing import Any
 
@@ -29,39 +33,29 @@ class ArxivWorld:
         self.calls: list[str] = []
         self.clients: list[dict[str, Any]] = []
 
-    def module(self) -> types.ModuleType:
-        world = self
-        mod = types.ModuleType("arxiv")
-
-        class Search:
-            def __init__(self, query: str, max_results: int, sort_by: Any = None, sort_order: Any = None) -> None:
-                self.query, self.max_results, self.sort_by, self.sort_order = query, max_results, sort_by, sort_order
-
-        class Client:
-            def __init__(self, **kw: Any) -> None:
-                world.clients.append(kw)
-
-            def results(self, search: Search):
-                world.calls.append(search.query)
-                entry = world.table.get(search.query, [])
-                if isinstance(entry, list) and entry and isinstance(entry[0], (Exception, list)):
-                    entry = entry.pop(0)
-                if isinstance(entry, Exception):
-                    raise entry
-                yield from entry
-
-        mod.Search, mod.Client = Search, Client  # type: ignore[attr-defined]
-        mod.SortCriterion = types.SimpleNamespace(SubmittedDate="submitted", Relevance="relevance")  # type: ignore[attr-defined]
-        mod.SortOrder = types.SimpleNamespace(Descending="desc")  # type: ignore[attr-defined]
-        return mod
+    def results(self, query: str, max_results: int, *, sort_by: str = "relevance", page_size: int | None = None,
+                delay_seconds: float = 0.0, retries: int = 2, **_unused: Any):
+        """Stands in for ``legacy_download.arxiv_results``; yields parsed-entry dicts."""
+        self.clients.append({"page_size": page_size, "delay_seconds": delay_seconds, "num_retries": retries,
+                             "sort_by": sort_by, "max_results": max_results})
+        self.calls.append(query)
+        entry = self.table.get(query, [])
+        if isinstance(entry, list) and entry and isinstance(entry[0], (Exception, list)):
+            entry = entry.pop(0)
+        if isinstance(entry, Exception):
+            raise entry
+        for result in entry:
+            yield {"short_id": result.get_short_id(), "pdf_url": result.pdf_url, "doi": result.doi,
+                   "title": result.title, "summary": result.summary,
+                   "year": result.published.year if result.published else None, "published": result.published}
 
     def install(self, monkeypatch: Any) -> ArxivWorld:
-        monkeypatch.setitem(sys.modules, "arxiv", self.module())
+        monkeypatch.setattr("app.modules.commands.harvest_rsoxs.arxiv_results", self.results)
         return self
 
 
 class OpenAlexWorld:
-    """Fake ``pyalex``: ``works[query]`` pages (lists of work dicts) or an exception; ``authors[name]`` records."""
+    """Fake ``Works``/``Authors`` query builders (formerly ``pyalex``): ``works[query]`` pages (lists of work dicts) or an exception; ``authors[name]`` records."""
 
     def __init__(self) -> None:
         self.works: dict[str, Any] = {}
@@ -75,9 +69,8 @@ class OpenAlexWorld:
         self.filters: list[dict[str, Any]] = []
         self.config = types.SimpleNamespace(email=None)
 
-    def module(self) -> types.ModuleType:
+    def module(self) -> types.SimpleNamespace:
         world = self
-        mod = types.ModuleType("pyalex")
 
         class BaseQuery:
             def __init__(self) -> None:
@@ -117,10 +110,16 @@ class OpenAlexWorld:
                 for i in range(0, len(entry), per_page):
                     yield entry[i : i + per_page]
 
-        def works_factory() -> BaseQuery:
+        def works_factory(mailto: str | None = None) -> BaseQuery:
+            if mailto:
+                world.config.email = mailto
             return BaseQuery() if world.no_paginate else PagingQuery()
 
         class Authors:
+            def __init__(self, mailto: str | None = None) -> None:
+                if mailto:
+                    world.config.email = mailto
+
             def search(self, name: str) -> Authors:
                 self.name = name
                 return self
@@ -131,10 +130,7 @@ class OpenAlexWorld:
                     raise entry
                 return entry
 
-        mod.Works = works_factory  # type: ignore[attr-defined]
-        mod.Authors = Authors  # type: ignore[attr-defined]
-        mod.config = world.config  # type: ignore[attr-defined]
-        return mod
+        return types.SimpleNamespace(Works=works_factory, Authors=Authors, config=world.config)
 
     def _by_doi(self, doi: str) -> Any:
         entry = self.by_doi.get(doi)
@@ -143,7 +139,9 @@ class OpenAlexWorld:
         return entry
 
     def install(self, monkeypatch: Any) -> OpenAlexWorld:
-        monkeypatch.setitem(sys.modules, "pyalex", self.module())
+        mod = self.module()
+        monkeypatch.setattr("app.modules.commands.harvest_rsoxs.Works", mod.Works)
+        monkeypatch.setattr("app.modules.commands.harvest_rsoxs.Authors", mod.Authors)
         return self
 
 

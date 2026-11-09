@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import hashlib
 import json
@@ -36,7 +37,7 @@ import os
 from pathlib import Path
 import re
 import time
-from typing import Any
+from typing import Any, Self
 import urllib.parse
 
 from ..resources import resource_root
@@ -48,8 +49,19 @@ Classifier = Callable[[str, str], str]
 REPO_ROOT = resource_root() or Path.cwd()
 
 from ..literature import download_pdfs as dl  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+from ..literature.legacy_download import (
+    ArxivHit,
+    arxiv_results,
+)
 from ..literature.legacy_download import hardened_download_pdf as download_pdf  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
-from ..literature.legacy_download import hardened_get_json
+from ..literature.legacy_download import (
+    hardened_get_bytes,
+    hardened_get_json,
+    openalex_get,
+    openalex_pages,
+    openalex_work,
+    unpaywall_oa_pdfs,
+)
 
 # Same allowlist as download_pdfs / DownloadAgent — keep harvest free of Academy imports.
 RELIABLE_PDF_HOSTS = dl.RELIABLE_PDF_HOSTS
@@ -948,29 +960,24 @@ def search_arxiv(
     classifier: Classifier | None = None,
 ) -> list[dict[str, Any]]:
     """Search arXiv by query (SubmittedDate, newest first); keep classifier A/B hits."""
-    import arxiv
-
     classify = classifier or classify_rsoxs
-    client = arxiv.Client(
-        page_size=min(per_query, 50),
-        delay_seconds=ARXIV_DELAY_SECONDS,
-        num_retries=ARXIV_CLIENT_NUM_RETRIES,
-    )
     merged: list[dict[str, Any]] = []
     seen: set[str] = set()
     for query in queries:
         LOGGER.info("arXiv search %r (SubmittedDate, %d)", query, per_query)
-        search = arxiv.Search(
-            query=query,
-            max_results=per_query,
-            sort_by=arxiv.SortCriterion.SubmittedDate,
-            sort_order=arxiv.SortOrder.Descending,
-        )
         attempt = 0
         while True:
             try:
-                for result in client.results(search):
-                    work = _work_from_arxiv_result(result)
+                for entry in arxiv_results(
+                    query,
+                    per_query,
+                    sort_by="submittedDate",
+                    page_size=min(per_query, 50),
+                    delay_seconds=ARXIV_DELAY_SECONDS,
+                    retries=ARXIV_CLIENT_NUM_RETRIES,
+                    get_bytes=hardened_get_bytes,
+                ):
+                    work = _work_from_arxiv_result(ArxivHit.from_entry(entry))
                     if work is None:
                         continue
                     if classify(work["title"], work["abstract"]) == "C":
@@ -1017,7 +1024,72 @@ def _normalize_openalex_work(
     return work
 
 
-def _paginate_works(query_obj: Any, per_query: int) -> list[dict[str, Any]]:  # noqa: ANN401  # Any: pyalex query object (untyped third-party)
+@dataclass
+class _OpenAlexQuery:
+    """Chainable OpenAlex list query over the hardened helpers (the call shape the pyalex builder had).
+
+    ``search``/``filter`` record the call order (pyalex put them in the URL in that order); ``get`` is one page,
+    ``paginate`` the cursor walk and ``[id]`` a single record. Nothing is requested before ``get``/``paginate``/
+    ``[id]`` is used; the contact address travels as the ``From`` header and ``mailto`` parameter only.
+    """
+
+    endpoint: str
+    mailto: str | None = None
+    _search: str | None = field(default=None, init=False)
+    _filters: dict[str, Any] = field(default_factory=dict, init=False)
+    _search_first: bool = field(default=True, init=False)
+
+    def search(self, text: str) -> Self:
+        """``.search(text)``."""
+        self._search_first = not self._filters
+        self._search = text
+        return self
+
+    def filter(self, **filters: Any) -> Self:  # noqa: A003, ANN401  # Any: nested OpenAlex filter values
+        """``.filter(key=value, ...)``; a nested mapping flattens to ``a.b:value``."""
+        self._filters.update(filters)
+        return self
+
+    def get(self, per_page: int = 25) -> list[dict[str, Any]]:
+        """One page of results."""
+        return openalex_get(
+            self.endpoint,
+            search=self._search,
+            filters=self._filters or None,
+            search_first=self._search_first,
+            per_page=per_page,
+            mailto=self.mailto,
+            get_json=hardened_get_json,
+        )[0]
+
+    def paginate(self, per_page: int = 25) -> Iterable[list[dict[str, Any]]]:
+        """Pages of results following the cursor."""
+        return openalex_pages(
+            endpoint=self.endpoint,
+            search=self._search,
+            filters=self._filters or None,
+            search_first=self._search_first,
+            per_page=per_page,
+            mailto=self.mailto,
+            get_json=hardened_get_json,
+        )
+
+    def __getitem__(self, record_id: str) -> dict[str, Any]:
+        """A single record by id (``works/<id>``)."""
+        return openalex_work(record_id, mailto=self.mailto, get_json=hardened_get_json)
+
+
+def Works(mailto: str | None = None) -> _OpenAlexQuery:  # noqa: N802  # the old pyalex class name
+    """A works query."""
+    return _OpenAlexQuery("works", mailto)
+
+
+def Authors(mailto: str | None = None) -> _OpenAlexQuery:  # noqa: N802  # the old pyalex class name
+    """An authors query."""
+    return _OpenAlexQuery("authors", mailto)
+
+
+def _paginate_works(query_obj: Any, per_query: int) -> list[dict[str, Any]]:  # noqa: ANN401  # Any: an _OpenAlexQuery (or a test double)
     """Fetch up to ``per_query`` OpenAlex works via paginate, falling back to ``get``."""
     results: list[dict[str, Any]] = []
     try:
@@ -1048,11 +1120,6 @@ def search_openalex(
     classifier: Classifier | None = None,
 ) -> list[dict[str, Any]]:
     """Search OpenAlex phrase queries; optionally require OA and a PDF URL."""
-    from pyalex import Works
-    from pyalex import config as pyalex_config
-
-    if mailto:
-        pyalex_config.email = mailto
     merged: list[dict[str, Any]] = []
     seen: set[str] = set()
     seen_titles: set[str] = set()
@@ -1064,14 +1131,14 @@ def search_openalex(
             per_query,
         )
         try:
-            query_obj = Works().search(query)
+            query_obj = Works(mailto).search(query)
             if oa_only:
                 query_obj = query_obj.filter(open_access={"is_oa": True})
             results = _paginate_works(query_obj, per_query)
         except Exception as exc:
             LOGGER.warning("OpenAlex search failed for %r (%s)", query, exc)
             try:
-                results = Works().search(query).get(per_page=min(per_query, 50))
+                results = Works(mailto).search(query).get(per_page=min(per_query, 50))
             except Exception as exc2:
                 LOGGER.warning("OpenAlex fallback failed for %r (%s)", query, exc2)
                 continue
@@ -1120,18 +1187,13 @@ def search_openalex_authors(
     mailto: str | None,
 ) -> list[dict[str, Any]]:
     """OpenAlex author IDs → RSoXS works. Keep hits even without a PDF."""
-    from pyalex import Authors, Works
-    from pyalex import config as pyalex_config
-
-    if mailto:
-        pyalex_config.email = mailto
     merged: list[dict[str, Any]] = []
     seen: set[str] = set()
     phrases = ("RSoXS", '"resonant soft x-ray scattering"', '"11.0.1.2"')
     for name in names:
         LOGGER.info("OpenAlex author search %r", name)
         try:
-            authors = Authors().search(name).get(per_page=25)
+            authors = Authors(mailto).search(name).get(per_page=25)
         except Exception as exc:
             LOGGER.warning("OpenAlex Authors search failed for %r (%s)", name, exc)
             continue
@@ -1144,7 +1206,7 @@ def search_openalex_authors(
             for phrase in phrases:
                 try:
                     query_obj = (
-                        Works()
+                        Works(mailto)
                         .filter(authorships={"author": {"id": aid}})
                         .search(phrase)
                     )
@@ -1496,19 +1558,18 @@ def _arxiv_pdf_urls_for_title(title: str) -> list[str]:
     if not title or len(title) < 12:
         return []
     try:
-        import arxiv
-
         query = f'ti:"{title.split(":")[0].strip()}"'
-        client = arxiv.Client(
+        urls: list[str] = []
+        for result in arxiv_results(
+            query,
+            5,
             page_size=5,
             delay_seconds=ARXIV_DELAY_SECONDS,
-            num_retries=ARXIV_CLIENT_NUM_RETRIES,
-        )
-        search = arxiv.Search(query=query, max_results=5, sort_by=arxiv.SortCriterion.Relevance)
-        urls: list[str] = []
-        for result in client.results(search):
-            if titles_near_duplicate(title, str(result.title or ""), threshold=0.72):
-                pdf = str(result.pdf_url or "").strip()
+            retries=ARXIV_CLIENT_NUM_RETRIES,
+            get_bytes=hardened_get_bytes,
+        ):
+            if titles_near_duplicate(title, str(result["title"] or ""), threshold=0.72):
+                pdf = str(result["pdf_url"] or "").strip()
                 if pdf and _is_reliable_pdf_url(pdf):
                     urls.append(pdf)
         return urls
@@ -1580,19 +1641,14 @@ def _openalex_by_doi_or_title(query: str, mailto: str | None) -> dict[str, Any] 
     work = _crossref_by_doi_or_title(query)
     if work:
         return work
-    from pyalex import Works
-    from pyalex import config as pyalex_config
-
-    if mailto:
-        pyalex_config.email = mailto
     q = (query or "").strip()
     raw = None
     try:
         doi = _canonical_doi(q)
         if doi:
-            raw = Works()[doi]
+            raw = Works(mailto)[doi]
         if raw is None:
-            hits = Works().search(q).get(per_page=5) or []
+            hits = Works(mailto).search(q).get(per_page=5) or []
             for cand in hits:
                 title = str(cand.get("display_name") or cand.get("title") or "")
                 if titles_near_duplicate(q, title, threshold=0.55) or q.lower() in title.lower():
@@ -2232,7 +2288,7 @@ def _resolve_oa_pdfs(
             paper["arxiv_id"] = oa_arxiv
             arxiv_id = oa_arxiv
     if not urls and doi and mailto:
-        upw_urls, upw_sources = dl.fetch_unpaywall_oa_pdfs(str(doi), mailto)
+        upw_urls, upw_sources = unpaywall_oa_pdfs(str(doi), mailto, get_json=hardened_get_json)
         for extra in upw_urls:
             if extra not in urls:
                 urls.append(extra)

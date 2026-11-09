@@ -452,7 +452,10 @@ def test_resolve_oa_pdfs_tries_each_resolver_only_until_it_has_a_url(monkeypatch
     monkeypatch.setattr(hv, "_openalex_oa_urls_for_doi", lambda doi, mailto: ([], None, []))
     for name, urls in {"fetch_unpaywall_oa_pdfs": [], "fetch_osti_oa_pdfs": [], "fetch_core_oa_pdfs": [],
                        "fetch_europepmc_search_oa_pdfs": [], "fetch_crossref_tdm_pdfs": ["https://arxiv.org/pdf/2101.00009"]}.items():
-        monkeypatch.setattr(hv.dl, name, stub(name, urls))
+        if name == "fetch_unpaywall_oa_pdfs":  # Unpaywall now goes through the hardened helper (T17B P1 follow-on)
+            monkeypatch.setattr(hv, "unpaywall_oa_pdfs", stub(name, urls))
+        else:
+            monkeypatch.setattr(hv.dl, name, stub(name, urls))
     paper: dict[str, Any] = {"doi": "https://doi.org/10.1/a"}
     urls, sources = hv._resolve_oa_pdfs(paper, "me@example.org")
     assert urls == ["https://arxiv.org/pdf/2101.00009"] and sources == ["fetch_crossref_tdm_pdfs"]
