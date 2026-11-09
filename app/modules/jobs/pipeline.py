@@ -296,6 +296,9 @@ class StageContext:
         mid-effect: ``reconcile`` (when given) inspects the world and returns the result if the
         effect actually landed; otherwise ``effect`` runs again, which must be idempotent.
         """
+        # Fence first: a run another process took over must learn it here, even when the effect is already
+        # recorded ``done`` (by the new owner) and nothing below would write.
+        self.guard()
         found = self.store.effect(self.job.job_id, self.stage, effect_id)
         if found is not None and found[0] == "done":
             return dict(found[1] or {})
