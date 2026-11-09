@@ -175,6 +175,25 @@ including an empty later page, next page while `start < totalResults`), `parse_a
 | Risks | The classifier prompt and fallback thresholds are behaviour; move them verbatim. `_is_ops_layout_question` is imported from `retrieval_agent` (keep as an injected predicate to avoid `agent_runtime` -> `f2w_agent` imports). |
 | Size | 2-3 days after the design decision. |
 
+**P2 status (owner decision 2026-11-09, fourteenth set: "LangGraph, via agent_runtime.admission").**
+
+- *Orchestrator: done.* The routing logic lives in `app/modules/agent_runtime/routing.py` (prechecks, `_decision`,
+  `validate_decision`, fallback state machine, classifier prompt verbatim, and a compiled LangGraph
+  `plan -> classify -> finalize` graph; no Academy import). The classifier call goes through
+  `agent_runtime/llm_gate.py::AdmittedChat` (budget reservation, admission slot `agent_llm`, bounded
+  `cborg_http.call_with_deadline`); the ledger adapter is `curation/agent_budget.py::LedgerAgentBudget`, attached to
+  the legacy service by `create_api_app` so these calls show in the `budget` block of `/v1/ops/status` and in
+  the cost-control spend. `f2w_agent/orchestrator_agent.py` is now a deprecated thin facade (real module, not a
+  `sys.modules` alias: the legacy hooks it injects cannot be imported from `agent_runtime`, whose import
+  boundary test forbids `app.modules` imports) and no longer subclasses the Academy `Agent`.
+- *Debate: done.* Scoring, index parsing, summary, heuristic fallback, prompt and guard rails live in
+  `app/modules/curation/evidence.py` with a compiled LangGraph `ask -> resolve | fallback` graph (no Academy import);
+  the call goes through the same `AdmittedChat` and `LedgerAgentBudget`. `f2w_agent/debate_agent.py` is a deprecated
+  thin facade (same reason as the orchestrator) with `f2w_agent/admitted_chat.py` holding the shared legacy wiring.
+  Parity: `tests/curation/test_evidence_golden.py` replays 22 recorded cases.
+- Parity: `tests/runtime/test_routing_golden.py` replays 48 recorded fake-model cases (decision, exact prompt, call
+  kwargs, precheck notes) captured from the legacy module before the port.
+
 ### P3. `bl1101_ingest.py` -> `graph/imports/bl1101/`
 
 | | |

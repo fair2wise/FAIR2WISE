@@ -30,6 +30,7 @@ from ...api.origin_gate import OriginGateMiddleware
 from ...api.sessions import TiledSessionStore, install_session_routes
 from ...api.source_text import capture_turn, note_paper_evidence, note_retrieval
 from ...api.upload_limits import LEGACY_MAX_BODY_BYTES, MaxBodySizeMiddleware
+from ..agent_runtime.llm_gate import BudgetPort
 from ..contracts.context import DeploymentProfile, RequestContext
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.json_types import Untyped
@@ -2756,6 +2757,8 @@ class AgentPipelineService:
         self._runtime_key: str | None = None
         #: Personal settings per ALS principal (``PersonalSettingsStore``); ``None`` on :local.
         self.personal_settings: Any | None = None
+        #: Curation budget for the orchestrator's model calls (T17B P2); attached by ``create_api_app``.
+        self.llm_budget: BudgetPort | None = None
         self._rebuild_agents()
         if self.runtime.graph_source == "splash":
             self._sync_session_graph_from_splash()
@@ -2876,11 +2879,13 @@ class AgentPipelineService:
         self.debate = EvidenceDebateAgent(
             backend=self.runtime.backend,
             model=model,
+            budget=self.llm_budget,
         )
         self.orchestrator = WorkflowOrchestratorAgent(
             backend=self.runtime.backend,
             model=model,
             max_steps=getattr(self.cfg, "max_orchestration_steps", 12),
+            budget=self.llm_budget,
         )
         self.paper_evidence = PaperEvidenceAgent(
             backend=self.runtime.backend,
@@ -3362,6 +3367,11 @@ class AgentPipelineService:
         if kg is None:
             return GraphPayload(nodes=[], edges=[], source_path=TILED_SOURCE_PATH)
         return graph_neighborhood_from_lookup(kg, node_id, hops)
+
+    def attach_llm_budget(self, budget: BudgetPort) -> None:
+        """Count the orchestrator's and debate's model calls against the curation budget (``BudgetPort``; T17B P2)."""
+        self.llm_budget = budget
+        self._rebuild_agents()
 
     def attach_tiled_save(self, target: SaveTarget) -> None:
         """Route the UI Save to a journaled multi-write on Tiled and the session graph to the effective record.
