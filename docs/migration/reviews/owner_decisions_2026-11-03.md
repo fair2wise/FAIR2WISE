@@ -156,3 +156,12 @@ not the other": confirmed (the plan's scope was e2e_demo only and bl1101's recor
 | Question | Owner answer |
 |---|---|
 | UI: pending approvals | "I think we need another page in the UI left side bar for \"Pending Approvals\" that show up in :local mode and in the :als-dev and :als-prod images when an admin is logged in" (read as: a new sidebar page listing the items awaiting a human approval, visible on `:local` to the local operator and on the ALS images only to a signed-in admin; approvals go through the existing approval routes and role checks, never a new approval path) |
+
+## Seventeenth set (2026-11-09)
+
+| Question | Owner answer |
+|---|---|
+| CONFLICT retryability default (audit `reviews/H5/conflict_retryability.md`) | "Flip the default (Recommended)" (CONFLICT non-retryable by default; the transient sites marked `retryable=True` explicitly; AST guard kept) |
+| bl1101 `fetch.py` on the hardened getter (P3 gated item 1) | "Yes, move to hardened getter (Recommended)" (the two retained tests are rewritten to fake the hardened getter) |
+| bl1101 snapshot writer for new versions (P3 gated item 2) | "Standard create_snapshot from v10 on (Recommended)" (v1-v9 bytes stay identical) |
+| P2 budget accounting (flat 0.05 USD reservation; cost-control enabled switch) | "we should only allow free models via CBORG at the moment. We get 50 free usage credits per month (mileage varies per model) on CBORG, so I want to avoid using those" (read as a model policy: every CBORG call path accepts only the free LBL-hosted model ids and refuses any other id with a typed error; model pickers show only free ids; LLM use by the chat helper agents is minimised, with the deterministic path as the default and model calls opt-in; the flat reservation and the enabled switch stay as implemented) |
