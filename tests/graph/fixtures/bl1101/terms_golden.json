@@ -1,0 +1,2264 @@
+{
+ "beamline_seed": {
+  "id": "beamline:BL-11-0-1-2",
+  "id_prefix": "beamline",
+  "term": "ALS Beamline 11.0.1.2",
+  "name": "ALS Beamline 11.0.1.2",
+  "category": "Beamline",
+  "definition": "ALS Beamline 11.0.1.2, resonant soft X-ray scattering (RSoXS) with a reflectometer endstation. Source EPU5; photon energy 165–1,500 eV. ALS public range 165–1,500 eV. Blueprint beam note: ~200–1500 eV. Polarization is user selectable; linear polarization continuously variable from horizontal to vertical; left and right elliptical (or circular) polarization. Spot size = 100 μm diameter. Field of view/spatial resolution = down to 2 nm resolution. Sample information: Polymer thin films, solid thin films, vacuum compatible liquid cell. Other notes: High vacuum, heating. Flux 10 13 photons/s/0.1%BW at 800 eV; resolving power 4000 at 800 eV. Blueprint: BL 11.0.1.2 RSOXS · Reflectometer endstation · device blueprint (2026-09-09).",
+  "source_papers": [
+   "als-src",
+   "bp-src"
+  ],
+  "type": "beamline:Beamline",
+  "relations": [
+   {
+    "relation": "hasEndstation",
+    "related_term": "beamline:Endstation-Reflectometer",
+    "related_id": "beamline:Endstation-Reflectometer",
+    "evidence": [
+     "bp-src"
+    ]
+   },
+   {
+    "relation": "hasDetector",
+    "related_term": "beamline:Detector-AXIS-SXR-40",
+    "related_id": "beamline:Detector-AXIS-SXR-40",
+    "evidence": [
+     "bp-src"
+    ]
+   },
+   {
+    "relation": "runsSoftware",
+    "related_term": "beamline:Software-Bluesky",
+    "related_id": "beamline:Software-Bluesky",
+    "evidence": [
+     "ops stack"
+    ]
+   },
+   {
+    "relation": "runsSoftware",
+    "related_term": "beamline:Software-ophyd-async",
+    "related_id": "beamline:Software-ophyd-async",
+    "evidence": [
+     "ops stack"
+    ]
+   },
+   {
+    "relation": "runsSoftware",
+    "related_term": "beamline:Software-EPICS",
+    "related_id": "beamline:Software-EPICS",
+    "evidence": [
+     "ops stack"
+    ]
+   },
+   {
+    "relation": "runsSoftware",
+    "related_term": "beamline:Software-LabVIEW",
+    "related_id": "beamline:Software-LabVIEW",
+    "evidence": [
+     "ops stack"
+    ]
+   },
+   {
+    "relation": "runsSoftware",
+    "related_term": "beamline:Software-Finch",
+    "related_id": "beamline:Software-Finch",
+    "evidence": [
+     "ops stack"
+    ]
+   },
+   {
+    "relation": "runsSoftware",
+    "related_term": "beamline:Software-Tiled",
+    "related_id": "beamline:Software-Tiled",
+    "evidence": [
+     "ops stack"
+    ]
+   },
+   {
+    "relation": "runsSoftware",
+    "related_term": "beamline:Software-Queue-Server",
+    "related_id": "beamline:Software-Queue-Server",
+    "evidence": [
+     "ops stack"
+    ]
+   },
+   {
+    "relation": "usesTechnique",
+    "related_term": "beamline:technique-RSoXS",
+    "related_id": "beamline:technique-RSoXS",
+    "evidence": [
+     "als-src"
+    ]
+   },
+   {
+    "relation": "usesTechnique",
+    "related_term": "beamline:technique-SAXS",
+    "related_id": "beamline:technique-SAXS",
+    "evidence": [
+     "als-src"
+    ]
+   },
+   {
+    "relation": "usesTechnique",
+    "related_term": "beamline:technique-WAXS",
+    "related_id": "beamline:technique-WAXS",
+    "evidence": [
+     "als-src"
+    ]
+   },
+   {
+    "relation": "usesTechnique",
+    "related_term": "beamline:technique-GISAXS",
+    "related_id": "beamline:technique-GISAXS",
+    "evidence": [
+     "als-src"
+    ]
+   },
+   {
+    "relation": "usesTechnique",
+    "related_term": "beamline:technique-XAS",
+    "related_id": "beamline:technique-XAS",
+    "evidence": [
+     "als-src"
+    ]
+   },
+   {
+    "relation": "usesTechnique",
+    "related_term": "beamline:technique-Resonant-scattering",
+    "related_id": "beamline:technique-Resonant-scattering",
+    "evidence": [
+     "als-src"
+    ]
+   },
+   {
+    "relation": "usesTechnique",
+    "related_term": "beamline:technique-Magnetic-scattering",
+    "related_id": "beamline:technique-Magnetic-scattering",
+    "evidence": [
+     "als-src"
+    ]
+   },
+   {
+    "relation": "supportsGeometry",
+    "related_term": "beamline:ScatteringGeometry-transmission",
+    "related_id": "beamline:ScatteringGeometry-transmission",
+    "evidence": [
+     "als-src"
+    ]
+   },
+   {
+    "relation": "supportsGeometry",
+    "related_term": "beamline:ScatteringGeometry-grazing-incidence",
+    "related_id": "beamline:ScatteringGeometry-grazing-incidence",
+    "evidence": [
+     "als-src"
+    ]
+   },
+   {
+    "relation": "supportsGeometry",
+    "related_term": "beamline:ScatteringGeometry-reflectivity",
+    "related_id": "beamline:ScatteringGeometry-reflectivity",
+    "evidence": [
+     "als-src"
+    ]
+   },
+   {
+    "relation": "related_to",
+    "related_term": "beamline:PhotonEnergy-soft-xray",
+    "related_id": "beamline:PhotonEnergy-soft-xray",
+    "evidence": [
+     "als-src"
+    ]
+   },
+   {
+    "relation": "related_to",
+    "related_term": "beamline:Polarization-linear-polarization",
+    "related_id": "beamline:Polarization-linear-polarization",
+    "evidence": [
+     "als-src"
+    ]
+   },
+   {
+    "relation": "related_to",
+    "related_term": "beamline:Polarization-left-circular-polarization",
+    "related_id": "beamline:Polarization-left-circular-polarization",
+    "evidence": [
+     "als-src"
+    ]
+   },
+   {
+    "relation": "related_to",
+    "related_term": "beamline:Polarization-right-circular-polarization",
+    "related_id": "beamline:Polarization-right-circular-polarization",
+    "evidence": [
+     "als-src"
+    ]
+   }
+  ]
+ },
+ "software_catalog": [
+  {
+   "id": "beamline:Software-Bluesky",
+   "id_prefix": "beamline",
+   "term": "Bluesky",
+   "name": "Bluesky",
+   "category": "Software",
+   "definition": "Bluesky RunEngine / queueserver plans for BL 11.0.1.2.",
+   "source_papers": [
+    "catalog:Bluesky"
+   ],
+   "type": "beamline:Software",
+   "relations": []
+  },
+  {
+   "id": "beamline:Software-ophyd-async",
+   "id_prefix": "beamline",
+   "term": "ophyd-async",
+   "name": "ophyd-async",
+   "category": "Software",
+   "definition": "ophyd-async device layer (sim-ophyd and real IOC devices).",
+   "source_papers": [
+    "catalog:ophyd-async"
+   ],
+   "type": "beamline:Software",
+   "relations": []
+  },
+  {
+   "id": "beamline:Software-EPICS",
+   "id_prefix": "beamline",
+   "term": "EPICS",
+   "name": "EPICS",
+   "category": "Software",
+   "definition": "EPICS IOCs and process variables (SIM11012: prefix in the virtual beamline).",
+   "source_papers": [
+    "catalog:EPICS"
+   ],
+   "type": "beamline:Software",
+   "relations": []
+  },
+  {
+   "id": "beamline:Software-LabVIEW",
+   "id_prefix": "beamline",
+   "term": "LabVIEW",
+   "name": "LabVIEW",
+   "category": "Software",
+   "definition": "Legacy LabVIEW controls (lv-config Motor/AI/DIO Setup.json) that the sims reproduce.",
+   "source_papers": [
+    "catalog:LabVIEW"
+   ],
+   "type": "beamline:Software",
+   "relations": []
+  },
+  {
+   "id": "beamline:Software-Finch",
+   "id_prefix": "beamline",
+   "term": "Finch",
+   "name": "Finch",
+   "category": "Software",
+   "definition": "React component library for Bluesky beamline UIs.",
+   "source_papers": [
+    "catalog:Finch"
+   ],
+   "type": "beamline:Software",
+   "relations": []
+  },
+  {
+   "id": "beamline:Software-Tiled",
+   "id_prefix": "beamline",
+   "term": "Tiled",
+   "name": "Tiled",
+   "category": "Software",
+   "definition": "Tiled data service for scan documents (README-only ingest of the ALS fork).",
+   "source_papers": [
+    "catalog:Tiled"
+   ],
+   "type": "beamline:Software",
+   "relations": []
+  },
+  {
+   "id": "beamline:Software-Queue-Server",
+   "id_prefix": "beamline",
+   "term": "Queue-Server",
+   "name": "Queue-Server",
+   "category": "Software",
+   "definition": "Bluesky queueserver HTTP API used by Finch.",
+   "source_papers": [
+    "catalog:Queue-Server"
+   ],
+   "type": "beamline:Software",
+   "relations": []
+  },
+  {
+   "id": "beamline:Software-ADAxisSXR40",
+   "id_prefix": "beamline",
+   "term": "ADAxisSXR40",
+   "name": "ADAxisSXR40",
+   "category": "Software",
+   "definition": "EPICS areaDetector driver for the AXIS-SXR-40 (Tucsen Dhyana XFXV4040BSI).",
+   "source_papers": [
+    "catalog:ADAxisSXR40"
+   ],
+   "type": "beamline:Software",
+   "relations": []
+  },
+  {
+   "id": "beamline:Software-splash-tiled",
+   "id_prefix": "beamline",
+   "term": "splash_tiled",
+   "name": "splash_tiled",
+   "category": "Software",
+   "definition": "Splash-on-Tiled graph service used with FAIR2WISE graphs.",
+   "source_papers": [
+    "catalog:splash_tiled"
+   ],
+   "type": "beamline:Software",
+   "relations": []
+  },
+  {
+   "id": "beamline:Software-als-computing-hub",
+   "id_prefix": "beamline",
+   "term": "als_computing_hub",
+   "name": "als_computing_hub",
+   "category": "Software",
+   "definition": "ALS Computing hub documentation for supporting services.",
+   "source_papers": [
+    "catalog:als_computing_hub"
+   ],
+   "type": "beamline:Software",
+   "relations": []
+  }
+ ],
+ "terms_from_als": [
+  {
+   "id": "beamline:technique-RSoXS",
+   "id_prefix": "beamline",
+   "term": "RSoXS",
+   "name": "RSoXS",
+   "category": "ExperimentalTechnique",
+   "definition": "Resonant soft X-ray scattering; primary technique at BL 11.0.1.2.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:ExperimentalTechnique",
+   "relations": [
+    {
+     "relation": "part_of",
+     "related_term": "beamline:BL-11-0-1-2",
+     "related_id": "beamline:BL-11-0-1-2",
+     "evidence": [
+      "als-src"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "beamline:technique-SAXS",
+   "id_prefix": "beamline",
+   "term": "SAXS",
+   "name": "SAXS",
+   "category": "ExperimentalTechnique",
+   "definition": "Small-angle X-ray scattering listed on the ALS 11.0.1.2 page.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:ExperimentalTechnique",
+   "relations": [
+    {
+     "relation": "part_of",
+     "related_term": "beamline:BL-11-0-1-2",
+     "related_id": "beamline:BL-11-0-1-2",
+     "evidence": [
+      "als-src"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "beamline:technique-WAXS",
+   "id_prefix": "beamline",
+   "term": "WAXS",
+   "name": "WAXS",
+   "category": "ExperimentalTechnique",
+   "definition": "Wide-angle X-ray scattering listed on the ALS 11.0.1.2 page.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:ExperimentalTechnique",
+   "relations": [
+    {
+     "relation": "part_of",
+     "related_term": "beamline:BL-11-0-1-2",
+     "related_id": "beamline:BL-11-0-1-2",
+     "evidence": [
+      "als-src"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "beamline:technique-GISAXS",
+   "id_prefix": "beamline",
+   "term": "GISAXS",
+   "name": "GISAXS",
+   "category": "ExperimentalTechnique",
+   "definition": "Grazing-incidence SAXS/WAXS listed on the ALS 11.0.1.2 page.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:ExperimentalTechnique",
+   "relations": [
+    {
+     "relation": "part_of",
+     "related_term": "beamline:BL-11-0-1-2",
+     "related_id": "beamline:BL-11-0-1-2",
+     "evidence": [
+      "als-src"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "beamline:technique-XAS",
+   "id_prefix": "beamline",
+   "term": "XAS",
+   "name": "XAS",
+   "category": "ExperimentalTechnique",
+   "definition": "X-ray absorption spectroscopy listed on the ALS 11.0.1.2 page.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:ExperimentalTechnique",
+   "relations": [
+    {
+     "relation": "part_of",
+     "related_term": "beamline:BL-11-0-1-2",
+     "related_id": "beamline:BL-11-0-1-2",
+     "evidence": [
+      "als-src"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "beamline:technique-Resonant-scattering",
+   "id_prefix": "beamline",
+   "term": "Resonant scattering",
+   "name": "Resonant scattering",
+   "category": "ExperimentalTechnique",
+   "definition": "Resonant scattering listed under technique category.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:ExperimentalTechnique",
+   "relations": [
+    {
+     "relation": "part_of",
+     "related_term": "beamline:BL-11-0-1-2",
+     "related_id": "beamline:BL-11-0-1-2",
+     "evidence": [
+      "als-src"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "beamline:technique-Magnetic-scattering",
+   "id_prefix": "beamline",
+   "term": "Magnetic scattering",
+   "name": "Magnetic scattering",
+   "category": "ExperimentalTechnique",
+   "definition": "Magnetic scattering listed on the ALS 11.0.1.2 page.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:ExperimentalTechnique",
+   "relations": [
+    {
+     "relation": "part_of",
+     "related_term": "beamline:BL-11-0-1-2",
+     "related_id": "beamline:BL-11-0-1-2",
+     "evidence": [
+      "als-src"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "beamline:Polarization-linear-polarization",
+   "id_prefix": "beamline",
+   "term": "linear polarization",
+   "name": "linear polarization",
+   "category": "Polarization",
+   "definition": "Linear polarization continuously variable from horizontal to vertical.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:Polarization",
+   "relations": []
+  },
+  {
+   "id": "beamline:Polarization-left-circular-polarization",
+   "id_prefix": "beamline",
+   "term": "left circular polarization",
+   "name": "left circular polarization",
+   "category": "Polarization",
+   "definition": "Left elliptical / circular polarization, user selectable.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:Polarization",
+   "relations": []
+  },
+  {
+   "id": "beamline:Polarization-right-circular-polarization",
+   "id_prefix": "beamline",
+   "term": "right circular polarization",
+   "name": "right circular polarization",
+   "category": "Polarization",
+   "definition": "Right elliptical / circular polarization, user selectable.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:Polarization",
+   "relations": []
+  },
+  {
+   "id": "beamline:ScatteringGeometry-transmission",
+   "id_prefix": "beamline",
+   "term": "transmission",
+   "name": "transmission",
+   "category": "ScatteringGeometry",
+   "definition": "Transmission scattering geometry used for polymer thin films.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:ScatteringGeometry",
+   "relations": []
+  },
+  {
+   "id": "beamline:ScatteringGeometry-grazing-incidence",
+   "id_prefix": "beamline",
+   "term": "grazing incidence",
+   "name": "grazing incidence",
+   "category": "ScatteringGeometry",
+   "definition": "Grazing-incidence SAXS/WAXS geometry listed by ALS.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:ScatteringGeometry",
+   "relations": []
+  },
+  {
+   "id": "beamline:ScatteringGeometry-reflectivity",
+   "id_prefix": "beamline",
+   "term": "reflectivity",
+   "name": "reflectivity",
+   "category": "ScatteringGeometry",
+   "definition": "Reflectometer endstation supports reflectivity / reflectometry.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:ScatteringGeometry",
+   "relations": []
+  },
+  {
+   "id": "beamline:AbsorptionEdge-C-K-edge",
+   "id_prefix": "beamline",
+   "term": "C K-edge",
+   "name": "C K-edge",
+   "category": "AbsorptionEdge",
+   "definition": "Carbon K-edge falls in the beamline soft X-ray range.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:AbsorptionEdge",
+   "relations": []
+  },
+  {
+   "id": "beamline:AbsorptionEdge-N-K-edge",
+   "id_prefix": "beamline",
+   "term": "N K-edge",
+   "name": "N K-edge",
+   "category": "AbsorptionEdge",
+   "definition": "Nitrogen K-edge falls in the beamline soft X-ray range.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:AbsorptionEdge",
+   "relations": []
+  },
+  {
+   "id": "beamline:AbsorptionEdge-O-K-edge",
+   "id_prefix": "beamline",
+   "term": "O K-edge",
+   "name": "O K-edge",
+   "category": "AbsorptionEdge",
+   "definition": "Oxygen K-edge falls in the beamline soft X-ray range.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:AbsorptionEdge",
+   "relations": []
+  },
+  {
+   "id": "beamline:Sample-polymer-thin-films",
+   "id_prefix": "beamline",
+   "term": "polymer thin films",
+   "name": "polymer thin films",
+   "category": "Sample",
+   "definition": "Sample class listed by ALS: polymer thin films.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:Sample",
+   "relations": []
+  },
+  {
+   "id": "beamline:Sample-solid-thin-films",
+   "id_prefix": "beamline",
+   "term": "solid thin films",
+   "name": "solid thin films",
+   "category": "Sample",
+   "definition": "Sample class listed by ALS: solid thin films.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:Sample",
+   "relations": []
+  },
+  {
+   "id": "beamline:Sample-vacuum-compatible-liquid-cell",
+   "id_prefix": "beamline",
+   "term": "vacuum compatible liquid cell",
+   "name": "vacuum compatible liquid cell",
+   "category": "Sample",
+   "definition": "Sample class listed by ALS: vacuum compatible liquid cell.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:Sample",
+   "relations": []
+  },
+  {
+   "id": "beamline:PhotonEnergy-soft-xray",
+   "id_prefix": "beamline",
+   "term": "Photon energy 165–1,500 eV",
+   "name": "Photon energy 165–1,500 eV",
+   "category": "PhotonEnergy",
+   "definition": "ALS public range 165–1,500 eV. Blueprint reports ~200–1500 eV, E/ΔE 4000 at 800 eV. Polarization is user selectable; linear polarization continuously variable from horizontal to vertical; left and right elliptical (or circular) polarization. Spot size = 100 μm diameter. Field of view/spatial resolution = down to 2 nm resolution. Sample information: Polymer thin films, solid thin films, vacuum compatible liquid cell. Other notes: High vacuum, heating.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:PhotonEnergy",
+   "relations": [],
+   "photon_energy_eV": {
+    "min": 165,
+    "max": 1500
+   }
+  },
+  {
+   "id": "beamline:source-EPU5",
+   "id_prefix": "beamline",
+   "term": "EPU5",
+   "name": "EPU5",
+   "category": "BeamlineStage",
+   "definition": "Insertion device / source listed by ALS as EPU5. Contacts: Cheng Wang cwang2@lbl.gov 510-486-4082 Thomas Ferron TJFerron@lbl.gov 510-486-4957.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:BeamlineStage",
+   "relations": []
+  }
+ ],
+ "terms_from_blueprint": {
+  "__sha256__": "54ca8bc53b32dadda76898dd3849a63895244a8e682b5fe4596f3c26e6d3b548"
+ },
+ "terms_from_people": [
+  {
+   "id": "beamline:Role-BeamlineScientist",
+   "id_prefix": "beamline",
+   "term": "Beamline scientist",
+   "name": "Beamline scientist",
+   "category": "BeamlineScientist",
+   "definition": "Documented scientific contact / beamline scientist role for ALS 11.0.1.2.",
+   "source_papers": [
+    "als-src"
+   ],
+   "type": "beamline:BeamlineScientist",
+   "relations": [],
+   "source_url": "https://als.lbl.gov/beamlines/11-0-1-2/"
+  },
+  {
+   "id": "beamline:Person-Cheng-Wang",
+   "id_prefix": "beamline",
+   "term": "Cheng Wang",
+   "name": "Cheng Wang",
+   "category": "Person",
+   "definition": "Cheng Wang is a documented 11.0.1.2 contact (BeamlineScientist). Source: https://als.lbl.gov/beamlines/11-0-1-2/. Email listed on the ALS page: cwang2@lbl.gov.",
+   "source_papers": [
+    "https://als.lbl.gov/beamlines/11-0-1-2/",
+    "bp-src"
+   ],
+   "type": "beamline:Person",
+   "relations": [
+    {
+     "relation": "hasRole",
+     "related_term": "beamline:Role-BeamlineScientist",
+     "related_id": "beamline:Role-BeamlineScientist",
+     "evidence": [
+      "ALS primary contact: Cheng Wang cwang2@lbl.gov 510-486-4082 Thomas Ferron TJFerron@lbl.gov 510-486-4957"
+     ]
+    },
+    {
+     "relation": "supports",
+     "related_term": "beamline:BL-11-0-1-2",
+     "related_id": "beamline:BL-11-0-1-2",
+     "evidence": [
+      "ALS primary contact: Cheng Wang cwang2@lbl.gov 510-486-4082 Thomas Ferron TJFerron@lbl.gov 510-486-4957"
+     ]
+    }
+   ],
+   "source_url": "https://als.lbl.gov/beamlines/11-0-1-2/",
+   "email": "cwang2@lbl.gov",
+   "role": "BeamlineScientist"
+  },
+  {
+   "id": "beamline:Person-Thomas-Ferron",
+   "id_prefix": "beamline",
+   "term": "Thomas Ferron",
+   "name": "Thomas Ferron",
+   "category": "Person",
+   "definition": "Thomas Ferron is a documented 11.0.1.2 contact (BeamlineScientist). Source: https://als.lbl.gov/beamlines/11-0-1-2/. Email listed on the ALS page: TJFerron@lbl.gov.",
+   "source_papers": [
+    "https://als.lbl.gov/beamlines/11-0-1-2/",
+    "bp-src"
+   ],
+   "type": "beamline:Person",
+   "relations": [
+    {
+     "relation": "hasRole",
+     "related_term": "beamline:Role-BeamlineScientist",
+     "related_id": "beamline:Role-BeamlineScientist",
+     "evidence": [
+      "ALS primary contact: Cheng Wang cwang2@lbl.gov 510-486-4082 Thomas Ferron TJFerron@lbl.gov 510-486-4957"
+     ]
+    },
+    {
+     "relation": "supports",
+     "related_term": "beamline:BL-11-0-1-2",
+     "related_id": "beamline:BL-11-0-1-2",
+     "evidence": [
+      "ALS primary contact: Cheng Wang cwang2@lbl.gov 510-486-4082 Thomas Ferron TJFerron@lbl.gov 510-486-4957"
+     ]
+    }
+   ],
+   "source_url": "https://als.lbl.gov/beamlines/11-0-1-2/",
+   "email": "TJFerron@lbl.gov",
+   "role": "BeamlineScientist"
+  }
+ ],
+ "make_term": [
+  {
+   "id": "beamline:t",
+   "id_prefix": "beamline",
+   "term": "T",
+   "name": "T",
+   "category": "Motor",
+   "definition": "d",
+   "source_papers": [
+    "src"
+   ],
+   "type": "beamline:Motor",
+   "relations": [
+    {
+     "relation": "partOf",
+     "related_term": "beamline:u",
+     "related_id": "beamline:u",
+     "evidence": [
+      "ev"
+     ]
+    }
+   ],
+   "synonyms": [
+    "a"
+   ]
+  },
+  {
+   "relation": "b",
+   "related_term": "c",
+   "related_id": "c"
+  }
+ ],
+ "attach_repo_terms": {
+  "__sha256__": "8f06955ee4367c9b201b51aa3c39fad079fd3a6c95716ec044fbbad2e8296b8c"
+ },
+ "merge_terms": {
+  "__sha256__": "22dd5dbf075ca9af85229451e221864befe8f550ac8918940ceb1d80ff54bf25"
+ },
+ "motor_map_keys": [
+  "aliases",
+  "leave_on_beamline",
+  "motors",
+  "path",
+  "source",
+  "version"
+ ],
+ "motor_map_version": 4,
+ "ingest_records": {
+  "__sha256__": "f2572943f5f96c31b54ea515e6c64b544eca9eb27d962a48df7aef8c8497c460"
+ },
+ "records_to_graph": {
+  "__sha256__": "523821bc06695d64c06fdd7bb5667ba917396cf55f9f3fa4bcc0d5b0cb5a4274"
+ },
+ "sort_graph_of_shuffled": {
+  "__sha256__": "523821bc06695d64c06fdd7bb5667ba917396cf55f9f3fa4bcc0d5b0cb5a4274"
+ },
+ "ingest_fixture": {
+  "terms": [
+   {
+    "id": "beamline:AbsorptionEdge-C-K-edge",
+    "id_prefix": "beamline",
+    "term": "C K-edge",
+    "name": "C K-edge",
+    "category": "AbsorptionEdge",
+    "definition": "Carbon K-edge falls in the beamline soft X-ray range.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:AbsorptionEdge",
+    "relations": []
+   },
+   {
+    "id": "beamline:AbsorptionEdge-N-K-edge",
+    "id_prefix": "beamline",
+    "term": "N K-edge",
+    "name": "N K-edge",
+    "category": "AbsorptionEdge",
+    "definition": "Nitrogen K-edge falls in the beamline soft X-ray range.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:AbsorptionEdge",
+    "relations": []
+   },
+   {
+    "id": "beamline:AbsorptionEdge-O-K-edge",
+    "id_prefix": "beamline",
+    "term": "O K-edge",
+    "name": "O K-edge",
+    "category": "AbsorptionEdge",
+    "definition": "Oxygen K-edge falls in the beamline soft X-ray range.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:AbsorptionEdge",
+    "relations": []
+   },
+   {
+    "id": "beamline:BL-11-0-1-2",
+    "id_prefix": "beamline",
+    "term": "ALS Beamline 11.0.1.2",
+    "name": "ALS Beamline 11.0.1.2",
+    "category": "Beamline",
+    "definition": "ALS Beamline 11.0.1.2, resonant soft X-ray scattering (RSoXS) with a reflectometer endstation. Source EPU5; photon energy 165–1,500 eV. ALS public range 165–1,500 eV. Blueprint reports ~200–1500 eV, E/ΔE 4000 at 800 eV. Polarization is user selectable; linear polarization continuously variable from horizontal to vertical; left and right elliptical (or circular) polarization. Spot size = 100 μm diameter. Field of view/spatial resolution = down to 2 nm resolution. Sample information: Polymer thin films, solid thin films, vacuum compatible liquid cell. Other notes: High vacuum, heating. Flux 10 13 photons/s/0.1%BW at 800 eV; resolving power 4000 at 800 eV. Blueprint:  ().",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2",
+     "blueprint_bl11012_version09092026.html"
+    ],
+    "type": "beamline:Beamline",
+    "relations": [
+     {
+      "relation": "hasEndstation",
+      "related_term": "beamline:Endstation-Reflectometer",
+      "related_id": "beamline:Endstation-Reflectometer",
+      "evidence": [
+       "blueprint_bl11012_version09092026.html"
+      ]
+     },
+     {
+      "relation": "hasDetector",
+      "related_term": "beamline:Detector-AXIS-SXR-40",
+      "related_id": "beamline:Detector-AXIS-SXR-40",
+      "evidence": [
+       "blueprint_bl11012_version09092026.html"
+      ]
+     },
+     {
+      "relation": "runsSoftware",
+      "related_term": "beamline:Software-Bluesky",
+      "related_id": "beamline:Software-Bluesky",
+      "evidence": [
+       "ops stack"
+      ]
+     },
+     {
+      "relation": "runsSoftware",
+      "related_term": "beamline:Software-ophyd-async",
+      "related_id": "beamline:Software-ophyd-async",
+      "evidence": [
+       "ops stack"
+      ]
+     },
+     {
+      "relation": "runsSoftware",
+      "related_term": "beamline:Software-EPICS",
+      "related_id": "beamline:Software-EPICS",
+      "evidence": [
+       "ops stack"
+      ]
+     },
+     {
+      "relation": "runsSoftware",
+      "related_term": "beamline:Software-LabVIEW",
+      "related_id": "beamline:Software-LabVIEW",
+      "evidence": [
+       "ops stack"
+      ]
+     },
+     {
+      "relation": "runsSoftware",
+      "related_term": "beamline:Software-Finch",
+      "related_id": "beamline:Software-Finch",
+      "evidence": [
+       "ops stack"
+      ]
+     },
+     {
+      "relation": "runsSoftware",
+      "related_term": "beamline:Software-Tiled",
+      "related_id": "beamline:Software-Tiled",
+      "evidence": [
+       "ops stack"
+      ]
+     },
+     {
+      "relation": "runsSoftware",
+      "related_term": "beamline:Software-Queue-Server",
+      "related_id": "beamline:Software-Queue-Server",
+      "evidence": [
+       "ops stack"
+      ]
+     },
+     {
+      "relation": "usesTechnique",
+      "related_term": "beamline:technique-RSoXS",
+      "related_id": "beamline:technique-RSoXS",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     },
+     {
+      "relation": "usesTechnique",
+      "related_term": "beamline:technique-SAXS",
+      "related_id": "beamline:technique-SAXS",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     },
+     {
+      "relation": "usesTechnique",
+      "related_term": "beamline:technique-WAXS",
+      "related_id": "beamline:technique-WAXS",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     },
+     {
+      "relation": "usesTechnique",
+      "related_term": "beamline:technique-GISAXS",
+      "related_id": "beamline:technique-GISAXS",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     },
+     {
+      "relation": "usesTechnique",
+      "related_term": "beamline:technique-XAS",
+      "related_id": "beamline:technique-XAS",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     },
+     {
+      "relation": "usesTechnique",
+      "related_term": "beamline:technique-Resonant-scattering",
+      "related_id": "beamline:technique-Resonant-scattering",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     },
+     {
+      "relation": "usesTechnique",
+      "related_term": "beamline:technique-Magnetic-scattering",
+      "related_id": "beamline:technique-Magnetic-scattering",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     },
+     {
+      "relation": "supportsGeometry",
+      "related_term": "beamline:ScatteringGeometry-transmission",
+      "related_id": "beamline:ScatteringGeometry-transmission",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     },
+     {
+      "relation": "supportsGeometry",
+      "related_term": "beamline:ScatteringGeometry-grazing-incidence",
+      "related_id": "beamline:ScatteringGeometry-grazing-incidence",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     },
+     {
+      "relation": "supportsGeometry",
+      "related_term": "beamline:ScatteringGeometry-reflectivity",
+      "related_id": "beamline:ScatteringGeometry-reflectivity",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     },
+     {
+      "relation": "related_to",
+      "related_term": "beamline:PhotonEnergy-soft-xray",
+      "related_id": "beamline:PhotonEnergy-soft-xray",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     },
+     {
+      "relation": "related_to",
+      "related_term": "beamline:Polarization-linear-polarization",
+      "related_id": "beamline:Polarization-linear-polarization",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     },
+     {
+      "relation": "related_to",
+      "related_term": "beamline:Polarization-left-circular-polarization",
+      "related_id": "beamline:Polarization-left-circular-polarization",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     },
+     {
+      "relation": "related_to",
+      "related_term": "beamline:Polarization-right-circular-polarization",
+      "related_id": "beamline:Polarization-right-circular-polarization",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     },
+     {
+      "relation": "hasDetector",
+      "related_term": "beamline:Detector-AXIS-SXR-40",
+      "related_id": "beamline:Detector-AXIS-SXR-40",
+      "evidence": [
+       "blueprint_bl11012_version09092026.html"
+      ]
+     },
+     {
+      "relation": "hasDetector",
+      "related_term": "beamline:ophyd-AreaDetectorCCD",
+      "related_id": "beamline:ophyd-AreaDetectorCCD",
+      "evidence": [
+       "blueprint_bl11012_version09092026.html"
+      ]
+     },
+     {
+      "relation": "implementsPlan",
+      "related_term": "beamline:ophyd-ScanPlan",
+      "related_id": "beamline:ophyd-ScanPlan",
+      "evidence": [
+       "bluesky plans"
+      ]
+     },
+     {
+      "relation": "implementsPlan",
+      "related_term": "beamline:plan-rsoxs-run",
+      "related_id": "beamline:plan-rsoxs-run",
+      "evidence": [
+       "bluesky plans"
+      ]
+     },
+     {
+      "relation": "implementsPlan",
+      "related_term": "beamline:plan-rel-scan",
+      "related_id": "beamline:plan-rel-scan",
+      "evidence": [
+       "bluesky plans"
+      ]
+     },
+     {
+      "relation": "implementsPlan",
+      "related_term": "beamline:plan-count",
+      "related_id": "beamline:plan-count",
+      "evidence": [
+       "bluesky plans"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "beamline:Detector-AXIS-SXR-40",
+    "id_prefix": "beamline",
+    "term": "AXIS-SXR-40",
+    "name": "AXIS-SXR-40",
+    "category": "Detector",
+    "definition": "Area detector at BL 11.0.1.2 (Tucsen Dhyana XFXV4040BSI in AXIS-SXR-40; blueprint sim_det).",
+    "source_papers": [
+     "blueprint_bl11012_version09092026.html"
+    ],
+    "type": "beamline:Detector",
+    "relations": [
+     {
+      "relation": "part_of",
+      "related_term": "beamline:BL-11-0-1-2",
+      "related_id": "beamline:BL-11-0-1-2",
+      "evidence": [
+       "blueprint_bl11012_version09092026.html"
+      ]
+     },
+     {
+      "relation": "part_of",
+      "related_term": "beamline:Endstation-Reflectometer",
+      "related_id": "beamline:Endstation-Reflectometer",
+      "evidence": [
+       "blueprint_bl11012_version09092026.html"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "beamline:Endstation-Reflectometer",
+    "id_prefix": "beamline",
+    "term": "Reflectometer endstation",
+    "name": "Reflectometer endstation",
+    "category": "Endstation",
+    "definition": "BL 11.0.1.2 RSOXS · Reflectometer endstation. Blueprint revision  dated . ",
+    "source_papers": [
+     "blueprint_bl11012_version09092026.html"
+    ],
+    "type": "beamline:Endstation",
+    "relations": [
+     {
+      "relation": "part_of",
+      "related_term": "beamline:BL-11-0-1-2",
+      "related_id": "beamline:BL-11-0-1-2",
+      "evidence": [
+       "blueprint_bl11012_version09092026.html"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "beamline:Person-Cheng-Wang",
+    "id_prefix": "beamline",
+    "term": "Cheng Wang",
+    "name": "Cheng Wang",
+    "category": "Person",
+    "definition": "Cheng Wang is a documented 11.0.1.2 contact (BeamlineScientist). Source: https://als.lbl.gov/beamlines/11-0-1-2/. Email listed on the ALS page: cwang2@lbl.gov.",
+    "source_papers": [
+     "https://als.lbl.gov/beamlines/11-0-1-2/",
+     "blueprint_bl11012_version09092026.html"
+    ],
+    "type": "beamline:Person",
+    "relations": [
+     {
+      "relation": "hasRole",
+      "related_term": "beamline:Role-BeamlineScientist",
+      "related_id": "beamline:Role-BeamlineScientist",
+      "evidence": [
+       "ALS primary contact: Cheng Wang cwang2@lbl.gov 510-486-4082 Thomas Ferron TJFerron@lbl.gov 510-486-4957"
+      ]
+     },
+     {
+      "relation": "supports",
+      "related_term": "beamline:BL-11-0-1-2",
+      "related_id": "beamline:BL-11-0-1-2",
+      "evidence": [
+       "ALS primary contact: Cheng Wang cwang2@lbl.gov 510-486-4082 Thomas Ferron TJFerron@lbl.gov 510-486-4957"
+      ]
+     }
+    ],
+    "source_url": "https://als.lbl.gov/beamlines/11-0-1-2/",
+    "email": "cwang2@lbl.gov",
+    "role": "BeamlineScientist"
+   },
+   {
+    "id": "beamline:Person-Thomas-Ferron",
+    "id_prefix": "beamline",
+    "term": "Thomas Ferron",
+    "name": "Thomas Ferron",
+    "category": "Person",
+    "definition": "Thomas Ferron is a documented 11.0.1.2 contact (BeamlineScientist). Source: https://als.lbl.gov/beamlines/11-0-1-2/. Email listed on the ALS page: TJFerron@lbl.gov.",
+    "source_papers": [
+     "https://als.lbl.gov/beamlines/11-0-1-2/",
+     "blueprint_bl11012_version09092026.html"
+    ],
+    "type": "beamline:Person",
+    "relations": [
+     {
+      "relation": "hasRole",
+      "related_term": "beamline:Role-BeamlineScientist",
+      "related_id": "beamline:Role-BeamlineScientist",
+      "evidence": [
+       "ALS primary contact: Cheng Wang cwang2@lbl.gov 510-486-4082 Thomas Ferron TJFerron@lbl.gov 510-486-4957"
+      ]
+     },
+     {
+      "relation": "supports",
+      "related_term": "beamline:BL-11-0-1-2",
+      "related_id": "beamline:BL-11-0-1-2",
+      "evidence": [
+       "ALS primary contact: Cheng Wang cwang2@lbl.gov 510-486-4082 Thomas Ferron TJFerron@lbl.gov 510-486-4957"
+      ]
+     }
+    ],
+    "source_url": "https://als.lbl.gov/beamlines/11-0-1-2/",
+    "email": "TJFerron@lbl.gov",
+    "role": "BeamlineScientist"
+   },
+   {
+    "id": "beamline:PhotonEnergy-soft-xray",
+    "id_prefix": "beamline",
+    "term": "Photon energy 165–1,500 eV",
+    "name": "Photon energy 165–1,500 eV",
+    "category": "PhotonEnergy",
+    "definition": "ALS public range 165–1,500 eV. Blueprint reports ~200–1500 eV, E/ΔE 4000 at 800 eV. Polarization is user selectable; linear polarization continuously variable from horizontal to vertical; left and right elliptical (or circular) polarization. Spot size = 100 μm diameter. Field of view/spatial resolution = down to 2 nm resolution. Sample information: Polymer thin films, solid thin films, vacuum compatible liquid cell. Other notes: High vacuum, heating.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:PhotonEnergy",
+    "relations": [],
+    "photon_energy_eV": {
+     "min": 165,
+     "max": 1500
+    }
+   },
+   {
+    "id": "beamline:Polarization-left-circular-polarization",
+    "id_prefix": "beamline",
+    "term": "left circular polarization",
+    "name": "left circular polarization",
+    "category": "Polarization",
+    "definition": "Left elliptical / circular polarization, user selectable.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:Polarization",
+    "relations": []
+   },
+   {
+    "id": "beamline:Polarization-linear-polarization",
+    "id_prefix": "beamline",
+    "term": "linear polarization",
+    "name": "linear polarization",
+    "category": "Polarization",
+    "definition": "Linear polarization continuously variable from horizontal to vertical.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:Polarization",
+    "relations": []
+   },
+   {
+    "id": "beamline:Polarization-right-circular-polarization",
+    "id_prefix": "beamline",
+    "term": "right circular polarization",
+    "name": "right circular polarization",
+    "category": "Polarization",
+    "definition": "Right elliptical / circular polarization, user selectable.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:Polarization",
+    "relations": []
+   },
+   {
+    "id": "beamline:Role-BeamlineScientist",
+    "id_prefix": "beamline",
+    "term": "Beamline scientist",
+    "name": "Beamline scientist",
+    "category": "BeamlineScientist",
+    "definition": "Documented scientific contact / beamline scientist role for ALS 11.0.1.2.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:BeamlineScientist",
+    "relations": [],
+    "source_url": "https://als.lbl.gov/beamlines/11-0-1-2/"
+   },
+   {
+    "id": "beamline:Sample-polymer-thin-films",
+    "id_prefix": "beamline",
+    "term": "polymer thin films",
+    "name": "polymer thin films",
+    "category": "Sample",
+    "definition": "Sample class listed by ALS: polymer thin films.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:Sample",
+    "relations": []
+   },
+   {
+    "id": "beamline:Sample-solid-thin-films",
+    "id_prefix": "beamline",
+    "term": "solid thin films",
+    "name": "solid thin films",
+    "category": "Sample",
+    "definition": "Sample class listed by ALS: solid thin films.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:Sample",
+    "relations": []
+   },
+   {
+    "id": "beamline:Sample-vacuum-compatible-liquid-cell",
+    "id_prefix": "beamline",
+    "term": "vacuum compatible liquid cell",
+    "name": "vacuum compatible liquid cell",
+    "category": "Sample",
+    "definition": "Sample class listed by ALS: vacuum compatible liquid cell.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:Sample",
+    "relations": []
+   },
+   {
+    "id": "beamline:ScatteringGeometry-grazing-incidence",
+    "id_prefix": "beamline",
+    "term": "grazing incidence",
+    "name": "grazing incidence",
+    "category": "ScatteringGeometry",
+    "definition": "Grazing-incidence SAXS/WAXS geometry listed by ALS.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:ScatteringGeometry",
+    "relations": []
+   },
+   {
+    "id": "beamline:ScatteringGeometry-reflectivity",
+    "id_prefix": "beamline",
+    "term": "reflectivity",
+    "name": "reflectivity",
+    "category": "ScatteringGeometry",
+    "definition": "Reflectometer endstation supports reflectivity / reflectometry.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:ScatteringGeometry",
+    "relations": []
+   },
+   {
+    "id": "beamline:ScatteringGeometry-transmission",
+    "id_prefix": "beamline",
+    "term": "transmission",
+    "name": "transmission",
+    "category": "ScatteringGeometry",
+    "definition": "Transmission scattering geometry used for polymer thin films.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:ScatteringGeometry",
+    "relations": []
+   },
+   {
+    "id": "beamline:Software-ADAxisSXR40",
+    "id_prefix": "beamline",
+    "term": "ADAxisSXR40",
+    "name": "ADAxisSXR40",
+    "category": "Software",
+    "definition": "EPICS areaDetector driver for the AXIS-SXR-40 (Tucsen Dhyana XFXV4040BSI).",
+    "source_papers": [
+     "catalog:ADAxisSXR40"
+    ],
+    "type": "beamline:Software",
+    "relations": []
+   },
+   {
+    "id": "beamline:Software-Bluesky",
+    "id_prefix": "beamline",
+    "term": "Bluesky",
+    "name": "Bluesky",
+    "category": "Software",
+    "definition": "Bluesky RunEngine / queueserver plans for BL 11.0.1.2.",
+    "source_papers": [
+     "catalog:Bluesky"
+    ],
+    "type": "beamline:Software",
+    "relations": []
+   },
+   {
+    "id": "beamline:Software-EPICS",
+    "id_prefix": "beamline",
+    "term": "EPICS",
+    "name": "EPICS",
+    "category": "Software",
+    "definition": "EPICS IOCs and process variables (SIM11012: prefix in the virtual beamline).",
+    "source_papers": [
+     "catalog:EPICS"
+    ],
+    "type": "beamline:Software",
+    "relations": []
+   },
+   {
+    "id": "beamline:Software-Finch",
+    "id_prefix": "beamline",
+    "term": "Finch",
+    "name": "Finch",
+    "category": "Software",
+    "definition": "React component library for Bluesky beamline UIs.",
+    "source_papers": [
+     "catalog:Finch"
+    ],
+    "type": "beamline:Software",
+    "relations": []
+   },
+   {
+    "id": "beamline:Software-LabVIEW",
+    "id_prefix": "beamline",
+    "term": "LabVIEW",
+    "name": "LabVIEW",
+    "category": "Software",
+    "definition": "Legacy LabVIEW controls (lv-config Motor/AI/DIO Setup.json) that the sims reproduce.",
+    "source_papers": [
+     "catalog:LabVIEW"
+    ],
+    "type": "beamline:Software",
+    "relations": []
+   },
+   {
+    "id": "beamline:Software-Queue-Server",
+    "id_prefix": "beamline",
+    "term": "Queue-Server",
+    "name": "Queue-Server",
+    "category": "Software",
+    "definition": "Bluesky queueserver HTTP API used by Finch.",
+    "source_papers": [
+     "catalog:Queue-Server"
+    ],
+    "type": "beamline:Software",
+    "relations": []
+   },
+   {
+    "id": "beamline:Software-Tiled",
+    "id_prefix": "beamline",
+    "term": "Tiled",
+    "name": "Tiled",
+    "category": "Software",
+    "definition": "Tiled data service for scan documents (README-only ingest of the ALS fork).",
+    "source_papers": [
+     "catalog:Tiled"
+    ],
+    "type": "beamline:Software",
+    "relations": []
+   },
+   {
+    "id": "beamline:Software-als-computing-hub",
+    "id_prefix": "beamline",
+    "term": "als_computing_hub",
+    "name": "als_computing_hub",
+    "category": "Software",
+    "definition": "ALS Computing hub documentation for supporting services.",
+    "source_papers": [
+     "catalog:als_computing_hub"
+    ],
+    "type": "beamline:Software",
+    "relations": []
+   },
+   {
+    "id": "beamline:Software-ophyd-async",
+    "id_prefix": "beamline",
+    "term": "ophyd-async",
+    "name": "ophyd-async",
+    "category": "Software",
+    "definition": "ophyd-async device layer (sim-ophyd and real IOC devices).",
+    "source_papers": [
+     "catalog:ophyd-async"
+    ],
+    "type": "beamline:Software",
+    "relations": []
+   },
+   {
+    "id": "beamline:Software-splash-tiled",
+    "id_prefix": "beamline",
+    "term": "splash_tiled",
+    "name": "splash_tiled",
+    "category": "Software",
+    "definition": "Splash-on-Tiled graph service used with FAIR2WISE graphs.",
+    "source_papers": [
+     "catalog:splash_tiled"
+    ],
+    "type": "beamline:Software",
+    "relations": []
+   },
+   {
+    "id": "beamline:fn-load-sim-devices",
+    "id_prefix": "beamline",
+    "term": "load_sim_devices",
+    "name": "load_sim_devices",
+    "category": "Method",
+    "definition": "Method `load_sim_devices` in devices.py.",
+    "source_papers": [
+     "fixture:devices.py:load_sim_devices"
+    ],
+    "type": "beamline:Method",
+    "relations": [
+     {
+      "relation": "runsSoftware",
+      "related_term": "beamline:Software-fixture",
+      "related_id": "beamline:Software-fixture",
+      "evidence": [
+       "fixture"
+      ]
+     },
+     {
+      "relation": "has_code_snippet",
+      "related_term": "beamline:snippet-fixture-load-sim-devices-50",
+      "related_id": "beamline:snippet-fixture-load-sim-devices-50",
+      "evidence": [
+       "fixture"
+      ]
+     }
+    ],
+    "source_file_path": "devices.py",
+    "source_start_line": 50,
+    "source_end_line": 51,
+    "repo_commit_sha": "test"
+   },
+   {
+    "id": "beamline:ophyd-AreaDetectorCCD",
+    "id_prefix": "beamline",
+    "term": "AreaDetectorCCD",
+    "name": "AreaDetectorCCD",
+    "category": "Detector",
+    "definition": "Detector `AreaDetectorCCD` in devices.py.",
+    "source_papers": [
+     "fixture:devices.py:AreaDetectorCCD"
+    ],
+    "type": "beamline:Detector",
+    "relations": [
+     {
+      "relation": "runsSoftware",
+      "related_term": "beamline:Software-fixture",
+      "related_id": "beamline:Software-fixture",
+      "evidence": [
+       "fixture"
+      ]
+     },
+     {
+      "relation": "has_code_snippet",
+      "related_term": "beamline:snippet-fixture-AreaDetectorCCD-9",
+      "related_id": "beamline:snippet-fixture-AreaDetectorCCD-9",
+      "evidence": [
+       "fixture"
+      ]
+     }
+    ],
+    "source_file_path": "devices.py",
+    "source_start_line": 9,
+    "source_end_line": 10,
+    "repo_commit_sha": "test"
+   },
+   {
+    "id": "beamline:ophyd-Endstation",
+    "id_prefix": "beamline",
+    "term": "Endstation",
+    "name": "Endstation",
+    "category": "Endstation",
+    "definition": "Endstation `Endstation` in devices.py.",
+    "source_papers": [
+     "fixture:devices.py:Endstation"
+    ],
+    "type": "beamline:Endstation",
+    "relations": [
+     {
+      "relation": "runsSoftware",
+      "related_term": "beamline:Software-fixture",
+      "related_id": "beamline:Software-fixture",
+      "evidence": [
+       "fixture"
+      ]
+     },
+     {
+      "relation": "has_code_snippet",
+      "related_term": "beamline:snippet-fixture-Endstation-17",
+      "related_id": "beamline:snippet-fixture-Endstation-17",
+      "evidence": [
+       "fixture"
+      ]
+     }
+    ],
+    "source_file_path": "devices.py",
+    "source_start_line": 17,
+    "source_end_line": 18,
+    "repo_commit_sha": "test"
+   },
+   {
+    "id": "beamline:ophyd-SampleEndstation",
+    "id_prefix": "beamline",
+    "term": "SampleEndstation",
+    "name": "SampleEndstation",
+    "category": "OphydDevice",
+    "definition": "OphydDevice `SampleEndstation` in devices.py.",
+    "source_papers": [
+     "fixture:devices.py:SampleEndstation"
+    ],
+    "type": "beamline:OphydDevice",
+    "relations": [
+     {
+      "relation": "runsSoftware",
+      "related_term": "beamline:Software-fixture",
+      "related_id": "beamline:Software-fixture",
+      "evidence": [
+       "fixture"
+      ]
+     },
+     {
+      "relation": "has_code_snippet",
+      "related_term": "beamline:snippet-fixture-SampleEndstation-13",
+      "related_id": "beamline:snippet-fixture-SampleEndstation-13",
+      "evidence": [
+       "fixture"
+      ]
+     }
+    ],
+    "source_file_path": "devices.py",
+    "source_start_line": 13,
+    "source_end_line": 14,
+    "repo_commit_sha": "test"
+   },
+   {
+    "id": "beamline:ophyd-ScanPlan",
+    "id_prefix": "beamline",
+    "term": "ScanPlan",
+    "name": "ScanPlan",
+    "category": "BlueskyPlan",
+    "definition": "BlueskyPlan `ScanPlan` in devices.py.",
+    "source_papers": [
+     "fixture:devices.py:ScanPlan"
+    ],
+    "type": "beamline:BlueskyPlan",
+    "relations": [
+     {
+      "relation": "runsSoftware",
+      "related_term": "beamline:Software-fixture",
+      "related_id": "beamline:Software-fixture",
+      "evidence": [
+       "fixture"
+      ]
+     },
+     {
+      "relation": "has_code_snippet",
+      "related_term": "beamline:snippet-fixture-ScanPlan-21",
+      "related_id": "beamline:snippet-fixture-ScanPlan-21",
+      "evidence": [
+       "fixture"
+      ]
+     },
+     {
+      "relation": "implementsPlan",
+      "related_term": "beamline:ophyd-ScanPlan",
+      "related_id": "beamline:ophyd-ScanPlan",
+      "evidence": [
+       "fixture"
+      ]
+     }
+    ],
+    "source_file_path": "devices.py",
+    "source_start_line": 21,
+    "source_end_line": 22,
+    "repo_commit_sha": "test"
+   },
+   {
+    "id": "beamline:ophyd-SimMotor",
+    "id_prefix": "beamline",
+    "term": "SimMotor",
+    "name": "SimMotor",
+    "category": "OphydDevice",
+    "definition": "OphydDevice `SimMotor` in devices.py.",
+    "source_papers": [
+     "fixture:devices.py:SimMotor"
+    ],
+    "type": "beamline:OphydDevice",
+    "relations": [
+     {
+      "relation": "runsSoftware",
+      "related_term": "beamline:Software-fixture",
+      "related_id": "beamline:Software-fixture",
+      "evidence": [
+       "fixture"
+      ]
+     },
+     {
+      "relation": "has_code_snippet",
+      "related_term": "beamline:snippet-fixture-SimMotor-5",
+      "related_id": "beamline:snippet-fixture-SimMotor-5",
+      "evidence": [
+       "fixture"
+      ]
+     }
+    ],
+    "source_file_path": "devices.py",
+    "source_start_line": 5,
+    "source_end_line": 6,
+    "repo_commit_sha": "test"
+   },
+   {
+    "id": "beamline:plan-count",
+    "id_prefix": "beamline",
+    "term": "count",
+    "name": "count",
+    "category": "BlueskyPlan",
+    "definition": "BlueskyPlan `count` in devices.py.",
+    "source_papers": [
+     "fixture:devices.py:count"
+    ],
+    "type": "beamline:BlueskyPlan",
+    "relations": [
+     {
+      "relation": "runsSoftware",
+      "related_term": "beamline:Software-fixture",
+      "related_id": "beamline:Software-fixture",
+      "evidence": [
+       "fixture"
+      ]
+     },
+     {
+      "relation": "has_code_snippet",
+      "related_term": "beamline:snippet-fixture-count-42",
+      "related_id": "beamline:snippet-fixture-count-42",
+      "evidence": [
+       "fixture"
+      ]
+     },
+     {
+      "relation": "implementsPlan",
+      "related_term": "beamline:plan-count",
+      "related_id": "beamline:plan-count",
+      "evidence": [
+       "fixture"
+      ]
+     }
+    ],
+    "source_file_path": "devices.py",
+    "source_start_line": 42,
+    "source_end_line": 43,
+    "repo_commit_sha": "test"
+   },
+   {
+    "id": "beamline:plan-rel-scan",
+    "id_prefix": "beamline",
+    "term": "rel_scan",
+    "name": "rel_scan",
+    "category": "BlueskyPlan",
+    "definition": "BlueskyPlan `rel_scan` in devices.py.",
+    "source_papers": [
+     "fixture:devices.py:rel_scan"
+    ],
+    "type": "beamline:BlueskyPlan",
+    "relations": [
+     {
+      "relation": "runsSoftware",
+      "related_term": "beamline:Software-fixture",
+      "related_id": "beamline:Software-fixture",
+      "evidence": [
+       "fixture"
+      ]
+     },
+     {
+      "relation": "has_code_snippet",
+      "related_term": "beamline:snippet-fixture-rel-scan-38",
+      "related_id": "beamline:snippet-fixture-rel-scan-38",
+      "evidence": [
+       "fixture"
+      ]
+     },
+     {
+      "relation": "implementsPlan",
+      "related_term": "beamline:plan-rel-scan",
+      "related_id": "beamline:plan-rel-scan",
+      "evidence": [
+       "fixture"
+      ]
+     }
+    ],
+    "source_file_path": "devices.py",
+    "source_start_line": 38,
+    "source_end_line": 39,
+    "repo_commit_sha": "test"
+   },
+   {
+    "id": "beamline:plan-rsoxs-run",
+    "id_prefix": "beamline",
+    "term": "rsoxs_run",
+    "name": "rsoxs_run",
+    "category": "BlueskyPlan",
+    "definition": "BlueskyPlan `rsoxs_run` in devices.py.",
+    "source_papers": [
+     "fixture:devices.py:rsoxs_run"
+    ],
+    "type": "beamline:BlueskyPlan",
+    "relations": [
+     {
+      "relation": "runsSoftware",
+      "related_term": "beamline:Software-fixture",
+      "related_id": "beamline:Software-fixture",
+      "evidence": [
+       "fixture"
+      ]
+     },
+     {
+      "relation": "has_code_snippet",
+      "related_term": "beamline:snippet-fixture-rsoxs-run-34",
+      "related_id": "beamline:snippet-fixture-rsoxs-run-34",
+      "evidence": [
+       "fixture"
+      ]
+     },
+     {
+      "relation": "implementsPlan",
+      "related_term": "beamline:plan-rsoxs-run",
+      "related_id": "beamline:plan-rsoxs-run",
+      "evidence": [
+       "fixture"
+      ]
+     }
+    ],
+    "source_file_path": "devices.py",
+    "source_start_line": 34,
+    "source_end_line": 35,
+    "repo_commit_sha": "test"
+   },
+   {
+    "id": "beamline:repo-fixture",
+    "id_prefix": "beamline",
+    "term": "fixture",
+    "name": "fixture",
+    "category": "Software",
+    "definition": "GitHub https://example.invalid/fixture @ test (full ingest).",
+    "source_papers": [
+     "fixture"
+    ],
+    "type": "beamline:Software",
+    "relations": [
+     {
+      "relation": "part_of",
+      "related_term": "beamline:BL-11-0-1-2",
+      "related_id": "beamline:BL-11-0-1-2",
+      "evidence": [
+       "fixture"
+      ]
+     },
+     {
+      "relation": "related_to",
+      "related_term": "beamline:Software-fixture",
+      "related_id": "beamline:Software-fixture",
+      "evidence": [
+       "fixture"
+      ]
+     }
+    ],
+    "repo_url": "https://example.invalid/fixture",
+    "repo_commit_sha": "test"
+   },
+   {
+    "id": "beamline:source-EPU5",
+    "id_prefix": "beamline",
+    "term": "EPU5",
+    "name": "EPU5",
+    "category": "BeamlineStage",
+    "definition": "Insertion device / source listed by ALS as EPU5. Contacts: Cheng Wang cwang2@lbl.gov 510-486-4082 Thomas Ferron TJFerron@lbl.gov 510-486-4957.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:BeamlineStage",
+    "relations": []
+   },
+   {
+    "id": "beamline:technique-GISAXS",
+    "id_prefix": "beamline",
+    "term": "GISAXS",
+    "name": "GISAXS",
+    "category": "ExperimentalTechnique",
+    "definition": "Grazing-incidence SAXS/WAXS listed on the ALS 11.0.1.2 page.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:ExperimentalTechnique",
+    "relations": [
+     {
+      "relation": "part_of",
+      "related_term": "beamline:BL-11-0-1-2",
+      "related_id": "beamline:BL-11-0-1-2",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "beamline:technique-Magnetic-scattering",
+    "id_prefix": "beamline",
+    "term": "Magnetic scattering",
+    "name": "Magnetic scattering",
+    "category": "ExperimentalTechnique",
+    "definition": "Magnetic scattering listed on the ALS 11.0.1.2 page.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:ExperimentalTechnique",
+    "relations": [
+     {
+      "relation": "part_of",
+      "related_term": "beamline:BL-11-0-1-2",
+      "related_id": "beamline:BL-11-0-1-2",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "beamline:technique-RSoXS",
+    "id_prefix": "beamline",
+    "term": "RSoXS",
+    "name": "RSoXS",
+    "category": "ExperimentalTechnique",
+    "definition": "Resonant soft X-ray scattering; primary technique at BL 11.0.1.2.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:ExperimentalTechnique",
+    "relations": [
+     {
+      "relation": "part_of",
+      "related_term": "beamline:BL-11-0-1-2",
+      "related_id": "beamline:BL-11-0-1-2",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "beamline:technique-Resonant-scattering",
+    "id_prefix": "beamline",
+    "term": "Resonant scattering",
+    "name": "Resonant scattering",
+    "category": "ExperimentalTechnique",
+    "definition": "Resonant scattering listed under technique category.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:ExperimentalTechnique",
+    "relations": [
+     {
+      "relation": "part_of",
+      "related_term": "beamline:BL-11-0-1-2",
+      "related_id": "beamline:BL-11-0-1-2",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "beamline:technique-SAXS",
+    "id_prefix": "beamline",
+    "term": "SAXS",
+    "name": "SAXS",
+    "category": "ExperimentalTechnique",
+    "definition": "Small-angle X-ray scattering listed on the ALS 11.0.1.2 page.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:ExperimentalTechnique",
+    "relations": [
+     {
+      "relation": "part_of",
+      "related_term": "beamline:BL-11-0-1-2",
+      "related_id": "beamline:BL-11-0-1-2",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "beamline:technique-WAXS",
+    "id_prefix": "beamline",
+    "term": "WAXS",
+    "name": "WAXS",
+    "category": "ExperimentalTechnique",
+    "definition": "Wide-angle X-ray scattering listed on the ALS 11.0.1.2 page.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:ExperimentalTechnique",
+    "relations": [
+     {
+      "relation": "part_of",
+      "related_term": "beamline:BL-11-0-1-2",
+      "related_id": "beamline:BL-11-0-1-2",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "beamline:technique-XAS",
+    "id_prefix": "beamline",
+    "term": "XAS",
+    "name": "XAS",
+    "category": "ExperimentalTechnique",
+    "definition": "X-ray absorption spectroscopy listed on the ALS 11.0.1.2 page.",
+    "source_papers": [
+     "als.lbl.gov/beamlines/11-0-1-2"
+    ],
+    "type": "beamline:ExperimentalTechnique",
+    "relations": [
+     {
+      "relation": "part_of",
+      "related_term": "beamline:BL-11-0-1-2",
+      "related_id": "beamline:BL-11-0-1-2",
+      "evidence": [
+       "als.lbl.gov/beamlines/11-0-1-2"
+      ]
+     }
+    ]
+   }
+  ],
+  "code_snippets": [
+   {
+    "id": "beamline:snippet-fixture-SimMotor-5",
+    "id_prefix": "beamline",
+    "curated": true,
+    "function_name": "SimMotor",
+    "code_snippet": "class SimMotor(Device):\n    value = Component(EpicsMotor, \"x\")",
+    "code_language": "python",
+    "code_description": "class `SimMotor` from fixture (devices.py:5-6)",
+    "source_paper": "fixture:devices.py:SimMotor",
+    "page": 5,
+    "source_type": "github",
+    "repo_name": "fixture",
+    "repo_url": "https://github.com/als-computing/fixture",
+    "repo_commit_sha": "test",
+    "source_file_path": "devices.py",
+    "source_start_line": 5,
+    "source_end_line": 6,
+    "source_file_url": "https://github.com/als-computing/fixture/blob/test/devices.py#L5-L6"
+   },
+   {
+    "id": "beamline:snippet-fixture-AreaDetectorCCD-9",
+    "id_prefix": "beamline",
+    "curated": true,
+    "function_name": "AreaDetectorCCD",
+    "code_snippet": "class AreaDetectorCCD:\n    pass",
+    "code_language": "python",
+    "code_description": "class `AreaDetectorCCD` from fixture (devices.py:9-10)",
+    "source_paper": "fixture:devices.py:AreaDetectorCCD",
+    "page": 9,
+    "source_type": "github",
+    "repo_name": "fixture",
+    "repo_url": "https://github.com/als-computing/fixture",
+    "repo_commit_sha": "test",
+    "source_file_path": "devices.py",
+    "source_start_line": 9,
+    "source_end_line": 10,
+    "source_file_url": "https://github.com/als-computing/fixture/blob/test/devices.py#L9-L10"
+   },
+   {
+    "id": "beamline:snippet-fixture-SampleEndstation-13",
+    "id_prefix": "beamline",
+    "curated": true,
+    "function_name": "SampleEndstation",
+    "code_snippet": "class SampleEndstation(Device):\n    pass",
+    "code_language": "python",
+    "code_description": "class `SampleEndstation` from fixture (devices.py:13-14)",
+    "source_paper": "fixture:devices.py:SampleEndstation",
+    "page": 13,
+    "source_type": "github",
+    "repo_name": "fixture",
+    "repo_url": "https://github.com/als-computing/fixture",
+    "repo_commit_sha": "test",
+    "source_file_path": "devices.py",
+    "source_start_line": 13,
+    "source_end_line": 14,
+    "source_file_url": "https://github.com/als-computing/fixture/blob/test/devices.py#L13-L14"
+   },
+   {
+    "id": "beamline:snippet-fixture-Endstation-17",
+    "id_prefix": "beamline",
+    "curated": true,
+    "function_name": "Endstation",
+    "code_snippet": "class Endstation(Device):\n    pass",
+    "code_language": "python",
+    "code_description": "class `Endstation` from fixture (devices.py:17-18)",
+    "source_paper": "fixture:devices.py:Endstation",
+    "page": 17,
+    "source_type": "github",
+    "repo_name": "fixture",
+    "repo_url": "https://github.com/als-computing/fixture",
+    "repo_commit_sha": "test",
+    "source_file_path": "devices.py",
+    "source_start_line": 17,
+    "source_end_line": 18,
+    "source_file_url": "https://github.com/als-computing/fixture/blob/test/devices.py#L17-L18"
+   },
+   {
+    "id": "beamline:snippet-fixture-ScanPlan-21",
+    "id_prefix": "beamline",
+    "curated": true,
+    "function_name": "ScanPlan",
+    "code_snippet": "class ScanPlan:\n    pass",
+    "code_language": "python",
+    "code_description": "class `ScanPlan` from fixture (devices.py:21-22)",
+    "source_paper": "fixture:devices.py:ScanPlan",
+    "page": 21,
+    "source_type": "github",
+    "repo_name": "fixture",
+    "repo_url": "https://github.com/als-computing/fixture",
+    "repo_commit_sha": "test",
+    "source_file_path": "devices.py",
+    "source_start_line": 21,
+    "source_end_line": 22,
+    "source_file_url": "https://github.com/als-computing/fixture/blob/test/devices.py#L21-L22"
+   },
+   {
+    "id": "beamline:snippet-fixture-rsoxs-run-34",
+    "id_prefix": "beamline",
+    "curated": true,
+    "function_name": "rsoxs_run",
+    "code_snippet": "def rsoxs_run(energy: float):\n    yield from []",
+    "code_language": "python",
+    "code_description": "function `rsoxs_run` from fixture (devices.py:34-35)",
+    "source_paper": "fixture:devices.py:rsoxs_run",
+    "page": 34,
+    "source_type": "github",
+    "repo_name": "fixture",
+    "repo_url": "https://github.com/als-computing/fixture",
+    "repo_commit_sha": "test",
+    "source_file_path": "devices.py",
+    "source_start_line": 34,
+    "source_end_line": 35,
+    "source_file_url": "https://github.com/als-computing/fixture/blob/test/devices.py#L34-L35"
+   },
+   {
+    "id": "beamline:snippet-fixture-rel-scan-38",
+    "id_prefix": "beamline",
+    "curated": true,
+    "function_name": "rel_scan",
+    "code_snippet": "def rel_scan(detectors, motor):\n    yield from []",
+    "code_language": "python",
+    "code_description": "function `rel_scan` from fixture (devices.py:38-39)",
+    "source_paper": "fixture:devices.py:rel_scan",
+    "page": 38,
+    "source_type": "github",
+    "repo_name": "fixture",
+    "repo_url": "https://github.com/als-computing/fixture",
+    "repo_commit_sha": "test",
+    "source_file_path": "devices.py",
+    "source_start_line": 38,
+    "source_end_line": 39,
+    "source_file_url": "https://github.com/als-computing/fixture/blob/test/devices.py#L38-L39"
+   },
+   {
+    "id": "beamline:snippet-fixture-count-42",
+    "id_prefix": "beamline",
+    "curated": true,
+    "function_name": "count",
+    "code_snippet": "def count(detectors):\n    yield from []",
+    "code_language": "python",
+    "code_description": "function `count` from fixture (devices.py:42-43)",
+    "source_paper": "fixture:devices.py:count",
+    "page": 42,
+    "source_type": "github",
+    "repo_name": "fixture",
+    "repo_url": "https://github.com/als-computing/fixture",
+    "repo_commit_sha": "test",
+    "source_file_path": "devices.py",
+    "source_start_line": 42,
+    "source_end_line": 43,
+    "source_file_url": "https://github.com/als-computing/fixture/blob/test/devices.py#L42-L43"
+   },
+   {
+    "id": "beamline:snippet-fixture-load-sim-devices-50",
+    "id_prefix": "beamline",
+    "curated": true,
+    "function_name": "load_sim_devices",
+    "code_snippet": "def load_sim_devices(path):\n    return path",
+    "code_language": "python",
+    "code_description": "function `load_sim_devices` from fixture (devices.py:50-51)",
+    "source_paper": "fixture:devices.py:load_sim_devices",
+    "page": 50,
+    "source_type": "github",
+    "repo_name": "fixture",
+    "repo_url": "https://github.com/als-computing/fixture",
+    "repo_commit_sha": "test",
+    "source_file_path": "devices.py",
+    "source_start_line": 50,
+    "source_end_line": 51,
+    "source_file_url": "https://github.com/als-computing/fixture/blob/test/devices.py#L50-L51"
+   }
+  ]
+ },
+ "replay_v3_to_v10": {
+  "stats": {
+   "linked": 60,
+   "aliased": 6,
+   "skipped_unknown": 0,
+   "motors": 90
+  },
+  "version": 10,
+  "nodes": 421,
+  "edges": 937,
+  "kg_sha256": "faf9c074cd9422a7b051550c9fe402f0986d45aa3c8d209e7f86c065d9f5f5fc",
+  "terms_sha256": "c6b9ee2afb6f1a9f108abee1190bcbcf86fa2a2c00ad871ec6330606d06753f5",
+  "sources_landed": [
+   {
+    "kind": "motor_stage_links",
+    "source_graph": "storage/kg/matkg_bl1101_v3.json",
+    "motor_stage_map": "storage/schema/bl1101_motor_stage_map.yaml",
+    "map_version": 4,
+    "linked": 60,
+    "aliased": 6
+   }
+  ],
+  "kg_text_len": 627663
+ },
+ "replay_v7_to_v10": {
+  "stats": {
+   "linked": 0,
+   "aliased": 0,
+   "skipped_unknown": 0,
+   "motors": 90
+  },
+  "version": 10,
+  "nodes": 1143,
+  "edges": 4623,
+  "kg_sha256": "4712e618a7ceb2c609723ea90dd3a4078cbd82991470b01c525e719a87e9c6e0",
+  "terms_sha256": null,
+  "sources_landed": [
+   {
+    "kind": "motor_stage_links",
+    "source_graph": "storage/kg/matkg_bl1101_v7.json",
+    "motor_stage_map": "storage/schema/bl1101_motor_stage_map.yaml",
+    "map_version": 4,
+    "linked": 0,
+    "aliased": 0
+   }
+  ],
+  "kg_text_len": 2348374
+ }
+}

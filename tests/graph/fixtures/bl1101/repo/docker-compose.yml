@@ -1,0 +1,7 @@
+services:
+  tiled:
+    image: tiled
+  redis:
+    image: redis
+volumes:
+  data: {}
