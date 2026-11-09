@@ -77,17 +77,14 @@ an existing frozen directory. It does no Git write, no network and no Tiled
 call. The corpus and version come from the file name: `matkg_e2e_demo.json`
 becomes `e2e_demo/v1`; `matkg_bl1101_v4.json` becomes `bl1101/v4`.
 
-The simplest layout is to start the container with the export folder and the
-release root being the same directory:
+After exporting, run inside the container (`f2w-kg-adopt` is installed as a
+console script in the image, see [console scripts](#console-scripts-in-the-image)).
+This is the sequence used in the 2026-11-06 rehearsal: copy the exported file
+from the export folder into the release root, then adopt it.
 
 ```bash
-F2W_KG_RELEASE_DIR=/var/lib/fair2wise/state/session/storage_kg scripts/run_local_container.sh
-```
-
-then, after exporting, run inside the container (`f2w-kg-adopt` is installed as
-a console script in the image, see [console scripts](#console-scripts-in-the-image)):
-
-```bash
+docker exec f2w-local cp /var/lib/fair2wise/state/kg_releases/matkg_<name>.json \
+  /var/lib/fair2wise/state/session/storage_kg/
 docker exec f2w-local f2w-kg-adopt adopt \
   --storage-kg /var/lib/fair2wise/state/session/storage_kg \
   --code-commit <40-hex commit of the code you run> --only matkg_<name>.json --dry-run
@@ -96,8 +93,10 @@ docker exec f2w-local f2w-kg-adopt adopt \
 
 `--code-commit` is required in the image: the commit is normally read from
 `.git`, and the image has none. Use the commit the image was built from.
-With the default export folder instead, copy the file into `storage_kg` first
-(`docker exec f2w-local cp <release_dir>/matkg_<name>.json <storage_kg>/`).
+
+An alternative layout (not exercised in the rehearsal) is to start the container
+with `F2W_KG_RELEASE_DIR=/var/lib/fair2wise/state/session/storage_kg` so that
+export and adoption share one folder and the copy step disappears.
 
 `f2w-kg-adopt descriptor --commit <sha> --corpus <c> --snapshot v1 --repository
 github.com/<org>/<repo>` prints a `state=candidate` data-release descriptor read
