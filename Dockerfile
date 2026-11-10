@@ -234,6 +234,8 @@ ENV F2W_DEPLOYMENT_PROFILE=local \
 # The commit the image was built from (docker build --build-arg GIT_COMMIT=$(git rev-parse HEAD)); CI also
 # sets the same label with --label. scripts/demo/seed.sh reads it for f2w-kg-adopt --code-commit.
 ARG GIT_COMMIT=unknown
+# A label is not readable inside the container: the Publish to Tiled job (library_publish) reads the commit from here.
+ENV F2W_CODE_COMMIT=${GIT_COMMIT}
 LABEL org.opencontainers.image.title="fair2wise" \
       org.opencontainers.image.revision="${GIT_COMMIT}" \
       org.opencontainers.image.description="FAIR2WISE :local - UI, API, worker and managed Tiled 0.2.18" \
