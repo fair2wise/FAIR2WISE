@@ -226,6 +226,7 @@ def create_api_app(
             ``knowledge_operations`` given beside ``operations`` that already carry one, or
             ``model_api`` without a JSON graph in ``cfg.graph``.
     """
+    from . import routes_approvals as approvals
     from . import routes_capabilities as capabilities
     from . import routes_folders as folders
     from . import routes_graph_sources as graph_sources
@@ -337,6 +338,7 @@ def create_api_app(
     publications.install(app)
     status.install(app)
     capabilities.install(app)
+    approvals.install(app)
     graph_sources.install(app)
     if judge_settings is None:
         judge_settings = JudgeModelService(JudgeModelStore(judge_settings_path(Path(cfg.workdir))))

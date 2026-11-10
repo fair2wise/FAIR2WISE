@@ -27,7 +27,11 @@ first and forwards to the T10 services, so the same authorization runs on every 
 * T07B (owner go 2026-11-06, thirteenth set): accepted canonicalization proposals -> scoped merge plan ->
   one of the gated apply routes (:class:`~app.modules.canonicalization.apply_adapters.MergeApplyService`);
   the approval is made here by ``create_approval`` for the exact ``plan_sha256`` the caller was shown, and
-  only once the route's gate is open (closed until the owner's C4 real-model rerun: typed ``gate_closed``).
+  only once the route's gate is open (closed until the owner's C4 real-model rerun: typed ``gate_closed``);
+* Pending Approvals (owner instruction 2026-11-09): :meth:`F2WOperations.pending_approvals` is one read over
+  the items above that wait for a human (plans awaiting review, budget-paused jobs, cases awaiting review, an
+  exceeded cost cap, accepted merges to apply). It names, per item, the existing route and body that approves
+  or rejects it and adds no write path of its own.
 
 Nothing here parses HTTP, and no route holds an algorithm of its own. The only logic added
 here is the H5 publication gate (:class:`PublicationGate`) and the read-only UI mapping of a
@@ -64,6 +68,7 @@ from ..modules.jobs.service import JobService
 from ..modules.jobs.store import JobLog
 from ..modules.security.authorization import (
     DeploymentSettings,
+    can_review_approvals,
     create_approval,
     local_operator_context,
     require,
@@ -101,6 +106,15 @@ H5_MESSAGE = ("publication to {target} is gated at H5: only approved rehearsal t
               "Tiled) are enabled on this deployment")
 #: Decisions one bulk review may carry (T31).
 MAX_BULK_REVIEW = 200
+#: Publication job kinds whose plan waits for ``POST /v1/publications/{job_id}/approval`` (V18), by item kind.
+#: ``publication`` becomes ``rollback`` when the job carries a rollback reason (V53). Mirrors
+#: ``app.modules.jobs.publication.KIND`` and ``OPERATION_KIND_NAMES`` (tests pin the two together).
+PLAN_ITEM_KINDS: Mapping[str, str] = {"publish": "publication", "corpus_retire": "retire", "corpus_purge": "purge"}
+#: Case state a human must decide (``CaseState.NEEDS_REVIEW``).
+_NEEDS_REVIEW = "needs_review"
+#: Routes of the pending-approvals items are given relative to the API base (``v1/...``), because the response
+#: projector (AUD-06) makes every absolute path opaque; the UI joins them to its own base.
+_V1 = "v1"
 
 
 _T = TypeVar("_T")
@@ -968,6 +982,149 @@ class F2WOperations:
                                        artifact_store=artifact_store if artifact_store is not None
                                        else knowledge.artifact_store, **kwargs)
 
+    # --- pending approvals (owner instruction 2026-11-09) -----------------------------------------
+
+    @staticmethod
+    def _action(method: str, path: str, body: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        """One existing route the UI calls for an item: method, path relative to the API base, JSON body."""
+        return {"method": method, "path": path, "body": dict(body) if body is not None else None}
+
+    def _pending_plans(self, ctx: RequestContext) -> list[dict[str, Any]]:
+        pub = self.publication
+        if pub is None:
+            return []
+        items: list[dict[str, Any]] = []
+        for job in self.jobs.list_visible(ctx, state=JobState.AWAITING_REVIEW, limit=1000):
+            kind = PLAN_ITEM_KINDS.get(job.kind)
+            if kind is None:
+                continue
+            record = pub.store.current_plan(job.job_id)
+            if record is None or pub.store.valid_approvals(job.job_id, record.plan):
+                continue  # not planned yet, or already approved: nothing is left for a human
+            plan = record.plan
+            params = job.inputs.params
+            rollback = params.get("rollback") if isinstance(params.get("rollback"), Mapping) else None
+            if kind == "publication" and rollback is not None:
+                kind = "rollback"
+            items.append({
+                "kind": kind, "id": job.job_id, "job_id": job.job_id, "job_kind": job.kind,
+                "corpus_scope": list(plan.corpus_scope), "target": plan.target,
+                "snapshot_ref": params.get("snapshot_ref"), "reason": rollback.get("reason") if rollback else None,
+                "plan": {"plan_id": plan.plan_id, "plan_sha256": plan.plan_sha256, "snapshot_id": plan.snapshot_id,
+                         "base_revision": plan.base_revision, "creates": plan.creates, "links": plan.links,
+                         "supersessions": plan.supersessions, "affected": len(plan.affected_ids)},
+                "submitted_at": job.handle().submitted_at.isoformat(), "requested_by": job.created_by,
+                "approve": self._action("POST", f"{_V1}/publications/{job.job_id}/approval",
+                                        {"plan_sha256": plan.plan_sha256}),
+                "reject": self._action("POST", f"{_V1}/jobs/{job.job_id}/cancel"),
+            })
+        return items
+
+    def _paused_jobs(self, ctx: RequestContext) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        for job in self.jobs.list_visible(ctx, state=JobState.PAUSED_BUDGET, limit=1000):
+            items.append({
+                "kind": "paused_job", "id": job.job_id, "job_id": job.job_id, "job_kind": job.kind,
+                "corpus_scope": list(job.inputs.corpus_scope), "pause_reason": job.pause_reason,
+                "submitted_at": job.handle().submitted_at.isoformat(), "requested_by": job.created_by,
+                "approve": self._action("POST", f"{_V1}/jobs/{job.job_id}/resume",
+                                        {"expected_revision": job.revision}),
+                "reject": self._action("POST", f"{_V1}/jobs/{job.job_id}/cancel"),
+            })
+        return items
+
+    def _review_cases(self, ctx: RequestContext) -> list[dict[str, Any]]:
+        if self.curation is None:
+            return []
+        items: list[dict[str, Any]] = []
+        for case in self.curation.list_cases(self._case_scope(ctx), state=_NEEDS_REVIEW, limit=1000):
+            case_id, revision = str(case["id"]), str(case.get("revision") or "")
+            review = f"{_V1}/curation/cases/{case_id}/review"
+            items.append({
+                "kind": "review_case", "id": case_id, "case_id": case_id, "corpus": case.get("corpus"),
+                "case_type": case.get("case_type"), "reason": case.get("reason"), "route": case.get("route"),
+                "priority": case.get("priority"), "revision": revision, "updated": case.get("updated"),
+                "approve": self._action("POST", review, {"bound_revision": revision, "accept": True}),
+                "reject": self._action("POST", review, {"bound_revision": revision, "accept": False}),
+            })
+        return items
+
+    def _cost_cap(self, ctx: RequestContext) -> list[dict[str, Any]]:
+        if self.control_path is None or not ctx.has("jobs.admin"):
+            return []
+        control = self.cost_control(ctx)
+        spend = control.get("spend")
+        if not isinstance(spend, Mapping) or not spend.get("cap_exceeded"):
+            return []
+        # Raising the cap or recording a cost approval needs a number a human types in: no one-click body here.
+        return [{
+            "kind": "cost_control", "id": "cost-control", "enabled": control["enabled"],
+            "budget_cap_usd": control["budget_cap_usd"], "spend": dict(spend),
+            "approve": None, "reject": None,
+            "routes": [self._action("PUT", f"{_V1}/curation/cost-control",
+                                    {"enabled": True, "budget_cap_usd": "<new cap in USD>"}),
+                       self._action("POST", f"{_V1}/curation/cost-approvals",
+                                    {"scope": ["<corpus>"], "models": ["<model>"], "cap_usd": "<USD>",
+                                     "expires_at": "<ISO 8601>"})],
+        }]
+
+    def _merge_plans(self, ctx: RequestContext) -> list[dict[str, Any]]:
+        if self.merge_apply is None or self.curation is None:
+            return []
+        items: list[dict[str, Any]] = []
+        apply_path = f"{_V1}/curation/merges/apply"
+        for corpus in self._case_scope(ctx):
+            accepted = self.curation.awaiting_validation([corpus])
+            if not accepted:
+                continue
+            body = {"corpus": corpus, "route": "apply_migration"}
+            items.append({
+                "kind": "merge_apply", "id": f"merge:{corpus}", "corpus": corpus, "accepted_cases": len(accepted),
+                "case_ids": sorted(str(c["id"]) for c in accepted), "plan": None,
+                # A dry run makes the plan and its hash; the real apply names that hash (the UI fills it in).
+                "plan_route": self._action("POST", apply_path, {**body, "dry_run": True}),
+                "approve": self._action("POST", apply_path, {**body, "dry_run": False, "plan_sha256": None}),
+                "reject": None,
+            })
+        return items
+
+    def pending_approvals(self, ctx: RequestContext) -> dict[str, Any]:
+        """Every item that waits for a human decision, with the existing route that decides it (V82).
+
+        Entry: ``graph.publish`` and, on ALS, a verified admin (``can_review_approvals``; the local operator on
+        ``:local``). Items: publication, rollback, retire and purge plans awaiting review (approve: V18 with the
+        shown ``plan_sha256``; reject: cancel the job, V08), budget-paused jobs (resume V09 / cancel V08),
+        curation cases awaiting review (ids and counts, no evidence text; V13 accept or reject at the shown
+        revision; only when the caller holds ``curation.approve``), an exceeded remote-cost cap (``jobs.admin``;
+        the routes need a typed number, so no one-click body) and corpora with accepted merges not yet applied
+        (V81: a dry run gives the hash the real apply names; only when the merge service is wired). Nothing is
+        approved or written here.
+
+        Raises:
+            ContractError: ``DENIED`` without ``graph.publish`` or, on ALS, for a non-admin.
+        """
+        require(ctx, "graph.publish")
+        if not can_review_approvals(ctx):
+            raise ContractError(ErrorCode.DENIED, "pending approvals are read by a verified admin on this profile")
+        can_review = ctx.has("curation.approve")
+        items = self._pending_plans(ctx) + self._paused_jobs(ctx)
+        if can_review:
+            items += self._review_cases(ctx)
+        items += self._cost_cap(ctx)
+        if can_review:
+            items += self._merge_plans(ctx)
+        counts: dict[str, int] = {}
+        for item in items:
+            counts[item["kind"]] = counts.get(item["kind"], 0) + 1
+        return {
+            "items": items, "counts": counts, "total": len(items),
+            "includes": {"plans": self.publication is not None,
+                         "review_cases": can_review and self.curation is not None,
+                         "cost_control": self.control_path is not None and ctx.has("jobs.admin"),
+                         "merge_apply": can_review and self.merge_apply is not None and self.curation is not None},
+            "generated_at": self.clock().isoformat(),
+        }
+
     # --- status ----------------------------------------------------------------------------------
 
     def audit_status(self, ctx: RequestContext) -> dict[str, Any]:
@@ -1046,5 +1203,6 @@ def job_log_json(log: JobLog) -> dict[str, Any]:
             "stage": log.stage, "message": log.message}
 
 
-__all__ = ("ALS_APPROVAL_TTL", "DEFAULT_APPROVAL_TTL", "MAX_BULK_REVIEW", "PROFILE_APPROVAL_TTL", "F2WOperations",
-           "PublicationGate", "build_operations", "default_approval_ttl", "job_event_json", "job_log_json")
+__all__ = ("ALS_APPROVAL_TTL", "DEFAULT_APPROVAL_TTL", "MAX_BULK_REVIEW", "PLAN_ITEM_KINDS", "PROFILE_APPROVAL_TTL",
+           "F2WOperations", "PublicationGate", "build_operations", "default_approval_ttl", "job_event_json",
+           "job_log_json")

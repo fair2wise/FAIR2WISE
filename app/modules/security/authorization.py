@@ -858,6 +858,23 @@ def chat_offers_ingestion(ctx: RequestContext) -> bool:
     return ctx.has("ingest.acquire") and ctx.has("ingest.extract")
 
 
+def can_review_approvals(ctx: RequestContext) -> bool:
+    """Return whether the caller may read the pending-approvals queue (``GET /v1/approvals/pending``, V82).
+
+    The same check feeds ``can_approve`` in ``GET /v1/capabilities`` (V60), so the sidebar entry and the route
+    cannot drift apart. The caller holds ``graph.publish`` (the capability that submits and applies the plans the
+    queue lists) and is the local operator on ``:local``, or on ALS a principal whose identity the Tiled identity
+    port reported as admin at sign-in (``Principal.is_admin``; the route dependency re-runs that role check
+    because ``graph.publish`` is an admin capability). An ALS non-admin never holds ``graph.publish``
+    (``capabilities_for``), so the admin clause is the explicit statement of what the capability already implies.
+    """
+    if "graph.publish" not in ctx.capabilities:
+        return False
+    if ctx.mode is AuthorizationMode.LOCAL_TRUSTED:
+        return ctx.principal.is_local_operator()
+    return ctx.principal.is_admin is True
+
+
 # --- workers (section 11) ----------------------------------------------------------
 
 def worker_context(ctx: RequestContext, *, run_id: str) -> RequestContext:

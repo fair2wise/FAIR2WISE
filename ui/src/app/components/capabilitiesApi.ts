@@ -17,6 +17,11 @@ export interface Capabilities {
   can_upload: boolean | null;
   /** T19E: the caller holds `chat.ask`, the entry capability of the `GET /v1/operations/*` reads. */
   can_run_operations: boolean | null;
+  /**
+   * Pending Approvals (owner instruction 2026-11-09): the entry check of `GET /v1/approvals/pending` (`graph.publish`
+   * and, on ALS, a verified admin). The sidebar entry shows only on an explicit `true`.
+   */
+  can_approve: boolean | null;
 }
 
 const ROLES: ReadonlySet<string> = new Set(['local_operator', 'admin', 'user']);
@@ -32,6 +37,7 @@ export function parseCapabilities(raw: unknown): Capabilities {
     can_save: flag(body.can_save),
     can_upload: flag(body.can_upload),
     can_run_operations: flag(body.can_run_operations),
+    can_approve: flag(body.can_approve),
   };
 }
 
@@ -41,6 +47,14 @@ export function parseCapabilities(raw: unknown): Capabilities {
  */
 export function canRunOperations(caps: Capabilities | null | undefined): boolean {
   return caps?.can_run_operations === true;
+}
+
+/**
+ * Whether the Pending Approvals page shows. As for Operations, only an explicit `true` shows it: an older server
+ * without the field, a 401/403/404 or a network error hides it (the server's 403 on the route stays the backstop).
+ */
+export function canApprove(caps: Capabilities | null | undefined): boolean {
+  return caps?.can_approve === true;
 }
 
 /** `GET /v1/capabilities`. Rejects with `ApiError` on 401/404/other failures (callers keep defaults). */

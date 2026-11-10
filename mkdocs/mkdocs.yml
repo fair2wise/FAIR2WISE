@@ -33,6 +33,7 @@ nav:
           - Library and Harvester: ui-library.md
           - Extraction tab: ui-extraction.md
           - Operations tab, CLI and SDK: ui-operations.md
+          - Pending Approvals: ui-approvals.md
           - UI architecture: ui-architecture.md
           - Agent API integration: ui-api.md
           - Development and testing: ui-development.md

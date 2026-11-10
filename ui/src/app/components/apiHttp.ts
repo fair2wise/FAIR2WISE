@@ -5,7 +5,7 @@
  * `parseAgentApiError`, and a transport failure uses `agentNetworkErrorMessage`.
  */
 import { AGENT_API_BASE } from './data/liveAgent';
-import { agentNetworkErrorMessage, parseAgentApiError } from './agentApiErrors';
+import { agentNetworkErrorMessage, parseAgentApiError, parseAgentApiErrorCode } from './agentApiErrors';
 
 /** Statuses that mean "this caller or server has no such route": the tab hides itself. */
 export const HIDDEN_STATUSES: ReadonlySet<number> = new Set([401, 403, 404, 405]);
@@ -13,15 +13,23 @@ export const HIDDEN_STATUSES: ReadonlySet<number> = new Set([401, 403, 404, 405]
 /** An HTTP failure from a `/v1` route, carrying the status for callers that branch on it. */
 export class ApiError extends Error {
   readonly status: number;
+  /** Typed error code of the body (`stale_approval`, `denied`, `unsupported_capability`, ...), when it carried one. */
+  readonly code: string | null;
+  /** Typed refusal reason of the body (`gate_closed`, `rollback_replacement_required`, ...), when present. */
+  readonly reason: string | null;
 
   /**
    * @param message - Human readable message (already parsed from the response body).
    * @param status - HTTP status code; 0 for a transport failure.
+   * @param code - The body's typed error code, if any.
+   * @param reason - The body's typed refusal reason, if any.
    */
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code: string | null = null, reason: string | null = null) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.code = code;
+    this.reason = reason;
   }
 }
 
@@ -60,7 +68,9 @@ export async function v1Fetch(
     throw new ApiError(agentNetworkErrorMessage(AGENT_API_BASE, error), 0);
   }
   if (!response.ok) {
-    throw new ApiError(parseAgentApiError(await response.text(), response.status), response.status);
+    const text = await response.text();
+    const typed = parseAgentApiErrorCode(text);
+    throw new ApiError(parseAgentApiError(text, response.status), response.status, typed.code, typed.reason);
   }
   return response;
 }
