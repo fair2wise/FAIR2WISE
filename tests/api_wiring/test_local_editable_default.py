@@ -155,8 +155,9 @@ def test_without_a_save_provider_the_legacy_splash_behaviour_is_unchanged(monkey
     assert service._loader_source("splash") == "splash"
 
 
-def test_a_save_target_given_at_startup_keeps_its_behaviour(monkeypatch, tmp_path):
-    """``cfg.tiled_save`` (ALS wiring) is not the ``:local`` provider: the loader alias applies to the provider only."""
+def test_a_save_target_given_at_startup_gets_the_json_loader_too():
+    """``cfg.tiled_save`` (ALS wiring) maps like the provider; see ``test_startup_tiled_save_loader.py``."""
     svc = object.__new__(api_mod.AgentPipelineService)
     svc.tiled_save = object()                    # type: ignore[assignment]
-    assert svc._loader_source("splash") == "splash"
+    svc.tiled_save_provider = None
+    assert svc._loader_source("splash") == "json"

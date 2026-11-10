@@ -2917,12 +2917,14 @@ class AgentPipelineService:
     def _loader_source(self, source: str) -> str:
         """The graph source the retrieval loaders (``krag.KnowledgeGraph``) are given for the UI source ``source``.
 
-        The editable mode keeps its wire token ``splash`` everywhere the UI sees it, but with the ``:local`` Tiled
-        save provider attached its session graph is a JSON file (the effective record), so the loaders read it as
-        ``json``: the ``splash`` loader would query ``splash-links`` (a Splash HTTP call, and the wrong data).
-        Without a provider (ALS, library callers) the source is passed through unchanged.
+        The editable mode keeps its wire token ``splash`` everywhere the UI sees it, but with a Tiled save target
+        attached (the ``:local`` provider, or a ``SaveTarget`` given at startup, the ALS wiring) its session graph is a
+        JSON file (the effective record), so the loaders read it as ``json``: the ``splash`` loader would query
+        ``splash-links`` (a Splash HTTP call, and the wrong data; Splash is deprecated). Without a save target (legacy
+        ``agent`` profile, library callers) the source is passed through unchanged.
         """
-        return "json" if self.tiled_save_provider is not None and source == "splash" else source
+        has_target = self.tiled_save_provider is not None or self.tiled_save is not None
+        return "json" if has_target and source == "splash" else source
 
     def _refresh_session_graph(self) -> None:
         """``:local`` editable mode: show the active publication's effective record, not the startup seed.
