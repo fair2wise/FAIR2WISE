@@ -219,6 +219,27 @@ class DisclosureBlock(_Strict):
     _s = field_validator("report_sha256")(_sha)
 
 
+class EditReconciliation(_Strict):
+    """How a ``parent.relation == "edit_reconciliation"`` version was made (json_kg_contract.md 6.2.2).
+
+    ``journal_sha256`` is the hash of the journal bytes *before* the carried edits were advanced to
+    ``reconciled`` (the journal is append-only, so those bytes are a prefix of the journal afterwards).
+    """
+
+    journal_sha256: str
+    base_snapshot_id: str
+    applied_edit_count: int = Field(ge=0)
+    journal_ref: str | None = None
+    conflicts_resolved: int | None = Field(default=None, ge=0)
+
+    _s = field_validator("journal_sha256")(_sha)
+
+    @field_validator("journal_ref")
+    @classmethod
+    def _journal_ref(cls, value: str | None) -> str | None:
+        return None if value is None else _ref(value)
+
+
 class KGManifest(_Strict):
     """``manifest.json`` of one frozen snapshot."""
 
@@ -237,6 +258,7 @@ class KGManifest(_Strict):
     inputs: list[InputRef]
     validation: ValidationBlock
     disclosure: DisclosureBlock
+    edit_reconciliation: EditReconciliation | None = None
 
     model_config = ConfigDict(frozen=True, extra="forbid", populate_by_name=True)
 

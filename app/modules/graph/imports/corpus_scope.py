@@ -762,6 +762,16 @@ def scope_dir(state_dir: Path, target: str, scope: str) -> Path:
     return Path(state_dir) / _slug(target) / _slug(scope)
 
 
+#: File name of the per-corpus edit journal under :func:`scope_dir` (Save writes it, the import-time conflict
+#: block and ``f2w-kg-snapshot --reconcile-edits`` read it).
+JOURNAL_FILENAME = "edits.jsonl"
+
+
+def journal_path(state_dir: Path, target: str, scope: str) -> Path:
+    """The per-corpus edit journal file of ``scope`` on ``target``: ``<state_dir>/<target>/<scope>/edits.jsonl``."""
+    return scope_dir(state_dir, target, scope) / JOURNAL_FILENAME
+
+
 # --------------------------------------------------------------------------- pinned reader (Q6)
 
 class PinnedReader:

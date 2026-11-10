@@ -44,6 +44,7 @@ from tests.jobs.replacement_world import DirSnapshots  # first: puts tests/fixtu
 
 from import_fakes import CountingClient, FakeClock, MemoryTiled  # noqa: E402  (path set by replacement_world)
 
+from app.modules.commands import build_kg_snapshot
 from app.modules.contracts.errors import ContractError, ErrorCode
 from app.modules.contracts.jobs import JobState
 from app.modules.graph import edit_journal as ej
@@ -584,6 +585,7 @@ def test_t26c_03_promote_v1_then_v2_with_distinct_target_approvals_and_receipts(
     g1, g2 = graph_in_git(rel, c1, CORPUS, "v1"), graph_in_git(rel, c2, CORPUS, "v2")
     pinned = {s: next(i for i in rel.items(c, CORPUS, s) if i["role"] == "graph")["sha256"]
               for s, c in (("v1", c1), ("v2", c2))}
+    commit_of = {"v1": c1, "v2": c2}
     jobs: dict[str, dict[str, str]] = {}
     plans: dict[str, dict[str, Any]] = {}
     receipts: dict[str, dict[str, Any]] = {}
@@ -603,6 +605,9 @@ def test_t26c_03_promote_v1_then_v2_with_distinct_target_approvals_and_receipts(
             # the plan and the receipt are bound to the Git-selected bytes and to this target only
             assert plan.input_sha256 == pinned[snap] == art.receipt.snapshot_sha256
             assert plan.target == tgt.target and art.receipt.target == tgt.target and art.receipt.verified
+            # H5 finding 1 (closed): the export left `<vN>.release_commit.json` on the mount, hash-bound to the
+            # files, so the job path records the data commit too
+            assert art.extras.data_commit == commit_of[snap]
             assert art.extras.profile == tgt.profile and art.extras.approved_by == tgt.approver.subject
             assert tgt.readback() == expected_readback(graph), "read-back equals the committed snapshot"
             assert tgt.pubstore.pointer(tgt.target).snapshot_ref == f"{CORPUS}/{snap}"
@@ -703,10 +708,11 @@ def test_t26c_04_crash_mid_import_then_replay_leaves_no_duplicate_facts(shared_r
 # ================================================================================================ 5. edit reconciliation
 
 def test_t26c_05_a_save_is_reconciled_into_a_new_committed_version_before_cross_environment_promotion(
-        release, staging, prod):
+        release, staging, prod, capsys):
     """plan 4.14: "An admin edit is journaled, reconciled into a new JSON version, tested and committed before
-    cross-environment promotion." The reconciliation path exists (``create_snapshot(edit_journal=...)``); what
-    does not exist is a route or command that drives it, so the test plays the operator (see the H5 record)."""
+    cross-environment promotion." The operator drives it with ``f2w-kg-snapshot --reconcile-edits`` (step 1:
+    the new version from the live snapshot plus the journal) and ``--confirm-commit`` (step 2: the commit that
+    holds it, recorded on the journal entries after the fixture owner committed); see the H5 record."""
     rel = release
     c1, c2 = rel.commits["c1"], rel.commits["c2"]
     staging.start_jobs()
@@ -745,22 +751,39 @@ def test_t26c_05_a_save_is_reconciled_into_a_new_committed_version_before_cross_
     assert staging.work() == (rollback.job_id, JobState.FAILED), "the job route refuses too (plan stage CONFLICT)"
     assert staging.readback()["nodes"][node][1] == "edited in the UI on staging", "nothing was overwritten"
 
-    # (c) reconcile into a NEW version v3 (parent v2, relation edit_reconciliation); the owner commits it (c4)
-    result = rel.build(CORPUS, 2, snapshot_id="v3", parent_snapshot_id="v2", parent_data_commit=c2,
-                       parent_relation="edit_reconciliation", edit_journal=journal, journal_target=staging.target,
-                       journal_scope=(CORPUS,))
-    assert result.snapshot_id == "v3" and sorted(result.reconciled_edits) == sorted(out.edit_ids)
-    assert result.edit_conflicts == ()
+    # (c) the operator reconciles into a NEW version v3 (parent v2, relation edit_reconciliation) with the
+    # command, from the live snapshot plus the journal: no terms, no json2kg, no Tiled, no Git write
+    assert build_kg_snapshot.main([
+        "--corpus", CORPUS, "--reconcile-edits", "--parent", "v2", "--parent-data-commit", c2, "--snapshot-id", "v3",
+        "--storage-kg", str(rel.storage), "--journal", str(journal.path), "--target", staging.target,
+        "--code-commit", COMMIT]) == 0
+    result = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert result["snapshot_id"] == "v3" and sorted(result["reconciled_edits"]) == sorted(out.edit_ids)
+    assert result["edit_conflicts"] == [] and result["relation"] == "edit_reconciliation"
+    assert result["graph_sha256"] == sha((rel.storage / CORPUS / "v3" / "graph.json").read_bytes())
+    assert {r.state for r in journal.latest().values()} == {"reconciled"}
+    assert {r.reconciled_in for r in journal.latest().values()} == {"v3"}
+    assert {r.data_commit for r in journal.latest().values()} == {None}, "no commit exists yet; none is claimed"
+    # the owner commits it (c4) ...
     c4 = rel.commit("c4", "data: synthetic/v3 (edit reconciliation of v2)")
     assert c4 != c2 and git(rel.root, "merge-base", "--is-ancestor", c2, c4) == ""
     assert codes(lambda: releases.lookup_snapshot(rel.root, c2, CORPUS, "v3")) == "missing", "v3 is a new commit's data"
     v3 = releases.lookup_snapshot(rel.root, c4, CORPUS, "v3")
     assert v3.manifest.parent.relation == "edit_reconciliation" and v3.manifest.parent.snapshot_id == "v2"
+    assert v3.manifest.edit_reconciliation.applied_edit_count == 2
     v3_graph = graph_in_git(rel, c4, CORPUS, "v3")
     assert v3.graph.sha256 != next(i for i in rel.items(c2, CORPUS, "v2") if i["role"] == "graph")["sha256"]
     assert next(t for t in v3_graph["things"] if t["id"] == node)["description"] == "edited in the UI on staging"
-    assert {r.state for r in journal.latest().values()} == {"reconciled"}
-    assert {r.reconciled_in for r in journal.latest().values()} == {"v3"}
+    # ... and records the commit on the reconciled entries (step 2), only after the commit verifiably holds v3
+    assert build_kg_snapshot.main([
+        "--corpus", CORPUS, "--confirm-commit", c2, "--snapshot-id", "v3", "--repo", str(rel.root),
+        "--storage-kg", str(rel.storage), "--journal", str(journal.path)]) == 1, "c2 does not hold v3"
+    assert build_kg_snapshot.main([
+        "--corpus", CORPUS, "--confirm-commit", c4, "--snapshot-id", "v3", "--repo", str(rel.root),
+        "--storage-kg", str(rel.storage), "--journal", str(journal.path)]) == 0
+    confirmed = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert confirmed["data_commit"] == c4 and sorted(confirmed["recorded"]) == sorted(out.edit_ids)
+    assert {(r.state, r.reconciled_in, r.data_commit) for r in journal.latest().values()} == {("reconciled", "v3", c4)}
 
     # (d) only now is anything promoted: staging first (same journal, edit now inside the lineage) ...
     staging.mount_selection(rel, c4, CORPUS, "v3")
@@ -778,11 +801,12 @@ def test_t26c_05_a_save_is_reconciled_into_a_new_committed_version_before_cross_
     assert art_s.receipt.snapshot_sha256 == art_p.receipt.snapshot_sha256 == v3.graph.sha256
     assert plan_s.plan_sha256 != plan_p.plan_sha256 and art_s.receipt.receipt_id != art_p.receipt.receipt_id
     assert art_p.receipt.target == prod.target != art_s.receipt.target
+    assert art_s.extras.data_commit == art_p.extras.data_commit == c4, "both job-path receipts record the commit"
     emit("edit_reconciliation", edits=out.edit_ids, reconciled_in="v3", new_commit=c4, parent_commit=c2,
          v3_graph_sha256=v3.graph.sha256, staging_receipt=art_s.receipt.receipt_id,
          prod_disposable_receipt=art_p.receipt.receipt_id, files_mounted_on_prod=len(prod_files),
-         gap="reconciliation is only reachable through create_snapshot(edit_journal=...) / the post-extraction freezer "
-             "(relation 'rebuild'); no command or route builds an edit_reconciliation version from the journal alone")
+         command="f2w-kg-snapshot --reconcile-edits (v3 from live v2 + journal), then --confirm-commit c4",
+         journal_data_commit=c4)
 
 
 # ================================================================================================ 6. rollback
