@@ -40,15 +40,13 @@ from ..modules.deployment import tiled_lifecycle
 from ..modules.deployment.tiled_config import ManagedTiledConfig
 from ..modules.graph import edit_journal as ej
 from ..modules.graph.backends.tiled_mutations import TiledMutationClient
-from ..modules.graph.imports.corpus_scope import ReleaseState, scope_dir
+from ..modules.graph.imports.corpus_scope import JOURNAL_FILENAME, ReleaseState, journal_path, scope_dir
 from ..modules.graph.imports.tiled_json import Clock
 from ..modules.graph.legacy_save import SaveTarget, TiledSaveBackend
 from ..modules.graph.ports import ContractError, ErrorCode
 from ..modules.jobs.publish_store import Pointer, PublishStore
 from ..modules.security.authorization import DeploymentSettings
 
-#: File name of the per-corpus edit journal under the scope's state directory.
-JOURNAL_FILENAME = "edits.jsonl"
 #: Owner wording (2026-11-03) for the state where Tiled holds no copy the UI could edit (``kg_update``).
 UNAVAILABLE_INDICATOR = "JSON available, Tiled unavailable"
 
@@ -68,7 +66,7 @@ class SaveUnavailable(ContractError):
 
 def local_edit_journal(state_dir: Path, target: str, scope: str) -> ej.EditJournal:
     """The per-corpus edit journal of ``scope`` on ``target`` (shared by Save and the publication step)."""
-    return ej.EditJournal(scope_dir(state_dir, target, scope) / JOURNAL_FILENAME)
+    return ej.EditJournal(journal_path(state_dir, target, scope))
 
 
 class LocalSaveProvider:

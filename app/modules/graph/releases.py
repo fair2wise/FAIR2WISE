@@ -338,6 +338,25 @@ def _graph_counts(blob: bytes) -> tuple[int, int]:
         raise ReleaseVerificationError("tampered", "graph.json is not a KG document") from None
 
 
+def walk_ancestry(snapshot_dir: Path, manifest: KGManifest, *, limit: int = 1000) -> tuple[str, ...]:
+    """Parent chain of a snapshot read from sibling ``<corpus>/<vN>/manifest.json`` files (T23C).
+
+    The walk stops at the first missing or unreadable ancestor manifest (the chain is then shorter, which can
+    only make an import look *less* protected-safe, never hide a conflict) and on any cycle.
+    """
+    seen = [manifest.snapshot_id]
+    current = manifest.parent.snapshot_id if manifest.parent else None
+    while current and current not in seen and len(seen) <= limit:
+        seen.append(current)
+        try:
+            raw = json.loads((snapshot_dir.parent / current / "manifest.json").read_text(encoding="utf-8"))
+            parent = (raw.get("parent") or {}).get("snapshot_id")
+        except (OSError, ValueError, AttributeError):
+            break
+        current = parent if isinstance(parent, str) else None
+    return tuple(seen[1:])
+
+
 def verify_snapshot_dir(snapshot_dir: Path) -> VerifiedSnapshot:
     """Hash-check ``storage/kg/<corpus>/<snapshot-id>/`` as it stands on disk.
 
@@ -1484,6 +1503,103 @@ def lookup_snapshot(repo: Path, data_commit: str, corpus: str, snapshot_id: str)
     return verify_git_release(repo, data_commit, items)
 
 
+#: Suffix of the commit record an export leaves beside the snapshot directory on a mount
+#: (``storage/kg/<corpus>/<vN>.release_commit.json``; see :func:`release_commit_path`).
+RELEASE_COMMIT_SUFFIX = ".release_commit.json"
+RELEASE_COMMIT_VERSION = "1"
+
+
+def release_commit_path(snapshot_dir: Path) -> Path:
+    """Where the export records the data commit of the snapshot at ``snapshot_dir``: a sibling file, not an entry.
+
+    The frozen layout admits no extra file inside ``<corpus>/<vN>/`` (``verify_snapshot_dir``), so the record
+    sits beside it as ``<corpus>/<vN>.release_commit.json``; nothing that enumerates snapshot ids matches it.
+    """
+    snapshot_dir = Path(snapshot_dir)
+    return snapshot_dir.with_name(snapshot_dir.name + RELEASE_COMMIT_SUFFIX)
+
+
+def build_release_commit_record(release: VerifiedRelease) -> dict[str, Any]:
+    """The commit record of an exported selection: commit plus every exported path with its sha256 and blob."""
+    arts = [release.graph, release.manifest_artifact, *release.compat] + (
+        [release.validation] if release.validation is not None else [])
+    return {
+        "record_version": RELEASE_COMMIT_VERSION, "data_commit": release.data_commit,
+        "corpus": release.manifest.corpus, "snapshot_id": release.manifest.snapshot_id,
+        "graph_sha256": release.graph.sha256, "manifest_sha256": release.manifest_artifact.sha256,
+        "artifacts": [{"path": a.path, "sha256": a.sha256, "git_blob": a.git_blob} for a in arts],
+    }
+
+
+def read_release_commit(snapshot_dir: Path, *, graph_sha256: str, manifest_sha256: str) -> str | None:
+    """The data commit an export recorded for the snapshot at ``snapshot_dir``, or ``None`` when no record exists.
+
+    A record is trusted only when it is well formed, names this corpus/snapshot and its ``graph_sha256`` and
+    ``manifest_sha256`` equal the hashes just verified from the files; anything else is refused rather than
+    ignored, because a wrong commit must never be bound into a plan or receipt. A mount exported before the
+    record existed (no file) imports as before, with no commit.
+
+    Raises:
+        ReleaseVerificationError: ``record_invalid`` (malformed or belonging to another snapshot) or ``wrong_hash``
+            (the record's hashes are not the verified bytes').
+    """
+    snapshot_dir = Path(snapshot_dir)
+    path = release_commit_path(snapshot_dir)
+    if not os.path.lexists(path):
+        return None
+    if path.is_symlink():
+        raise ReleaseVerificationError("record_invalid", f"{path.name} is a symlink")
+    try:
+        raw = json.loads(path.read_bytes().decode("utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ReleaseVerificationError("record_invalid", f"{path.name} is unreadable: {exc}") from None
+    if not isinstance(raw, dict) or raw.get("record_version") != RELEASE_COMMIT_VERSION:
+        raise ReleaseVerificationError("record_invalid", f"{path.name} is not a release commit record")
+    commit = raw.get("data_commit")
+    if not isinstance(commit, str) or not _GIT_COMMIT.match(commit):
+        raise ReleaseVerificationError("record_invalid", f"{path.name}: data_commit is not a full Git object id")
+    if (raw.get("corpus"), raw.get("snapshot_id")) != (snapshot_dir.parent.name, snapshot_dir.name):
+        raise ReleaseVerificationError("record_invalid", f"{path.name} names another corpus/snapshot")
+    if raw.get("graph_sha256") != graph_sha256 or raw.get("manifest_sha256") != manifest_sha256:
+        raise ReleaseVerificationError("wrong_hash", f"{path.name} does not match the verified snapshot bytes")
+    return commit
+
+
+def _export_file(root: Path, rel_path: str, data: bytes, sha256: str) -> str:
+    """Create ``root/rel_path`` exclusively with ``data`` and re-hash it; identical existing bytes are accepted."""
+    target = root.joinpath(*rel_path.split("/"))
+    for parent in [target, *target.parents]:
+        if parent == root:
+            break
+        if parent.is_symlink():
+            raise ReleaseVerificationError("export_conflict", f"{rel_path}: a symlink is on the export path")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    status = "written"
+    if os.path.lexists(target):
+        if target.is_symlink() or target.read_bytes() != data:
+            raise ReleaseVerificationError("export_conflict", f"{rel_path} exists at the export root with "
+                                           "other bytes; exported files are never overwritten")
+        status = "already_present"
+    else:
+        tmp = target.with_name(f".{target.name}.export-{os.getpid()}.tmp")
+        try:
+            with tmp.open("xb") as handle:
+                handle.write(data)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.link(tmp, target)  # never replaces an existing file
+        except FileExistsError:
+            raise ReleaseVerificationError("export_conflict", f"{rel_path} appeared during export") from None
+        except OSError as exc:
+            raise ReleaseVerificationError("export_failed", f"{rel_path}: {exc.strerror}") from None
+        finally:
+            if tmp.exists():
+                tmp.unlink()
+    if sha256_bytes(target.read_bytes()) != sha256:
+        raise ReleaseVerificationError("export_failed", f"{rel_path} does not read back with the pinned sha256")
+    return status
+
+
 def export_snapshot_selection(repo: Path, data_commit: str, artifacts: Sequence[Mapping[str, Any]],
                               dest_root: Path) -> list[dict[str, Any]]:
     """Export pinned artifacts from ``data_commit`` to ``dest_root/<path>`` (a mount), byte for byte.
@@ -1492,6 +1608,11 @@ def export_snapshot_selection(repo: Path, data_commit: str, artifacts: Sequence[
     re-hashed after writing. An existing identical file is accepted (idempotent re-export); an existing different
     file, a symlink on the way or a write that does not read back identically is refused. The working tree of
     ``repo`` is never read and nothing is written to Git.
+
+    After the last artifact landed, the commit record ``<corpus>/<vN>.release_commit.json``
+    (:func:`build_release_commit_record`) is written beside the snapshot directory under the same rules, so an
+    import from this mount can record ``data_commit`` (H5 rehearsal finding 1). The returned list names the
+    artifacts only; the record's path is :func:`release_commit_path`.
 
     Raises:
         ReleaseVerificationError: a verification code, ``export_conflict`` or ``export_failed``.
@@ -1506,36 +1627,9 @@ def export_snapshot_selection(repo: Path, data_commit: str, artifacts: Sequence[
     root = root.resolve()
     done: list[dict[str, Any]] = []
     for art in chosen:
-        target = root.joinpath(*art.path.split("/"))
-        for parent in [target, *target.parents]:
-            if parent == root:
-                break
-            if parent.is_symlink():
-                raise ReleaseVerificationError("export_conflict", f"{art.path}: a symlink is on the export path")
-        target.parent.mkdir(parents=True, exist_ok=True)
-        status = "written"
-        if os.path.lexists(target):
-            if target.read_bytes() != art.data:
-                raise ReleaseVerificationError("export_conflict", f"{art.path} exists at the export root with "
-                                               "other bytes; exported files are never overwritten")
-            status = "already_present"
-        else:
-            tmp = target.with_name(f".{target.name}.export-{os.getpid()}.tmp")
-            try:
-                with tmp.open("xb") as handle:
-                    handle.write(art.data)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                os.link(tmp, target)  # never replaces an existing file
-            except FileExistsError:
-                raise ReleaseVerificationError("export_conflict", f"{art.path} appeared during export") from None
-            except OSError as exc:
-                raise ReleaseVerificationError("export_failed", f"{art.path}: {exc.strerror}") from None
-            finally:
-                if tmp.exists():
-                    tmp.unlink()
-        if sha256_bytes(target.read_bytes()) != art.sha256:
-            raise ReleaseVerificationError("export_failed",
-                                           f"{art.path} does not read back with the pinned sha256")
+        status = _export_file(root, art.path, art.data, art.sha256)
         done.append({"path": art.path, "sha256": art.sha256, "git_blob": art.git_blob, "status": status})
+    record = canonical_json_bytes(build_release_commit_record(release))
+    record_rel = release.graph.path.rsplit("/", 1)[0] + RELEASE_COMMIT_SUFFIX
+    _export_file(root, record_rel, record, sha256_bytes(record))
     return done

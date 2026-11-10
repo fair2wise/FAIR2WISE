@@ -61,7 +61,9 @@ from ..releases import (
     ReleaseVerificationError,
     VerifiedRelease,
     VerifiedSnapshot,
+    read_release_commit,
     verify_snapshot_dir,
+    walk_ancestry,
 )
 from ..snapshot_manifest import KGManifest
 from .journal import ImportJournal, Lease, operation_id
@@ -157,25 +159,6 @@ def default_supported_schema_fingerprints(registry: Any = None) -> frozenset[str
     return frozenset(current | {fp for fp in before if fp})
 
 
-def walk_ancestry(snapshot_dir: Path, manifest: KGManifest, *, limit: int = 1000) -> tuple[str, ...]:
-    """Parent chain of a snapshot read from sibling ``<corpus>/<vN>/manifest.json`` files (T23C).
-
-    The walk stops at the first missing or unreadable ancestor manifest (the chain is then shorter, which can
-    only make an import look *less* protected-safe, never hide a conflict) and on any cycle.
-    """
-    seen = [manifest.snapshot_id]
-    current = manifest.parent.snapshot_id if manifest.parent else None
-    while current and current not in seen and len(seen) <= limit:
-        seen.append(current)
-        try:
-            raw = json.loads((snapshot_dir.parent / current / "manifest.json").read_text(encoding="utf-8"))
-            parent = (raw.get("parent") or {}).get("snapshot_id")
-        except (OSError, ValueError, AttributeError):
-            break
-        current = parent if isinstance(parent, str) else None
-    return tuple(seen[1:])
-
-
 def load_source(source: Source, *, supported_schema_fingerprints: Collection[str]) -> SourceSnapshot:
     """Preflight a frozen snapshot (json_kg_contract.md 5.1; no target contact).
 
@@ -198,6 +181,13 @@ def load_source(source: Source, *, supported_schema_fingerprints: Collection[str
     else:
         manifest, graph_bytes, commit = source.manifest, source.graph_bytes, None
         graph_sha, manifest_sha = source.graph_sha256, source.manifest_sha256
+        if source_dir is not None:
+            # A mount written by ``f2w-kg-release export`` carries the commit the bytes were selected from
+            # (``<vN>.release_commit.json``, hash-bound to these files); an older mount has none.
+            try:
+                commit = read_release_commit(source_dir, graph_sha256=graph_sha, manifest_sha256=manifest_sha)
+            except ReleaseVerificationError as exc:
+                raise ContractError(ErrorCode.INVALID_INPUT, f"release commit record refused: {exc}") from None
     if hashlib.sha256(graph_bytes).hexdigest() != manifest.graph.sha256 or graph_sha != manifest.graph.sha256:
         raise ContractError(ErrorCode.INVALID_INPUT, "graph bytes do not match the manifest")
     fp = manifest.schema_block.import_fingerprint

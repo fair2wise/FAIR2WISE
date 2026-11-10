@@ -44,6 +44,35 @@ def test_missing_required_and_bad_profile_exit_2(capsys):
     assert "required" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize("argv", [
+    ["--corpus", "c", "--reconcile-edits", "--parent", "v1", "--journal", "j"],              # no --storage-kg
+    ["--corpus", "c", "--reconcile-edits", "--storage-kg", "s", "--journal", "j"],           # no --parent
+    ["--corpus", "c", "--reconcile-edits", "--parent", "v1", "--storage-kg", "s"],           # no journal
+    ["--corpus", "c", "--reconcile-edits", "--parent", "v1", "--storage-kg", "s", "--state-dir", "d"],  # no target
+    ["--corpus", "c", "--reconcile-edits", "--parent", "v1", "--storage-kg", "s", "--journal", "j",
+     "--parent-relation", "repair"],                                                          # relation is fixed
+    ["--corpus", "c", "--confirm-commit", "abc", "--snapshot-id", "v2", "--repo", "r", "--storage-kg", "s",
+     "--journal", "j"],                                                                       # not a full commit
+    ["--corpus", "c", "--confirm-commit", "a" * 40, "--repo", "r", "--storage-kg", "s", "--journal", "j"],  # no id
+    ["--corpus", "c", "--confirm-commit", "a" * 40, "--snapshot-id", "v2", "--storage-kg", "s", "--journal", "j"],
+    ["--corpus", "c", "--reconcile-edits", "--confirm-commit", "a" * 40, "--parent", "v1", "--storage-kg", "s",
+     "--journal", "j", "--snapshot-id", "v2", "--repo", "r"],                                 # one mode at a time
+])
+def test_reconciliation_modes_check_their_own_requirements_exit_2(argv, capsys):
+    with pytest.raises(SystemExit) as stop:
+        cmd.parse_args(argv)
+    assert stop.value.code == 2 and capsys.readouterr().err
+
+
+def test_reconciliation_modes_parse_without_terms():
+    args = cmd.parse_args(["--corpus", "c", "--reconcile-edits", "--parent", "v1", "--storage-kg", "s",
+                           "--state-dir", "d", "--target", "http://127.0.0.1:8000"])
+    assert args.reconcile_edits and args.terms is None and args.target == "http://127.0.0.1:8000"
+    args = cmd.parse_args(["--corpus", "c", "--confirm-commit", "a" * 40, "--snapshot-id", "v2", "--repo", "r",
+                           "--storage-kg", "s", "--journal", "j"])
+    assert args.confirm_commit == "a" * 40 and not args.reconcile_edits and args.journal == Path("j")
+
+
 def test_help_exits_0(capsys):
     with pytest.raises(SystemExit) as stop:
         cmd.parse_args(["--help"])

@@ -64,20 +64,22 @@ target 36 entities / 19 links, route rollback plan `0/0/0`, 0 writes; zero infer
 non-loopback connects; real disposable server: `als-prod` rules, receipts `receipt-e087ed64e74d92989c67`,
 `receipt-596b1ae5c5c276e95dbf`, `receipt-e977ed4bfbb1cb00fc1d`, 14 entities after rollback, 17 FORGE rows unchanged.
 
-## Findings (gaps for H5, no product bug found)
+## Findings (gaps for H5, no product bug found; 1 and 2 closed afterwards)
 
-1. **The publication job's receipt does not record the data commit.** `ReplacementPublishStep` loads a mounted
-   directory, so `receipt.extras.data_commit` is `null` on the job path (test 03 prints it). The receipt is still bound to
-   the Git bytes by `snapshot_sha256` (equals the pinned sha256) and `manifest_sha256`. The commit is recorded when the
-   importer's source is the commit-selected release object (`lookup_snapshot`/`verify_git_release`; tests 04 and 09).
-   Release contract section 8 says descriptors reference receipts by `receipt_sha256`, which works either way. Owner
-   question: should the job path carry the commit (needs the export step to leave a commit record on the mount)? Not
-   changed here; it is a design choice, not a defect.
-2. **Edit reconciliation has no operator entry point of its own.** `create_snapshot(edit_journal=...)` (and the
-   post-extraction freezer, relation `rebuild`) is the only path that replays the journal into a new version; there is no
-   command or route that builds an `edit_reconciliation` version from the journal alone, and `f2w-kg-snapshot` has no
-   journal option. The edit protection itself works (test 05). Also, the journal marks edits `reconciled` when the new
-   snapshot is created, before the owner commits it; the rehearsal checks the commit exists before any export.
+1. **The publication job's receipt did not record the data commit. CLOSED (design change, owner to confirm).**
+   `ReplacementPublishStep` loads a mounted directory, so `receipt.extras.data_commit` was `null` on the job path.
+   Now `f2w-kg-release export` (`releases.export_snapshot_selection`) also writes
+   `storage/kg/<corpus>/<vN>.release_commit.json` beside the snapshot directory (not inside it: the frozen layout
+   admits no extra file): `data_commit`, corpus, snapshot id, `graph_sha256`, `manifest_sha256` and every exported
+   path with sha256 and git blob, created exclusively and re-hashed like the artifacts. `tiled_json.load_source` reads
+   it for a directory source and trusts it only when its hashes equal the just-verified bytes; a record that is
+   malformed, names another snapshot, is a symlink or does not match the bytes is refused (`INVALID_INPUT`), never
+   ignored. A mount exported before this change has no file and imports as before with `data_commit` null. Tests:
+   `tests/releases/test_release_commit_record.py`; rehearsal tests 03 and 05 now assert the job-path receipts carry the
+   commit. The plan hash is unchanged by this for a given commit-less source; for a mount with a record the plan detail
+   carries the commit (it already did for release-object sources), so an approval is bound to it.
+2. **Edit reconciliation had no operator entry point of its own. CLOSED (no policy change).** See "Edit
+   reconciliation command" below.
 3. **The mount must include the flat compat copy.** Import refuses a mounted snapshot without
    `storage/kg/matkg_<corpus>_<id>.json` ("compat copy ... is missing"). The descriptor's artifact list includes it, so
    `f2w-kg-release export` mounts it. A hand-rolled export of only graph/manifest/validation fails.
@@ -85,6 +87,35 @@ non-loopback connects; real disposable server: `als-prod` rules, receipts `recei
    the commit report `missing`; committed ones report `layout`. Both are typed refusals and nothing is exported.
 5. Approvals: a production-profile plan needs its own verified-admin approval per target and per plan; nothing here
    weakens that (the approval is `DENIED` across targets and `STALE_APPROVAL` across plans).
+
+## Edit reconciliation command (finding 2)
+
+```sh
+# 1. new version v<N+1> (relation edit_reconciliation) from the live snapshot plus the per-corpus Save journal
+f2w-kg-snapshot --corpus <corpus> --reconcile-edits --parent <live vN> --storage-kg <workdir>/storage_kg \
+    --state-dir <ops-root>/publication-state --target <tiled-url>      # or --journal <path>/edits.jsonl
+# 2. the owner commits it (f2w-kg-release prepare / verify-committed, then the printed git commands), then
+f2w-kg-snapshot --corpus <corpus> --confirm-commit <40-hex> --snapshot-id v<N+1> --repo <repo> \
+    --storage-kg <workdir>/storage_kg --journal <path>/edits.jsonl
+```
+
+Step 1 replays the journal onto the parent's own `graph.json` bytes (a JSON patch, no terms, no json2kg), writes
+`graph.json`, `manifest.json` (with the `edit_reconciliation` block and `seed_graph`/`edit_journal` inputs),
+`validation.json` and the flat copy exactly as `create_snapshot` does, and prints directory, sha256 and manifest
+sha256. No Tiled, network, model or Git write. Journal entries are marked `reconciled` (`reconciled_in` = the new
+id) only after the frozen directory was re-read and hash-checked (`verify_snapshot_dir`); a failed read-back leaves the
+journal untouched. Conflicting edits are journaled as `conflict` and keep blocking the next import; if no edit
+changes the graph, or nothing is owed, no version is created. Step 2 verifies, read-only, that the commit holds
+exactly the local bytes and records the commit as `data_commit` on those entries (an appended record; idempotent; a
+different commit is refused).
+
+**State semantics chosen.** The journal model has no "pending commit" state and none was invented. `reconciled`
+already means "carried into snapshot `reconciled_in`", which is what the import-time protection needs the moment the
+version exists (a re-import of v2 must still be refused, and v3 is accepted). The cross-environment rule "committed
+before promotion" is a property of the version, so it is recorded as a field, `data_commit`, on the same entries
+by the explicit second step, and checked against Git bytes. Existing journals stay valid (the field defaults to null).
+The change from before: the journal is now advanced only after the read-back verification, in both
+`create_snapshot(edit_journal=...)` and the command.
 
 ## How the owner re-runs this against their own second disposable target
 
@@ -126,6 +157,7 @@ product's real profile settings and is outside this rehearsal.
 - Owner sign-off in `docs/migration/reviews/H5/decision.json` (not made here).
 - The owner names the real production-profile target. Nothing in this rehearsal authorizes a write there; the real
   promotion needs the owner's own approval of the plan for that target, made in the product.
-- Owner decisions on findings 1 and 2 (record the data commit on the job path; an operator entry point for edit
-  reconciliation). Neither blocks the rehearsal result.
+- Owner confirmation of the design changes that closed findings 1 and 2 (the `release_commit.json` record the export
+  leaves on the mount; the `f2w-kg-snapshot --reconcile-edits` / `--confirm-commit` two-step and the journal
+  `data_commit` field). Neither blocks the rehearsal result.
 - H6 repeats package/container parity.

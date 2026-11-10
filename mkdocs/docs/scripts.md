@@ -32,8 +32,8 @@ names.
 | `f2w-corpus-qa` | `commands.corpus_qa` | Extracted-terms QA audit (byte-pinned to the T19A baseline) |
 | `f2w-repair-corpus` | `commands.repair_corpus` | Write a repaired copy of an extracted-terms file |
 | `f2w-download-pdfs` | `literature.download_pdfs` | Search arXiv/OpenAlex and download PDFs |
-| `f2w-kg-snapshot` | `commands.build_kg_snapshot` | Freeze a versioned JSON KG snapshot |
-| `f2w-kg-release` | `commands.prepare_kg_release` | Prepare, verify and export a KG release (never commits or pushes) |
+| `f2w-kg-snapshot` | `commands.build_kg_snapshot` | Freeze a versioned JSON KG snapshot; `--reconcile-edits` freezes the next version from the live snapshot plus the Save journal, `--confirm-commit <40-hex>` records the commit that holds it on the reconciled edits |
+| `f2w-kg-release` | `commands.prepare_kg_release` | Prepare, verify and export a KG release (never commits or pushes); `export` also leaves `<corpus>/<vN>.release_commit.json` on the mount so a publication receipt records `data_commit` |
 | `f2w-kg-adopt` | `commands.adopt_legacy_kg` | `adopt` (flat `matkg_*.json` to `<corpus>/v<N>/` releases; `--dry-run`, `--only`, `--code-commit`) and `descriptor` (candidate data-release descriptor from Git objects); no Git write, no network, no Tiled |
 
 In the images the project is not pip-installed, so the same ten commands are installed as launchers in

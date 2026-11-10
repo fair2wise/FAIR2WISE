@@ -72,10 +72,10 @@ def test_rsoxs_and_bl1101_graphs_keep_their_overlay(registry, name, schema_id):
 def test_matkg_graphs_keep_no_overlay_and_default_to_matkg(registry, name):
     assert schema_path_for_graph(name) is None and registry.for_graph(name) is None
     # callers that need a schema then use the matkg default (snapshot._choose_schema)
-    from app.modules.graph.snapshot import _choose_schema, SnapshotRequest
+    from app.modules.graph.snapshot import _choose_schema
 
     corpus = name[len("matkg_"):-len(".json")].split("_")[0].lower()
-    entry, source = _choose_schema(SnapshotRequest(corpus=corpus, terms_path=Path("unused")), registry)
+    entry, source = _choose_schema(None, corpus, registry, allow_pending_review=False)
     assert (entry.schema_id, source) == ("matkg_schema", "default")
 
 

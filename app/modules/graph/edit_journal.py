@@ -6,8 +6,16 @@ that an acknowledged edit is never silently lost by a later import (plan 4.11: "
 acknowledged and then lost by the next import").
 
 Lifecycle of an entry: ``recorded`` -> ``applied`` (scoped Tiled effect done) -> ``acknowledged``
-(the caller was told) -> ``reconciled`` (carried into snapshot ``reconciled_in``). An entry may also
-become ``conflict`` or ``resolved`` (a reviewed :class:`ConflictResolution` was attached).
+(the caller was told) -> ``reconciled`` (carried into the frozen, re-read and hash-checked snapshot
+``reconciled_in``). An entry may also become ``conflict`` or ``resolved`` (a reviewed
+:class:`ConflictResolution` was attached).
+
+``reconciled`` means "part of a new JSON version", as plan 4.14 and GIT_KG_PROMOTION_SPEC.md order the steps
+("journaled, reconciled into a new JSON version, tested and committed before cross-environment promotion"):
+the commit is a later, separate step owned by the operator. It is recorded on the same entry as
+``data_commit`` (a further ``reconciled`` record appended by ``f2w-kg-snapshot --confirm-commit`` once the
+commit verifiably holds the version's bytes), so a promotion check can ask the journal both "which version
+carries this edit" and "which commit holds that version" without a new state.
 
 Q7/Q12 (owner, 2026-10-30): a Save performs its multi-write sequence on Tiled immediately and is
 acknowledged only after the Tiled effect. A sequence that stops half-way marks the entry ``failed``;
@@ -59,6 +67,8 @@ class EditRecord(BaseModel):
         before / after: Field-level values, or hashes for protected text.
         recorded_at: Time of this record.
         reconciled_in: Snapshot id that carries the edit (``reconciled``/``resolved``).
+        data_commit: Full Git object id of the commit that holds ``reconciled_in`` (``f2w-kg-snapshot
+            --confirm-commit``, after the owner committed the reconciled version). ``None`` until then.
         note: Free text (conflict/resolution reason).
     """
 
@@ -80,6 +90,7 @@ class EditRecord(BaseModel):
     after: dict[str, object] = Field(default_factory=dict)
     recorded_at: datetime
     reconciled_in: str | None = None
+    data_commit: str | None = Field(default=None, pattern=r"^[0-9a-f]{40}$")
     note: str | None = None
 
 
@@ -172,13 +183,14 @@ class EditJournal:
         return {r.edit_id: r for r in self._read()}
 
     def advance(self, edit_id: str, state: State, at: datetime, *, reconciled_in: str | None = None,
-                note: str | None = None) -> EditRecord:
-        """Append the next state of an existing edit."""
+                note: str | None = None, data_commit: str | None = None) -> EditRecord:
+        """Append the next state of an existing edit (``reconciled_in``/``data_commit`` are kept when not given)."""
         current = self.latest().get(edit_id)
         if current is None:
             raise ContractError(ErrorCode.NOT_FOUND, f"no edit {edit_id!r}")
         return self.append(current.model_copy(update={"seq": current.seq + 1, "state": state, "recorded_at": at,
                                                       "reconciled_in": reconciled_in or current.reconciled_in,
+                                                      "data_commit": data_commit or current.data_commit,
                                                       "note": note if note is not None else current.note}))
 
     def sha256(self) -> str:
