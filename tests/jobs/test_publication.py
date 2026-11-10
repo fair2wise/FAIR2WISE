@@ -282,6 +282,31 @@ def test_competing_publisher_for_the_same_target_is_refused(w):
     assert w.work() == (job_id, JobState.SUCCEEDED)
 
 
+def test_a_long_import_keeps_the_publisher_lease_alive_through_its_guard_calls(w):
+    """A 22k-node publication ran past the 120 s publisher lease and lost it mid-import (twice a minute of work
+    was redone from the journal until the job failed). The import guard must renew the per-target lease, so an
+    import whose every gap is shorter than the lease may run for any total time."""
+    from app.modules.jobs.store import Lease
+
+    job_id = to_review(w)
+    w.approve(job_id)
+    real_apply = w.step.apply
+    stretch = w.jobs_store.lease_seconds * 2 // 3  # each gap is shorter than the lease; four gaps are not
+
+    def slow_apply(ctx, plan, approval, *, operation_id, guard):
+        for _ in range(4):
+            w.clock.advance(stretch)
+            row = w.jobs_db.one("SELECT * FROM leases WHERE resource=?", (f"job:{job_id}",))
+            # what the worker's heartbeat thread does for the job lease while the stage blocks
+            w.jobs_store.renew_lease(Lease(row["resource"], row["owner"], row["token"], row["fence"], row["expires_at"]))
+            guard()
+        return real_apply(ctx, plan, approval, operation_id=operation_id, guard=guard)
+
+    w.step.apply = slow_apply
+    assert w.work() == (job_id, JobState.SUCCEEDED)
+    assert len(w.tiled.entities) == 3 and len(w.tiled.links) == 2
+
+
 def test_a_publisher_lease_that_never_frees_fails_the_job_after_the_bounded_retries(w):
     from app.modules.jobs.pipeline import MAX_CONFLICT_REQUEUES
 
