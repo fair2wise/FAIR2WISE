@@ -409,7 +409,7 @@ def _check_per_page(per_page: int | None) -> None:
 
 def openalex_get(endpoint: str, *, search: str | None = None, filters: Mapping[str, Any] | None = None,
                  search_first: bool = True, per_page: int | None = None, cursor: str | None = None,
-                 mailto: str | None = None, api_key: str | None = None,
+                 params: Mapping[str, str] | None = None, mailto: str | None = None, api_key: str | None = None,
                  get_json: GetJson = hardened_get_json,
                  sleep: Callable[[float], None] | None = None) -> tuple[list[dict[str, JsonValue]], str | None]:
     """One list request, ``pyalex.<Endpoint>().search(..).filter(..).get(per_page=N)`` over the hardened getter.
@@ -424,6 +424,8 @@ def openalex_get(endpoint: str, *, search: str | None = None, filters: Mapping[s
         search_first: ``True`` for ``.search(..).filter(..)`` order, ``False`` for ``.filter(..).search(..)``.
         per_page: Page size, 1..200 (pyalex's own rule).
         cursor: Cursor token (``"*"`` starts a cursor walk).
+        params: Extra query parameters appended after ``per-page`` (``sort``, ``select``); none by default, so the
+            existing callers' URLs are unchanged.
         mailto: Contact address (``From`` header and ``mailto`` parameter), when usable.
         api_key: OpenAlex key; sent as ``Authorization: Bearer`` only, never in the URL or a log line.
         get_json: The hardened getter (patched by tests).
@@ -444,6 +446,7 @@ def openalex_get(endpoint: str, *, search: str | None = None, filters: Mapping[s
         parts.append(f"cursor={quote_plus(cursor)}")
     if per_page is not None:
         parts.append(f"per-page={per_page}")
+    parts.extend(f"{quote_plus(name)}={quote_plus(value, safe=',:')}" for name, value in (params or {}).items())
     if mailto:
         parts.append(f"mailto={quote_plus(mailto)}")
     query = "&".join(parts)

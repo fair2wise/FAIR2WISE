@@ -12,21 +12,37 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import partial
+import json
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 import httpx
 import pytest
 
-from app.modules.library.harvest import Candidate, arxiv_queries, arxiv_searcher, clean_doi
+from app.modules.library import harvest as hv
+from app.modules.library.harvest import Candidate, arxiv_queries, arxiv_searcher, clean_doi, openalex_searcher
+from app.modules.library.service import VerifyUnavailable
 from app.modules.literature import legacy_download as ld
 from app.modules.literature.legacy_download import JSONFetchError, hardened_get_bytes, hardened_get_json
+from app.modules.literature.openalex import (
+    OpenAlexClient,
+    OpenAlexSettings,
+    QuotaBreaker,
+    ResponseCache,
+    abstract_from_inverted_index,
+    raise_for_no_data,
+)
 from app.modules.literature.safe_fetch import NetworkPolicy
 
 FIX = Path(__file__).parent / "fixtures" / "harvest_metadata"
 PUBLIC = NetworkPolicy(resolver=lambda host: ["93.184.216.34"])
 PAGE1, PAGE2, EMPTY = ((FIX / n).read_bytes() for n in ("arxiv_page1.xml", "arxiv_page2.xml", "arxiv_empty.xml"))
+OA_BODY = (FIX / "openalex_library_search.json").read_bytes()
+KEY = "oa-secret-key-0123456789"
+MAILTO = "curator@lbl.gov"
 
 
 @pytest.fixture(autouse=True)
@@ -65,6 +81,10 @@ class Wire:
     @property
     def urls(self) -> list[str]:
         return [str(r.url) for r in self.requests]
+
+
+def _query(url: str) -> dict[str, list[str]]:
+    return parse_qs(urlsplit(url).query)
 
 
 # ------------------------------------------------------------------------------------------------ arXiv
@@ -180,3 +200,118 @@ def test_arxiv_search_is_policy_checked_per_hop():
                       policy=NetworkPolicy(resolver=lambda host: ["10.0.0.5"]))
     with pytest.raises(JSONFetchError, match="blocked URL"):
         arxiv_searcher(get_bytes=blocked)("rsoxs", 5)
+
+
+# ------------------------------------------------------------------------------------------------ OpenAlex
+def old_openalex_searcher(fetch: Callable[..., Any]) -> Callable[[str, int], list[Candidate]]:
+    """The pre-port ``openalex_searcher`` body, verbatim, over an injected real ``OpenAlexClient.fetch``."""
+    from app.modules.literature.acquire import openalex_work_urls
+
+    def search(topic: str, per_query: int) -> list[Candidate]:
+        params = {"search": " ".join(hv.topic_terms(topic)) or topic, "per_page": min(per_query, 100),
+                  "sort": "relevance_score:desc", "select": hv._OPENALEX_FIELDS}
+        data = fetch("works", params, timeout=30.0)
+        raise_for_no_data(data)
+        found: list[Candidate] = []
+        for work in data.get("results", []):
+            doi = clean_doi(work.get("doi"))
+            primary = (work.get("primary_location") or {}).get("landing_page_url") or ""
+            found.append(Candidate(
+                title=" ".join(str(work.get("title") or "").split()), source="openalex",
+                year=work.get("publication_year"), doi=doi,
+                abstract=abstract_from_inverted_index(work.get("abstract_inverted_index")) or "",
+                landing_url=f"https://doi.org/{doi}" if doi else (primary or str(work.get("id") or "")),
+                pdf_urls=openalex_work_urls(work)))
+        return found
+
+    return search
+
+
+def _old_openalex(wire: Wire, topic: str, per_query: int) -> list[Candidate]:
+    client = OpenAlexClient(wire.client(), cache=ResponseCache(":memory:"), breaker=QuotaBreaker(),
+                            settings=OpenAlexSettings(api_key=KEY, mailto=MAILTO), sleep=lambda s: None)
+    return old_openalex_searcher(client.fetch)(topic, per_query)
+
+
+@pytest.fixture
+def keyed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENALEX_API_KEY", KEY)
+
+
+def test_openalex_searcher_matches_the_client_results(keyed: None):
+    topic = "resonant soft x-ray scattering"
+    old_wire, new_wire = Wire((200, OA_BODY)), Wire((200, OA_BODY))
+    old = _old_openalex(old_wire, topic, 150)
+    new = openalex_searcher(lambda: MAILTO, get_json=new_wire.getter(hardened_get_json))(topic, 150)
+
+    assert new == old and len(new) == 3
+    assert [c.doi for c in new] == ["10.1021/acs.macromol.3c09999", None, "10.1000/closed.1"]
+    assert new[0].title == "Molecular orientation from RSoXS" and new[0].abstract == "We measure orientation with RSoXS"
+    assert "https://arxiv.org/pdf/2312.09999v2" in new[0].pdf_urls and new[0].landing_url.startswith("https://doi.org/10.")
+    assert new[1].landing_url == "https://repo.example.edu/handle/1234" and new[1].year == 2019
+    assert new[2].title == "" and new[2].landing_url == "https://doi.org/10.1000/closed.1" and new[2].year is None
+
+
+def test_openalex_request_is_the_same_query_with_the_key_in_the_header_only(keyed: None):
+    old_wire, new_wire = Wire((200, OA_BODY)), Wire((200, OA_BODY))
+    _old_openalex(old_wire, "resonant soft x-ray scattering", 150)
+    openalex_searcher(lambda: MAILTO, get_json=new_wire.getter(hardened_get_json))("resonant soft x-ray scattering", 150)
+    old_q, new_q = _query(old_wire.urls[0]), _query(new_wire.urls[0])
+
+    assert urlsplit(old_wire.urls[0]).path == urlsplit(new_wire.urls[0]).path == "/works"
+    assert old_q.pop("api_key") == [KEY]  # the old client's query-parameter key ...
+    assert "api_key" not in new_q and KEY not in new_wire.urls[0]  # ... is gone from the URL
+    assert new_q.pop("per-page") == old_q.pop("per_page") == ["100"]  # capped at 100; OpenAlex takes either spelling
+    assert new_q == old_q  # search, sort, select, mailto
+    assert new_q["search"] == ["resonant soft x-ray scattering"] and new_q["sort"] == ["relevance_score:desc"]
+    request = new_wire.requests[0]
+    assert request.headers["authorization"] == f"Bearer {KEY}" and request.headers["from"] == MAILTO
+
+
+def test_openalex_without_an_exported_key_is_skipped_not_called(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
+    wire = Wire((200, OA_BODY))
+    with pytest.raises(VerifyUnavailable, match="OPENALEX_API_KEY is not configured"):
+        openalex_searcher(lambda: "", get_json=wire.getter(hardened_get_json))("rsoxs", 5)
+    assert wire.requests == []
+
+
+def test_openalex_polite_contact_is_optional(keyed: None):
+    wire = Wire((200, OA_BODY))
+    openalex_searcher(get_json=wire.getter(hardened_get_json))("rsoxs", 5)
+    assert "mailto" not in _query(wire.urls[0]) and "from" not in wire.requests[0].headers
+
+
+def test_openalex_honours_retry_after_once_and_then_fails_like_a_skipped_source(keyed: None):
+    slept: list[float] = []
+    wire = Wire((429, b"", {"Retry-After": "4"}), (200, OA_BODY))
+    found = openalex_searcher(get_json=wire.getter(hardened_get_json), sleep=slept.append)("rsoxs", 5)
+    assert len(found) == 3 and slept == [4.0] and len(wire.urls) == 2
+
+    slept.clear()
+    quota = Wire((429, b""))  # an exhausted daily allowance names no wait: one request, error out (the source is skipped)
+    with pytest.raises(JSONFetchError, match="HTTP 429"):
+        openalex_searcher(get_json=quota.getter(hardened_get_json), sleep=slept.append)("rsoxs", 5)
+    assert slept == [] and len(quota.urls) == 1
+
+
+def test_openalex_key_never_reaches_a_log_line(keyed: None, caplog: pytest.LogCaptureFixture):
+    caplog.set_level(logging.DEBUG)
+    wire = Wire((429, b"", {"Retry-After": "1"}), (200, OA_BODY))
+    openalex_searcher(lambda: MAILTO, get_json=wire.getter(hardened_get_json), sleep=lambda s: None)("rsoxs", 5)
+    assert KEY not in caplog.text and KEY not in repr(wire.requests[0].url)
+
+
+def test_an_answer_without_results_is_an_error_and_the_source_is_skipped(keyed: None):
+    wire = Wire((200, json.dumps({"error": "x"}).encode()))
+    with pytest.raises(ValueError, match="Unknown response format"):
+        openalex_searcher(get_json=wire.getter(hardened_get_json))("rsoxs", 5)
+
+
+def test_openalex_get_extra_params_do_not_change_existing_urls():
+    wire = Wire((200, OA_BODY), (200, OA_BODY))
+    ld.openalex_get("works", search="a b", per_page=5, get_json=wire.getter(hardened_get_json))
+    ld.openalex_get("works", search="a b", per_page=5, params={"sort": "relevance_score:desc", "select": "id,doi"},
+                    get_json=wire.getter(hardened_get_json))
+    assert wire.urls[0] == "https://api.openalex.org/works?search=a+b&per-page=5"
+    assert wire.urls[1] == "https://api.openalex.org/works?search=a+b&per-page=5&sort=relevance_score:desc&select=id,doi"

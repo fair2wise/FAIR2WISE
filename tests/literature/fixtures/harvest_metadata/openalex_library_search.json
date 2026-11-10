@@ -1,0 +1,41 @@
+{
+  "meta": {"count": 3, "db_response_time_ms": 41, "page": 1, "per_page": 3, "next_cursor": "IlsxNzAxXSI="},
+  "results": [
+    {
+      "id": "https://openalex.org/W4300000001",
+      "doi": "https://doi.org/10.1021/ACS.MACROMOL.3C09999",
+      "title": "Molecular   orientation from\n RSoXS",
+      "publication_year": 2023,
+      "primary_location": {"landing_page_url": "https://pubs.acs.org/doi/10.1021/acs.macromol.3c09999", "pdf_url": null, "is_oa": false},
+      "best_oa_location": {"landing_page_url": "https://arxiv.org/abs/2312.09999", "pdf_url": "https://arxiv.org/pdf/2312.09999v2", "is_oa": true, "version": "submittedVersion"},
+      "locations": [
+        {"landing_page_url": "https://arxiv.org/abs/2312.09999", "pdf_url": "https://arxiv.org/pdf/2312.09999v2", "is_oa": true, "version": "submittedVersion"},
+        {"landing_page_url": "https://pubs.acs.org/doi/10.1021/acs.macromol.3c09999", "pdf_url": null, "is_oa": false}
+      ],
+      "open_access": {"is_oa": true, "oa_status": "green", "oa_url": "https://arxiv.org/pdf/2312.09999v2"},
+      "abstract_inverted_index": {"We": [0], "measure": [1], "orientation": [2], "with": [3], "RSoXS": [4]}
+    },
+    {
+      "id": "https://openalex.org/W4300000002",
+      "doi": null,
+      "title": "A thesis without a DOI",
+      "publication_year": 2019,
+      "primary_location": {"landing_page_url": "https://repo.example.edu/handle/1234", "pdf_url": null, "is_oa": true},
+      "best_oa_location": null,
+      "locations": [{"landing_page_url": "https://repo.example.edu/handle/1234", "pdf_url": "https://repo.example.edu/bitstream/1234/thesis.pdf", "is_oa": true, "version": "publishedVersion"}],
+      "open_access": {"is_oa": true, "oa_status": "green", "oa_url": "https://repo.example.edu/bitstream/1234/thesis.pdf"},
+      "abstract_inverted_index": null
+    },
+    {
+      "id": "https://openalex.org/W4300000003",
+      "doi": "https://doi.org/10.1000/closed.1",
+      "title": null,
+      "publication_year": null,
+      "primary_location": null,
+      "best_oa_location": null,
+      "locations": [],
+      "open_access": {"is_oa": false, "oa_status": "closed", "oa_url": null},
+      "abstract_inverted_index": null
+    }
+  ]
+}

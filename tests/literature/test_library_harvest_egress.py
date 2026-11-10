@@ -15,7 +15,7 @@ from app.modules.library import harvest
 from app.modules.literature import legacy_download
 
 CLIENTS = {"pyalex", "arxiv", "feedparser", "lxml", "defusedxml", "requests", "urllib3"}
-GETTER = {"arxiv_results": "get_bytes"}
+GETTER = {"arxiv_results": "get_bytes", "openalex_get": "get_json"}
 SOURCE = Path(harvest.__file__).read_text(encoding="utf-8")
 TREE = ast.parse(SOURCE)
 
@@ -37,6 +37,7 @@ def test_no_direct_metadata_client_in_the_harvester():
         if isinstance(node, ast.Call):
             assert getattr(node.func, "id", "") not in {"__import__", "import_module"}
             assert getattr(node.func, "attr", "") != "import_module"
+    assert "OpenAlexClient" not in SOURCE and "_get_fetch" not in SOURCE
 
 
 def test_helper_calls_pass_their_getter_explicitly():
@@ -49,8 +50,10 @@ def test_helper_calls_pass_their_getter_explicitly():
 
 def test_the_default_getters_are_the_hardened_ones():
     assert harvest.hardened_get_bytes is legacy_download.hardened_get_bytes
-    assert harvest.arxiv_results is legacy_download.arxiv_results
+    assert harvest.hardened_get_json is legacy_download.hardened_get_json
+    assert harvest.arxiv_results is legacy_download.arxiv_results and harvest.openalex_get is legacy_download.openalex_get
     assert harvest.arxiv_searcher.__kwdefaults__["get_bytes"] is legacy_download.hardened_get_bytes  # type: ignore[index]
+    assert harvest.openalex_searcher.__kwdefaults__["get_json"] is legacy_download.hardened_get_json  # type: ignore[index]
 
 
 def test_the_arxiv_call_never_undercuts_the_three_second_rule():
@@ -58,6 +61,15 @@ def test_the_arxiv_call_never_undercuts_the_three_second_rule():
     delay = next(k.value for k in call.keywords if k.arg == "delay_seconds")
     assert isinstance(delay, ast.Name) and delay.id == "ARXIV_MIN_INTERVAL_SECONDS"
     assert not any(k.arg in {"limiter", "sleep", "clock"} for k in call.keywords)  # the process-wide limiter applies
+
+
+def test_openalex_key_comes_from_the_exported_environment_through_the_helper_only():
+    keyed = [k.value for call in _calls("openalex_get") for k in call.keywords if k.arg == "api_key"]
+    assert keyed and all(isinstance(v, ast.Call) and getattr(v.func, "id", "") == "openalex_api_key" and not v.args
+                         for v in keyed)
+    assert "OPENALEX_API_KEY" not in SOURCE.replace('"OPENALEX_API_KEY is not configured"', "")
+    assert "api_key=" not in SOURCE.replace("api_key=openalex_api_key()", "")  # never a URL parameter
+    assert harvest.openalex_api_key is legacy_download.openalex_api_key
 
 
 def test_pdf_downloader_still_checks_every_redirect_hop():

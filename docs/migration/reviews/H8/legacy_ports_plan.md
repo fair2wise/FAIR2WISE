@@ -180,7 +180,22 @@ Both P1 owner-gated items were decided on 2026-11-09 (nineteenth set) and are do
   `harvest_rsoxs` and `download_pdfs.run_openalex_workflow` pass it, sent as `Authorization: Bearer` only. `dotenv_entry.PROCESS_ONLY_VARS` drops a `.env` value;
   `scripts/run_local_container.sh` already passes it through only when exported. Tests: `test_legacy_download_polite.py`, `test_openalex_api_key.py` (URL/log/repr tripwires);
   egress pins now require `api_key=openalex_api_key()`; parity tests unchanged.
-- Follow-up (not done, another session owns it): `app/modules/library/harvest.py` (`arxiv` package client, `OpenAlexClient`) should get the same 3 s arXiv spacing and Retry-After handling.
+- Follow-up: `app/modules/library/harvest.py` (`arxiv` package client, `OpenAlexClient`) should get the same 3 s arXiv spacing and Retry-After handling. Done in P1d below.
+
+### P1d. Library harvest on the same helpers (DONE 2026-11-09, branch `forge_merge-T-library-harvest-port`, not merged)
+
+`app/modules/library/harvest.py` (the Library/Harvester feature, `library_harvest` job) was the last `import arxiv` in `app/`; its owner (session f2w-mateo-c0) agreed to the port.
+
+- **arXiv.** `arxiv_searcher(*, get_bytes=hardened_get_bytes)` runs `arxiv_results(query, per_query, sort_by="submittedDate", page_size=min(per_query, 50), delay_seconds=ARXIV_MIN_INTERVAL_SECONDS, retries=3, get_bytes=...)`
+  for each query (same requests, sort, page size and retry count as the old `arxiv.Client(page_size, delay_seconds=3.0, num_retries=3)`), and builds the same `Candidate`s (id = last path segment of the Atom id, as before).
+- **OpenAlex.** `openalex_searcher(contact=lambda: "", *, get_json=hardened_get_json, sleep=None)` calls `openalex_get("works", search=..., per_page=min(per_query, 100), params={"sort": "relevance_score:desc", "select": ...}, mailto=..., api_key=openalex_api_key(), get_json=...)`.
+  `openalex_get` gained an optional `params` mapping (appended after `per-page`; absent by default, so no existing URL changes). The key is read from the process environment per search and sent only as `Authorization: Bearer`;
+  without it the source raises `VerifyUnavailable("OPENALEX_API_KEY is not configured")` and the harvest skips it, as before. The polite-pool address comes from the new `LibraryService.contact_email` (set by `from_startup` from `OPENALEX_EMAIL`, placeholders dropped).
+- **Kept unchanged (constraints of the Harvester owner):** `pdf_downloader` (per-hop `NetworkPolicy.check_url`, size cap, `%PDF-` check), the job inputs, the `library_harvest` kind, routes, response shapes and the candidates/dismiss flows; `tests/library/test_library_harvest.py` passes untouched (it injects searchers). `OpenAlexClient` is unchanged and still serves verify, intake, resolver and tools (its key still travels as an `api_key` parameter there; that is outside this port and is listed in the report as a follow-up decision).
+- **Behaviour changes.** arXiv requests are now at least 3 s apart process-wide (the package spaced them per client only, and a second harvest right behind the first was not spaced); a 429/503 with `Retry-After` is waited out once (cap 60 s) for both sources. OpenAlex lost the client's response cache, quota breaker and three-attempt backoff: a failed search skips the source (logged), a 429 without `Retry-After` is not retried, and an answer without `results` is now an error (source skipped) instead of an empty list.
+- **Tests.** `tests/literature/test_library_harvest_parity.py` (real `arxiv.Client` and real `OpenAlexClient` as oracles over golden fixtures, `fixtures/harvest_metadata/openalex_library_search.json` new; request URLs, candidates, pacing, retry and Retry-After rules, key header-only, no key in logs) and `tests/literature/test_library_harvest_egress.py` (no direct client import, getters passed explicitly, key only via `openalex_api_key()`, 3 s floor not undercut, `pdf_downloader` hop check still present).
+- **Dependencies (report only, nothing edited).** No module under `app/` imports `arxiv` or `pyalex` any more (the two matches left are `tests/literature/test_download_agent_metadata_parity.py` and the two harvest parity files, which drive the real clients as oracles). Both can leave the runtime lists
+  (`pyproject.toml` `dependencies`: `arxiv>=4.0.0`, `pyalex>=0.21`; `pixi.toml` default `[pypi-dependencies]`: `arxiv`, `pyalex`) and move to `[feature.dev.pypi-dependencies]`; `pixi.lock` then needs a re-solve. `requests` and `lxml` must stay (other `app/` users). The `arxiv.*`/`pyalex.*` mypy overrides can stay (tests are not type-checked).
 
 ### P2. `orchestrator_agent.py` + `debate_agent.py` -> `agent_runtime/` and `curation/`
 
