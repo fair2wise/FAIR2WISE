@@ -99,6 +99,10 @@ To get a Tiled graph to show, publish it first
 ([The `:local` image, end to end](local-image.md)). A graph is cut at 100,000 nodes and
 Tiled is scanned at most once every 20 seconds.
 
+A focused neighbourhood (`GET /graph/neighborhood/{id}`) is capped at 500 nodes. When that cap cuts it, the
+response carries the header `X-F2W-Graph-Truncated: true` (the body is unchanged) and the viewer shows a small notice
+beside the node count: "Neighbourhood limited to N nodes; N+ nodes match". The exact total is not computed.
+
 ## Navigation and inspection
 
 | Interaction | Result |

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   fetchGraphNeighborhood,
+  fetchGraphNeighborhoodResult,
   fetchGraphNodeDetail,
   fetchLiveGraph,
   graphSourceQuery,
@@ -59,6 +60,17 @@ describe('graph source on every graph request', () => {
     const plain = stub();
     await fetchGraphNeighborhood('m:a', 2);
     expect(lastUrl(plain)).toMatch(/\/graph\/neighborhood\/m%3Aa\?hops=2$/);
+  });
+
+  it('reports the truncation header of a neighborhood read without changing the body', async () => {
+    const body = { nodes: [], edges: [], source_path: 'tiled://graphql' };
+    const cut = vi.fn(async () => new Response(JSON.stringify(body), { status: 200, headers: { 'X-F2W-Graph-Truncated': 'true' } }));
+    vi.stubGlobal('fetch', cut);
+    expect(await fetchGraphNeighborhoodResult('m:a', 3)).toEqual({ graph: body, truncated: true });
+    expect(await fetchGraphNeighborhood('m:a', 3)).toEqual(body);
+    const whole = vi.fn(async () => new Response(JSON.stringify(body), { status: 200 }));
+    vi.stubGlobal('fetch', whole);
+    expect(await fetchGraphNeighborhoodResult('m:a', 3)).toEqual({ graph: body, truncated: false });
   });
 
   it('GET /graph/node sends source (and still json_graph_path when given)', async () => {

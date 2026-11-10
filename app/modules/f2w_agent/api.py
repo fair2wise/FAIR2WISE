@@ -1616,19 +1616,27 @@ def graph_subset_from_file(graph_path: Path, node_ids: list[str]) -> dict[str, A
 def graph_subset_from_lookup(
     kg: object, wanted: Sequence[str], *, hops: int = CITE_FOCUS_HOPS, max_nodes: int | None = None,
 ) -> dict[str, Any]:
+    """:func:`graph_subset_and_cut` without the truncation flag."""
+    return graph_subset_and_cut(kg, wanted, hops=hops, max_nodes=max_nodes)[0]
+
+
+def graph_subset_and_cut(
+    kg: object, wanted: Sequence[str], *, hops: int = CITE_FOCUS_HOPS, max_nodes: int | None = None,
+) -> tuple[dict[str, Any], bool]:
     """Serialize an in-memory lookup graph (Tiled) into the UI node contract.
 
     The wanted ids are first widened to their ``hops`` neighborhood (default ``CITE_FOCUS_HOPS``;
     ``tiled_neighborhood_ids``), keeping at most ``max_nodes`` nodes when given; when that yields nothing, each wanted id is resolved
-    on its own. Returns ``{"nodes": [], "edges": []}`` when nothing resolves.
+    on its own. Returns ``{"nodes": [], "edges": []}`` when nothing resolves. The flag is true when ``max_nodes`` dropped nodes.
     """
     wanted_ids = [str(node_id) for node_id in wanted if str(node_id).strip()]
     empty: dict[str, Any] = {"nodes": [], "edges": []}
     nodes_map = getattr(kg, "nodes", {}) or {}
     if not wanted_ids or not isinstance(nodes_map, dict):
-        return empty
+        return empty, False
 
     expanded = tiled_neighborhood_ids(kg, wanted_ids, hops=hops)
+    cut = max_nodes is not None and len(expanded) > max_nodes
     if max_nodes is not None:
         expanded = expanded[:max_nodes]
     if not expanded:
@@ -1641,7 +1649,7 @@ def graph_subset_from_lookup(
             seen.add(resolved)
             expanded.append(resolved)
     if not expanded:
-        return empty
+        return empty, False
 
     nodes: list[dict[str, Any]] = []
     for node_id in expanded:
@@ -1678,7 +1686,7 @@ def graph_subset_from_lookup(
                     "predicate": _string_value(edge.get("predicate"), DEFAULT_PREDICATE),
                 }
             )
-    return {"nodes": nodes, "edges": edges}
+    return {"nodes": nodes, "edges": edges}, cut
 
 
 def graph_neighborhood_from_lookup(kg: object, node_id: str, hops: int = CITE_FOCUS_HOPS) -> GraphPayload:
@@ -1687,13 +1695,19 @@ def graph_neighborhood_from_lookup(kg: object, node_id: str, hops: int = CITE_FO
     ``hops`` is clamped to 1..``MAX_HOPS`` and the node count capped at ``NEIGHBORHOOD_MAX_NODES``,
     as for the JSON graph sources.
     """
-    subset = graph_subset_from_lookup(
+    return graph_neighborhood_and_cut(kg, node_id, hops)[0]
+
+
+def graph_neighborhood_and_cut(kg: object, node_id: str, hops: int = CITE_FOCUS_HOPS) -> tuple[GraphPayload, bool]:
+    """:func:`graph_neighborhood_from_lookup` plus whether the node cap cut the neighborhood."""
+    subset, cut = graph_subset_and_cut(
         kg, [node_id], hops=max(1, min(int(hops), MAX_HOPS)), max_nodes=NEIGHBORHOOD_MAX_NODES)
-    return GraphPayload(
+    payload = GraphPayload(
         nodes=subset.get("nodes") or [],
         edges=subset.get("edges") or [],
         source_path=TILED_SOURCE_PATH,
     )
+    return payload, cut
 
 
 def query_graph_payload(
@@ -2903,12 +2917,14 @@ class AgentPipelineService:
     def _loader_source(self, source: str) -> str:
         """The graph source the retrieval loaders (``krag.KnowledgeGraph``) are given for the UI source ``source``.
 
-        The editable mode keeps its wire token ``splash`` everywhere the UI sees it, but with the ``:local`` Tiled
-        save provider attached its session graph is a JSON file (the effective record), so the loaders read it as
-        ``json``: the ``splash`` loader would query ``splash-links`` (a Splash HTTP call, and the wrong data).
-        Without a provider (ALS, library callers) the source is passed through unchanged.
+        The editable mode keeps its wire token ``splash`` everywhere the UI sees it, but with a Tiled save target
+        attached (the ``:local`` provider, or a ``SaveTarget`` given at startup, the ALS wiring) its session graph is a
+        JSON file (the effective record), so the loaders read it as ``json``: the ``splash`` loader would query
+        ``splash-links`` (a Splash HTTP call, and the wrong data; Splash is deprecated). Without a save target (legacy
+        ``agent`` profile, library callers) the source is passed through unchanged.
         """
-        return "json" if self.tiled_save_provider is not None and source == "splash" else source
+        has_target = self.tiled_save_provider is not None or self.tiled_save is not None
+        return "json" if has_target and source == "splash" else source
 
     def _refresh_session_graph(self) -> None:
         """``:local`` editable mode: show the active publication's effective record, not the startup seed.
@@ -3449,6 +3465,13 @@ class AgentPipelineService:
         if kg is None:
             return GraphPayload(nodes=[], edges=[], source_path=TILED_SOURCE_PATH)
         return graph_neighborhood_from_lookup(kg, node_id, hops)
+
+    def tiled_neighborhood_result(self, node_id: str, hops: int = CITE_FOCUS_HOPS) -> tuple[GraphPayload, bool]:
+        """:meth:`tiled_neighborhood_payload` plus whether the node cap cut it."""
+        kg = self.ensure_tiled_lookup(node_id)
+        if kg is None:
+            return GraphPayload(nodes=[], edges=[], source_path=TILED_SOURCE_PATH), False
+        return graph_neighborhood_and_cut(kg, node_id, hops)
 
     def attach_llm_budget(self, budget: BudgetPort) -> None:
         """Count the orchestrator's and debate's model calls against the curation budget (``BudgetPort``; T17B P2)."""
@@ -7263,25 +7286,31 @@ def create_app(
 
     @app.get("/graph/neighborhood/{node_id:path}", response_model=GraphPayload)
     async def graph_neighborhood(
-        node_id: str, hops: int = CITE_FOCUS_HOPS, source: str | None = None,
+        response: Response, node_id: str, hops: int = CITE_FOCUS_HOPS, source: str | None = None,
         ctx: RequestContext = Depends(ui_context),
     ) -> GraphPayload:
         """Return a node's neighborhood subgraph: from the graph source named by ``source``, else from Tiled."""
+        # Header ``X-F2W-Graph-Truncated: true`` is set when the node cap cut it (additive; the docstring is the OpenAPI text).
         cleaned = str(node_id or "").strip()
         if not cleaned:
             raise HTTPException(status_code=400, detail="Node id is required")
         if source:
             try:
                 picked = await asyncio.to_thread(_sources().graph, source)
-                around = GraphSources.neighborhood(picked, cleaned, hops)
+                found = GraphSources.neighborhood_capped(picked, cleaned, hops)
             except SourceError as exc:
                 raise _source_failure(exc) from None
-            if around is None:
+            if found is None:
                 raise HTTPException(status_code=404, detail=f"Neighborhood not found: {cleaned}")
+            around, cut = found
+            if cut:
+                response.headers["X-F2W-Graph-Truncated"] = "true"
             return cast(GraphPayload, guard.project_route(
                 ctx, "GET", "/graph/neighborhood/" + cleaned, _model_to_jsonable(_source_payload(around))))
-        payload = await asyncio.to_thread(service.tiled_neighborhood_payload, cleaned, hops)
+        payload, tiled_cut = await asyncio.to_thread(service.tiled_neighborhood_result, cleaned, hops)
         if payload.nodes:
+            if tiled_cut:
+                response.headers["X-F2W-Graph-Truncated"] = "true"
             return cast(GraphPayload, guard.project_route(ctx, "GET", "/graph/neighborhood/" + cleaned, _model_to_jsonable(payload)))
         raise HTTPException(status_code=404, detail=f"Neighborhood not found: {cleaned}")
 
