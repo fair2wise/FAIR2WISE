@@ -16,6 +16,7 @@ def legacy_admitted_chat(backend: str, model: str, budget: BudgetPort | None) ->
     """An :class:`AdmittedChat` over ``term_extractor.clients.make_chat_client`` (looked up per call)."""
     from ..cborg_http import call_with_deadline
     from ..llm_admission import ProviderAdmission
+    from ..model_policy import require_free_cborg_model
     from ..term_extractor import clients
 
     def factory() -> Any:  # noqa: ANN401 - the chat client
@@ -34,6 +35,8 @@ def legacy_admitted_chat(backend: str, model: str, budget: BudgetPort | None) ->
         budget=budget,
         local=(backend or "").lower() == "ollama",
         admission_key=AGENT_ADMISSION_KEY,
+        # Free-model policy (owner decision 2026-11-09): a paid id is refused before budget, slot or client.
+        model_check=lambda m: require_free_cborg_model(m, context="chat helper agent"),
     )
 
 __all__ = ("legacy_admitted_chat",)

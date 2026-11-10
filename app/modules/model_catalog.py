@@ -14,12 +14,13 @@ a listing, an error message or a log line.
 
 Used by the validation judge-model picker (``/v1/validation/judge-model``) and the pilot
 labelling tool of the binary evaluation suite (``--list-models``). Importing this module has
-no side effects.
+no side effects. The listing is not a permission: :mod:`app.modules.model_policy` decides which of
+the listed models may be used (free LBL-hosted ids only), using the prices here when the payload has any.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import logging
@@ -54,6 +55,9 @@ class ModelListing:
         models: Model ids the endpoint returned, sorted and de-duplicated (empty when unavailable).
         listed_at: UTC time of the request (ISO 8601, ``Z``).
         error: Short reason when ``unavailable`` (exception type and a scrubbed message, never a key).
+        prices: Price per model id when the payload carried one (see :func:`_item_price`); empty otherwise.
+            The free-model policy (:mod:`app.modules.model_policy`) refines its allowlist with it: an
+            allowlisted model priced above 0 here is refused.
     """
 
     backend: str
@@ -61,6 +65,17 @@ class ModelListing:
     models: tuple[str, ...] = ()
     listed_at: str = field(default_factory=_utc_now)
     error: str | None = None
+    prices: Mapping[str, float] = field(default_factory=dict)
+
+    def price_of(self, model: str) -> float | None:
+        """The listed price of ``model`` (exact id, then its lower-case and bare/``lbl/`` spellings), or None."""
+        cleaned = str(model or "").strip()
+        lowered = cleaned.lower()
+        bare = lowered.split("/", 1)[1] if lowered.startswith("lbl/") else lowered
+        for key in (cleaned, lowered, bare, "lbl/" + bare):
+            if key in self.prices:
+                return self.prices[key]
+        return None
 
     @property
     def available(self) -> bool:
@@ -82,18 +97,80 @@ def _scrub(text: str, secret: str | None = None, limit: int = 200) -> str:
     return out if len(out) <= limit else out[: limit - 3] + "..."
 
 
-def _model_ids(page: Any) -> Iterable[str]:  # noqa: ANN401  # Any: OpenAI SDK page object (untyped here)
+_PRICE_KEYS = ("input_cost_per_token", "output_cost_per_token", "input_cost_per_million_tokens",
+               "output_cost_per_million_tokens", "prompt", "completion", "input", "output", "price", "cost")
+
+
+def _number(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.strip().lstrip("$"))
+        except ValueError:
+            return None
+    return None
+
+
+def _item_price(item: Any) -> float | None:  # noqa: ANN401  # Any: one listing item (SDK object or dict)
+    """The highest price a listing item states, or None when it states none.
+
+    Looked at, in order: the item itself, its ``pricing`` and ``model_info`` blocks (LiteLLM proxies put
+    ``input_cost_per_token`` there), under the keys in :data:`_PRICE_KEYS`. Unknown shapes yield None, so a
+    payload without prices leaves the allowlist alone.
+    """
+    blocks: list[Any] = [item]
+    for name in ("pricing", "model_info", "litellm_params"):
+        block = getattr(item, name, None)
+        if block is None and isinstance(item, dict):
+            block = item.get(name)
+        if block is not None:
+            blocks.append(block)
+    found: list[float] = []
+    for block in blocks:
+        for key in _PRICE_KEYS:
+            value = block.get(key) if isinstance(block, dict) else getattr(block, key, None)
+            number = _number(value)
+            if number is not None:
+                found.append(number)
+    return max(found) if found else None
+
+
+def _items(page: Any) -> Iterable[Any]:  # noqa: ANN401  # Any: OpenAI SDK page object (untyped here)
     data = getattr(page, "data", None)
     if data is None and isinstance(page, dict):
         data = page.get("data")
     if data is None:
         data = page
-    for item in data or ():
-        ident = getattr(item, "id", None)
-        if ident is None and isinstance(item, dict):
-            ident = item.get("id")
-        if isinstance(ident, str) and ident.strip():
-            yield ident.strip()
+    yield from (data or ())
+
+
+def _item_id(item: Any) -> str | None:  # noqa: ANN401  # Any: one listing item (SDK object or dict)
+    ident = getattr(item, "id", None)
+    if ident is None and isinstance(item, dict):
+        ident = item.get("id")
+    return ident.strip() if isinstance(ident, str) and ident.strip() else None
+
+
+def _model_ids(page: Any) -> Iterable[str]:  # noqa: ANN401  # Any: OpenAI SDK page object (untyped here)
+    for item in _items(page):
+        ident = _item_id(item)
+        if ident is not None:
+            yield ident
+
+
+def _model_prices(page: Any) -> dict[str, float]:  # noqa: ANN401  # Any: OpenAI SDK page object (untyped here)
+    prices: dict[str, float] = {}
+    for item in _items(page):
+        ident = _item_id(item)
+        if ident is None:
+            continue
+        price = _item_price(item)
+        if price is not None:
+            prices[ident] = price
+    return prices
 
 
 def list_cborg_models_live(
@@ -142,10 +219,11 @@ def list_cborg_models_live(
         with hold():
             page = client.models.list(timeout=timeout)
             models = tuple(sorted(set(_model_ids(page))))
+            prices = _model_prices(page)
     except Exception as exc:  # noqa: BLE001 - provider/network fault is "unavailable", never a list
         logger.warning("model listing unavailable: %s", type(exc).__name__)
         return ModelListing("cborg", "unavailable", error=_scrub(f"{type(exc).__name__}: {exc}", key))
-    return ModelListing("cborg", "live", models)
+    return ModelListing("cborg", "live", models, prices=prices)
 
 
 class CachedModelCatalog:

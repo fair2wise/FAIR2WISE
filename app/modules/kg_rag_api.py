@@ -1714,8 +1714,15 @@ class CBorgClient:
         api_key: str | None = None,
         base_url: str | None = None,
     ) -> None:
-        """Initialize with CBORG model, API key, and base URL."""
-        self.model = model
+        """Initialize with CBORG model, API key, and base URL.
+
+        Raises:
+            ModelPolicyError: ``model`` is not a free LBL-hosted model (owner decision 2026-11-09); raised
+                before the key is read and before any client exists.
+        """
+        from .model_policy import require_free_cborg_model
+
+        self.model = require_free_cborg_model(model, context="KG-RAG chat client")
         self.client = openai.AsyncOpenAI(
             api_key=require_cborg_api_key(api_key),
             base_url=(base_url or CBORG_BASE_URL).rstrip("/"),

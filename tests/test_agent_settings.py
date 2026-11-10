@@ -95,28 +95,25 @@ def test_settings_update_model_rebuilds_agents(tmp_path, monkeypatch):
     client = _settings_client(tmp_path, monkeypatch, kg_mode="splash")
     initial_agents = len(TrackingRetrieval.created)
 
-    response = client.put("/settings", json={"model": "gemini-flash"})
+    response = client.put("/settings", json={"model": "lbl/cborg-deepthought"})
 
     assert response.status_code == 200
     body = response.json()
-    assert body["model"] == "gemini-flash"
+    assert body["model"] == "lbl/cborg-deepthought"
     assert len(TrackingRetrieval.created) > initial_agents
-    assert TrackingRetrieval.created[-1]["kwargs"]["model"] == "gemini-flash"
-    assert client.get("/health").json()["model"] == "gemini-flash"
+    assert TrackingRetrieval.created[-1]["kwargs"]["model"] == "lbl/cborg-deepthought"
+    assert client.get("/health").json()["model"] == "lbl/cborg-deepthought"
 
 
-def test_settings_normalizes_legacy_gemini_model_ids(tmp_path, monkeypatch):
+def test_settings_legacy_gemini_model_ids_fall_back_to_the_default_free_model(tmp_path, monkeypatch):
+    # Free-model policy (owner decision 2026-11-09): the legacy aliases still normalise, but the paid
+    # models they name are not allowed via CBORG, so the server uses the default free model.
     client = _settings_client(tmp_path, monkeypatch)
 
-    cases = {
-        "google/gemini-flash": "gemini-flash",
-        "google/gemini-flash-lite": "gemini-2.5-flash-lite",
-        "google/gemini-pro": "gemini-pro",
-    }
-    for raw, expected in cases.items():
+    for raw in ("google/gemini-flash", "google/gemini-flash-lite", "google/gemini-pro"):
         response = client.put("/settings", json={"model": raw})
         assert response.status_code == 200
-        assert response.json()["model"] == expected
+        assert response.json()["model"] == "lbl/cborg-chat"
 
 
 def test_settings_update_workflow_mode(tmp_path, monkeypatch):

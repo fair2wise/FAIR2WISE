@@ -56,7 +56,8 @@ def test_local_operator_sees_the_live_list_and_no_judge_by_default(local_judge):
     app, _, lister = local_judge
     body = app.client().get("/v1/validation/judge-model").json()
     assert body["judge_model"] is None and body["scope"] == "deployment"
-    assert body["available_models"] == list(LIVE)
+    # free-model policy (2026-11-09): the paid-looking id is not offered
+    assert body["available_models"] == [m for m in LIVE if m != "claude-sonnet"]
     assert body["models_source"] == "live" and lister.calls == 1
     assert app.port.calls == 0  # :local makes no identity call
 

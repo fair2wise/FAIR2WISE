@@ -53,18 +53,12 @@
         "contract_v1"
       ],
       "available_cborg_models": [
-        "deepseek-r1:70b",
         "lbl/cborg-chat",
-        "gemini-flash",
-        "gemini-2.5-flash-lite",
-        "gemini-pro",
-        "anthropic/claude-opus",
-        "anthropic/claude-sonnet",
-        "gpt",
-        "gpt-chat",
-        "gpt-mini",
-        "nova-micro",
-        "openai/gpt-4o"
+        "lbl/cborg-deepthought",
+        "lbl/cborg-coder",
+        "lbl/cborg-mini",
+        "lbl/gpt-oss-120b",
+        "lbl/gpt-oss-20b"
       ],
       "default_ollama_model": "deepseek-r1:70b"
     }

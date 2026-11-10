@@ -201,18 +201,14 @@ f2w_agent:
   model:
     env: F2W_MODEL
     default: lbl/cborg-chat
+  # Free LBL-hosted models only (owner decision 2026-11-09; app/modules/model_policy.py filters this list).
   cborg_models:
     - lbl/cborg-chat
-    - gemini-flash
-    - gemini-2.5-flash-lite
-    - gemini-pro
-    - anthropic/claude-opus
-    - anthropic/claude-sonnet
-    - gpt
-    - gpt-chat
-    - gpt-mini
-    - nova-micro
-    - openai/gpt-4o
+    - lbl/cborg-deepthought
+    - lbl/cborg-coder
+    - lbl/cborg-mini
+    - lbl/gpt-oss-120b
+    - lbl/gpt-oss-20b
   workflow_mode:
     env: F2W_WORKFLOW_MODE
     default: agentic

@@ -26,8 +26,8 @@ def parse_args() -> argparse.Namespace:
                    help="Directory containing PDF files to process")
     p.add_argument("--output", type=Path, default=Path("storage/terminology/terms_test.json"),
                    help="Output JSON file for extracted terms")
-    p.add_argument("--model", default="amazon/gpt-oss-20b",
-                   help="LLM model name")
+    p.add_argument("--model", default=None,
+                   help="LLM model name (CBORG: a free LBL-hosted id; default the policy's default free model)")
     p.add_argument("--backend", choices=["cborg", "ollama"], default="cborg",
                    help="LLM backend")
     p.add_argument("--workers", type=int, default=4,
@@ -99,6 +99,17 @@ def main() -> None:
     if args.backend == "cborg" and not cborg_api_key:
         log.error("CBORG backend requires CBORG_API_KEY to be set")
         sys.exit(1)
+    if args.backend == "cborg":
+        # Free-model policy (owner decision 2026-11-09): refused here, before any client or request exists.
+        from ..model_policy import ModelPolicyError, default_free_model, require_free_cborg_model
+
+        try:
+            args.model = require_free_cborg_model(args.model or default_free_model(), context="f2w-run --model")
+        except ModelPolicyError as exc:
+            log.error("%s", exc)
+            sys.exit(1)
+    elif not args.model:
+        args.model = "deepseek-r1:70b"  # local Ollama default (not a CBORG model; the policy does not apply)
 
     chebi_path = args.chebi if Path(args.chebi).exists() else None
     if not chebi_path:

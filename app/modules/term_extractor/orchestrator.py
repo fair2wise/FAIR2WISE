@@ -26,6 +26,7 @@ from ..cborg_http import (
 from ..cborg_limiter import sync_slot
 from ..literature.pdf_reader import open_pdf
 from ..llm_admission import shared_admission_enabled
+from ..model_policy import require_free_cborg_model
 from .agent import build_graph
 from .clients import make_chat_client
 from .merge_index import DEFAULT_EMBED_MODEL, DEFAULT_MERGE_TOP_K, TermMergeIndex
@@ -268,8 +269,10 @@ class Orchestrator:
                 max_retries=LLM_MAX_RETRIES,
             )
         logger.debug("Building LLM: backend=cborg base=%s model=%s", self.cborg_base, self.model)
+        # Free-model policy (owner decision 2026-11-09): refused before the key is read or a client exists.
+        model = require_free_cborg_model(self.model, context="extraction model")
         return ChatOpenAI(
-            model=self.model,
+            model=model,
             api_key=SecretStr(require_cborg_api_key(self.cborg_api_key)),
             base_url=self.cborg_base,
             temperature=self.temperature,

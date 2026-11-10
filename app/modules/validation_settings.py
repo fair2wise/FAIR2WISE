@@ -11,7 +11,10 @@ holds that one setting and nothing else:
   on ALS only a verified admin can see or change it (validation runs are admin actions);
   on ``:local`` the local operator holds every capability (D34). A new value must be in the
   provider's *current* live listing (:mod:`app.modules.model_catalog`); when the listing
-  cannot be fetched the change is refused rather than accepted unchecked.
+  cannot be fetched the change is refused rather than accepted unchecked. It must also be a
+  free LBL-hosted model (:mod:`app.modules.model_policy`, owner decision 2026-11-09): the view
+  offers only free ids and flags a saved paid id (``judge_model_allowed``), and a paid id is
+  refused with ``denied``.
 
 **Deployment-wide, not personal (T25D).** A judge decides validation verdicts that are gate
 evidence for the whole deployment. A per-user judge would let two users produce reports
@@ -37,6 +40,7 @@ from typing import Any, cast
 from .contracts.context import RequestContext
 from .contracts.errors import ContractError, ErrorCode
 from .model_catalog import CachedModelCatalog
+from .model_policy import load_policy
 from .security.authorization import require
 
 logger = logging.getLogger(__name__)
@@ -115,16 +119,20 @@ class JudgeModelService:
         """The current judge plus the models the provider offers right now."""
         require(ctx, JUDGE_CAPABILITY)
         listing = self.catalog.get(refresh=refresh)
+        policy = load_policy()
         current = self.store.read()
         model = current["judge_model"]
         return {
             **current,
             "judge_model_available": None if not listing.available or model is None else model in listing.models,
-            "available_models": list(listing.models),
+            # Free-model policy (owner decision 2026-11-09): only free ids are offered; a saved paid id is flagged.
+            "judge_model_allowed": None if model is None else policy.is_allowed(model, listing),
+            "available_models": policy.filter(listing.models, listing),
             "models_source": listing.source,
             "models_listed_at": listing.listed_at,
             "models_error": listing.error,
             "backend": listing.backend,
+            "model_policy": policy.describe(),
         }
 
     def update(self, ctx: RequestContext, judge_model: str | None) -> dict[str, Any]:
@@ -134,6 +142,8 @@ class JudgeModelService:
         if cleaned is not None:
             if len(cleaned) > MAX_MODEL_ID:
                 raise ContractError(ErrorCode.INVALID_INPUT, "judge model id is too long")
+            # Free-model policy (owner decision 2026-11-09): a paid id is refused (DENIED) before the live check.
+            load_policy().require(cleaned, context="judge model")
             listing = self.catalog.get(refresh=True)
             if not listing.available:
                 raise ContractError(ErrorCode.UNAVAILABLE,
@@ -142,6 +152,7 @@ class JudgeModelService:
             if cleaned not in listing.models:
                 raise ContractError(ErrorCode.INVALID_INPUT,
                                     "judge model is not in the provider's current model list")
+            load_policy().require(cleaned, context="judge model", listing=listing)
         self.store.write(cleaned, updated_by=ctx.principal.subject)
         logger.info("validation judge model set to %s by %s", cleaned, ctx.principal.subject)
         return self.view(ctx)

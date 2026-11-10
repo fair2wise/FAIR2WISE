@@ -25,7 +25,7 @@ import datetime as _dt
 import os
 import sys
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Sequence
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 from evals.binary.labeling import pilot as P
 from evals.binary.labeling.labeler import (
@@ -69,6 +69,24 @@ def _require_key() -> None:
     require_cborg_api_key()
 
 
+def _policy_refusal(*roles: Tuple[str, Optional[str]]) -> Optional[str]:
+    """The free-model policy's refusal of the first role whose id is not a free LBL-hosted model, or None.
+
+    Owner decision 2026-11-09: every CBORG id this tool would send or record (the labeller, the judge and the
+    model under test) must be free; the refusal happens here, before the listing is asked or a client exists.
+    """
+    from app.modules.model_policy import ModelPolicyError, require_free_cborg_model
+
+    for role, model in roles:
+        if not model:
+            continue
+        try:
+            require_free_cborg_model(model, context=role)
+        except ModelPolicyError as exc:
+            return str(exc)
+    return None
+
+
 def _err(msg: str) -> int:
     print("error: " + sanitize(msg, 600), file=sys.stderr)
     return 2
@@ -101,11 +119,16 @@ def cmd_list_models(lister: Optional[Callable[[], object]] = None) -> int:
         _require_key()
     except RuntimeError as exc:
         return _err(str(exc))
+    from app.modules.model_policy import load_policy
+
     listing = (lister or list_cborg_models_live)()
     if not listing.available:
         return _err(f"the CBORG model list is unavailable: {listing.error}")
-    print(f"# {len(listing.models)} models listed by CBORG at {listing.listed_at}")
-    for model in listing.models:
+    policy = load_policy()
+    free = policy.filter(listing.models, listing)
+    print(f"# {len(listing.models)} models listed by CBORG at {listing.listed_at}; {len(free)} allowed by the"
+          f" free-model policy ({policy.source}, as of {policy.as_of}); only these may be used")
+    for model in free:
         print(model)
     return 0
 
@@ -134,6 +157,10 @@ def cmd_label(args: argparse.Namespace, client_factory: Optional[ClientFactory] 
     store = LabelStore(resolve_root(args.out))
     judge, judge_source = resolve_judge_model(args.judge_model, args.settings_workdir)
     check_roles(labeler=args.model, judge=judge, model_under_test=args.model_under_test)
+    policy_problem = _policy_refusal(("labelling model", args.model), ("judge model", judge),
+                                     ("model under test", args.model_under_test))
+    if policy_problem:
+        return _err(policy_problem)
     if client_factory is None:
         try:
             _require_key()

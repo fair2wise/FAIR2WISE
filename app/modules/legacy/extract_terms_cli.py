@@ -111,8 +111,14 @@ class CBorgChatClient(ChatClient):
     Env: CBORG_API_KEY, CBORG_BASE_URL (defaults to https://api.cborg.lbl.gov)
     """
     def __init__(self, model: str, api_key: str | None = None, base_url: str | None = None):
-        """Initialize with CBORG model, API key, and base URL."""
-        self.model = model
+        """Initialize with CBORG model, API key, and base URL.
+
+        The model must be a free LBL-hosted id (owner decision 2026-11-09): ``ModelPolicyError`` is
+        raised before the key is read and before any client exists.
+        """
+        from ..model_policy import require_free_cborg_model
+
+        self.model = require_free_cborg_model(model, context="legacy extraction CLI")
         self.client = openai.OpenAI(
             api_key=require_cborg_api_key(api_key),
             base_url=(base_url or os.environ.get("CBORG_BASE_URL") or "https://api.cborg.lbl.gov").rstrip("/"),

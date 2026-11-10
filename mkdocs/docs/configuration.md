@@ -111,7 +111,42 @@ dispatcher. Results report whether the active backend is `semantic` or
 | `KG_RAG_LLM_TIMEOUT` | Request timeout in seconds |
 | `KG_RAG_SHOW_BASELINE` | Also produce a non-RAG baseline |
 | `EXTRACT_TERMS_BACKEND` | Extraction backend |
-| `EXTRACT_TERMS_MODEL` | Extraction model |
+| `EXTRACT_TERMS_MODEL` | Extraction model (CBORG: must be a free LBL-hosted id, see below) |
+
+## Model policy: free CBORG models only
+
+Owner decision 2026-11-09 (`docs/migration/reviews/owner_decisions_2026-11-03.md`, seventeenth
+set): "we should only allow free models via CBORG at the moment. We get 50 free usage credits per
+month (mileage varies per model) on CBORG, so I want to avoid using those." The application
+enforces this as a model policy (`app/modules/model_policy.py`):
+
+- **Allowlist as data.** `app/modules/free_cborg_models.json` (shipped with the package) lists
+  the free LBL-hosted ids taken from the CBORG models page on 2026-11-06 (`source`, `as_of`), the
+  `default_model` (`lbl/cborg-chat`) and `aliases` (`mistral-large-4` is `lbl/cborg-coder-ultra`).
+  Edit the JSON to change the policy; no code changes. `F2W_MODEL_POLICY_FILE` points a deployment
+  at an edited copy. A missing or invalid file is an empty allowlist: every CBORG id is refused.
+- **Spellings.** A bare id (`cborg-chat`, as the CBORG listing endpoint returns them) and its
+  `lbl/` form (`lbl/cborg-chat`, as the chat API accepts them) are one model. An id with another
+  provider prefix (`openai/`, `anthropic/`, `google/`, `amazon/`, ...) is never free.
+- **Live refinement.** The live model list (`GET /models`, `GET /v1/library/models`, the judge
+  route) is filtered to the allowlist; when the listing carries a price for a model, the model is
+  allowed only if that price is 0. (On 2026-11-06 the listing carried no prices, so the allowlist
+  alone decides until CBORG exposes them.)
+- **Every CBORG call path refuses a non-free id before any request**, with a typed `denied`
+  error (`reason: model_not_free`) that names the id and the policy and never a key: the CBORG chat
+  clients (`term_extractor.clients`, `kg_rag_api`, the legacy extraction CLI), the extraction model
+  (`f2w-run --model`, the `library_extract` job), the validation judge (`PUT /v1/validation/judge-model`,
+  `--judge-model`), the pilot labelling CLI (labeller, judge, model under test), the binary runner,
+  and the chat helper agents (`AdmittedChat`). Ollama and other local backends are unaffected.
+- **Pickers.** The Settings panel's CBORG model dropdown and the judge dropdown show only free
+  ids. A saved or configured paid id (an old browser preference, `KG_RAG_CBORG_MODEL`,
+  `config.yml`) falls back to the default free model on the server and the panel shows a notice;
+  the frozen `GET`/`PUT /settings` payload keeps its shape (values are filtered, never fields).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `F2W_MODEL_POLICY_FILE` | packaged `free_cborg_models.json` | Another copy of the allowlist (same JSON shape) |
+| `F2W_HELPER_AGENT_LLM` | unset (off) | Opt-in: let the orchestrator routing and evidence-debate helper agents call the model. Off, they take their deterministic path and make no model call, so chat spends no credits on classification or debate; extraction and question answering keep using the chosen free model. |
 
 ## Images: gateway port and profile
 

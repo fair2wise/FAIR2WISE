@@ -489,11 +489,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
     rubrics = reports.load_rubrics(args.cases_dir)
     judge, source = resolve_judge_model(args.judge_model, args.settings_workdir)
+    # Free-model policy (owner decision 2026-11-09): the judge and the model under test must be free ids.
+    from app.modules.model_policy import ModelPolicyError, require_free_cborg_model
+
     try:
+        for role, model in (("judge model", judge), ("model under test", args.model_under_test)):
+            if model:
+                require_free_cborg_model(model, context=role)
         runner = Runner(manifest, executor=PytestNodeExecutor(timeout=args.timeout), rubrics=rubrics,
                         labels=load_label_set(args.labels_dir), judge_model=judge, judge_model_source=source,
                         model_under_test=args.model_under_test)
-    except RoleSeparationError as exc:
+    except (RoleSeparationError, ModelPolicyError) as exc:
         print(f"refused: {sanitize(exc)}", file=sys.stderr)
         return 2
     subject = None
