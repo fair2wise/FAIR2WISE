@@ -15,6 +15,9 @@ entry (T18D, TIL-22).
 * ``can_approve``: ``security.authorization.can_review_approvals`` (the entry check of ``GET /v1/approvals/pending``,
   V82: ``graph.publish`` and, on ALS, a verified admin): the Pending Approvals page shows only when this is true
   (owner instruction 2026-11-09).
+* ``can_publish`` (additive, owner decision 2026-11-10): the "Publish to Tiled" button may show: profile ``:local``, the
+  caller holds ``graph.publish`` and ``library.extract`` and the deployment's publication reaches its own Tiled (the
+  checks of V83). The button needs an explicit ``true``.
 * ``role``: ``local_operator`` (``:local``, no sign-in), ``admin`` (verified Tiled admin) or ``user``.
 """
 
@@ -24,12 +27,13 @@ from typing import Any, cast
 
 from fastapi import Depends, FastAPI, Request
 
-from ..modules.contracts.context import RequestContext
+from ..modules.contracts.context import DeploymentProfile, RequestContext
 from ..modules.security.authorization import can_review_approvals
 from .routes_common import Prefixed, context, project
 
 
-def capabilities_for_caller(ctx: RequestContext, *, editable_source: bool = True) -> dict[str, Any]:
+def capabilities_for_caller(ctx: RequestContext, *, editable_source: bool = True,
+                            can_publish: bool = False) -> dict[str, Any]:
     """The capability DTO of one caller (pure; the route and the tests share it)."""
     can_edit = "graph.edit" in ctx.capabilities
     if ctx.principal.is_local_operator():
@@ -38,7 +42,8 @@ def capabilities_for_caller(ctx: RequestContext, *, editable_source: bool = True
         role = "admin" if ctx.principal.is_admin else "user"
     return {"role": role, "profile": ctx.profile.value, "can_edit": can_edit,
             "can_save": can_edit and editable_source, "can_upload": "graph.upload" in ctx.capabilities,
-            "can_run_operations": "chat.ask" in ctx.capabilities, "can_approve": can_review_approvals(ctx)}
+            "can_run_operations": "chat.ask" in ctx.capabilities, "can_approve": can_review_approvals(ctx),
+            "can_publish": can_publish}
 
 
 def install(app: FastAPI) -> FastAPI:
@@ -54,7 +59,11 @@ def install(app: FastAPI) -> FastAPI:
         available = getattr(service, "save_available", None)
         if editable and callable(available):
             editable = bool(available())
-        return cast(dict[str, Any], project(request, capabilities_for_caller(ctx, editable_source=editable)))
+        publisher = getattr(request.app.state, "f2w_library_publisher", None)
+        can_publish = (publisher is not None and publisher.available() and ctx.profile is DeploymentProfile.LOCAL
+                       and "graph.publish" in ctx.capabilities and "library.extract" in ctx.capabilities)
+        return cast(dict[str, Any], project(request, capabilities_for_caller(
+            ctx, editable_source=editable, can_publish=can_publish)))
 
     return app
 

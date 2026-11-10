@@ -32,6 +32,7 @@ LIBRARY_VERIFY_KIND = "library_verify"
 LIBRARY_INDEX_KIND = "library_index"
 LIBRARY_EXTRACT_KIND = "library_extract"
 LIBRARY_HARVEST_KIND = "library_harvest"
+LIBRARY_PUBLISH_KIND = "library_publish"
 
 #: Job kind to the capability that submits it (all local-operator only, ``LOCAL_ONLY_CAPABILITIES``).
 LIBRARY_KIND_CAPABILITIES: Mapping[str, str] = {
@@ -40,6 +41,7 @@ LIBRARY_KIND_CAPABILITIES: Mapping[str, str] = {
     LIBRARY_INDEX_KIND: "library.index",
     LIBRARY_EXTRACT_KIND: "library.extract",
     LIBRARY_HARVEST_KIND: "library.harvest",
+    LIBRARY_PUBLISH_KIND: "graph.publish",  # export, adopt and stage a publication plan (never approves)
 }
 
 #: Name of the ``params`` entry that makes an otherwise identical submission a new job.
@@ -50,7 +52,8 @@ StageHandler = Callable[[StageContext], StageResult]
 
 #: Which task supplies each stub kind's real handler (named in the failure message).
 _OWNER_TASK: Mapping[str, str] = {LIBRARY_VERIFY_KIND: "T35", LIBRARY_INDEX_KIND: "T36",
-                                  LIBRARY_EXTRACT_KIND: "T39", LIBRARY_HARVEST_KIND: "T45"}
+                                  LIBRARY_EXTRACT_KIND: "T39", LIBRARY_HARVEST_KIND: "T45",
+                                  LIBRARY_PUBLISH_KIND: "the publish wiring"}
 
 
 def not_implemented(kind: str) -> StageHandler:
@@ -92,7 +95,8 @@ def library_inputs(params: Mapping[str, Any] | None = None, *, nonce: str | None
 
 
 def register_library_jobs(job_service: JobService, settings: DeploymentSettings, *,
-                          handlers: Mapping[str, StageHandler] | None = None) -> tuple[str, ...]:
+                          handlers: Mapping[str, StageHandler] | None = None,
+                          pipelines: Mapping[str, Pipeline] | None = None) -> tuple[str, ...]:
     """Register the library job kinds on ``job_service`` (trusted wiring), on ``:local`` only.
 
     On an ALS profile nothing is registered, so submissions of these kinds are refused as unknown kinds.
@@ -102,6 +106,7 @@ def register_library_jobs(job_service: JobService, settings: DeploymentSettings,
         job_service: The :class:`~app.modules.jobs.service.JobService`.
         settings: Startup ``DeploymentSettings`` (``is_local`` decides).
         handlers: ``kind -> stage body`` overriding the fail-closed stubs (T35, T36, T39).
+        pipelines: ``kind -> Pipeline`` for a kind with several stages (``library_publish``); wins over ``handlers``.
 
     Returns:
         The kinds this call registered (empty on ALS).
@@ -109,16 +114,17 @@ def register_library_jobs(job_service: JobService, settings: DeploymentSettings,
     if not settings.is_local:
         logger.info("library job kinds are not registered on %s (local profile only)", settings.profile)
         return ()
-    unknown = set(handlers or ()) - set(LIBRARY_KIND_CAPABILITIES)
+    unknown = (set(handlers or ()) | set(pipelines or ())) - set(LIBRARY_KIND_CAPABILITIES)
     if unknown:
         raise ValueError(f"unknown library job kinds: {sorted(unknown)}")
     registered: list[str] = []
     for kind, capability in LIBRARY_KIND_CAPABILITIES.items():
         if job_service.has_kind(kind):
             continue
+        custom = (pipelines or {}).get(kind)
         run = (handlers or {}).get(kind) or (_probe if kind == LIBRARY_PROBE_KIND else not_implemented(kind))
-        pipeline = Pipeline([StageSpec("run", run, phase="other", relevant=("corpus_scope", "params"),
-                                       required_capability=capability)])
+        pipeline = custom or Pipeline([StageSpec("run", run, phase="other", relevant=("corpus_scope", "params"),
+                                                 required_capability=capability)])
         job_service.register(kind, pipeline, capability=capability)
         registered.append(kind)
     logger.info("registered library job kinds: %s", ", ".join(registered) or "(none new)")
@@ -126,5 +132,5 @@ def register_library_jobs(job_service: JobService, settings: DeploymentSettings,
 
 
 __all__ = ("LIBRARY_EXTRACT_KIND", "LIBRARY_HARVEST_KIND", "LIBRARY_INDEX_KIND", "LIBRARY_KIND_CAPABILITIES", "LIBRARY_PROBE_KIND",
-           "LIBRARY_VERIFY_KIND", "NONCE_PARAM", "StageHandler", "library_inputs", "not_implemented",
+           "LIBRARY_PUBLISH_KIND", "LIBRARY_VERIFY_KIND", "NONCE_PARAM", "StageHandler", "library_inputs", "not_implemented",
            "register_library_jobs")

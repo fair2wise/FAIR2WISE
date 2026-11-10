@@ -207,6 +207,7 @@ EXPLICIT_TRANSIENT = Counter({
     ("modules/graph/imports/corpus_scope.py", "plan_replacement"): 1,
     ("modules/graph/imports/corpus_scope.py", "read_scope_state"): 1,
     ("modules/graph/imports/journal.py", "Lease.acquire"): 2,
+    ("modules/library/publish.py", "LibraryPublisher._adopt"): 1,  # the version number was taken by a racing publish
     ("modules/graph/imports/journal.py", "Lease.check"): 1,
     ("modules/graph/imports/save_recovery.py", "execute_save"): 1,
     ("modules/graph/imports/save_recovery.py", "recover_failed_saves"): 1,

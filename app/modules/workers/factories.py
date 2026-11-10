@@ -60,15 +60,30 @@ def library_service(db_path: str, environ: Mapping[str, str] | None = None) -> J
     from ..library.harvest import Harvester, HarvestStore
 
     harvester = Harvester(library, HarvestStore(workdir / "library" / "harvest.sqlite"))
-    register_library_jobs(service, settings, handlers=library_handlers(library, extractor=extractor, harvester=harvester))
     # Owner decision 2026-11-04: ``:local`` publishes into the image's own Tiled, so this worker must run the
     # publication kind the API process registers (same stores, same gate; a no-op without a matching managed Tiled).
-    from ...api.local_publication import build_local_publication, managed_tiled_from
+    # Built before the library kinds: the library_publish job (owner decision 2026-11-10) stages through it.
+    from ...api.local_publication import SNAPSHOTS_DIRNAME, build_local_publication, managed_tiled_from
 
+    wired = None
     managed = managed_tiled_from(env)
     if managed is not None:
-        if build_local_publication(service, settings, managed, workdir=workdir, ops_root=Path(db_path).parent) is None:
+        wired = build_local_publication(service, settings, managed, workdir=workdir, ops_root=Path(db_path).parent)
+        if wired is None:
             logger.warning("local publication not registered on the worker: the managed Tiled is not this deployment's target")
+    pipelines = {}
+    if wired is not None:
+        from ...api.operations import F2WOperations
+        from ..library.jobs import LIBRARY_PUBLISH_KIND
+        from ..library.kg_service import KgLibrary
+        from ..library.publish import LibraryPublisher
+
+        operations = F2WOperations(settings, service, publication=wired.publication, publication_gate=wired.gate)
+        pipelines[LIBRARY_PUBLISH_KIND] = LibraryPublisher(
+            KgLibrary(BundleStore(workdir / BUNDLES_DIRNAME)), operations, storage_kg=workdir / SNAPSHOTS_DIRNAME,
+            environ=env).pipeline()
+    register_library_jobs(service, settings, handlers=library_handlers(library, extractor=extractor, harvester=harvester),
+                          pipelines=pipelines)
     return service
 
 

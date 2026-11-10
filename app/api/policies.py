@@ -189,6 +189,13 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
             "counts only, when the caller holds curation.approve), an exceeded cost cap (jobs.admin) and corpora "
             "with accepted merges to apply; each item carries the existing approve/reject route and body; ALS: "
             "verified admin only"),
+    # Publish to Tiled button (owner decision 2026-11-10, twenty-first set): export, adopt and stage the publication
+    # plan of a finished KG bundle as one library_publish job; :local only. It approves nothing: the plan waits on
+    # Pending Approvals (V82) for the existing V18 approval. Design: docs/migration/reviews/H6/publish_button.md.
+    _v("V83", "POST", "/library/kgs/{name}/publish", "graph.publish", on_als=False,
+       note="confirm=false previews (corpus, next free vN, problems; writes nothing); confirm=true submits the "
+            "library_publish job (export, adopt in process with the image's commit label, stage via "
+            "submit_publication to the managed local Tiled); needs library.extract too; never approves"),
 )
 
 #: ``(METHOD, path) -> RoutePolicy`` for the ``/v1`` routes.

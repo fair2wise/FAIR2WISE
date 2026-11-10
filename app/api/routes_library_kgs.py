@@ -16,6 +16,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..modules.contracts.context import RequestContext
 from ..modules.contracts.errors import ContractError, ErrorCode
 from ..modules.library.kg_service import MAX_PAPER_IDS, KgLibrary
+from ..modules.library.publish import LibraryPublisher
+from ..modules.security.authorization import require
 from .routes_common import Prefixed, context, project
 
 
@@ -35,6 +37,15 @@ class ExportBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     confirm: bool = False
+
+
+class PublishBody(BaseModel):
+    """Body of ``POST /v1/library/kgs/{name}/publish``: ``confirm`` false is a preview, ``again`` forces a new version."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    confirm: bool = False
+    again: bool = False
 
 
 class ContinueBody(BaseModel):
@@ -98,7 +109,22 @@ def install(app: FastAPI, service: KgLibrary) -> FastAPI:
             raise ContractError(ErrorCode.INVALID_INPUT, "exporting writes to the release directory; confirm is required")
         return project(request, kg_library(request).export(name))  # type: ignore[no-any-return]
 
+    @router.post("/kgs/{name}/publish")
+    def publish_kg(name: str, body: PublishBody, request: Request,
+                   ctx: RequestContext = Depends(context)) -> dict[str, Any]:
+        """Publish to Tiled: preview (``confirm`` false) or submit the ``library_publish`` job; never approves anything."""
+        publisher = getattr(request.app.state, "f2w_library_publisher", None)
+        if not isinstance(publisher, LibraryPublisher):
+            raise ContractError(ErrorCode.INTERNAL, "the publisher is not installed")
+        require(ctx, "library.extract")
+        if body.confirm is not True:
+            detail = publisher.preview(name, again=body.again)
+            detail.pop("_problems", None)
+            detail.pop("_inputs", None)
+            return project(request, detail)  # type: ignore[no-any-return]
+        return project(request, publisher.submit(ctx, name, again=body.again))  # type: ignore[no-any-return]
+
     return app
 
 
-__all__ = ("ContinueBody", "EstimateBody", "ExportBody", "install", "kg_library")
+__all__ = ("ContinueBody", "EstimateBody", "ExportBody", "PublishBody", "install", "kg_library")

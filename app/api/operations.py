@@ -333,6 +333,8 @@ class F2WOperations:
         view: dict[str, Any] = {"job": _json(handle), "ui_state": ui_state, "pause_reason": job.pause_reason,
                                 "stop_requested": job.stop_requested, "progress": progress, "publication": None}
         pub = self.publication
+        if job.kind == "library_publish":  # additive block of the Publish to Tiled job (owner decision 2026-11-10)
+            view["library_publish"] = self._library_publish_view(ctx, job_id)
         if pub is None or job.kind != "publish":
             return view
         store = pub.store
@@ -367,6 +369,18 @@ class F2WOperations:
             view["ui_state"] = "quarantined"
         view["publication"] = detail
         return view
+
+    def _library_publish_view(self, ctx: RequestContext, job_id: str) -> dict[str, Any] | None:
+        """The ``library_publish`` block of :meth:`job_view`: stages, adopted release, live plan of the staged job."""
+        from ..modules.library.publish import LibraryPublisher
+
+        def publication_view(pub_id: str) -> dict[str, Any] | None:
+            try:
+                return self.job_view(ctx, pub_id)
+            except ContractError:
+                return None
+
+        return LibraryPublisher.view(self.jobs.store, job_id, publication_view)
 
     # --- curation review --------------------------------------------------------------------
 
