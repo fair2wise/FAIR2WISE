@@ -92,7 +92,10 @@ docker exec f2w-local f2w-kg-adopt adopt \
 ```
 
 `--code-commit` is required in the image: the commit is normally read from
-`.git`, and the image has none. Use the commit the image was built from.
+`.git`, and the image has none. Use the commit the image was built from: it is the
+label `org.opencontainers.image.revision` (`docker inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' f2w-local`;
+CI sets it, a local build sets it with `--build-arg GIT_COMMIT=$(git rev-parse HEAD)`, and an image built without
+it says `unknown`).
 
 An alternative layout (not exercised in the rehearsal) is to start the container
 with `F2W_KG_RELEASE_DIR=/var/lib/fair2wise/state/session/storage_kg` so that
@@ -277,3 +280,10 @@ Details: `docs/migration/reviews/H4/apply_adapters.md`.
   `docs/migration/reviews/H8/splash_retirement.md`; the cutover and every
   deletion stay gated at H8 and `splash_links/` is still in the repository. The
   legacy editable mode and `compose.splash.yaml` still work.
+
+## Demo scripts
+
+For a demo on another Mac, `scripts/demo/` holds read-only `check_machine.sh`, `install.sh` (checksum, `docker load`,
+volumes, start), `seed.sh` (adopts the demo corpora, stages the publication plans and prints the owner's approval
+commands; it approves only with the owner's explicit `--i-approve`), `smoke.sh`, `reset.sh`, `backup.sh`, `restore.sh`
+and `keepawake.sh`. The order of operations is in `docs/migration/demo/RUNBOOK_DRAFT.md`.

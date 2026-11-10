@@ -231,7 +231,11 @@ ENV F2W_DEPLOYMENT_PROFILE=local \
     F2W_TILED_PYTHON=/opt/tiled/venv/bin/python \
     F2W_TILED_PORT=8765
 
+# The commit the image was built from (docker build --build-arg GIT_COMMIT=$(git rev-parse HEAD)); CI also
+# sets the same label with --label. scripts/demo/seed.sh reads it for f2w-kg-adopt --code-commit.
+ARG GIT_COMMIT=unknown
 LABEL org.opencontainers.image.title="fair2wise" \
+      org.opencontainers.image.revision="${GIT_COMMIT}" \
       org.opencontainers.image.description="FAIR2WISE :local - UI, API, worker and managed Tiled 0.2.18" \
       f2w.profile="local" \
       f2w.base_path="/fair2wise" \
@@ -250,7 +254,11 @@ ENV F2W_DEPLOYMENT_PROFILE=als-dev \
     F2W_TILED_MODE=external \
     F2W_TILED_URL=https://tiled-staging.als.lbl.gov
 
+# The commit the image was built from (docker build --build-arg GIT_COMMIT=$(git rev-parse HEAD)); CI also
+# sets the same label with --label. scripts/demo/seed.sh reads it for f2w-kg-adopt --code-commit.
+ARG GIT_COMMIT=unknown
 LABEL org.opencontainers.image.title="fair2wise" \
+      org.opencontainers.image.revision="${GIT_COMMIT}" \
       org.opencontainers.image.description="FAIR2WISE :als-dev - UI, API and worker; central Tiled (staging)" \
       f2w.profile="als-dev" \
       f2w.base_path="/fair2wise" \
@@ -269,7 +277,11 @@ ENV F2W_DEPLOYMENT_PROFILE=als-prod \
     F2W_TILED_MODE=external \
     F2W_TILED_URL=https://tiled.als.lbl.gov
 
+# The commit the image was built from (docker build --build-arg GIT_COMMIT=$(git rev-parse HEAD)); CI also
+# sets the same label with --label. scripts/demo/seed.sh reads it for f2w-kg-adopt --code-commit.
+ARG GIT_COMMIT=unknown
 LABEL org.opencontainers.image.title="fair2wise" \
+      org.opencontainers.image.revision="${GIT_COMMIT}" \
       org.opencontainers.image.description="FAIR2WISE :als-prod - UI, API and worker; central Tiled (production)" \
       f2w.profile="als-prod" \
       f2w.base_path="/fair2wise" \
