@@ -205,3 +205,101 @@ Truncation flag added (branch `forge_merge-T-nbhd-flag`): `GET /graph/neighborho
 `X-F2W-Graph-Truncated: true` when the node cap cut the neighbourhood (Tiled path and `source` path; absent otherwise). The body
 shape, status codes and the cap value (500, not configurable) are unchanged; the owner decision on the cap is still open. The
 viewer shows "Neighbourhood limited to N nodes; N+ nodes match" when the header is present.
+
+## 10. Large-graph default view added (owner decision 2026-11-10)
+
+Date: 2026-11-10. Branch `forge_merge-demo-viewer-big`. Owner decision (twenty-second set, `owner_decisions_2026-11-03.md`): make the KG
+Viewer safe and usable for the two big demo graphs, the most complete RSoXS KG (22,012 nodes, 57,575 edges, source `json:rsoxs_v4` or
+`tiled:rsoxs`) and the 580-paper OPV KG (15,815 nodes, 20,096 edges, `tiled:qwen3_235b_580papers`). Section 5 above could not measure
+browser drawing ("not measured: ... no Playwright run"); this section does, then records the policy that followed.
+
+### 10.1 Measurement before the change
+
+Setup: headless Chromium bundled with Playwright 1.63, viewport 1440x900, the production UI build served statically, the API mocked with
+`page.route` (the same `mockAgent` fixture the Playwright specs use; the live container was not touched). The graphs are synthetic with
+the real sizes and wire shape (`ui/e2e/fixtures/bigGraph.ts`: seeded preferential attachment, 12% Unknown nodes and 15% of edges to
+Unknown for RSoXS, 55% and 70% for the OPV KG; real degree maxima are higher, see 10.4). Source chosen through the Source selector
+(localStorage `fair2wise-graph-source-v1` set to `json:<graph>`), then **KG Viewer** clicked. Long tasks from `PerformanceObserver`, heap
+from `performance.memory` and CDP `Performance.getMetrics`, idle fps from a `requestAnimationFrame` counter over 2 s. One run per cell on
+a developer Mac; absolute times will differ on other hardware, the orders of magnitude will not.
+
+| graph (Nodes: All, Fixed layout) | first graph shown | longest task | long tasks, total | SVG elements | idle fps | JS heap | screenshot |
+|---|---|---|---|---|---|---|---|
+| 2,000 nodes / 5,000 edges | 1.3 s | 3.1 s | 4.7 s | 40,058 | 1.5 | 29 MB | 0.1 s |
+| 10,000 nodes / 26,000 edges | 10.1 s | 5.0 s | 10.2 s | 206,058 | 1 | 88 MB | 1.0 s |
+| OPV KG 15,815 / 20,096 | 7.7 s | 4.4 s | 7.7 s | 199,709 | 0 | 81 MB | 34 s |
+| RSoXS KG 22,012 / 57,575 | 25.9 s | 13.1 s | 25.2 s | 455,568 | 0 | 163 MB | **failed after 90 s (tab frozen)** |
+
+What this shows:
+
+* With **Nodes: All** (the default) the viewer draws every node: 22,012 node elements and 455,568 SVG elements for RSoXS. The tab is
+  blocked for 26 s before the first frame and afterwards runs at 0 fps; even a screenshot cannot be taken. The OPV KG is better only
+  because it has fewer edges (8 s, 200,000 elements). The in-code warning "SVG layout may lag at this scale" appears above 500 nodes but
+  does not prevent anything.
+* Focusing a node was worse than drawing. On the 22k graph a search result click did not return in 280 s (the toolbar did not answer
+  for 30 s after first paint in the unfixed build). Profiling by pausing the page showed `resolveViewerNodeId` (`kgCatalog.ts`): it
+  scores every node of the graph and compiled two regular expressions per node (44,000 per call), and the viewer calls it several times
+  per render and in effects. This also affects the focus flow on any large JSON graph, independent of the view policy.
+* Force-directed (canvas) on the 10,000-node graph answered the click in about 1.6 s, consistent with section 5's compute table, but it
+  needs the same 10 s to build the graph first and 40 s to settle.
+
+### 10.2 Policy implemented
+
+Constants in `ui/src/app/components/largeGraphPolicy.ts` (all named, all unit tested):
+
+| constant | value | meaning |
+|---|---|---|
+| `LARGE_GRAPH_NODE_THRESHOLD` | 1,500 | above this many nodes in the loaded graph the default view is an overview, not All |
+| `OVERVIEW_DEFAULT_NODES` | 300 | first overview |
+| `OVERVIEW_STEPS` | 300, 1,000, 2,000, 5,000 | "Show more" and the Nodes selector; 5,000 is the most the viewer draws |
+| `SLOW_LAYOUT_NODE_LIMIT` | 2,000 | above it: "(slow)" label, a warning in the banner, and Force-directed disabled (fixed layout only) |
+| `FOCUS_NEIGHBORHOOD_MAX_NODES` | 500 | cap of a focused neighbourhood read out of a large graph (same value as the server's `NEIGHBORHOOD_MAX_NODES`) |
+
+* Overview: the top-N nodes by degree (degree counted among the nodes eligible for the view, so a node whose links all go to Unknown
+  placeholders does not outrank real hubs; ties by label, then id) with the edges between them. `Unknown` placeholder nodes are hidden
+  by default, with a checkbox to include them. Banner: "Showing the 300 most connected of 22,012 nodes: search or focus a node to
+  explore, or show more." plus the number of hidden Unknown nodes; header "300 of 22,012 nodes".
+* The Nodes selector in a large graph lists the same steps and drives the same state as Show more, so it always agrees with the banner
+  (the parent's `All` default is not used for large graphs; ChatSidebar and App are untouched). A graph source change resets to 300.
+* Search is unchanged and covers every node (server `POST /graph/nodes/search`). Focusing a result shows its neighbourhood; for a large
+  JSON graph the client-side neighbourhood is now capped at 500 nodes (seed first, then the most connected) with the existing amber
+  notice "Neighbourhood limited to 500 nodes; N nodes match" (testid `graph-neighborhood-truncated`); Tiled neighbourhoods keep the
+  server cap and the `X-F2W-Graph-Truncated` notice. "Back to overview" returns.
+* `resolveViewerNodeId` takes an id-index fast path (a typed node whose id equals the request and no other alias names a node: the
+  result is identical to the scan because that candidate always has the top rank) and compiles its boundary pattern once per call.
+* No server change: whole-graph reads already stop at 100,000 nodes with `X-F2W-Graph-Truncated`, the neighbourhood route already caps
+  at 500, and no response shape changed. Graphs of 1,500 nodes or fewer (the demo graphs of 268 to 421 nodes, every existing test and
+  fixture) take exactly the old path.
+
+### 10.3 Measurement after the change
+
+Same harness and graphs, same machine, single run.
+
+| graph | first graph shown | longest task | long tasks, total | SVG elements | node elements | idle fps | JS heap | header |
+|---|---|---|---|---|---|---|---|---|
+| 2,000 nodes | 0.41 s | 0.46 s | 0.74 s | 7,954 | 300 | 43 | 24 MB | 300 of 2,000 nodes |
+| 10,000 nodes | 0.26 s | 0.46 s | 0.65 s | 4,780 | 300 | 56 | 22 MB | 300 of 10,000 nodes |
+| OPV KG 15,815 | 0.21 s | 0.46 s | 0.59 s | 3,208 | 300 | 60 | 21 MB | 300 of 15,815 nodes |
+| RSoXS KG 22,012 | 0.27 s | 0.48 s | 0.71 s | 3,742 | 300 | 60 | 27 MB | 300 of 22,012 nodes |
+
+Other steps on the RSoXS graph: search then click a leaf (outside the overview) 0.15 s, 5 nodes shown (before: no return in 280 s);
+Back to overview 0.17 s; Show more to 1,000 nodes 1.0 s; to 2,000 nodes 8 s (47,000 SVG elements for 6,200 edges; the time is the
+browser painting them, not script); to 5,000 nodes 21 s and a 30 s screenshot timeout. Switching to Force-directed on the 300-node
+overview responds in 0.06 to 0.08 s. So the 300 and 1,000 steps are comfortable, 2,000 is a visible pause, and 5,000 is only worth it
+when someone insists, which is why it is labelled "(slow)" and carries the warning.
+
+Verification in code: `ui/e2e/kg-viewer-large.spec.ts` (22k RSoXS and 15.8k OPV mock graphs; render within 15 s, at most 2,000
+node elements and 20,000 SVG elements, a timer round trip under 2 s, Show more steps, the warning and the disabled Force button above
+2,000, search of a node outside the overview, the 500-node cap on a 670-link hub, Unknown hiding, small graph unchanged) and the
+vitest files `largeGraphPolicy.test.ts` and `GraphMockupLarge.test.tsx`. Screenshots of every cell above (before and after, default
+and Force) were taken and inspected; they are kept in the session scratchpad (`viewer_big_shots/`), not committed.
+
+### 10.4 Caveats
+
+* Synthetic graphs: sizes and the Unknown share are real, but degrees are less skewed (generated maximum about 60 outside the
+  explicit hubs, the real RSoXS v4 maximum is 670). The overview of the real graph will have denser edges among its top 300 nodes.
+* The fixed layout is a golden-angle spiral, so the overview is a disc of 300 nodes, not a clustered picture; the force layout shows
+  the structure. Nothing was changed there.
+* The 5,000-node step is allowed with a warning rather than forbidden; if the owner prefers a hard limit of 2,000, set the last
+  entry of `OVERVIEW_STEPS` to 2,000.
+* No live container, no network and no LLM were used.
