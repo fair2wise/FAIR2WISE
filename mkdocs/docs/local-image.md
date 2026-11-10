@@ -287,3 +287,19 @@ For a demo on another Mac, `scripts/demo/` holds read-only `check_machine.sh`, `
 volumes, start), `seed.sh` (adopts the demo corpora, stages the publication plans and prints the owner's approval
 commands; it approves only with the owner's explicit `--i-approve`), `smoke.sh`, `reset.sh`, `backup.sh`, `restore.sh`
 and `keepawake.sh`. The order of operations is in `docs/migration/demo/RUNBOOK_DRAFT.md`.
+
+## CBORG from the container: IPv6
+
+CBORG only accepts requests from addresses the owner has authorized (LBLnet, VPN, or an address authorized at
+`https://api.cborg.lbl.gov/key/manage`). A developer's authorized address is usually the machine's **global IPv6**
+address. The Colima VM and the Docker daemon are set up for IPv6 (`network.address: true`, daemon `"ipv6": true`
+with `fixed-cidr-v6: fd00:f2::/64`), so a container has a private `fd00::` address and NAT66 out through the host.
+glibc still sorts the IPv4 destination first for a private IPv6 source, and the container then reaches CBORG over
+IPv4, which is not authorized: every call answers HTTP 403 "IP address ... not recognized" (model lists come back
+empty, QA answers fail).
+
+`scripts/run_local_container.sh` therefore mounts `docker/gai.conf` read-only at `/etc/gai.conf` (it gives private
+IPv6 sources the same label as global destinations, so IPv6 wins). Nothing else changes; if the container has no
+IPv6 it falls back to IPv4. `F2W_GAI_CONF=none` skips the mount. Check from inside a running container:
+`docker exec f2w-local python -c "import socket;print(socket.getaddrinfo('api.cborg.lbl.gov',443)[0][0])"`
+should print `AddressFamily.AF_INET6`. On LBLnet or the VPN IPv4 is also authorized and the mount is harmless.

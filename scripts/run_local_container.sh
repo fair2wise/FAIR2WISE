@@ -9,6 +9,10 @@
 #   env: OPENALEX_API_KEY (passed through when exported; not read from the dotenv file),
 #        F2W_KG_RELEASE_DIR (where KG exports are written; default on the state volume),
 #        F2W_CONTAINER_NAME (f2w-local), F2W_HOST_PORT (8080),
+#        F2W_GAI_CONF (the repo's docker/gai.conf): mounted read-only at /etc/gai.conf so the container prefers IPv6
+#        (CBORG allowlists the host's global IPv6 address only; the container has a ULA fd00:: address on Docker's
+#        IPv6 bridge and glibc would otherwise pick IPv4 first: HTTP 403 "IP address ... not recognized").
+#        Set F2W_GAI_CONF=none to skip it. Harmless when the container has no IPv6 (falls back to IPv4).
 #        F2W_PAPERS_DIR (the repo's papers/ folder): mounted read-only at /data/papers and
 #        offered as the one folder root (F2W_FOLDER_ROOTS) of the folder routes.
 #        F2W_LIBRARY_HOST_DIR (default: the same papers/ folder): mounted read-write at
@@ -39,6 +43,17 @@ unset line value
 openalex_args=()
 [ -z "${OPENALEX_API_KEY:-}" ] || openalex_args=(-e OPENALEX_API_KEY)
 
+# IPv6 preference for CBORG (docker/profiles/README.md, "IPv6 preference"): needs Docker IPv6 enabled on the VM/daemon.
+gai_conf="${F2W_GAI_CONF:-$(cd "$(dirname "$0")/.." && pwd)/docker/gai.conf}"
+gai_args=()
+if [ "$gai_conf" != "none" ]; then
+  if [ -f "$gai_conf" ]; then
+    gai_args=(-v "$gai_conf":/etc/gai.conf:ro)
+  else
+    echo "note: $gai_conf not found; the container will not prefer IPv6 (CBORG may answer 403 off LBLnet/VPN)" >&2
+  fi
+fi
+
 docker volume create f2w-local-state >/dev/null
 docker volume create f2w-local-tiled >/dev/null
 docker rm -f "$name" >/dev/null 2>&1 || true
@@ -48,6 +63,7 @@ docker run -d --name "$name" --stop-timeout 120 \
   -e F2W_FOLDER_ROOTS=/data/papers \
   -e "F2W_KG_RELEASE_DIR=${F2W_KG_RELEASE_DIR:-/var/lib/fair2wise/state/kg_releases}" \
   ${openalex_args[@]+"${openalex_args[@]}"} \
+  ${gai_args[@]+"${gai_args[@]}"} \
   -v "$papers":/data/papers:ro \
   -v "$library":/var/lib/fair2wise/library \
   -v f2w-local-state:/var/lib/fair2wise/state \
