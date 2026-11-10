@@ -189,3 +189,11 @@ not the other": confirmed (the plan's scope was e2e_demo only and bl1101's recor
 | Question | Owner answer |
 |---|---|
 | First target deployment and priorities | "OK so the first target deployment will be a locally run demo in 1 month (december 10 or 11) not on this machine, but either my mac studio or another one. So we must prioritize the remaining work around this (ignore :als-dev and :als-prod work/decisions for now) to show an end-to-end demo. If possible, we want to test against our tiled-staging.als.lbl.gov/ tiled server, but let's make sure everything else is squared away first" (read as: the `:local` profile on a machine other than the development one is the first target; ALS image work and decisions are deferred; a test against tiled-staging.als.lbl.gov is a stretch goal after the local demo path is solid; it is a reachability and credential decision for the owner, never done by an agent without it) |
+
+## Twenty-first set (2026-11-10)
+
+| Question | Owner answer |
+|---|---|
+| Library-to-publish route for the demo (supersedes the "Not now" of the tenth set) | "Yes: a 'Publish to Tiled' action in the Library KG tab (Recommended)" (export, adopt and stage the publication plan from one button on `:local`; the plan then appears on Pending Approvals for the owner to approve; no new approval path) |
+| QA when the knowledge graph has no information | "we should still get a regular chat answer, but an honest sentence "the knowledge graph has no information on this" with the answer. but the chat shouldn't break if the LLM can still answer the question" (read as: when retrieval is insufficient the chat still returns the language model's normal answer, with an honest statement that the knowledge graph has no information on the question; it must not turn into a refusal or an error) |
+| Demo machine checks | "I won't be able to test on the mac studio until next week when I'm back on site, so let's prioritize everything else first today" |
