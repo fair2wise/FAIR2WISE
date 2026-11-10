@@ -71,7 +71,7 @@ verdict is sufficient, 0.05 for no evidence).
 | No `CBORG_API_KEY` | `Retrieval failed: CBORG_API_KEY is not set; refusing to create a CBORG client (the OpenAI SDK would otherwise ...)` (`cborg_http.py:242`) | fallback answer, reason line is that text |
 | No publication yet | startup `F2W_GRAPH` seed answers (`api.py:2937-2950` returns quietly) | unchanged; the seed is not the demo corpus |
 | Empty or all-missing graph | `RuntimeError("No knowledge graphs loaded; cannot answer questions. Check graph file paths and logs above.")` shown as `Retrieval failed safely` | now `No knowledge graphs loaded; publish or adopt a corpus (or pick a graph in Settings), then ask again.` (prefix kept: `runtime_bridge/qa_tool.py:80` matches it) |
-| Question outside the KG | status `answered`, `sufficient=true`, confidence ~0.98, a rambling leeway answer with `[KG: ...]` chips on unrelated nodes (editable mode skips every JSON-mode guard, `api.py:5631`); in JSON mode an OpenAlex candidate search and a paper-download offer | `stop_insufficient` with `KG_NO_INFORMATION_ANSWER` (`api.py:1972`, `5614`), no model call, no node list, no paper offer (section 4) |
+| Question outside the KG | status `answered`, `sufficient=true`, confidence ~0.98, a rambling leeway answer with `[KG: ...]` chips on unrelated nodes (editable mode skips every JSON-mode guard, `api.py:5631`); in JSON mode an OpenAlex candidate search and a paper-download offer | a normal model answer preceded by `*The knowledge graph has no information on this question.*` (owner decision 2026-11-10; `KG_NO_INFORMATION_SENTENCE`, `api.py:_generate_general_answer`), no unrelated nodes, no paper offer, no judge call; without a reachable model the sentence plus a one-line reason (section 4) |
 | Very long answers | unbounded text; context is capped at 16k chars (`kg_rag_api.py:172`) but the answer is not | unchanged (G11, low) |
 | SSE drops | no event seen: UI silently re-asks via `POST /chat` (`liveAgent.ts:575`) and the turn id dedupes the claim; after a first event: `Agent run failed: Agent stream ended without a complete event` and the server cancels the turn (`api.py:7628`). No resume | unchanged (G10). nginx buffering is off and read timeout 900 s (`docker/nginx.conf:103-109`) |
 
@@ -86,9 +86,12 @@ offline it ends in `candidate_search_error` ("Candidate metadata search failed s
 
 1. **Off-domain gate** (`retrieval_agent.py:306 _off_domain`, wired in `query`, and `api.py:5614`): when no topic word of the question
    (stop words removed) occurs in the name, description, category or title of any retrieved node (or nothing was retrieved), retrieval
-   reports `no_evidence` plus `off_domain`, with `selected=[]`; `_ask_locked` answers `stop_insufficient` with a fixed sentence. It runs
-   before any model call (saves the 13 s), shows no unrelated nodes and keeps the response shape (same keys; `sufficient=false`,
-   `confidence=0.05`). Never fires for questions with no topic word (follow-ups), Tiled identity questions, or hits without text.
+   reports `no_evidence` plus `off_domain`, with `selected=[]`; `_ask_locked` then returns status `answered` whose text is the
+   italic sentence `*The knowledge graph has no information on this question.*` followed by one general-knowledge model answer
+   (`_generate_general_answer`, label `general-answer`, bounded by `LLM_HELPER_TIMEOUT_SECONDS`), per the owner decision of
+   2026-11-10 (not a refusal, never an error; if no model is reachable the sentence is followed by "I also could not reach a
+   language model ... (reason)"). No judge/leeway call (one model call instead of two), no unrelated nodes or papers. The response
+   shape is unchanged; `sufficient=false` and `confidence=0.05` remain the machine-readable "not from the KG" signal. Never fires for questions with no topic word (follow-ups), Tiled identity questions, or hits without text.
    Limit: a single shared common word defeats it ("current" in "Tesla stock price current" matches "short-circuit current"); the
    three demo refusal questions are chosen not to hit that, and the judge/leeway remain the second line (G2).
 2. **Clean provider errors** (`describe_llm_failure`): 403, 429 and other HTTP status errors never show the raw body.
@@ -128,7 +131,7 @@ or `/chat/stream`. Run: `python scripts/demo/qa_probe.py --base http://127.0.0.1
   an untestable-with-fakes prompt change).
 - Out-of-domain, 13.5 s, `answered`: lexical retrieval returned hundreds of weak hits, the judge said insufficient, the leeway call wrote a
   rambling answer, and `_confidence` scores any sufficient verdict 0.72-0.98, so `sufficient` and `confidence` said "good". Fixed by the
-  gate in section 4 (verify live: the probe's `ooc-*` questions should now return in under 1 s with `stop_insufficient`).
+  gate in section 4 (verify live: the probe's `ooc-*` questions should return the sentence plus a plain model answer in one model call, about 5-15 s).
 
 ## 8. Stretch goals (design only, nothing implemented)
 
@@ -172,11 +175,11 @@ Value for the demo: it makes "answers from what is in Tiled" literally true; tod
 | # | Risk | Gap | Fix / proposal |
 |---|---|---|---|
 | G1 | high | CBORG not reachable on demo day (needs LBLnet/VPN; 403 elsewhere): QA returned an error | **Fixed**: labelled retrieval-only answer with citations (section 5). Still verify the machine reaches CBORG; rehearse both |
-| G2 | high | Out-of-KG question answered with a rambling leeway answer and confidence ~0.98 | **Fixed** for no-topic-overlap questions (section 4). Residual: one shared common word defeats it; proposal: make `_confidence` 0.35 for leeway answers and put "not in the graph" first (small, needs the owner's wording) |
+| G2 | high | Out-of-KG question answered with a rambling leeway answer and confidence ~0.98 | **Fixed** per the owner decision: sentence first, then the model's ordinary answer (section 4). Residual: one shared common word defeats the gate; proposal: make `_confidence` 0.35 for leeway answers |
 | G3 | high | Hedging opener on in-domain answers ("The knowledge graph lacks specific slots...") | Proposal: LEEWAY_SYSTEM and JUDGE rule 1 to answer first, one closing line for gaps; needs a live A/B on the 12 questions (cannot be validated with fakes) |
 | G4 | high | Chat reads only the active pointer's corpus; a demo that switches the viewer to the other corpus then asks QA gets the first corpus' answers | Demo script: activate the corpus you will ask about (pointer), or implement (b)'s corpus choice from the viewer selection (M). Add to the runbook |
 | G5 | high | `e2e_demo` KG file is not in the repo; expected nodes for it cannot be curated here | Owner exports `graph.json`; run `qa_expected_nodes.py --graph <it>`; seed script must publish it before QA |
-| G6 | medium | Latency 13-38 s per turn, no token streaming (answer appears at once after sequential judge + leeway calls) | Progress steps hide some; proposals: skip the leeway call when judge missing_topics are slot gaps (saves one call), stream tokens (L); keep `--slow 45` in probe; rehearse timings |
+| G6 | medium | Latency 13-38 s per turn, no token streaming (the UI uses `/chat/stream` but only for progress steps; the answer arrives whole after sequential judge + leeway calls, each a fully collected CBORG stream) | Progress steps hide some; proposals (none implemented): add `token` SSE events from the CBORG stream (needs a UI change, L); run judge and leeway concurrently only when the judge is predicted insufficient; cap context (`KG_RAG_CTX_CHARS`, default 16000) to cut judge time; `--slow` in the probe flags regressions; also skip the leeway call when judge missing_topics are slot gaps (saves one call), stream tokens (L); keep `--slow 45` in probe; rehearse timings |
 | G7 | medium | JSON source selected in Settings turns unanswerable/low-evidence questions into OpenAlex searches and download offers (needs internet) | Keep the default source for the demo; runbook line |
 | G8 | medium | Lexical retrieval has no stop words and unstable tie order; bluesky question ranks science-KG nodes above the ops node (rank 25) | Stop-word filter in `_lexical_search` (changes ranking, needs eval re-run: not done); semantic backend is in the image (`-e KG_RAG_RETRIEVAL_BACKEND=semantic`, unverified live, slower startup) |
 | G9 | medium | Hung CBORG: up to ~250 s per turn (two 125 s waits) before a message | Lower `KG_RAG_LLM_TIMEOUT` (env, e.g. 40) for the demo; proposal: one deadline for the whole turn |

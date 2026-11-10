@@ -1969,11 +1969,12 @@ def _extraction_outcome_text(result: dict[str, Any]) -> str:
     return "Extraction completed: " + "; ".join(parts) + "."
 
 
-KG_NO_INFORMATION_ANSWER = (
-    "The knowledge graph has no information on this question. It covers the loaded corpora only, and "
-    "none of the retrieved nodes mention what you asked about. Try a question about those topics, or ask me "
-    "to find papers on the subject."
+KG_NO_INFORMATION_SENTENCE = "*The knowledge graph has no information on this question.*"
+KG_NO_MODEL_NOTE = (
+    "I also could not reach a language model to answer from general knowledge ({reason}). "
+    "Ask again when the model service is reachable."
 )
+
 
 JSON_GRAPH_NO_EVIDENCE_REFUSAL = (
     "The selected JSON graph did not contain enough direct evidence to answer this question."
@@ -5396,6 +5397,36 @@ class AgentPipelineService:
             return composed or rewritten
         return rewritten
 
+    async def _generate_general_answer(self, question: str, history: list[dict[str, str]] | None) -> str:
+        """Answer a question the knowledge graph cannot, from the model's general knowledge (one bounded call).
+
+        Never raises: without a reachable model the text says so (with the reason) instead of failing the turn.
+        """
+        from .retrieval_agent import describe_llm_failure
+
+        prompt = (
+            "You are FAIR2WISE, a concise assistant for materials science and ALS beamline users. The knowledge "
+            "graph has no information on the question below, and the user was told so. Answer it helpfully and "
+            "briefly from general knowledge. Do not cite the knowledge graph, papers or DOIs, and do not invent "
+            "measurement values.\n\n"
+            f"HISTORY:\n{json.dumps((history or [])[-MAX_HISTORY_MESSAGES:], ensure_ascii=False)}\n\n"
+            f"QUESTION:\n{question}"
+        )
+
+        def run() -> str:
+            """Run the general-knowledge completion."""
+            return str(
+                self._labeled_completion(prompt, timeout=LLM_HELPER_TIMEOUT_SECONDS, label="general-answer") or ""
+            ).strip()
+
+        try:
+            loop = asyncio.get_event_loop()
+            body = await loop.run_in_executor(None, bind_context(run))
+        except Exception as exc:
+            note_error("AgentPipelineService._generate_general_answer", exc)
+            return KG_NO_MODEL_NOTE.format(reason=describe_llm_failure(exc))
+        return body or KG_NO_MODEL_NOTE.format(reason="the model returned no text")
+
     async def _generate_json_graph_leeway_answer(
         self,
         question: str,
@@ -5612,16 +5643,18 @@ class AgentPipelineService:
                 )
 
             if verdict.get("off_domain") and not _direct_download_request(question):
-                # No retrieved node mentions any topic word of the question: say so, never improvise an answer
-                # from unrelated nodes and never offer unrelated papers.
-                self.workflow.update(phase="stop_insufficient")
+                # No retrieved node mentions any topic word of the question (owner decision 2026-11-10): the chat
+                # still answers like a normal model chat, after one honest sentence; never a refusal or an error.
+                self.workflow.update(phase="answered")
+                body = await self._generate_general_answer(question, history)
                 return self._response(
-                    "stop_insufficient",
-                    KG_NO_INFORMATION_ANSWER,
-                    False,
+                    "answered",
+                    f"{KG_NO_INFORMATION_SENTENCE}\n\n{body}",
+                    False,  # sufficient=false (confidence 0.05) stays the machine-readable "not from the KG" signal
                     verdict,
                     rounds,
                     active_graph_path,
+                    publications_override=[],
                 )
 
             json_needs_ingest = (

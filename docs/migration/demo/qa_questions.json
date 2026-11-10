@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Demo QA question set. answerable=false questions must be refused with a 'no information' answer. expected_node_ids are curated ids that the real lexical retriever (scripts/demo/qa_expected_nodes.py --check) returns within the first 40 hits under every PYTHONHASHSEED tried (the order of hits is not stable, so the probe tests membership, not rank). e2e_demo has no tracked graph (it was exported from the demo container), so it carries expected_terms only; pass its graph.json to qa_expected_nodes.py to curate node ids for it.",
+  "description": "Demo QA question set. answerable=false questions must still get a normal answer that opens with the italic sentence 'The knowledge graph has no information on this question.' (owner decision 2026-11-10). expected_node_ids are curated ids that the real lexical retriever (scripts/demo/qa_expected_nodes.py --check) returns within the first 40 hits under every PYTHONHASHSEED tried (the order of hits is not stable, so the probe tests membership, not rank). e2e_demo has no tracked graph (it was exported from the demo container), so it carries expected_terms only; pass its graph.json to qa_expected_nodes.py to curate node ids for it.",
   "graph_files": [
     "storage/kg/matkg_rsoxs_v1.json",
     "storage/kg/matkg_bl1101_v4.json"

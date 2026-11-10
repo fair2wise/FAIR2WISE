@@ -75,15 +75,36 @@ def test_in_domain_question_is_answered_with_one_model_call(env, kg_mode):
     assert llm.labels == ["KG-RAG-judge"]
 
 
+GENERAL = "Synthetic deterministic model text."  # what the harness's fake sync chat client answers
+
+
 @pytest.mark.parametrize("kg_mode", ["json", "splash"])
-def test_out_of_domain_question_says_the_kg_has_no_information(env, kg_mode):
+def test_out_of_domain_question_gets_the_model_answer_after_an_honest_sentence(env, kg_mode):
     ctx, llm = env
     body = _client(ctx, kg_mode).post("/chat", json={"message": "What is the capital of France?"}).json()
-    assert body["status"] == "stop_insufficient"
-    assert body["answer"] == api_mod.KG_NO_INFORMATION_ANSWER
-    assert body["sufficient"] is False and body["node_ids"] == [] and body["pending"] is None
-    assert llm.labels == []  # no model call, no improvised answer
+    assert body["status"] == "answered"  # never a refusal or an error
+    assert body["answer"] == f"{api_mod.KG_NO_INFORMATION_SENTENCE}\n\n{GENERAL}"
+    assert body["answer"].startswith("*The knowledge graph has no information on this question.*")
+    assert body["sufficient"] is False and body["confidence"] == 0.05  # the "not from the KG" signal
+    assert body["node_ids"] == [] and body["publications"] == [] and body["pending"] is None
+    assert llm.labels == []  # no judge or leeway call; the general answer used the sync chat client
+    assert ctx.calls["llm.chat"] >= 1
     assert ctx.calls.get("download.search_candidates", 0) == 0  # no unrelated paper offer
+
+
+def test_out_of_domain_without_a_reachable_model_still_answers_and_says_why(env, monkeypatch):
+    ctx, llm = env
+    from app.modules.term_extractor import clients
+
+    def down(*args, **kwargs):
+        raise _http_error(403)
+
+    monkeypatch.setattr(clients, "make_chat_client", down)
+    body = _client(ctx, "splash").post("/chat", json={"message": "What is the capital of France?"}).json()
+    assert body["status"] == "answered"
+    assert body["answer"].startswith(api_mod.KG_NO_INFORMATION_SENTENCE)
+    assert "could not reach a language model" in body["answer"] and "HTTP 403" in body["answer"]
+    assert "raw provider body" not in body["answer"]
 
 
 def test_off_domain_gate_ignores_follow_ups_and_topic_words():
@@ -144,7 +165,7 @@ def test_stream_reports_provider_failure_as_an_error_event_and_off_domain_as_com
     assert events[-1]["event"] == "error" and "HTTP 403" in events[-1]["data"]["answer"]
     raw = client.post("/chat/stream", json={"message": "What is the capital of France?"}).content
     last = H.parse_sse(raw)[-1]
-    assert last["event"] == "complete" and last["data"]["answer"] == api_mod.KG_NO_INFORMATION_ANSWER
+    assert last["event"] == "complete" and last["data"]["answer"].startswith(api_mod.KG_NO_INFORMATION_SENTENCE)
 
 
 def test_empty_graph_file_gives_an_actionable_message(env):
@@ -172,14 +193,15 @@ def test_model_failure_gives_a_labelled_retrieval_only_answer_with_sources(env, 
     assert llm.labels == ["KG-RAG-judge"]  # the leeway call is not attempted either
 
 
-def test_offline_fallback_can_be_switched_off_and_off_domain_still_refuses(env, monkeypatch):
+def test_offline_fallback_can_be_switched_off_and_off_domain_still_answers(env, monkeypatch):
     ctx, llm = env
     assert ra.offline_fallback_enabled({}) is True
     assert ra.offline_fallback_enabled({"F2W_QA_OFFLINE_FALLBACK": "off"}) is False
     llm.mode, llm.error = "raise", _http_error(403)
     monkeypatch.delenv("F2W_QA_OFFLINE_FALLBACK")
     body = _client(ctx, "json").post("/chat", json={"message": "What is the capital of France?"}).json()
-    assert body["answer"] == api_mod.KG_NO_INFORMATION_ANSWER  # decided before any model call
+    assert body["answer"].startswith(api_mod.KG_NO_INFORMATION_SENTENCE)  # decided before the judge call
+    assert llm.labels == []
 
 
 def test_offline_answer_text_is_bounded_and_cites_each_node():

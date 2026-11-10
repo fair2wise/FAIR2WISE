@@ -10,7 +10,8 @@ settings route. Each answered question costs real model calls on the server, so 
 Verdicts. An answerable question PASSes when an expected node id is among the returned nodes, or (corpora whose
 graph is not tracked) when an expected term occurs in the answer or in a returned node name; it WARNs when the
 status is not an answer, no evidence matches, the answer opens with a hedge, or it was slower than ``--slow``.
-An unanswerable question PASSes only when the system says the knowledge graph has no information.
+An unanswerable question PASSes only when the answer opens with the sentence saying the knowledge graph has no information
+(it must still be a normal answer, not an error).
 Exit code: 0 normally, 1 with ``--strict`` and any WARN, 2 when the API is unreachable.
 """
 from __future__ import annotations
@@ -27,8 +28,7 @@ import urllib.request
 import uuid
 
 DEFAULT_QUESTIONS = Path(__file__).resolve().parents[2] / "docs" / "migration" / "demo" / "qa_questions.json"
-REFUSAL_STATUSES = {"stop_insufficient", "insufficient_json_graph", "insufficient_evidence"}
-REFUSAL_RE = re.compile(r"no information|does not contain|not enough (direct )?evidence|cannot answer", re.I)
+NO_INFO_RE = re.compile(r"knowledge graph has no information", re.I)
 HEDGE_RE = re.compile(r"^\W*(the (knowledge )?graph (lacks|does not)|no .{0,40} graph\b|i could not)", re.I)
 
 
@@ -76,9 +76,13 @@ def judge(item: dict, resp: dict, latency: float, slow: float) -> tuple[str, lis
     ids, names = sources(resp)
     reasons: list[str] = []
     if not item.get("answerable", True):
-        if status in REFUSAL_STATUSES or REFUSAL_RE.search(answer):
-            return ("PASS" if latency <= slow else "WARN"), ([] if latency <= slow else [f"slow {latency:.0f}s"])
-        return "WARN", [f"expected a 'no information' answer, got status={status}"]
+        if not NO_INFO_RE.search(answer[:200]):
+            return "WARN", [f"answer does not open with the 'no information' sentence (status={status})"]
+        if status != "answered":
+            reasons.append(f"status={status}")
+        if latency > slow:
+            reasons.append(f"slow {latency:.0f}s")
+        return ("WARN" if reasons else "PASS"), reasons
     if status != "answered":
         reasons.append(f"status={status}")
     expected = set(item.get("expected_node_ids") or [])

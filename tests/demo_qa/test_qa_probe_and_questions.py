@@ -41,8 +41,10 @@ def test_judge_answerable_and_unanswerable():
     terms = {"answerable": True, "expected_node_ids": [], "expected_terms": ["cyclotron"]}
     assert probe.judge(terms, {"status": "answered", "answer": "A cyclotron line", "node_ids": []}, 1, 45)[0] == "PASS"
     refuse = {"answerable": False}
-    assert probe.judge(refuse, {"status": "stop_insufficient", "answer": "x"}, 1, 45)[0] == "PASS"
+    said = "*The knowledge graph has no information on this question.*\n\nParis."
+    assert probe.judge(refuse, {"status": "answered", "answer": said}, 1, 45)[0] == "PASS"
     assert probe.judge(refuse, {"status": "answered", "answer": "Paris."}, 1, 45)[0] == "WARN"
+    assert probe.judge(refuse, {"status": "retrieval_error", "answer": said}, 1, 45)[0] == "WARN"
 
 
 class _Handler(http.server.BaseHTTPRequestHandler):
@@ -52,8 +54,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         _Handler.seen.append({"path": self.path, "origin": self.headers.get("Origin"), **body})
         refuse = "France" in body["message"]
-        payload = {"status": "stop_insufficient" if refuse else "answered", "sufficient": not refuse,
-                   "answer": "The knowledge graph has no information." if refuse else "EPU polarization motor.",
+        payload = {"status": "answered", "sufficient": not refuse,
+                   "answer": "*The knowledge graph has no information on this question.*\n\nParis." if refuse else "EPU polarization motor.",
                    "node_ids": [] if refuse else ["beamline:Motor-epu-polarization"], "confidence": 0.5,
                    "turn_id": "t1"}
         if self.path.endswith("/stream"):
