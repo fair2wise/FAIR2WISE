@@ -118,6 +118,16 @@ owner-gated open questions (corpus-less rollback with several corpora live; whic
 `docs/migration/api/README.md` section 3.2. Tests: `tests/jobs/test_replacement_publication.py` (two corpora, two
 versions each, rollback of A while B stays live, rollback of B) and `tests/api_v1/test_v1_corpus_pointer.py`.
 
+## Corpus-less rollback with several corpora live is refused (owner decision 2026-11-09, nineteenth set)
+
+`rollback-replacement` (V53) and `rollback` (V20) with no `corpus` while the live-by-corpus view holds more than one
+corpus answer 409 `conflict`, `reason = "corpus_required"`, `retryable = false`, naming the live corpora
+(`Publication._require_corpus_when_ambiguous`). With one live corpus they work as before; naming a corpus works as
+in Model C. The T13 rehearsal case (A/v1, B/v1, then a rollback that planned zero operations) is therefore no longer
+reachable without a corpus; the zero-operation plan itself is unchanged. Tests:
+`tests/jobs/test_replacement_publication.py` (two live refused, one live allowed, corpus named allowed, V20) and
+`tests/api_v1/test_v1_corpus_pointer.py` (409 body with the reason).
+
 ## Corpus removal moves the pointer (owner decision 2026-11-09, eighteenth set)
 
 `corpus-retire` no longer clears the target pointer while another corpus is live: `PublishStore.clear_pointer` writes

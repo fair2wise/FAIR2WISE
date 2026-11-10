@@ -153,6 +153,9 @@ curl -fsS "${H[@]}" -X POST $API/v1/publications/rollback-replacement \
 - One pointer exists per target, with history. A rollback is a toggle between
   the last two pointers (a second rollback is a roll-forward) and is itself a
   planned, approved job. Candidates, receipts and snapshots are never deleted.
+- With several corpora live a rollback must name the corpus (`"corpus": "<name>"`
+  in the request); without it the server answers `409 conflict` with reason
+  `corpus_required` and lists the live corpora. With one live corpus nothing changes.
 - **A rollback moves the pointer; it never removes a corpus.** Removing a corpus
   is a separate plan (`corpus-retire`); when another corpus stays live, that
   removal moves the pointer (and so the Save target) to the most recently

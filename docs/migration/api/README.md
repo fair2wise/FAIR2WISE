@@ -177,9 +177,11 @@ additionally keeps a corpus only while its Tiled release marker names the versio
   with no earlier version is refused with 409 `conflict`, `reason = "no_previous_corpus_version"` (not retryable); a
   corpus with no live version with 404 `not_found`, `reason = "corpus_not_live"`. V20 stays refused on a replacement
   deployment (`rollback_replacement_required`) whatever `corpus` says.
-* **Without `corpus` nothing changes**: the previous pointer of any corpus (B28). **With several corpora live that is
-  ambiguous** (it can be a no-op that only moves the pointer, 3.1); it is *not* refused. Whether to refuse it is the
-  memo's open question 2 and is **owner-gated**.
+* **Without `corpus`, with exactly one live corpus, nothing changes**: the previous pointer (B28). **With several
+  corpora live a rollback that names no corpus is refused** (owner decision 2026-11-09, nineteenth set; memo question 2):
+  V53 and V20 answer 409 `conflict`, `reason = "corpus_required"`, not retryable, with a message naming the live
+  corpora; no job is created and nothing moves. "Live" is the live-by-corpus view (`PublishStore.live_by_corpus`).
+  On a replacement deployment V20 keeps answering `rollback_replacement_required` first.
 * `Publication.verify_agreement(ctx, target, scope)` compares the corpus's marker with that corpus's live version, not
   the target pointer (a false disagreement before).
 * Job `ui_state`: `published` while the job's receipt is the live version of its own corpus, `superseded` only when another

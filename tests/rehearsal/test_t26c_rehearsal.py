@@ -868,7 +868,10 @@ def test_t26c_07_a_rollback_of_one_corpus_never_touches_the_other_on_the_same_ta
     # (1) the E2E case: pointer now names OTHER; the route's "previous pointer" is the synthetic v1 that is live
     writes = len(prod.client.writes)
     all_rows = (prod.rows(CORPUS), prod.rows(OTHER), prod.foreign())
-    handle = prod.pub.rollback_replacement(prod.ctx, prod.target, reason="back to synthetic")
+    with pytest.raises(ContractError) as ambiguous:       # 2026-11-09 (nineteenth set): the route must name a corpus
+        prod.pub.rollback_replacement(prod.ctx, prod.target, reason="back to synthetic")
+    assert ambiguous.value.reason == "corpus_required"
+    handle = prod.pub.submit(prod.ctx, f"{CORPUS}/v1", prod.target, rollback_reason="back to synthetic")
     assert prod.work() == (handle.job_id, JobState.AWAITING_REVIEW)
     plan = prod.pub.current_plan(prod.ctx, handle.job_id)
     noop_plan = (plan.creates, plan.links, plan.supersessions)

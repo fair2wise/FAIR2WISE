@@ -223,7 +223,12 @@ def test_noop_rollback_after_an_unrelated_corpus_moves_the_pointer_and_writes_no
     assert world.live() == a_live, "publishing another corpus retires nothing of A"
     before, n_writes = counts(world), len(world.client.writes)
 
-    handle = world.pub.rollback_replacement(world.ctx, world.target, reason="back to A")
+    # Owner decision 2026-11-09 (nineteenth set): with two corpora live the request must name one, so the
+    # corpus-less call is refused; the zero-operation plan itself is submitted the way a named rollback does.
+    with pytest.raises(ContractError) as refused:
+        world.pub.rollback_replacement(world.ctx, world.target, reason="back to A")
+    assert refused.value.reason == "corpus_required"
+    handle = world.pub.submit(world.ctx, f"{SCOPE}/v1", world.target, rollback_reason="back to A")
     assert world.work() == (handle.job_id, JobState.AWAITING_REVIEW)
     plan = world.pub.current_plan(world.ctx, handle.job_id)
     assert (plan.creates, plan.links, plan.supersessions) == (0, 0, 0) and plan.corpus_scope == (SCOPE,)
@@ -248,7 +253,7 @@ def test_noop_rollback_after_an_unrelated_corpus_moves_the_pointer_and_writes_no
     assert not world.pubstore.quarantined(handle.job_id)
 
     # The B28 toggle back is a no-op for B as well: pointer version 4, still nothing written.
-    world.finish(world.pub.rollback_replacement(world.ctx, world.target, reason="and forward").job_id)
+    world.finish(world.pub.submit(world.ctx, f"{OTHER}/v1", world.target, rollback_reason="and forward").job_id)
     pointer = world.pubstore.pointer(world.target)
     assert (pointer.version, pointer.snapshot_ref) == (4, f"{OTHER}/v1")
     assert counts(world) == before and len(world.client.writes) == n_writes
@@ -264,7 +269,7 @@ def test_noop_receipt_fails_verify_for_another_revision_target_or_without_its_co
     derive_corpus(world.v1, OTHER)
     world.publish("v1")
     world.finish(world.pub.submit(world.ctx, f"{OTHER}/v1", world.target).job_id)
-    job = world.finish(world.pub.rollback_replacement(world.ctx, world.target, reason="back to A").job_id)
+    job = world.finish(world.pub.submit(world.ctx, f"{SCOPE}/v1", world.target, rollback_reason="back to A").job_id)
     plan = world.pubstore.current_plan(job).plan
     outcome = ApplyOutcome.from_dict(world.store.stage(job, "import").result)
     thin = world.step.receipts.find(plan_sha256=plan.plan_sha256)[0]
@@ -376,15 +381,41 @@ def test_corpus_rollback_is_refused_with_a_typed_error_without_an_earlier_versio
     assert world.service.store.list_jobs() and len(world.service.store.list_jobs()) == 2
 
 
-def test_rollback_without_corpus_still_means_the_previous_pointer(world):
-    """Backward compatible: with two corpora live, ``corpus=None`` steps back one pointer of any corpus."""
+def test_rollback_without_corpus_is_refused_while_several_corpora_are_live(world):
+    """Owner decision 2026-11-09 (nineteenth set): V53/V20 with no corpus and several live is 409 ``corpus_required``."""
     derive_corpus(world.v1, OTHER)
     world.publish("v1")
     world.publish("v2")
     submit_finish(world, OTHER, "v1")
-    handle = world.pub.rollback_replacement(world.ctx, world.target, reason="legacy meaning")
+    jobs_before, pointer_before = len(world.service.store.list_jobs()), world.pubstore.pointer(world.target)
+    with pytest.raises(ContractError) as err:
+        world.pub.rollback_replacement(world.ctx, world.target, reason="which one?")
+    assert err.value.code is ErrorCode.CONFLICT and err.value.reason == "corpus_required"
+    assert err.value.retryable is False and SCOPE in str(err.value) and OTHER in str(err.value)
+    assert len(world.service.store.list_jobs()) == jobs_before and world.pubstore.pointer(world.target) == pointer_before
+    # Naming a corpus is allowed (A has an earlier version: v1).
+    handle = world.pub.rollback_replacement(world.ctx, world.target, reason="A back", corpus=SCOPE)
     assert world.work() == (handle.job_id, JobState.AWAITING_REVIEW)
-    assert world.pub.current_plan(world.ctx, handle.job_id).corpus_scope == (SCOPE,)  # previous pointer = A/v2
+    assert world.pub.current_plan(world.ctx, handle.job_id).corpus_scope == (SCOPE,)
+
+
+def test_rollback_without_corpus_still_means_the_previous_pointer_with_one_live_corpus(world):
+    world.publish("v1")
+    world.publish("v2")
+    handle = world.pub.rollback_replacement(world.ctx, world.target, reason="one corpus: unchanged")
+    assert world.work() == (handle.job_id, JobState.AWAITING_REVIEW)
+    assert world.pub.current_plan(world.ctx, handle.job_id).corpus_scope == (SCOPE,)
+
+
+def test_pointer_only_rollback_without_corpus_is_refused_with_several_live_when_no_marker_moves(world, monkeypatch):
+    derive_corpus(world.v1, OTHER)
+    world.publish("v1")
+    submit_finish(world, OTHER, "v1")
+    monkeypatch.setattr(world.pub, "replacement", False)
+    with pytest.raises(ContractError) as err:
+        world.pub.rollback(world.ctx, world.target, reason="which one?")
+    assert err.value.code is ErrorCode.CONFLICT and err.value.reason == "corpus_required"
+    assert world.pubstore.pointer(world.target).snapshot_ref == f"{OTHER}/v1"
 
 
 def test_live_versions_follow_corpus_removal_and_markers(world):
@@ -483,7 +514,7 @@ def test_noop_rollback_is_auto_approved_on_local_with_an_auto_safe_plan_record(a
     world.publish("v1")
     world.finish(world.pub.submit(world.ctx, f"{OTHER}/v1", world.target).job_id)
     before, n_writes = counts(world), len(world.client.writes)
-    handle = world.pub.rollback_replacement(world.ctx, world.target, reason="back to A")
+    handle = world.pub.submit(world.ctx, f"{SCOPE}/v1", world.target, rollback_reason="back to A")
     assert world.work() == (handle.job_id, JobState.SUCCEEDED), "no human approval step"
     plan = world.pubstore.current_plan(handle.job_id).plan
     assert (plan.creates, plan.links, plan.supersessions) == (0, 0, 0)
@@ -526,7 +557,7 @@ def test_noop_rollback_waits_for_a_human_on_any_other_profile(auto_world):
     world.pub.deps.auto_approve = hook
     world.publish("v1")
     world.finish(world.pub.submit(world.ctx, f"{OTHER}/v1", world.target).job_id)
-    handle = world.pub.rollback_replacement(world.ctx, world.target, reason="back to A")
+    handle = world.pub.submit(world.ctx, f"{SCOPE}/v1", world.target, rollback_reason="back to A")
     assert world.work() == (handle.job_id, JobState.AWAITING_REVIEW)
     plan = world.pub.current_plan(world.ctx, handle.job_id)
     assert plan.creates == plan.links == plan.supersessions == 0
@@ -540,5 +571,5 @@ def test_no_auto_approver_is_wired_by_default(world):
     derive_corpus(world.v1, OTHER)
     world.publish("v1")
     world.finish(world.pub.submit(world.ctx, f"{OTHER}/v1", world.target).job_id)
-    handle = world.pub.rollback_replacement(world.ctx, world.target, reason="back to A")
+    handle = world.pub.submit(world.ctx, f"{SCOPE}/v1", world.target, rollback_reason="back to A")
     assert world.work() == (handle.job_id, JobState.AWAITING_REVIEW)
