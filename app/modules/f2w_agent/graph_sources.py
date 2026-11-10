@@ -581,24 +581,33 @@ class GraphSources:
     @staticmethod
     def neighborhood(graph: SourceGraph, node_id: str, hops: int) -> SourceGraph | None:
         """Undirected breadth-first neighborhood (``hops`` clamped to 1..:data:`MAX_HOPS`, capped nodes)."""
+        found = GraphSources.neighborhood_capped(graph, node_id, hops)
+        return None if found is None else found[0]
+
+    @staticmethod
+    def neighborhood_capped(graph: SourceGraph, node_id: str, hops: int) -> tuple[SourceGraph, bool] | None:
+        """:meth:`neighborhood` plus whether the node cap cut it (a node within ``hops`` was left out)."""
         if node_id not in graph.by_id:
             return None
         hops = max(1, min(int(hops), MAX_HOPS))
         seen = {node_id: 0}
         order = [node_id]
         queue: deque[str] = deque([node_id])
-        while queue and len(order) < NEIGHBORHOOD_MAX_NODES:
+        while queue:
             current = queue.popleft()
             if seen[current] >= hops:
                 continue
             for idx in graph.adjacency.get(current, ()):
                 edge = graph.edges[idx]
                 other = edge["object"] if edge["subject"] == current else edge["subject"]
-                if other not in seen and other in graph.by_id and len(order) < NEIGHBORHOOD_MAX_NODES:
-                    seen[other] = seen[current] + 1
-                    order.append(other)
-                    queue.append(other)
-        return graph.subgraph(order)
+                if other in seen or other not in graph.by_id:
+                    continue
+                if len(order) >= NEIGHBORHOOD_MAX_NODES:
+                    return graph.subgraph(order), True
+                seen[other] = seen[current] + 1
+                order.append(other)
+                queue.append(other)
+        return graph.subgraph(order), False
 
 
 __all__ = ("CORPUS_NAME_RE", "DEFAULT_PREDICATE", "GraphScanner", "GraphSources", "JsonFile", "MAX_NODES", "SOURCE_ID_RE",

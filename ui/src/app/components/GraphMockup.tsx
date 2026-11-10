@@ -26,7 +26,7 @@ import { graphSourceFromPath, useGraphSourceState } from './graphSourceStore';
 import { useGraphSources } from './graphSourcesHooks';
 import { useCapabilities } from './capabilitiesHooks';
 import {
-  fetchGraphNeighborhood,
+  fetchGraphNeighborhoodResult,
   fetchGraphNodeDetail,
   fetchLiveGraph,
   GraphPayload,
@@ -1678,6 +1678,7 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
   const [focusedHops, setFocusedHops] = useState(1);
   const [tiledFocusGraph, setTiledFocusGraph] = useState<GraphPayload | null>(null);
   const [tiledFocusLoading, setTiledFocusLoading] = useState(false);
+  const [tiledFocusCut, setTiledFocusCut] = useState(false);
   const [viewBox, setViewBox] = useState<ViewBox>(fullViewBox(W, H));
   const viewerSourceState = useGraphSourceState();
   // The source whose catalog the KG viewer shows; chat mode always reads the default graph.
@@ -1828,6 +1829,7 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
   useEffect(() => {
     if (!activeFocusId || !tiledFocus) {
       setTiledFocusGraph(null);
+      setTiledFocusCut(false);
       setTiledFocusLoading(false);
       return;
     }
@@ -1843,9 +1845,11 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
     }
     let cancelled = false;
     setTiledFocusLoading(true);
-    fetchGraphNeighborhood(activeFocusId, CITE_FOCUS_HOPS, viewerSource)
-      .then(payload => {
+    setTiledFocusCut(false);
+    fetchGraphNeighborhoodResult(activeFocusId, CITE_FOCUS_HOPS, viewerSource)
+      .then(({ graph: payload, truncated }) => {
         if (cancelled || !payload.nodes.length) return;
+        setTiledFocusCut(truncated);
         setTiledFocusGraph(payload);
       })
       .catch(() => undefined)
@@ -2275,6 +2279,16 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
               </span>
               {tiledFocusLoading ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-sky-500" aria-label="Loading neighborhood" />
+              ) : null}
+              {tiledFocusCut && tiledFocusGraph ? (
+                <span
+                  role="status"
+                  data-testid="graph-neighborhood-truncated"
+                  className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-800"
+                >
+                  Neighbourhood limited to {tiledFocusGraph.nodes.length.toLocaleString()} nodes;{' '}
+                  {tiledFocusGraph.nodes.length.toLocaleString()}+ nodes match
+                </span>
               ) : null}
             </div>
           )}

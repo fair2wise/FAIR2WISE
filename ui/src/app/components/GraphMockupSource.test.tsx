@@ -45,7 +45,7 @@ function stubFetch(listing: unknown = LISTING, results: unknown[] = []) {
   return fetchMock;
 }
 
-function renderViewer(graph: GraphPayload, isKgViewer = true) {
+function renderViewer(graph: GraphPayload, isKgViewer = true, citeFocusNodeId: string | null = null) {
   return render(
     <QueryClientProvider client={new QueryClient()}>
       <div style={{ width: 800, height: 600 }}>
@@ -53,6 +53,7 @@ function renderViewer(graph: GraphPayload, isKgViewer = true) {
           graph={graph}
           highlightedNodeIds={[]}
           isKgViewer={isKgViewer}
+          citeFocusNodeId={citeFocusNodeId}
           onToggleKgViewer={() => undefined}
           onKgViewerNodeLimitChange={() => undefined}
           onGraphSourceChange={() => undefined}
@@ -149,5 +150,45 @@ describe('GraphMockup Save on the corpus shown in the graph view (owner decision
     expect(String(patch?.[0])).toMatch(/\/graph\/node\/m%3Aa\?source=tiled%3Ae2e_demo$/);
     await waitFor(() => expect(fetchMock.mock.calls.map(call => String(call[0])))
       .toContainEqual(expect.stringMatching(/\/graph\?source=tiled%3Ae2e_demo$/)));
+  });
+});
+
+describe('GraphMockup neighborhood truncation notice', () => {
+  const focusNodes = [
+    { id: 'tiled:beamline:ESAF-1', label: 'ESAF 1', type: 'ESAF', description: '' },
+    { id: 'tiled:beamline:Proposal-1', label: 'Proposal 1', type: 'Proposal', description: '' },
+  ];
+
+  function stubNeighborhood(truncated: boolean) {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/graph/neighborhood/')) {
+        const payload = {
+          ...graphOf('tiled://graphql', focusNodes),
+          edges: [{ source: focusNodes[0].id, target: focusNodes[1].id, predicate: 'rel:hasProposal' }],
+        };
+        return new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: truncated ? { 'X-F2W-Graph-Truncated': 'true' } : {},
+        });
+      }
+      if (url.includes('/v1/graph/sources')) return new Response(JSON.stringify(LISTING), { status: 200 });
+      return new Response('{}', { status: 404 });
+    }));
+  }
+
+  it('tells the user when the neighborhood was cut by the server cap', async () => {
+    stubNeighborhood(true);
+    renderViewer(graphOf('tiled://graphql', focusNodes), true, 'tiled:beamline:ESAF-1');
+    const notice = await screen.findByTestId('graph-neighborhood-truncated');
+    expect(notice).toHaveTextContent('Neighbourhood limited to 2 nodes; 2+ nodes match');
+    expect(notice).toHaveAttribute('role', 'status');
+  });
+
+  it('shows no notice for a complete neighborhood', async () => {
+    stubNeighborhood(false);
+    renderViewer(graphOf('tiled://graphql', focusNodes), true, 'tiled:beamline:ESAF-1');
+    await waitFor(() => expect(screen.queryByLabelText('Loading neighborhood')).toBeNull());
+    expect(screen.queryByTestId('graph-neighborhood-truncated')).toBeNull();
   });
 });

@@ -724,11 +724,20 @@ export async function searchGraphNodes(
   return response.json();
 }
 
-export async function fetchGraphNeighborhood(
+/** Response header the server sets when a graph read was cut by its node cap (additive; the body is unchanged). */
+export const GRAPH_TRUNCATED_HEADER = 'X-F2W-Graph-Truncated';
+
+export interface GraphNeighborhoodResult {
+  graph: GraphPayload;
+  /** True when the server's neighborhood node cap cut the result (`X-F2W-Graph-Truncated: true`). */
+  truncated: boolean;
+}
+
+export async function fetchGraphNeighborhoodResult(
   nodeId: string,
   hops = 3,
   source?: string | null,
-): Promise<GraphPayload> {
+): Promise<GraphNeighborhoodResult> {
   const params = new URLSearchParams();
   if (hops > 0) params.set('hops', String(hops));
   if (source) params.set('source', source);
@@ -741,7 +750,16 @@ export async function fetchGraphNeighborhood(
     const detail = await response.text();
     throw new Error(detail || `Agent API returned ${response.status}`);
   }
-  return response.json();
+  const truncated = response.headers?.get(GRAPH_TRUNCATED_HEADER)?.toLowerCase() === 'true';
+  return { graph: await response.json(), truncated };
+}
+
+export async function fetchGraphNeighborhood(
+  nodeId: string,
+  hops = 3,
+  source?: string | null,
+): Promise<GraphPayload> {
+  return (await fetchGraphNeighborhoodResult(nodeId, hops, source)).graph;
 }
 
 export async function fetchGraphNodeDetail(

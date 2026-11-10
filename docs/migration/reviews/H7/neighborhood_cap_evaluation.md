@@ -198,3 +198,10 @@ returning a truncated flag so the viewer can say "showing 500 of 11,398".
 * gzip transfer size; deployment hardware and network; concurrent requests; single-run timings (cold first requests inflate
   max columns; medians are more reliable).
 * `matkg_bl1101_v7.json` has 1,143 nodes in this checkout, not a large graph.
+
+## 9. Update: truncation flag added
+
+Truncation flag added (branch `forge_merge-T-nbhd-flag`): `GET /graph/neighborhood/{id}` now sets the response header
+`X-F2W-Graph-Truncated: true` when the node cap cut the neighbourhood (Tiled path and `source` path; absent otherwise). The body
+shape, status codes and the cap value (500, not configurable) are unchanged; the owner decision on the cap is still open. The
+viewer shows "Neighbourhood limited to N nodes; N+ nodes match" when the header is present.
