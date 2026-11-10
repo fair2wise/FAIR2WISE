@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "as_of": "2026-11-10",
+  "branch_base": "forge_merge a4054b0",
+  "note": "Numbers were read from files or computed read-only; fields marked estimate are not measurements.",
+  "live_extraction": {
+    "paper": {
+      "path_local_only": "papers/rsoxs/2020/10.1107_s1600577520011066.pdf",
+      "title": "Absolute intensity calibration for carbon-edge soft X-ray scattering",
+      "doi": "10.1107/S1600577520011066",
+      "pages": 8, "size_kb": 715, "words": 6748
+    },
+    "backup_papers": ["10.1557/mrc.2018.195", "10.1103/PhysRevMaterials.2.066003"],
+    "model": "cborg-chat",
+    "cap": "one paper of at most 10 pages (the Extract tab has no page or chunk setting)",
+    "estimate_tokens_8_pages": 12800,
+    "wall_time_estimate_minutes": [5, 10],
+    "wall_time_basis": "estimate; measured only with lbl/cborg-deepthought: 13 min 44 s for one 6-page paper (about 2.3 min per page); the e2e_demo extraction time is not recorded",
+    "fallback_after_minutes": 12
+  },
+  "harvest": {
+    "topic": "resonant soft x-ray scattering",
+    "quote_topic": false,
+    "alternates": ["RSoXS vapor-deposited", "soft x-ray scattering", "RSoXS"],
+    "sources": ["arxiv"],
+    "max_downloads": 8,
+    "per_query": "default 50 (not in the UI form)",
+    "expected_seconds_estimate": 40,
+    "basis": "Nov 4 harvest: 5 PDFs in 13.4 s (about 3.4 s each); 2 arXiv queries 3 s apart"
+  },
+  "corpora": {
+    "seed": [
+      {"snapshot": "e2e_demo/v1", "tiled_nodes": 268, "tiled_links": 126, "flat_file_in_image": false},
+      {"snapshot": "bl1101/v4", "flat_file": "matkg_bl1101_v4.json", "nodes": 421, "edges": 937, "types": 24, "max_3hop": 410}
+    ],
+    "adopt_live": {
+      "snapshot": "opv_demo/v1",
+      "flat_file": "matkg_deepseek-r1_70b_100_20250929_004942.json",
+      "copied_as": "matkg_opv_demo.json",
+      "nodes": 725, "edges": 533, "rendered_nodes": 384, "rendered_edges": 62, "types": 21,
+      "max_3hop_rendered": 16, "disclosure": "pass", "adoption_dry_run": "would_adopt"
+    },
+    "qa_targets": ["e2e_demo", "bl1101/v4", "opv_demo (materials questions)"]
+  },
+  "explore_edit_nodes": {
+    "opv_demo": [
+      {"id": "matkg:P3HT", "label": "P3HT", "type": "ConjugatedPolymer", "links": 5, "use": "start of neighbourhood"},
+      {"id": "matkg:P3HTPC61BMblend", "label": "P3HT:PC61BM blend", "type": "ChemicalEntity", "links": 3, "use": "edit: type to Material"},
+      {"id": "matkg:66-Phenyl-C71-butyricacidmethylesterPCBM", "label": "[6,6]-Phenyl-C71-butyric acid methyl ester (PCBM)", "type": "ChemicalEntity", "links": 2, "use": "edit: label to PC71BM"},
+      {"id": "matkg:Y6", "label": "Y6", "type": "ChemicalEntity", "links": 2, "use": "read"},
+      {"id": "matkg:WAXS", "label": "WAXS", "type": "ExperimentalTechnique", "links": 3, "use": "read"}
+    ],
+    "bl1101_v4": [
+      {"id": "beamline:BL-11-0-1-2", "label": "ALS Beamline 11.0.1.2", "type": "Beamline", "links": 298},
+      {"id": "beamline:stage-Sample-stage", "label": "Sample stage", "type": "BeamlineStage", "links": 30},
+      {"id": "beamline:stage-Detector", "label": "Detector", "type": "BeamlineStage", "links": 19},
+      {"id": "beamline:Software-Bluesky", "label": "Bluesky", "type": "Software", "links": 23},
+      {"id": "beamline:Motor-beamline-energy", "label": "Beamline Energy", "type": "Motor", "links": 7}
+    ],
+    "e2e_demo": "not determinable: graph not tracked; fill in after the seed export"
+  }
+}
