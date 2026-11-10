@@ -151,10 +151,32 @@ export function mergeGraphPayloads(base: GraphPayload, extra: GraphPayload): Gra
   };
 }
 
+// The needle is the same for every node of one resolve call: compile its pattern once, not per node (a 22k-node
+// graph otherwise compiled 44k regular expressions per lookup and froze the tab on focus).
+let lastBoundaryNeedle = '';
+let lastBoundaryPattern: RegExp | null = null;
+
 function tokenBoundaryMatch(haystack: string, needle: string): boolean {
   if (!needle || needle.length < 3) return false;
-  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`).test(haystack);
+  if (needle !== lastBoundaryNeedle || !lastBoundaryPattern) {
+    const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    lastBoundaryPattern = new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`);
+    lastBoundaryNeedle = needle;
+  }
+  return lastBoundaryPattern.test(haystack);
+}
+
+/** id -> node index per node array (the viewer resolves ids many times per render on the same graph). */
+const nodeIdIndexes = new WeakMap<LiveGraphNode[], Map<string, LiveGraphNode>>();
+
+function nodeIdIndex(nodes: LiveGraphNode[]): Map<string, LiveGraphNode> {
+  let index = nodeIdIndexes.get(nodes);
+  if (!index) {
+    index = new Map();
+    for (const node of nodes) if (!index.has(node.id)) index.set(node.id, node);
+    nodeIdIndexes.set(nodes, index);
+  }
+  return index;
 }
 
 export function overlayNodeIdAliases(nodeId: string): string[] {
@@ -175,6 +197,13 @@ export function resolveViewerNodeId(graph: GraphPayload, nodeId: string): string
   const raw = nodeId.trim();
   if (!raw) return null;
   const aliases = overlayNodeIdAliases(raw);
+  // Fast path: an exact id of a typed node outranks every other candidate (rank 125 against at most 115), unless
+  // another alias of the id also names a node; then the full scan below decides.
+  const byId = nodeIdIndex(graph.nodes);
+  const exact = byId.get(raw);
+  if (exact && (exact.type || '').toLowerCase() !== 'unknown' && aliases.every(alias => alias === raw || !byId.has(alias))) {
+    return exact.id;
+  }
   const lowerAliases = new Set(aliases.map(item => item.toLowerCase()));
   const lower = raw.toLowerCase();
   const label = raw.replace(/^tiled:/i, '').replace(/^matkg:/i, '').replace(/[_-]+/g, ' ').trim().toLowerCase();
