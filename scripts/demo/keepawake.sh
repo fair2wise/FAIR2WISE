@@ -32,7 +32,7 @@ case "$HOURS" in ''|*[!0-9]*) demo_die "--hours must be a whole number" ;; esac
 is_ours() {  # pid alive and really a caffeinate process
   local pid="$1" comm
   kill -0 "$pid" 2>/dev/null || return 1
-  comm="$(ps -p "$pid" -o comm= 2>/dev/null || true)"
+  comm="$(ps -p "$pid" -o command= 2>/dev/null || true)"
   case "$comm" in *caffeinate*) return 0 ;; *) return 1 ;; esac
 }
 

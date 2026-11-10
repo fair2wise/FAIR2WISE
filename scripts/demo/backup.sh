@@ -47,7 +47,8 @@ demo_tar_run "$TILED_VOL" ro "$OUT" -C /v -cpf /b/tiled.tar .
 {
   printf 'created: %s\n' "$(date '+%Y-%m-%d %H:%M:%S %z')"
   printf 'state_volume: %s\ntiled_volume: %s\ncontainer: %s\n' "$STATE_VOL" "$TILED_VOL" "$NAME"
-  printf 'image: %s\n' "$(docker inspect -f '{{.Config.Image}}' "$NAME" 2>/dev/null || echo unknown)"
+  img="$(docker inspect -f '{{.Config.Image}}' "$NAME" 2>/dev/null || true)"
+  printf 'image: %s\n' "${img:-unknown}"
   printf 'hot: %s\n' "$HOT"
 } > "$OUT/meta.txt"
 

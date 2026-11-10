@@ -47,12 +47,11 @@ if [ -z "$COMMIT" ]; then
   COMMIT="$(docker inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$NAME" 2>/dev/null || true)"
   [ -z "$COMMIT" ] || demo_info "code commit from the image label: $COMMIT"
 fi
-case "$COMMIT" in
-  [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*) ;;
-  *) demo_die "no usable code commit (image label is '${COMMIT:-empty}'). Pass --code-commit <40-hex commit the image was built from>." ;;
-esac
-[ "${#COMMIT}" -eq 40 ] || demo_die "the code commit must be 40 hex characters, got ${#COMMIT}"
-case "$COMMIT" in *[!0-9a-f]*) demo_die "the code commit must be lowercase hex" ;; esac
+if [ -z "$COMMIT" ] || [ "$COMMIT" = unknown ]; then
+  demo_die "no code commit: the image has no org.opencontainers.image.revision label (built without GIT_COMMIT). Pass --code-commit <40-hex commit the image was built from>."
+fi
+[ "${#COMMIT}" -eq 40 ] || demo_die "the code commit must be 40 hex characters (${#COMMIT} given)"
+case "$COMMIT" in *[!0-9a-f]*) demo_die "the code commit must be 40 lowercase hex characters" ;; esac
 
 # ---- helpers
 H_CT='Content-Type: application/json'; H_OR="Origin: http://127.0.0.1:${PORT}"

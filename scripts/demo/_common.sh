@@ -15,9 +15,11 @@ STORAGE_KG="/var/lib/fair2wise/state/session/storage_kg"
 DEFAULT_IMAGE="f2w:local"
 
 # Docker Desktop and Homebrew's docker are not always on a non-login shell's PATH.
-case ":$PATH:" in *:/opt/homebrew/bin:*) ;; *) [ ! -d /opt/homebrew/bin ] || PATH="$PATH:/opt/homebrew/bin" ;; esac
-case ":$PATH:" in *:/usr/local/bin:*) ;; *) PATH="$PATH:/usr/local/bin" ;; esac
-export PATH
+if [ -z "${F2W_DEMO_NO_PATH_EXTEND:-}" ]; then   # tests set it so only their stub PATH is searched
+  case ":$PATH:" in *:/opt/homebrew/bin:*) ;; *) [ ! -d /opt/homebrew/bin ] || PATH="$PATH:/opt/homebrew/bin" ;; esac
+  case ":$PATH:" in *:/usr/local/bin:*) ;; *) PATH="$PATH:/usr/local/bin" ;; esac
+  export PATH
+fi
 
 demo_info() { printf '==> %s\n' "$*"; }
 demo_warn() { printf 'WARNING: %s\n' "$*" >&2; }

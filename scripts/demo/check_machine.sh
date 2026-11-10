@@ -18,9 +18,11 @@ case "${1:-}" in -h|--help) usage; exit 0 ;; esac
 [ "$#" -le 1 ] || { usage >&2; exit 2; }
 IMAGE_TAR="${1:-}"
 
-case ":$PATH:" in *:/opt/homebrew/bin:*) ;; *) [ ! -d /opt/homebrew/bin ] || PATH="$PATH:/opt/homebrew/bin" ;; esac
-case ":$PATH:" in *:/usr/local/bin:*) ;; *) PATH="$PATH:/usr/local/bin" ;; esac
-export PATH
+if [ -z "${F2W_DEMO_NO_PATH_EXTEND:-}" ]; then   # tests set it so only their stub PATH is searched
+  case ":$PATH:" in *:/opt/homebrew/bin:*) ;; *) [ ! -d /opt/homebrew/bin ] || PATH="$PATH:/opt/homebrew/bin" ;; esac
+  case ":$PATH:" in *:/usr/local/bin:*) ;; *) PATH="$PATH:/usr/local/bin" ;; esac
+  export PATH
+fi
 
 have() { command -v "$1" >/dev/null 2>&1; }
 section() { printf '\n== %s ==\n' "$*"; }
@@ -164,7 +166,7 @@ have caffeinate && add_check PASS "caffeinate available" "$(command -v caffeinat
 section "Time zone and clock"
 printf 'local time: %s\n' "$(date '+%Y-%m-%d %H:%M:%S %z (%Z)')"
 printf 'UTC time:   %s\n' "$(date -u '+%Y-%m-%d %H:%M:%S')"
-if [ -L /etc/localtime ]; then printf 'time zone:  %s\n' "$(readlink /etc/localtime | sed 's|.*/zoneinfo/||')"; fi
+if have readlink && [ -L /etc/localtime ]; then printf 'time zone:  %s\n' "$(readlink /etc/localtime | sed 's|.*/zoneinfo/||')"; fi
 printf 'The clock is compared with the HTTPS Date header below (when a host answers).\n'
 
 # ---------------------------------------------------------------- ports
