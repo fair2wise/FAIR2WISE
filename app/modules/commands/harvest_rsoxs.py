@@ -57,6 +57,7 @@ from ..literature.legacy_download import hardened_download_pdf as download_pdf  
 from ..literature.legacy_download import (
     hardened_get_bytes,
     hardened_get_json,
+    openalex_api_key,
     openalex_get,
     openalex_pages,
     openalex_work,
@@ -1030,7 +1031,9 @@ class _OpenAlexQuery:
 
     ``search``/``filter`` record the call order (pyalex put them in the URL in that order); ``get`` is one page,
     ``paginate`` the cursor walk and ``[id]`` a single record. Nothing is requested before ``get``/``paginate``/
-    ``[id]`` is used; the contact address travels as the ``From`` header and ``mailto`` parameter only.
+    ``[id]`` is used; the contact address travels as the ``From`` header and ``mailto`` parameter only. The exported
+    OpenAlex key (if any) is read per request and sent as the ``Authorization`` header only; the query
+    object never holds it.
     """
 
     endpoint: str
@@ -1059,6 +1062,7 @@ class _OpenAlexQuery:
             search_first=self._search_first,
             per_page=per_page,
             mailto=self.mailto,
+            api_key=openalex_api_key(),
             get_json=hardened_get_json,
         )[0]
 
@@ -1071,12 +1075,13 @@ class _OpenAlexQuery:
             search_first=self._search_first,
             per_page=per_page,
             mailto=self.mailto,
+            api_key=openalex_api_key(),
             get_json=hardened_get_json,
         )
 
     def __getitem__(self, record_id: str) -> dict[str, Any]:
         """A single record by id (``works/<id>``)."""
-        return openalex_work(record_id, mailto=self.mailto, get_json=hardened_get_json)
+        return openalex_work(record_id, mailto=self.mailto, api_key=openalex_api_key(), get_json=hardened_get_json)
 
 
 def Works(mailto: str | None = None) -> _OpenAlexQuery:  # noqa: N802  # the old pyalex class name
@@ -2169,10 +2174,12 @@ def _openalex_oa_urls_for_doi(
     if dl.is_usable_contact_email(mailto):
         user_agent += f"; mailto:{mailto}"
     user_agent += ")"
+    headers = {"User-Agent": user_agent, "Accept": "application/json"}
+    api_key = openalex_api_key()
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"  # header only; never in the URL, never logged
     try:
-        raw = hardened_get_json(
-            endpoint, headers={"User-Agent": user_agent, "Accept": "application/json"}
-        )
+        raw = hardened_get_json(endpoint, headers=headers)
     except Exception as exc:
         LOGGER.warning("OpenAlex DOI lookup failed for %r (%s)", canon, exc)
         return [], None, []

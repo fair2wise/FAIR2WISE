@@ -18,6 +18,10 @@ Lookup order:
 
 Values never override variables already set in the process environment
 (``override=False``, as before).
+
+Secrets listed in :data:`PROCESS_ONLY_VARS` are never taken from a ``.env`` file
+at all (owner decision 2026-11-09, ``OPENALEX_API_KEY``): a value the file sets
+is dropped again unless the variable was already exported in the process.
 """
 from __future__ import annotations
 
@@ -28,6 +32,8 @@ from .resources import is_checkout
 
 DOTENV_VAR = "F2W_DOTENV"
 _DISABLED = {"", "0", "none", "off", "false"}
+#: Variables a ``.env`` file may not supply: exported in the process or absent.
+PROCESS_ONLY_VARS = frozenset({"OPENALEX_API_KEY"})
 
 
 def find_entrypoint_dotenv(anchor: str | Path) -> Path | None:
@@ -60,5 +66,8 @@ def load_entrypoint_dotenv(anchor: str | Path) -> Path | None:
         return None
     from dotenv import load_dotenv
 
+    exported = {name for name in PROCESS_ONLY_VARS if name in os.environ}
     load_dotenv(path, override=False)
+    for name in PROCESS_ONLY_VARS - exported:
+        os.environ.pop(name, None)  # the file's value is not used; the name (never the value) is not logged either
     return path

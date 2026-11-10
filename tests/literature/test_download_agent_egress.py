@@ -71,6 +71,11 @@ def test_metadata_goes_through_the_hardened_helpers():
         assert sites, helper
         for site in sites:  # the getter is always passed explicitly (and is patchable at module level)
             assert {k.arg for k in site.keywords} >= {kwarg}, helper
+            if helper.startswith("openalex_"):  # owner decision 2026-11-09: the exported key, read per request, header-only
+                keyed = [k.value for k in site.keywords if k.arg == "api_key"]
+                assert keyed and isinstance(keyed[0], ast.Call) and getattr(keyed[0].func, "id", "") == "openalex_api_key", helper
+    assert da.openalex_api_key is legacy_download.openalex_api_key
+    assert "OPENALEX_API_KEY" not in SRC.read_text(encoding="utf-8")  # the agent never reads the variable itself
     assert calls  # sanity
 
 

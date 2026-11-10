@@ -914,12 +914,12 @@ def run_openalex_workflow(keyword: str, target_dir: str, max_results: int) -> No
     Works without a DOI or primary-location PDF URL are skipped, as are
     files that already exist.
     """
-    from .legacy_download import hardened_get_json, openalex_pages
+    from .legacy_download import hardened_get_json, openalex_api_key, openalex_pages
 
     Path(target_dir).mkdir(parents=True, exist_ok=True)
     works: list[dict[str, Any]] = []
     for page in openalex_pages(filters={"title": {"search": keyword}}, per_page=min(max(max_results, 1), 200),
-                               n_max=max_results, get_json=hardened_get_json):
+                               n_max=max_results, api_key=openalex_api_key(), get_json=hardened_get_json):
         works.extend(page)
         if len(works) >= max_results:
             break
