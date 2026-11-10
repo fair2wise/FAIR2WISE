@@ -168,6 +168,16 @@ def test_provider_error_is_unavailable_and_the_key_is_scrubbed():
     assert listing.source == "unavailable" and secret not in (listing.error or "")
 
 
+def test_provider_error_does_not_echo_the_callers_ip_address():
+    """A CBORG 403 names the caller's public address; the model-list error shown in the UI must not."""
+    msg = "Access denied: IP address 76.132.71.141 is not recognized (also 2001:db8::1)"
+    models = FakeModels(exc=RuntimeError(msg))
+    listing = list_cborg_models_live(client=SimpleNamespace(models=models), slot=_null_slot)
+    assert listing.source == "unavailable"
+    assert "76.132.71.141" not in (listing.error or "") and "2001:db8" not in (listing.error or "")
+    assert "<ip>" in (listing.error or "")
+
+
 def test_cache_reuses_a_live_listing_and_retries_unavailable_sooner():
     now = [0.0]
     lister = FakeLister(ModelListing("cborg", "live", ("a",)))

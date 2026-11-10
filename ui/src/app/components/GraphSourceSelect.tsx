@@ -57,6 +57,8 @@ export function GraphSourceSelect({ onChange }: { onChange?: (id: string | null)
   const { json, tiled } = groups(listing);
   const known = listing?.sources.find(source => source.id === selected) ?? null;
   const tiledDown = listing?.tiled.status === 'unavailable';
+  // The server marks a Tiled graph `read_only: false` when its corpus is live on the Save target (Save edits it).
+  const editable = known !== null && !known.read_only;
   const note = error
     ?? (query.isError ? 'Graph sources unavailable' : null)
     ?? (tiledDown && (selected?.startsWith('tiled:') ?? false) ? 'Tiled unavailable' : null);
@@ -105,11 +107,11 @@ export function GraphSourceSelect({ onChange }: { onChange?: (id: string | null)
       </label>
       <span
         data-testid="graph-source-kind"
-        title={selected === null ? 'The graph chosen in Settings' : 'Read-only source'}
-        className="inline-flex h-6 items-center rounded-full border border-slate-200 bg-slate-50 px-2 text-[11px] font-medium text-slate-600"
+        title={selected === null ? 'The graph chosen in Settings' : editable ? 'Editable source: Save edits this corpus' : 'Read-only source'}
+        className="inline-flex h-6 items-center whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2 text-[11px] font-medium text-slate-600"
       >
         {sourceKindLabel(selected)}
-        {selected !== null ? ' · read-only' : ''}
+        {selected !== null ? (editable ? ' · editable' : ' · read-only') : ''}
       </span>
       {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-sky-500" aria-label="Loading graph source" /> : null}
       {note ? (

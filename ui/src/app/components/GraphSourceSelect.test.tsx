@@ -44,6 +44,18 @@ describe('GraphSourceSelect', () => {
     expect(screen.getByTestId('graph-source-kind')).toHaveTextContent('Default');
   });
 
+  it('shows a Tiled graph whose corpus is live on the Save target as editable, not read-only', async () => {
+    stubListing(listing('ok', [JSON_ROW, { ...TILED_ROW, read_only: false }]));
+    renderSelect();
+    const select = await screen.findByRole('combobox', { name: 'Graph source' });
+    await waitFor(() => expect(screen.getByRole('option', { name: /e2e_demo/ })).toBeInTheDocument());
+    fireEvent.change(select, { target: { value: 'tiled:e2e_demo' } });
+    expect(screen.getByTestId('graph-source-kind')).toHaveTextContent('Tiled · editable');
+    expect(screen.getByTestId('graph-source-kind')).not.toHaveTextContent('read-only');
+    fireEvent.change(select, { target: { value: 'json:rsoxs_v1' } });
+    expect(screen.getByTestId('graph-source-kind')).toHaveTextContent('JSON · read-only');
+  });
+
   it('stores the choice, shows its kind and read-only state, and reports it to the host', async () => {
     stubListing(listing());
     const onChange = vi.fn();

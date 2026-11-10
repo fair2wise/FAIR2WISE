@@ -39,6 +39,13 @@ DEFAULT_TTL_SECONDS = 300.0
 DEFAULT_FAILURE_TTL_SECONDS = 30.0
 
 _SECRETISH = re.compile(r"(?i)(bearer\s+\S+|sk-[A-Za-z0-9_\-]{6,}|api[_-]?key\S*)")
+# A provider refusal can echo the caller's public address ("IP address 1.2.3.4 is not recognized"): never show it.
+_IP_ADDRESS = re.compile(
+    r"(?<![\w.:])(?:(?:\d{1,3}\.){3}\d{1,3}"
+    r"|(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}"
+    r"|(?:[0-9A-Fa-f]{1,4}:){1,7}:(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){0,5})?"
+    r"|::(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){0,6})?)(?![\w.:])"
+)
 
 
 def _utc_now() -> str:
@@ -93,6 +100,7 @@ def _scrub(text: str, secret: str | None = None, limit: int = 200) -> str:
     if secret:
         out = out.replace(secret, "<redacted>")
     out = _SECRETISH.sub("<redacted>", out)
+    out = _IP_ADDRESS.sub("<ip>", out)
     out = " ".join(out.split())
     return out if len(out) <= limit else out[: limit - 3] + "..."
 
