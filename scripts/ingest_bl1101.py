@@ -5,6 +5,10 @@ Replay from repo root:
   python3 scripts/ingest_bl1101.py
   python3 scripts/ingest_bl1101.py --from-scratch
   python3 scripts/ingest_bl1101.py --from-graph storage/kg/matkg_bl1101_v3.json --snapshot 4
+
+Writer: v1-v9 are the frozen legacy flat documents; a new version (v10 on) is written with
+``app.modules.graph.snapshot.create_snapshot`` (``storage/kg/bl1101/v<N>/`` plus the flat copy) unless
+``--legacy-writer`` is passed. ``--from-graph`` past v9 requires ``--legacy-writer``.
 """
 
 from __future__ import annotations

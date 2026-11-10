@@ -1,15 +1,109 @@
-"""Versioned ``matkg_bl1101_vN.json`` snapshot paths and writer, and the JSON-first motor-stage promote."""
+"""Versioned ``matkg_bl1101_vN.json`` snapshot paths and writers, and the JSON-first motor-stage promote.
+
+Two writers (owner decision 2026-11-09, seventeenth set):
+
+* ``write_kg_snapshot`` is the legacy document writer that produced ``v1``-``v9``: one flat
+  ``things/associations/metadata.graph_snapshot`` file whose ``sha256`` covers its own text. It is kept verbatim
+  so the frozen history replays byte-identically (``tests/graph/test_bl1101_ingest_port.py``) and is used only for
+  a target version in the legacy range (``<= LEGACY_WRITER_MAX_VERSION``) or on an explicit ``--legacy-writer``.
+* ``write_standard_snapshot`` routes a new version (``v10`` on) through :func:`app.modules.graph.snapshot.create_snapshot`,
+  the writer of every other corpus: ``storage/kg/bl1101/v<N>/{graph.json,manifest.json,validation.json}`` plus the
+  byte-identical flat ``matkg_bl1101_v<N>.json`` compatibility copy, the release-contract layout that
+  ``releases.verify_snapshot_dir`` and ``f2w-kg-adopt`` accept. ``graph.json`` is exact ``json2kg`` output of the
+  extracted-terms file (schema ``bl1101_schema`` bound by file-name pattern).
+
+:func:`uses_legacy_writer` is the single switch; ``cli.run_ingest`` and ``cli.main`` consult it.
+"""
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+from datetime import datetime
 import json
 from pathlib import Path
+import re
 from typing import Any
 
+from app.modules.graph.snapshot import SnapshotRequest, SnapshotResult, create_snapshot
+from app.modules.schema.registry import SchemaRegistry
+
 from .common import LOGGER, _rel_to_repo, sha256_file, utc_now
-from .paths import KG_DIR, MOTOR_STAGE_MAP_PATH, TERMS_DIR
+from .paths import KG_DIR, MOTOR_STAGE_MAP_PATH, REPO_ROOT, TERMS_DIR
 from .specs import INGEST_VERSION, SCHEMA_VERSION, SNAPSHOT_RE
 from .terms import apply_motor_stage_map_to_graph, apply_motor_stage_map_to_terms, load_motor_stage_map
+
+#: Corpus name of the bl1101 ops KG under ``storage/kg`` (``matkg_bl1101_v<N>.json``, ``storage/kg/bl1101/v<N>/``).
+CORPUS = "bl1101"
+#: Last version written by the legacy document writer. ``v1``-``v9`` are frozen history; ``v10`` on use
+#: :func:`write_standard_snapshot` unless the caller asks for the legacy writer explicitly.
+LEGACY_WRITER_MAX_VERSION = 9
+#: ``extraction.revisions[].extractor`` recorded in a standard manifest.
+EXTRACTOR = "app.modules.graph.imports.bl1101"
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+
+
+def uses_legacy_writer(version: int, *, legacy_writer: bool = False) -> bool:
+    """Return whether snapshot ``version`` is written with the legacy document writer.
+
+    The rule: the legacy writer for a version in the frozen range (``<= LEGACY_WRITER_MAX_VERSION``) or when
+    ``legacy_writer`` is set explicitly (the ``--legacy-writer`` flag); the standard ``create_snapshot`` writer
+    otherwise.
+    """
+    return legacy_writer or version <= LEGACY_WRITER_MAX_VERSION
+
+
+def write_standard_snapshot(
+    terms_path: Path,
+    version: int,
+    *,
+    kg_dir: Path | None = None,
+    sources_landed: Sequence[Mapping[str, Any]] = (),
+    code_commit: str | None = None,
+    run_id: str | None = None,
+    now: datetime | None = None,
+    registry: SchemaRegistry | None = None,
+) -> SnapshotResult:
+    """Freeze ``terms_path`` as ``bl1101`` snapshot ``v<version>`` with the standard writer.
+
+    Args:
+        terms_path: The extracted-terms file of this version (json2kg input; its ``metadata`` becomes the graph's).
+        version: Snapshot number N; the id is ``v<N>`` and an existing one is refused, never overwritten.
+        kg_dir: The ``storage/kg`` directory to write into. Defaults to ``KG_DIR``.
+        sources_landed: Source records of the run; the ``sha256`` values among them form the corpus revision.
+        code_commit: Full Git object id of the building code (default: read from ``.git`` without a shell).
+        run_id: Recorded in the manifest.
+        now: Creation time (tests); default UTC now.
+        registry: Schema registry (default: the discovered one).
+
+    Returns:
+        The :class:`~app.modules.graph.snapshot.SnapshotResult` (directory, flat copy, manifest, validation and
+        disclosure status).
+
+    Raises:
+        SnapshotError: see :func:`~app.modules.graph.snapshot.create_snapshot` (``SnapshotExistsError`` when
+            ``v<version>`` exists, ``SnapshotBuildError`` when json2kg rejects the terms).
+    """
+    storage_kg = kg_dir or KG_DIR
+    try:
+        terms_ref = terms_path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+    except ValueError:
+        terms_ref = f"private:{CORPUS}/{terms_path.name}"
+    hashes = [str(item["sha256"]) for item in sources_landed
+              if isinstance(item.get("sha256"), str) and _SHA256.match(item["sha256"])]
+    request = SnapshotRequest(
+        corpus=CORPUS,
+        terms_path=terms_path,
+        storage_kg=storage_kg,
+        snapshot_id=f"v{version}",
+        extraction_revisions=[{"extractor": EXTRACTOR, "version": INGEST_VERSION}],
+        source_sha256=hashes,
+        terms_ref=terms_ref,
+        code_commit=code_commit,
+        run_id=run_id,
+        now=now,
+        registry=registry,
+    )
+    return create_snapshot(request)
 
 
 def next_snapshot_version(kg_dir: Path) -> int:

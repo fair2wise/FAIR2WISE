@@ -133,7 +133,8 @@ def test_bl1101_main_summaries(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr(
         ing, "run_motor_link_promote", lambda **kw: {**base, "stats": {"linked": 3, "aliased": 4}}
     )
-    assert ing.main(["--from-graph", str(tmp_path / "g.json")]) == 0
+    # --snapshot inside the legacy range: past v9 the promote needs --legacy-writer (owner decision 2026-11-09)
+    assert ing.main(["--from-graph", str(tmp_path / "g.json"), "--snapshot", "5"]) == 0
     assert _drain(capsys) == (
         "bl1101 v5: 10 nodes, 20 edges → kg/x.json\nmotor links: +3 part_of, +4 alias related_to\n",
         "",
