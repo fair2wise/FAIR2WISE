@@ -28,7 +28,13 @@ from . import json2kg
 from .cli_output import output
 from .graph.imports.bl1101.common import _rel_to_repo, beam_id, utc_now
 from .graph.imports.bl1101.paths import KG_DIR, REPO_ROOT, SCHEMA_PATH, TERMS_DIR
-from .graph.imports.bl1101.snapshot import next_snapshot_version, snapshot_paths, write_kg_snapshot
+from .graph.imports.bl1101.snapshot import (
+    next_snapshot_version,
+    snapshot_paths,
+    uses_legacy_writer,
+    write_kg_snapshot,
+    write_standard_snapshot,
+)
 from .graph.imports.bl1101.specs import BEAMLINE_ID, NAMESPACE
 from .graph.imports.bl1101.terms import _rel, make_term, sort_graph
 
@@ -793,6 +799,8 @@ def run_tiled_sim_promote(
     terms_dir: Path | None = None,
     seed: dict[str, Any] | None = None,
     include_sim_nodes: bool = False,
+    legacy_writer: bool = False,
+    code_commit: str | None = None,
 ) -> dict[str, Any]:
     """Copy an ops KG, optionally merge simulated ESAF/Proposal/run entities, write vN.
 
@@ -809,6 +817,18 @@ def run_tiled_sim_promote(
         fixture), pass ``include_sim_nodes=True`` or use the CLI flag
         ``--include-sim-nodes``.  Do **not** ship a bl1101 snapshot generated with
         ``--include-sim-nodes`` as the canonical KG.
+
+    The writer follows the bl1101 switch rule
+    (:func:`~app.modules.graph.imports.bl1101.snapshot.uses_legacy_writer`): ``v1``-``v9`` or
+    ``legacy_writer=True`` use the legacy document writer (``write_kg_snapshot``, bytes unchanged); a later
+    version uses the standard ``create_snapshot`` writer (release-contract layout). The standard writer
+    freezes a *terms* file, so it takes the extracted-terms file of the source version (copied with the promote
+    record) and ignores the source graph's body; it therefore refuses ``include_sim_nodes`` (sim nodes cannot
+    be expressed as terms) and a missing terms file.
+
+    Raises:
+        ValueError: the source graph is the destination, or a standard-writer build was asked for sim nodes or
+            has no source terms file.
     """
     source_kg = source_kg.resolve()
     if not source_kg.exists():
@@ -819,6 +839,20 @@ def run_tiled_sim_promote(
     dest_kg, dest_terms = snapshot_paths(version, kg_dir=out_kg_dir, terms_dir=out_terms_dir)
     if dest_kg.resolve() == source_kg:
         raise ValueError(f"Refusing to overwrite source snapshot {source_kg}")
+    standard = not uses_legacy_writer(version, legacy_writer=legacy_writer)
+    if standard and include_sim_nodes:
+        raise ValueError(
+            f"v{version} is written with the standard writer, which freezes a terms file and cannot carry "
+            "simulated nodes; pass legacy_writer=True (--legacy-writer) to bake them into the legacy document"
+        )
+    src_terms = TERMS_DIR / "extracted_terms_bl1101_v4.json"
+    match = re.search(r"matkg_bl1101_v(\d+)\.json$", source_kg.name)
+    if match:
+        candidate = TERMS_DIR / f"extracted_terms_bl1101_v{match.group(1)}.json"
+        if candidate.exists():
+            src_terms = candidate
+    if standard and not src_terms.exists():
+        raise ValueError(f"v{version} needs a source extracted-terms file for the standard writer: {src_terms}")
     seed = seed or load_seed()
     fixture = fixture or generate_fixture(seed)
     graph = json.loads(source_kg.read_text(encoding="utf-8"))
@@ -855,20 +889,36 @@ def run_tiled_sim_promote(
     }
     meta["promote"] = promote
     meta["schema"] = str(SCHEMA_PATH.relative_to(REPO_ROOT))
-    kg_path = write_kg_snapshot(graph, version, kg_dir=out_kg_dir)
-    src_terms = TERMS_DIR / "extracted_terms_bl1101_v4.json"
-    match = re.search(r"matkg_bl1101_v(\d+)\.json$", source_kg.name)
-    if match:
-        candidate = TERMS_DIR / f"extracted_terms_bl1101_v{match.group(1)}.json"
-        if candidate.exists():
-            src_terms = candidate
-    if src_terms.exists():
+    details: dict[str, Any] = {"writer": "legacy"}
+    if standard:
         records = json.loads(src_terms.read_text(encoding="utf-8"))
         rec_meta = records.setdefault("metadata", {})
         rec_meta["promote"] = promote
-        rec_meta["graph_snapshot"] = dict(graph.get("metadata", {}).get("graph_snapshot") or {})
+        # name/version/time only, as a standard ingest records; the hash and counts live in the manifest
+        rec_meta["graph_snapshot"] = {"name": f"matkg_bl1101_v{version}", "version": version, "written_at": utc_now()}
         dest_terms.parent.mkdir(parents=True, exist_ok=True)
         dest_terms.write_text(json.dumps(records, indent=2, ensure_ascii=False), encoding="utf-8")
+        frozen = write_standard_snapshot(dest_terms, version, kg_dir=out_kg_dir, code_commit=code_commit)
+        kg_path = frozen.flat_path
+        graph = json.loads(frozen.graph_path.read_text(encoding="utf-8"))
+        details = {
+            "writer": "standard",
+            "snapshot_dir": frozen.directory,
+            "manifest_path": frozen.manifest_path,
+            "validation_status": frozen.validation_status,
+            "disclosure_status": frozen.disclosure.status,
+            "commit_ready": frozen.commit_ready,
+            "warnings": list(frozen.warnings),
+        }
+    else:
+        kg_path = write_kg_snapshot(graph, version, kg_dir=out_kg_dir)
+        if src_terms.exists():
+            records = json.loads(src_terms.read_text(encoding="utf-8"))
+            rec_meta = records.setdefault("metadata", {})
+            rec_meta["promote"] = promote
+            rec_meta["graph_snapshot"] = dict(graph.get("metadata", {}).get("graph_snapshot") or {})
+            dest_terms.parent.mkdir(parents=True, exist_ok=True)
+            dest_terms.write_text(json.dumps(records, indent=2, ensure_ascii=False), encoding="utf-8")
     LOGGER.info(
         "Promoted tiled sim %s → %s (ESAFs=%d proposals=%d scans=%d samples=%d)",
         source_kg,
@@ -888,6 +938,7 @@ def run_tiled_sim_promote(
         "promote": promote,
         "graph": graph,
         "fixture": fixture,
+        **details,
     }
 
 
@@ -1001,6 +1052,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--fixture", type=Path, default=FIXTURE_PATH)
     parser.add_argument("--from-graph", type=Path, default=KG_DIR / "matkg_bl1101_v4.json")
     parser.add_argument("--snapshot", type=int, default=None, help="Write this bl1101 vN (default: next unused)")
+    parser.add_argument(
+        "--legacy-writer",
+        action="store_true",
+        help="Write the version with the legacy document writer (always the case for v1-v9)",
+    )
     parser.add_argument("--generate-only", action="store_true", help="Write fixture JSON, do not ingest")
     parser.add_argument(
         "--include-sim-nodes",
@@ -1077,6 +1133,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         version=args.snapshot,
         seed=seed,
         include_sim_nodes=args.include_sim_nodes,
+        legacy_writer=args.legacy_writer,
     )
     output.info(
         f"bl1101 v{result['version']}: {result['nodes']} nodes, {result['edges']} edges → {result['kg_path']}"
