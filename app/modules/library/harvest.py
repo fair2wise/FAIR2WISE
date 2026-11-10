@@ -36,6 +36,7 @@ import httpx
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..jobs.pipeline import StageContext, StageResult
+from ..literature.legacy_download import ARXIV_MIN_INTERVAL_SECONDS, GetBytes, arxiv_results, hardened_get_bytes
 from ..literature.safe_fetch import BlockedURL, NetworkPolicy
 from .arrange import is_valid_folder_name
 from .service import LibraryService
@@ -153,23 +154,31 @@ def arxiv_queries(topic: str) -> list[str]:
     return queries
 
 
-def arxiv_searcher() -> Searcher:
-    """A searcher over the pinned ``arxiv`` package (newest first, one polite request at a time)."""
-    def search(topic: str, per_query: int) -> list[Candidate]:
-        import arxiv
+def arxiv_searcher(*, get_bytes: GetBytes = hardened_get_bytes) -> Searcher:
+    """A searcher over the hardened arXiv helper (newest first; every request spaced and policy-checked).
 
-        client = arxiv.Client(page_size=min(per_query, 50), delay_seconds=3.0, num_retries=3)
+    Same requests as the ``arxiv`` package it replaces (page size ``min(per_query, 50)``, three retries, newest
+    submissions first) through :func:`arxiv_results`: every request goes out under the egress policy and is kept at
+    least 3 s after the previous one by the process-wide limiter (owner decision 2026-11-09); a 429/503 with
+    ``Retry-After`` is waited out once before the retry rule applies.
+
+    Args:
+        get_bytes: The hardened byte getter (tests patch it); the egress policy rides on it.
+    """
+    def search(topic: str, per_query: int) -> list[Candidate]:
         found: list[Candidate] = []
         for query in arxiv_queries(topic):
             logger.info("arXiv search %r", query)
-            request = arxiv.Search(query=query, max_results=per_query, sort_by=arxiv.SortCriterion.SubmittedDate,
-                                   sort_order=arxiv.SortOrder.Descending)
-            for result in client.results(request):
-                arxiv_id = str(result.entry_id).rsplit("/", 1)[-1]
+            for entry in arxiv_results(query, per_query, sort_by="submittedDate", page_size=min(per_query, 50),
+                                       delay_seconds=ARXIV_MIN_INTERVAL_SECONDS, retries=3, get_bytes=get_bytes):
+                # The package's ``entry_id`` was the Atom ``<id>`` (``http://arxiv.org/abs/<short id>``) and the id
+                # kept here its last path segment (an old-style ``cat/NNNNNNN`` id loses its category, as before).
+                arxiv_id = entry["short_id"].rsplit("/", 1)[-1]
                 found.append(Candidate(
-                    title=" ".join(str(result.title).split()), source="arxiv", year=result.published.year,
-                    doi=clean_doi(result.doi), arxiv_id=arxiv_id, abstract=" ".join(str(result.summary).split()),
-                    landing_url=str(result.entry_id), pdf_urls=[f"https://arxiv.org/pdf/{arxiv_id}"]))
+                    title=" ".join(entry["title"].split()), source="arxiv", year=entry["year"],
+                    doi=clean_doi(entry["doi"]), arxiv_id=arxiv_id, abstract=" ".join(entry["summary"].split()),
+                    landing_url=f"http://arxiv.org/abs/{entry['short_id']}",
+                    pdf_urls=[f"https://arxiv.org/pdf/{arxiv_id}"]))
         return found
 
     return search
