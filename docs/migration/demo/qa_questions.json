@@ -1,126 +1,113 @@
 {
-  "version": 1,
-  "description": "Demo QA question set. answerable=false questions must still get a normal answer that opens with the italic sentence 'The knowledge graph has no information on this question.' (owner decision 2026-11-10). expected_node_ids are curated ids that the real lexical retriever (scripts/demo/qa_expected_nodes.py --check) returns within the first 40 hits under every PYTHONHASHSEED tried (the order of hits is not stable, so the probe tests membership, not rank). e2e_demo has no tracked graph (it was exported from the demo container), so it carries expected_terms only; pass its graph.json to qa_expected_nodes.py to curate node ids for it.",
-  "graph_files": [
-    "storage/kg/matkg_rsoxs_v1.json",
-    "storage/kg/matkg_bl1101_v4.json"
-  ],
+  "version": 2,
+  "description": "Demo QA question set for the two demo corpora live on one :local target (owner decision 2026-11-10, twenty-second set): 'rsoxs' (the most complete RSoXS KG, storage/kg/matkg_rsoxs_v4.json, 22012 things) and 'qwen3_235b_580papers' (the 580-paper OPV KG, 15815 things). Each answerable question names its expected corpus and passes when an expected node of THAT corpus is among the returned nodes (about 2000 node ids exist in both KGs, so the corpus matters: the chat's graph ids are the corpus names). answerable=false questions must still get a normal answer that opens with the italic sentence 'The knowledge graph has no information on this question.' (owner decision 2026-11-10); the three were chosen because the off-domain gate fires for them over the 38k-node union (most general-knowledge questions share some word with a node and defeat the gate, gap G2). expected_node_ids are curated with scripts/demo/qa_expected_nodes.py --check (real lexical retriever, both KGs loaded as the chat loads them): each is retrieved from the question's corpus within the first 40 hits under every PYTHONHASHSEED tried (hit order is not stable, membership is).",
+  "graph_files": {
+    "rsoxs": "storage/kg/matkg_rsoxs_v4.json",
+    "qwen3_235b_580papers": "storage/kg/matkg_qwen3_235b_580papers.json"
+  },
   "questions": [
     {
-      "id": "e2e-laser-rsoxs",
-      "corpus": "e2e_demo",
-      "question": "What does the laser-driven resonant soft X-ray scattering work show about picosecond dynamics?",
-      "answerable": true,
-      "expected_node_ids": [],
-      "expected_terms": [
-        "laser",
-        "picosecond",
-        "resonant"
-      ]
-    },
-    {
-      "id": "e2e-ilgad-nk",
-      "corpus": "e2e_demo",
-      "question": "Which sensor was used to detect soft X-rays down to the nitrogen K-edge?",
-      "answerable": true,
-      "expected_node_ids": [],
-      "expected_terms": [
-        "ilgad",
-        "nitrogen",
-        "k-edge"
-      ]
-    },
-    {
-      "id": "e2e-cyclotron",
-      "corpus": "e2e_demo",
-      "question": "What cyclotron line energy was reported for the ultraluminous X-ray source NGC 4861 X-2?",
-      "answerable": true,
-      "expected_node_ids": [],
-      "expected_terms": [
-        "cyclotron",
-        "4861",
-        "1.89"
-      ]
-    },
-    {
-      "id": "e2e-submonolayer",
-      "corpus": "e2e_demo",
-      "question": "How are molecular states tracked at buried interfaces with sub-monolayer sensitivity?",
-      "answerable": true,
-      "expected_node_ids": [],
-      "expected_terms": [
-        "buried",
-        "interface",
-        "molecular"
-      ]
-    },
-    {
-      "id": "bl-epu-polarization",
-      "corpus": "bl1101",
-      "question": "Which motors control the EPU polarization at beamline 11.0.1.2?",
+      "id": "rsoxs-morphology",
+      "corpus": "rsoxs",
+      "question": "What can RSoXS tell us about the morphology of organic thin films?",
       "answerable": true,
       "expected_node_ids": [
-        "beamline:Motor-epu-polarization",
-        "beamline:AnalogInput-epu-polarization-ai"
+        "matkg:resonantsoftX-rayscatteringRSoXS"
       ],
       "expected_terms": [
-        "epu",
-        "polarization"
+        "rsoxs",
+        "morphology"
       ]
     },
     {
-      "id": "bl-axis-sxr40",
-      "corpus": "bl1101",
-      "question": "How is the AXIS-SXR-40 detector connected in the 11.0.1.2 beamline?",
+      "id": "rsoxs-domain-spacing",
+      "corpus": "rsoxs",
+      "question": "What domain spacing was measured by RSoXS?",
       "answerable": true,
       "expected_node_ids": [
-        "beamline:Detector-AXIS-SXR-40",
-        "beamline:Software-ADAxisSXR40",
-        "beamline:stage-Detector"
+        "matkg:domainspacing"
       ],
       "expected_terms": [
-        "axis",
-        "sxr"
+        "domain",
+        "spacing"
       ]
     },
     {
-      "id": "bl-bluesky",
-      "corpus": "bl1101",
-      "question": "What Bluesky software and plans exist for beamline 11.0.1.2?",
+      "id": "rsoxs-simulation",
+      "corpus": "rsoxs",
+      "question": "Which tools simulate RSoXS patterns: CyRSoXS and NRSS?",
       "answerable": true,
       "expected_node_ids": [
-        "beamline:Software-Bluesky",
-        "beamline:doc-bl11012-bluesky-README"
+        "matkg:CyRSoXS",
+        "matkg:NRSS"
       ],
       "expected_terms": [
-        "bluesky"
+        "cyrsoxs",
+        "nrss"
       ]
     },
     {
-      "id": "rsoxs-polymer-films",
-      "corpus": "rsoxs_v1",
-      "question": "What is RSoXS used for in studying thin polymer films?",
+      "id": "rsoxs-polarized",
+      "corpus": "rsoxs",
+      "question": "What is polarized RSoXS (P-RSoXS)?",
       "answerable": true,
       "expected_node_ids": [
-        "matkg:thinpolymerfilms",
-        "beamline:Sample-polymer-thin-films"
+        "matkg:polarizedRSoXS",
+        "matkg:PolarizedX-rayscattering"
       ],
       "expected_terms": [
-        "polymer",
-        "rsoxs"
+        "polarized"
       ]
     },
     {
-      "id": "rsoxs-bhj-photovoltaics",
-      "corpus": "rsoxs_v1",
-      "question": "What do the papers say about bulk heterojunction photovoltaic thin films?",
+      "id": "opv-p3ht-pc70bm",
+      "corpus": "qwen3_235b_580papers",
+      "question": "How does a P3HT:PC70BM blend behave as a bulk heterojunction?",
       "answerable": true,
       "expected_node_ids": [
-        "matkg:BulkHeterojunctionPhotovoltaicThinFilms"
+        "matkg:P3HTPC70BM"
       ],
       "expected_terms": [
-        "heterojunction",
-        "photovoltaic"
+        "p3ht",
+        "pc70bm"
+      ]
+    },
+    {
+      "id": "opv-charge-transfer",
+      "corpus": "qwen3_235b_580papers",
+      "question": "What role do charge-transfer excitations play in donor materials?",
+      "answerable": true,
+      "expected_node_ids": [
+        "matkg:charge-transferCTexcitation"
+      ],
+      "expected_terms": [
+        "charge-transfer"
+      ]
+    },
+    {
+      "id": "opv-itic-2cl",
+      "corpus": "qwen3_235b_580papers",
+      "question": "What is ITIC-2Cl as an acceptor with PBT1-C?",
+      "answerable": true,
+      "expected_node_ids": [
+        "matkg:ITIC-2Cl",
+        "matkg:PBT1-CITIC-2Cl"
+      ],
+      "expected_terms": [
+        "itic-2cl"
+      ]
+    },
+    {
+      "id": "opv-ptb7th-efficiency",
+      "corpus": "qwen3_235b_580papers",
+      "question": "What is the efficiency of PTB7-Th:PC71BM bulk heterojunction cells?",
+      "answerable": true,
+      "expected_node_ids": [
+        "matkg:PTB7-ThPC71BMBHJ"
+      ],
+      "expected_terms": [
+        "ptb7-th",
+        "efficiency"
       ]
     },
     {
@@ -132,17 +119,17 @@
       "expected_terms": []
     },
     {
-      "id": "ooc-sourdough",
+      "id": "ooc-monalisa",
       "corpus": "none",
-      "question": "How do I bake sourdough bread?",
+      "question": "Who painted the Mona Lisa?",
       "answerable": false,
       "expected_node_ids": [],
       "expected_terms": []
     },
     {
-      "id": "ooc-worldcup",
+      "id": "ooc-novel",
       "corpus": "none",
-      "question": "Who won the football World Cup in 2022?",
+      "question": "Who wrote Pride and Prejudice?",
       "answerable": false,
       "expected_node_ids": [],
       "expected_terms": []

@@ -209,6 +209,11 @@ additionally keeps a corpus only while its Tiled release marker names the versio
     as before. When the corpus edited is not the one the session graph shows, the effective record is materialized to a
     scratch file (`<workdir>/kg.edit.<corpus>.json`) so the view on screen and retrieval over it are untouched.
   - `can_save` keeps its meaning ("a Save target is reachable now": the pointer's corpus resolves).
+* **The QA chat searches every live corpus** (owner decision 2026-11-10, twenty-second set): with two or more corpora live on
+  the local target the chat's graph set is the union of their effective records (`LocalSaveProvider.live_corpora()`, loaded
+  lazily and cached by `(corpus, snapshot, sha256)`), each citation naming its corpus; with one it reads the session graph as
+  before. No route or response field changed (additive keys only inside `rounds[].retrieval` and `publications[]`); the Save
+  target and the viewer are not affected. Design and measurements: `docs/migration/demo/QA_READINESS.md` section 10.
 * Open owner questions (memo 8): 4 whether Save and the pointer move to X after a corpus-X rollback (implemented as
   proposed: they do), 5 approval of a no-op rollback (decided, 3.1), 6 per-corpus toggle (implemented as proposed),
   7 `superseded` meaning (implemented as proposed); 3 is decided above; 1 and 2 are open as stated above.
