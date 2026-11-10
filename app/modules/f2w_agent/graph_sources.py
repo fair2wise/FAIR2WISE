@@ -18,7 +18,11 @@ Safety
     The id from a request is only ever a key into a catalog the server built itself from its own listings
     (:meth:`GraphSources.listing`). It is never joined to a path, parsed as a URL or used to pick a Tiled
     target; the Tiled client is fixed at startup and the credential never leaves it. A malformed or unknown
-    id is ``unknown_source`` (404). Both kinds are read-only; edits stay refused for any ``source``.
+    id is ``unknown_source`` (404). ``json:`` sources are read-only. A ``tiled:<corpus>`` source is **editable iff
+    that corpus is live on the deployment's Save target** (owner decision 2026-11-09, eighteenth set: Save edits
+    the corpus shown in the graph view); the trusted wiring installs that predicate (:meth:`GraphSources.set_editable`),
+    the listing reports it as ``read_only: false`` and ``PATCH /graph/node/{id}?source=tiled:<corpus>`` edits that
+    corpus. Every other ``source`` on an edit is ``read_only_source`` (400).
 
 Cost
     A Tiled read is one complete entity scan and one link scan, kept for :data:`TILED_TTL_SECONDS` and shared
@@ -64,6 +68,8 @@ KIND_TILED = "tiled"
 SOURCE_ID_RE = re.compile(r"^(json|tiled):[A-Za-z0-9][A-Za-z0-9_.@/-]{0,119}$")
 _NAME_CLEAN_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 _CORPUS_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+#: A corpus name as the PATCH route's ``corpus`` parameter may spell it (one path-safe segment, no ``/`` or ``@``).
+CORPUS_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,119}$")
 _TILED_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.@/-]{0,119}$")
 DEFAULT_PREDICATE = "rel:related_to"
 
@@ -89,8 +95,11 @@ class SourceError(Exception):
         return {"code": self.code, "message": self.message}
 
 
-def read_only_error() -> SourceError:
-    """The refusal of any edit that names a source."""
+def read_only_error(source: str | None = None) -> SourceError:
+    """The refusal of an edit that names a read-only source (a ``json:`` file, or a Tiled graph that is not live)."""
+    if source is not None and source.startswith(f"{KIND_TILED}:"):
+        return SourceError("read_only_source", 400, "This Tiled graph is not a live publication of this deployment; "
+                           "it is read-only")
     return SourceError("read_only_source", 400, "Graph sources are read-only; switch to the default graph to edit")
 
 
@@ -361,6 +370,7 @@ class GraphSources:
         self._tiled_ttl = tiled_ttl
         self._lock = threading.Lock()
         self._scan: _TiledScan | None = None
+        self._editable: Callable[[str], bool] | None = None
         self._json_cache: OrderedDict[tuple[str, int, int], SourceGraph] = OrderedDict()
 
     # -- wiring
@@ -368,6 +378,32 @@ class GraphSources:
         """Install the trusted read-only Tiled scanner (startup wiring only; never from a request)."""
         self._tiled = scanner
         self._scan = None
+
+    def set_editable(self, predicate: Callable[[str], bool] | None) -> None:
+        """Install the editable-source rule: ``predicate(corpus)`` is true iff ``tiled:<corpus>`` may be edited.
+
+        Startup wiring only (``create_api_app``): on ``:local`` it is the Save provider's ``available(corpus)``, true
+        iff the corpus is live on the deployment's Save target. ``None`` makes every source read-only again.
+        """
+        self._editable = predicate
+
+    def editable(self, source_id: str) -> bool:
+        """Whether an edit may name ``source_id``: a ``tiled:<corpus>`` source whose corpus the predicate accepts."""
+        if self._editable is None or not isinstance(source_id, str) or not SOURCE_ID_RE.match(source_id):
+            return False
+        kind, _, corpus = source_id.partition(":")
+        if kind != KIND_TILED or not CORPUS_NAME_RE.match(corpus):
+            return False
+        try:
+            return bool(self._editable(corpus))
+        except Exception:      # the rule never turns a Save-side failure into a listing failure
+            logger.warning("editable-source rule failed for %s", source_id, exc_info=True)
+            return False
+
+    def invalidate_tiled(self) -> None:
+        """Forget the cached Tiled scan (after a Save through a Tiled source, so the next read shows the edit)."""
+        with self._lock:
+            self._scan = None
 
     @property
     def tiled_offered(self) -> bool:
@@ -464,13 +500,13 @@ class GraphSources:
                                              revision=revision, graph_id=item.graph_id), json_file=item)
         return entries
 
-    @staticmethod
-    def _tiled_entries(scan: _TiledScan) -> dict[str, _Entry]:
+    def _tiled_entries(self, scan: _TiledScan) -> dict[str, _Entry]:
         entries: dict[str, _Entry] = {}
         for gid, tg in scan.graphs.items():
             sid = f"tiled:{gid}"
             entries[sid] = _Entry(SourceInfo(
-                sid, KIND_TILED, tg.label, available=tg.conflict is None, node_count=len(tg.nodes),
+                sid, KIND_TILED, tg.label, read_only=not (tg.conflict is None and self.editable(sid)),
+                available=tg.conflict is None, node_count=len(tg.nodes),
                 edge_count=len(tg.edges), revision=tg.revision,
                 detail=None if tg.conflict is None else "inconsistent records in Tiled", graph_id=gid),
                 tiled_id=gid)
@@ -565,6 +601,6 @@ class GraphSources:
         return graph.subgraph(order)
 
 
-__all__ = ("DEFAULT_PREDICATE", "GraphScanner", "GraphSources", "JsonFile", "MAX_NODES", "SOURCE_ID_RE",
+__all__ = ("CORPUS_NAME_RE", "DEFAULT_PREDICATE", "GraphScanner", "GraphSources", "JsonFile", "MAX_NODES", "SOURCE_ID_RE",
            "SourceError", "SourceGraph", "SourceInfo", "SourceListing", "TiledGraph", "build_source_graph",
            "build_tiled_graphs", "normalize_json_graph", "read_only_error", "tiled_node")

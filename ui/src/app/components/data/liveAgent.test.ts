@@ -181,4 +181,24 @@ describe('liveAgent chat requests', () => {
     expect(init?.method).toBe('PATCH');
     expect(JSON.parse(String(init?.body))).toEqual({ relationship_updates: relationshipUpdates });
   });
+
+  it('sends the viewed graph source on a node edit and nothing for the default graph', async () => {
+    const responseBody = { id: 'n1', label: 'One', type: 'Thing', description: '' };
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(responseBody), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await updateGraphNode('n1', { label: 'One' }, 'tiled:e2e_demo');
+    await updateGraphNode('n1', { label: 'One' }, null);
+
+    expect(String(fetchMock.mock.calls[0][0])).toMatch(/\/graph\/node\/n1\?source=tiled%3Ae2e_demo$/);
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('PATCH');
+    expect(String(fetchMock.mock.calls[1][0])).toMatch(/\/graph\/node\/n1$/);
+  });
+
+  it('surfaces the typed refusal of a read-only source on a node edit', async () => {
+    const body = { detail: { code: 'read_only_source', message: 'This Tiled graph is not a live publication of this deployment; it is read-only' } };
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(body), { status: 400 })));
+
+    await expect(updateGraphNode('n1', { label: 'One' }, 'tiled:stale')).rejects.toThrow(/not a live publication/);
+  });
 });

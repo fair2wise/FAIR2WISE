@@ -68,14 +68,25 @@ def test_v20_with_corpus_steps_back_within_that_corpus_only(local):
     publish(local, "rsoxs/v2")
     publish(local, "bl1101/v4")
     c = local.client()
-    # Without a corpus: exactly as before (the previous pointer, whatever its corpus).
+    # Without a corpus while two are live: refused (owner decision 2026-11-09, nineteenth set), nothing moves.
     plain = c.post("/v1/publications/rollback", json={"target": local.target, "reason": "legacy"})
-    assert plain.status_code == 200 and plain.json()["pointer"]["snapshot_ref"] == "rsoxs/v2"
+    body = plain.json()
+    assert plain.status_code == 409 and body["code"] == "conflict" and body["reason"] == "corpus_required", plain.text
+    assert body["retryable"] is False and "bl1101" in body["message"] and "rsoxs" in body["message"]
+    assert pointer(local)["pointer"]["snapshot_ref"] == "bl1101/v4"
     back = c.post("/v1/publications/rollback", json={"target": local.target, "reason": "A", "corpus": "rsoxs"})
     assert back.status_code == 200 and back.json()["pointer"]["snapshot_ref"] == "rsoxs/v1"
     body = pointer(local)
     assert body["corpora"]["rsoxs"]["snapshot_ref"] == "rsoxs/v1" and body["corpora"]["bl1101"]["snapshot_ref"] == "bl1101/v4"
     assert body["pointer"]["snapshot_ref"] == "rsoxs/v1", "the pointer stays 'last activated'"
+
+
+def test_v20_without_corpus_still_means_the_previous_pointer_with_one_live_corpus(local):
+    local.snapshots.add(ref="rsoxs/v2", nodes=("a", "b", "c", "d"))
+    publish(local, "rsoxs/v1")
+    publish(local, "rsoxs/v2")
+    plain = local.client().post("/v1/publications/rollback", json={"target": local.target, "reason": "legacy"})
+    assert plain.status_code == 200 and plain.json()["pointer"]["snapshot_ref"] == "rsoxs/v1"
 
 
 def test_corpus_with_no_earlier_version_is_refused_with_a_typed_error(local):

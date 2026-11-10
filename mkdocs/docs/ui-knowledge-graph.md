@@ -72,8 +72,10 @@ In the full-width viewer the **Source** control chooses what the viewer reads:
 - **Tiled**: each F2W graph in the local image's own Tiled (`<graph> / <release>`),
   showing only the live release (staged and retired records are never nodes).
 
-The badge next to the control shows the kind of the selected source and that it is
-read-only: Edit is hidden and the server refuses edits (`400 read_only_source`).
+The badge next to the control shows the kind of the selected source. A JSON source
+is read-only: Edit is hidden and the server refuses edits (`400 read_only_source`).
+On the local image a Tiled source whose corpus is live (a published corpus) is
+editable: Edit is shown and Save edits **that** corpus, the one the view shows.
 The choice is remembered per browser; a remembered source the server no longer
 lists falls back to the default graph. When Tiled is down the control says
 **Tiled unavailable** and a read of a Tiled source shows the error instead of an
@@ -89,9 +91,10 @@ never accepts a path, URL or Tiled address. They look like:
 
 An unknown or malformed id is `404 unknown_source`. On an ALS image the
 listing reports Tiled as `not_offered` and only JSON files appear. The listing
-is read-only for both kinds (`read_only: true`); an edit that names a source is
-`400 read_only_source`. Search, node detail and neighborhood accept the same
-`source` parameter. Design and limits: `docs/migration/reviews/H8/ui_graph_sources.md`.
+marks JSON sources `read_only: true`; a Tiled source is `read_only: false` only
+when its corpus is live on the image's Save target, and an edit that names any
+other source is `400 read_only_source`. Search, node detail and neighborhood accept
+the same `source` parameter, and so does Save (`PATCH /graph/node/{id}?source=`). Design and limits: `docs/migration/reviews/H8/ui_graph_sources.md`.
 To get a Tiled graph to show, publish it first
 ([The `:local` image, end to end](local-image.md)). A graph is cut at 100,000 nodes and
 Tiled is scanned at most once every 20 seconds.
@@ -163,7 +166,8 @@ records can be bookmarked from the detail panel.
 Editing is available only when the saved graph source is the editable one
 (`splash_links` in Settings) and the server says Save is possible
 (`can_save` in `GET /v1/capabilities`). Select **Edit** in a node detail panel
-to stage changes. The graph **Source** selector above is always read-only.
+to stage changes. With the graph **Source** selector on a live Tiled corpus,
+Save edits that corpus; JSON sources are read-only.
 
 On the `:local` image the editable source is backed by Tiled, not Splash: the
 image starts in JSON mode (Save off), and after you choose the editable source

@@ -9,11 +9,14 @@ from the deployment's own publication state and the legacy service asks for it o
 The rule (one target, possibly several corpora):
 
 * The deployment's Tiled is the one target the ``:local`` gate allows (:func:`~.local_publication.local_tiled_target`).
-* The corpus a Save edits is the one named by the **active publication pointer** of that target
+* The corpus a Save edits is **the corpus shown in the graph view** (owner decision 2026-11-09, eighteenth set).
+  Without a selected graph source that is the corpus named by the **active publication pointer** of that target
   (:meth:`~app.modules.jobs.publish_store.PublishStore.pointer`, ``snapshot_ref = "<corpus>/<vN>"``): the last
-  publication activated on the image. The session graph the UI shows in its editable mode is that corpus's
-  effective record (active snapshot plus in-flight journal entries), so the node being edited is a node of that
-  corpus; a node of another corpus is the legacy 404 and the UI's read-only graph sources never reach Save.
+  publication activated on the image, whose effective record (active snapshot plus in-flight journal entries) the
+  session graph of the editable mode shows. With a graph source selected the UI names that corpus
+  (``PATCH /graph/node/{id}?source=tiled:<corpus>``) and :meth:`LocalSaveProvider.resolve` is asked for it: a
+  ``tiled:<corpus>`` source is editable **iff** ``corpus`` is live on this target (Model C per-corpus view);
+  ``json:`` sources stay read-only. A node of another corpus is the legacy 404.
 * With ``F2W_CORPUS_SCOPE`` set, the pointer's corpus must be in scope; otherwise Save is unavailable.
 * The importer's own release record of that corpus (``release.json`` under the state directory) must name the
   same snapshot as live, the frozen ``graph.json`` must exist and its bytes must match the pointer's recorded
@@ -94,7 +97,8 @@ class LocalSaveProvider:
         self._client = TiledMutationClient(target, profile="local",
                                            credential=lambda: tiled_lifecycle.writer_credential(managed))
         self._lock = threading.Lock()
-        self._cached: tuple[tuple[str, str, str], TiledSaveBackend] | None = None
+        #: One backend per ``(corpus, snapshot, sha256)`` seen (several corpora may be live and edited in turn).
+        self._cached: dict[tuple[str, str, str], TiledSaveBackend] = {}
 
     def __repr__(self) -> str:  # never show the client (it holds the credential provider)
         return f"LocalSaveProvider(target={self.target!r}, state_dir={str(self.state_dir)!r})"
@@ -103,11 +107,13 @@ class LocalSaveProvider:
         """The Save target of the active publication, built from the current state (no caching of the decision).
 
         Without ``corpus`` the corpus is the active pointer's (the last activated one). Naming a ``corpus`` selects
-        that corpus's live version from the per-corpus view instead (Model C); no route or UI selector uses it yet.
+        that corpus's live version from the per-corpus view instead (Model C): the legacy PATCH route passes the
+        corpus of the Tiled graph source the viewer shows (``source=tiled:<corpus>``) or an explicit ``corpus``.
 
         Raises:
-            SaveUnavailable: No publication is active yet, the pointer's corpus is outside the deployment's corpus
-                scope, the importer's release record disagrees with the pointer, or the frozen graph is missing.
+            SaveUnavailable: No publication is active yet (``no_publication``), the named corpus is not live
+                (``corpus_not_live``), the corpus is outside the deployment's corpus scope, the importer's release
+                record disagrees with the pointer, or the frozen graph is missing.
         """
         pointer = self.store.pointer(self.target)
         if corpus is not None:
@@ -141,7 +147,7 @@ class LocalSaveProvider:
                           access_blob=self.access_blob or None)
 
     def backend(self, corpus: str | None = None) -> TiledSaveBackend:
-        """The Save backend for the current publication (one instance per ``(corpus, snapshot, sha256)``).
+        """The Save backend of the active publication, or of ``corpus``'s live version (one per ``(corpus, snapshot, sha256)``).
 
         Raises:
             SaveUnavailable: As :meth:`resolve`.
@@ -149,14 +155,22 @@ class LocalSaveProvider:
         target = self.resolve(corpus)
         key = (target.scope, target.base_snapshot_id, target.base_graph_sha256)
         with self._lock:
-            if self._cached is None or self._cached[0] != key:
-                self._cached = (key, TiledSaveBackend(target))
-            return self._cached[1]
+            backend = self._cached.get(key)
+            if backend is None:
+                stale = [k for k in self._cached if k[0] == key[0]]     # a new version of the corpus replaces the old
+                for old in stale:
+                    del self._cached[old]
+                backend = self._cached[key] = TiledSaveBackend(target)
+            return backend
 
-    def available(self) -> bool:
-        """Whether a Save could reach a target now (``can_save`` of ``GET /v1/capabilities``)."""
+    def available(self, corpus: str | None = None) -> bool:
+        """Whether a Save could reach a target now (``can_save`` of ``GET /v1/capabilities``).
+
+        With ``corpus`` this is the **editable-source rule** of the graph view: the Tiled graph source
+        ``tiled:<corpus>`` is editable iff that corpus is live on this target and its snapshot checks out.
+        """
         try:
-            self.resolve()
+            self.resolve(corpus)
         except ContractError:
             return False
         return True

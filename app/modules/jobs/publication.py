@@ -62,6 +62,8 @@ logger = logging.getLogger(__name__)
 KIND = "publish"
 #: ``ContractError.reason`` of a pointer-only rollback refused because the deployment has a release marker.
 ROLLBACK_REPLACEMENT_REQUIRED = "rollback_replacement_required"
+#: ``ContractError.reason`` of a rollback that names no corpus while several corpora are live on the target.
+CORPUS_REQUIRED = "corpus_required"
 #: Corpus removal (retire-all) and purge are separate jobs with their own plan and approval (Q3).
 RETIRE_KIND = "corpus_retire"
 PURGE_KIND = "corpus_purge"
@@ -810,6 +812,27 @@ class Publication:
                 out[corpus] = version
         return out
 
+    def _require_corpus_when_ambiguous(self, target: str, corpus: str | None) -> None:
+        """Refuse a rollback that names no corpus while several corpora are live (owner decision 2026-11-09).
+
+        "The previous pointer" is ambiguous then (it may belong to either corpus and may be a no-op), so the caller
+        must name the corpus. With one live corpus (or none) a corpus-less rollback is unchanged.
+
+        Raises:
+            ContractError: ``CONFLICT``, reason ``corpus_required`` (not retryable), naming the live corpora.
+        """
+        if corpus is not None:
+            return
+        live = sorted(self.store.live_by_corpus(target))
+        if len(live) > 1:
+            raise ContractError(
+                ErrorCode.CONFLICT,
+                f"several corpora are live on this target ({', '.join(live)}); name the corpus to roll back "
+                "(the optional `corpus` of the rollback request)",
+                retryable=False,
+                reason=CORPUS_REQUIRED,
+            )
+
     def _previous_for(self, target: str, corpus: str | None) -> dict[str, Any]:
         if corpus is None:
             previous = self.store.previous_record(target)
@@ -830,7 +853,8 @@ class Publication:
         """Restore the previous active pointer (human, ``graph.publish``, audited). Candidates are retained.
 
         With ``corpus`` the pointer moves to that corpus's previous published version (not the previous pointer of
-        any corpus); a corpus with no earlier version is refused (``no_previous_corpus_version``).
+        any corpus); a corpus with no earlier version is refused (``no_previous_corpus_version``). Without ``corpus``
+        and with several corpora live it is refused (``corpus_required``).
         """
         if ctx.actor_kind not in (ActorKind.INTERACTIVE, ActorKind.CLI) or not ctx.has("graph.publish"):
             raise ContractError(ErrorCode.DENIED, "rollback requires a human with graph.publish")
@@ -843,6 +867,7 @@ class Publication:
                 retryable=False,
                 reason=ROLLBACK_REPLACEMENT_REQUIRED,
             )
+        self._require_corpus_when_ambiguous(target, corpus)
         return self.deps.audit.guard(
             kind="pointer_rollback",
             operation_id=f"rollback-{target}-{int(self.deps.clock())}",
@@ -864,11 +889,12 @@ class Publication:
         With ``corpus`` (Model C) "previous" is the previous published version *of that corpus* (the latest earlier
         one that differs from its live version, from the pointer history), whatever other corpora were activated in
         between; the pointer then moves to that corpus ("last activated"). Without ``corpus`` the behaviour is the
-        B28 toggle over the last two pointers of any corpus; with several corpora live that is ambiguous, and
-        whether to refuse it is an open owner question (pointer memo, question 2).
+        B28 toggle over the last two pointers of any corpus; with several corpora live that is ambiguous and is
+        refused (owner decision 2026-11-09, nineteenth set): 409 ``corpus_required``, naming the live corpora.
 
         Raises:
-            ContractError: ``DENIED`` (human with ``graph.publish`` required); ``CONFLICT`` when there is no
+            ContractError: ``DENIED`` (human with ``graph.publish`` required); ``CONFLICT`` (``corpus_required``)
+                when no corpus is named while several are live; ``CONFLICT`` when there is no
                 previous pointer (``no_previous_corpus_version`` for a named corpus) or this deployment keeps no
                 release marker; ``NOT_FOUND`` (``corpus_not_live``) for a corpus with no live version.
         """
@@ -877,6 +903,7 @@ class Publication:
         if not self.replacement:
             raise ContractError(ErrorCode.CONFLICT, "this deployment has no replacement importer; use rollback",
                 retryable=False)
+        self._require_corpus_when_ambiguous(target, corpus)
         previous = self._previous_for(target, corpus)
         return self.submit(ctx, str(previous["snapshot_ref"]), target, rollback_reason=reason)
 
@@ -895,4 +922,4 @@ class Publication:
         )
 
 
-__all__ = ("ROLLBACK_REPLACEMENT_REQUIRED", "KIND", "OPERATION_KIND_NAMES", "OPERATION_STAGES", "PURGE_KIND", "PUBLISH_STAGES", "RETIRE_KIND", "Publication", "PublicationDeps", "default_approval_verifier", "operation_id")
+__all__ = ("CORPUS_REQUIRED", "ROLLBACK_REPLACEMENT_REQUIRED", "KIND", "OPERATION_KIND_NAMES", "OPERATION_STAGES", "PURGE_KIND", "PUBLISH_STAGES", "RETIRE_KIND", "Publication", "PublicationDeps", "default_approval_verifier", "operation_id")

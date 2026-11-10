@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GraphMockup } from './GraphMockup';
+import { loadAgentSettings, saveAgentSettings } from './agentSettings';
 import { resetGraphSourceStore, setGraphSourceStatus, setSelectedGraphSource } from './graphSourceStore';
 import type { GraphPayload } from './data/liveAgent';
 
@@ -16,12 +17,27 @@ const LISTING = {
   tiled: { status: 'ok', detail: null },
 };
 
-function stubFetch() {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+/** The listing of a `:local` server whose corpus `e2e_demo` is live on the Save target (editable Tiled source). */
+const EDITABLE_LISTING = {
+  sources: [
+    { id: 'tiled:e2e_demo', kind: 'tiled', label: 'e2e_demo / v1', read_only: false, available: true },
+    { id: 'json:other', kind: 'json', label: 'other.json', read_only: true, available: true },
+  ],
+  tiled: { status: 'ok', detail: null },
+};
+
+function stubFetch(listing: unknown = LISTING, results: unknown[] = []) {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    if (url.includes('/v1/graph/sources')) return new Response(JSON.stringify(LISTING), { status: 200 });
+    if (url.includes('/v1/graph/sources')) return new Response(JSON.stringify(listing), { status: 200 });
     if (url.includes('/graph/nodes/search')) {
-      return new Response(JSON.stringify({ query: 'alpha', retrieval_backend: 'lexical:source', results: [] }), { status: 200 });
+      return new Response(JSON.stringify({ query: 'alpha', retrieval_backend: 'lexical:source', results }), { status: 200 });
+    }
+    if (url.includes('/graph/node/') && init?.method === 'PATCH') {
+      return new Response(JSON.stringify({ ...NODE, label: 'Alpha film (edited)' }), { status: 200 });
+    }
+    if (url.includes('/graph?') || url.endsWith('/graph')) {
+      return new Response(JSON.stringify(graphOf('source:tiled:e2e_demo')), { status: 200 });
     }
     return new Response('{}', { status: 404 });
   });
@@ -101,5 +117,37 @@ describe('GraphMockup graph source wiring', () => {
     setSelectedGraphSource('tiled:e2e_demo');
     renderViewer(graphOf('source:tiled:e2e_demo', []));
     expect(await screen.findByTestId('graph-source-empty')).toBeInTheDocument();
+  });
+});
+
+async function openNodePanel() {
+  // The editable mode of Settings (the `json` mode never edits, whatever the source says).
+  saveAgentSettings({ ...loadAgentSettings(), graphSource: 'splash_links' });
+  await searchFor('alpha');
+  fireEvent.click(await screen.findByRole('button', { name: /Alpha film/ }));
+  await screen.findByRole('button', { name: 'Close node details' });
+}
+
+describe('GraphMockup Save on the corpus shown in the graph view (owner decision 2026-11-09)', () => {
+  it('hides Edit for a read-only source', async () => {
+    stubFetch(LISTING, [{ node: NODE, score: 1 }]);
+    setSelectedGraphSource('tiled:e2e_demo');
+    renderViewer(graphOf('source:tiled:e2e_demo'));
+    await openNodePanel();
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Edit properties' })).toBeNull());
+  });
+
+  it('offers Edit for an editable Tiled source and sends that source on Save and on the reload', async () => {
+    const fetchMock = stubFetch(EDITABLE_LISTING, [{ node: NODE, score: 1 }]);
+    setSelectedGraphSource('tiled:e2e_demo');
+    renderViewer(graphOf('source:tiled:e2e_demo'));
+    await openNodePanel();
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit properties' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Save/ }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(call => call[1]?.method === 'PATCH')).toBe(true));
+    const patch = fetchMock.mock.calls.find(call => call[1]?.method === 'PATCH');
+    expect(String(patch?.[0])).toMatch(/\/graph\/node\/m%3Aa\?source=tiled%3Ae2e_demo$/);
+    await waitFor(() => expect(fetchMock.mock.calls.map(call => String(call[0])))
+      .toContainEqual(expect.stringMatching(/\/graph\?source=tiled%3Ae2e_demo$/)));
   });
 });

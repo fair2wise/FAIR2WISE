@@ -415,7 +415,7 @@
       },
       "patch": {
         "summary": "Patch Graph Node",
-        "description": "Patch a splash-mode graph node; a graph source is read-only and refuses every edit.",
+        "description": "Patch a node of the corpus shown in the graph view: the editable default, or an editable Tiled source.",
         "operationId": "patch_graph_node_graph_node__node_id__patch",
         "parameters": [
           {
@@ -441,6 +441,22 @@
                 }
               ],
               "title": "Source"
+            }
+          },
+          {
+            "name": "corpus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Corpus"
             }
           }
         ],

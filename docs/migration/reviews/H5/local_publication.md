@@ -42,13 +42,17 @@ to the legacy service by `create_api_app(local_publication=True)` unless an expl
 resolves the target **per Save request** from the deployment's own publication state:
 
 - Target: the one Tiled the `:local` gate allows (same trust condition as the publication).
-- Corpus rule (one target, possibly several corpora): the corpus named by the **active publication pointer** of
-  that target (`PublishStore.pointer(target).snapshot_ref = "<corpus>/<vN>"`, the last publication activated on the
-  image). The session graph the UI edits in its editable (`splash`-labelled) mode is that corpus's effective record
-  (active snapshot plus in-flight journal entries), so the node being edited is a node of that corpus; a node of
-  another corpus is the legacy 404, and the UI's selectable graph sources stay read-only (`source` -> 400). With
-  `F2W_CORPUS_SCOPE` set, the pointer's corpus must be in scope (defence in depth: the publication job already
-  refuses out-of-scope corpora).
+- Corpus rule (one target, possibly several corpora): **the corpus shown in the graph view** (owner decision
+  2026-11-09, eighteenth set). Without a selected graph source that is the corpus named by the **active publication
+  pointer** of that target (`PublishStore.pointer(target).snapshot_ref = "<corpus>/<vN>"`, the last publication
+  activated on the image): the session graph the UI edits in its editable (`splash`-labelled) mode is that corpus's
+  effective record (active snapshot plus in-flight journal entries). With a Tiled graph source selected the UI sends
+  `PATCH /graph/node/{id}?source=tiled:<corpus>` and the edit goes to that corpus's live version
+  (`LocalSaveProvider.resolve(corpus)`, its own journal): a `tiled:<corpus>` source is **editable iff the corpus is
+  live on this Save target** (listed `read_only: false`); `json:` sources and non-live Tiled graphs stay
+  `400 read_only_source`. A node of another corpus is the legacy 404. With `F2W_CORPUS_SCOPE` set, the corpus must
+  be in scope (defence in depth: the publication job already refuses out-of-scope corpora). Details and the
+  optional `corpus` query parameter: `docs/migration/api/README.md` section 3.2.
 - Base snapshot: `<workdir>/storage_kg/<corpus>/<vN>/graph.json` with the pointer's recorded `snapshot_sha256`;
   the importer's own `release.json` of that corpus must name the same snapshot as live. `TiledSaveBackend`
   hash-checks the base on every read (a mismatch is its `CONFLICT`, the route's 502, never a 500); `StaleSave`
@@ -113,6 +117,25 @@ previous version of that corpus), `verify_agreement` and the job `ui_state` comp
 owner-gated open questions (corpus-less rollback with several corpora live; which corpus Save edits) are in
 `docs/migration/api/README.md` section 3.2. Tests: `tests/jobs/test_replacement_publication.py` (two corpora, two
 versions each, rollback of A while B stays live, rollback of B) and `tests/api_v1/test_v1_corpus_pointer.py`.
+
+## Corpus-less rollback with several corpora live is refused (owner decision 2026-11-09, nineteenth set)
+
+`rollback-replacement` (V53) and `rollback` (V20) with no `corpus` while the live-by-corpus view holds more than one
+corpus answer 409 `conflict`, `reason = "corpus_required"`, `retryable = false`, naming the live corpora
+(`Publication._require_corpus_when_ambiguous`). With one live corpus they work as before; naming a corpus works as
+in Model C. The T13 rehearsal case (A/v1, B/v1, then a rollback that planned zero operations) is therefore no longer
+reachable without a corpus; the zero-operation plan itself is unchanged. Tests:
+`tests/jobs/test_replacement_publication.py` (two live refused, one live allowed, corpus named allowed, V20) and
+`tests/api_v1/test_v1_corpus_pointer.py` (409 body with the reason).
+
+## Corpus removal moves the pointer (owner decision 2026-11-09, eighteenth set)
+
+`corpus-retire` no longer clears the target pointer while another corpus is live: `PublishStore.clear_pointer` writes
+the `retire` row, then moves the pointer to the latest live version of the most recently activated remaining corpus
+(`move` history row, reason naming the removal); the pointer is cleared only when nothing is live. `GET
+/v1/publications/pointer` and the UI Save target (`LocalSaveProvider.resolve()`) keep working for the remaining corpus.
+Tests: `tests/jobs/test_replacement_publication.py` (three corpora, removal order, resume is a no-op) and
+`tests/api_wiring/test_local_save.py` (Save after the removal).
 
 ## Zero-operation rollback auto-approval (owner decision 2026-11-09, `:local` only)
 

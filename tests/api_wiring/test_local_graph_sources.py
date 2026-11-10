@@ -128,7 +128,8 @@ def test_end_to_end_published_release_is_listed_and_served_from_the_real_tiled(t
     assert "json:synthetic/v1" in kinds and kinds["json:synthetic/v1"]["kind"] == "json"
     tiled_id = next(i for i, s in kinds.items() if s["kind"] == "tiled" and s["label"].startswith("synthetic"))
     row = kinds[tiled_id]
-    assert row["read_only"] is True and row["node_count"] == len(ids) and row["revision"]
+    # The published corpus is live on the Save target, so its Tiled source is editable (owner decision 2026-11-09).
+    assert row["read_only"] is False and row["node_count"] == len(ids) and row["revision"]
 
     body = client.get("/graph", params={"source": tiled_id}).json()
     assert {n["id"] for n in body["nodes"]} == ids                   # no FORGE seed entity, no marker
@@ -141,4 +142,10 @@ def test_end_to_end_published_release_is_listed_and_served_from_the_real_tiled(t
     found = client.post("/graph/nodes/search", params={"source": tiled_id},
                         json={"query": one["label"], "limit": 3}).json()
     assert found["results"] and found["results"][0]["node"]["id"] in ids
-    assert client.patch(f"/graph/node/{one['id']}", params={"source": tiled_id}, json={"label": "x"}).status_code == 400
+    assert client.patch(f"/graph/node/{one['id']}", params={"source": "json:synthetic/v1"},
+                        json={"label": "x"}).status_code == 400                      # a JSON source stays read-only
+    # The live Tiled corpus is editable (owner decision 2026-11-09): Save edits the corpus the view shows.
+    edited = client.patch(f"/graph/node/{one['id']}", params={"source": tiled_id}, json={"label": "edited via source"})
+    assert edited.status_code == 200 and edited.json()["label"] == "edited via source"
+    reread = {n["id"]: n for n in client.get("/graph", params={"source": tiled_id}).json()["nodes"]}
+    assert reread[one["id"]]["label"] == "edited via source"

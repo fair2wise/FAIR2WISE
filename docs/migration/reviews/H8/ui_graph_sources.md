@@ -29,7 +29,7 @@ contract fixtures are untouched).
 | `POST /graph/nodes/search` | `chat.read_support` (R07) | optional query `source` (the body is unchanged) |
 | `GET /graph/neighborhood/{node_id:path}` | `chat.read_support` (R08) | optional query `source` |
 | `GET /graph/node/{node_id}` | `chat.read_support` (R09) | optional query `source`; wins over `json_graph_path`, which is then not read |
-| `PATCH /graph/node/{node_id}` | `graph.edit` (R10) | optional query `source`: any value is `400 read_only_source` after the capability check |
+| `PATCH /graph/node/{node_id}` | `graph.edit` (R10) | optional query `source` and `corpus`: a `tiled:<corpus>` source whose corpus is live on the Save target is edited (owner decision 2026-11-09); any other value is `400 read_only_source` after the capability check (`docs/migration/api/README.md` 3.2) |
 
 The legacy routes keep their policy rows; only the OpenAPI snapshots gained the optional parameter
 (`tests/contracts/legacy_ui/fixtures/openapi_ui.json`, `docs/migration/ui_contracts/openapi_baseline.json`). The
@@ -56,8 +56,9 @@ built from input.
  "tiled": {"status": "ok|unavailable|not_offered", "detail": null}}
 ```
 
-`read_only` is `true` for both kinds (there is no existing editable JSON/Tiled mode behind this route: JSON mode is
-already read-only and a Tiled edit needs the journaled Save path, not a source). JSON counts are `null` until the
+`read_only` is `true` for every JSON source and for a Tiled graph that is not a live corpus of the Save target; a
+`tiled:<corpus>` source whose corpus is live is `read_only: false` and Save edits it through the journaled Save path
+(owner decision 2026-11-09, eighteenth set; `docs/migration/api/README.md` 3.2). JSON counts are `null` until the
 file has been read once (counting would parse it). A Tiled outage is reported in `tiled` and never fails the listing.
 
 ### Tiled mapping
@@ -89,8 +90,10 @@ through the same converter as JSON nodes (`_graph_node_from_raw`), so `id`, `lab
   message).
 - Release snapshots are listed on `:local` only. Flat JSON files are listed on every profile, the same data class
   `GET /graph` already serves every reader (owner decision O-A5 allows `json_graph_path` for every reader).
-- Edits: `PATCH` with any `source` is refused (`400`, `read_only_source`, after the `graph.edit` check, so an ALS
-  non-editor still gets 403 first). The source layer has no write path.
+- Edits: `PATCH` with a `json:` source or a non-live `tiled:` source is refused (`400`, `read_only_source`, after the
+  `graph.edit` check, so an ALS non-editor still gets 403 first). A live `tiled:<corpus>` source is edited through the
+  Save path of that corpus (`LocalSaveProvider.resolve(corpus)`); the source layer itself has no write path and only
+  drops its cached scan after such a Save.
 
 ## 4. Limits, caching, blocking
 

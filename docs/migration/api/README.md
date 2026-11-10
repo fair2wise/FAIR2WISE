@@ -165,7 +165,15 @@ additionally keeps a corpus only while its Tiled release marker names the versio
 
 * **V19** `GET /v1/publications/pointer?target=` keeps `pointer` unchanged and adds a top-level `corpora` map
   `{corpus: {snapshot_ref, version_of_pointer_that_activated_it, receipt_id}}` (`{}` when nothing is live). It can be
-  non-empty while `pointer` is `null` (a corpus removal clears the pointer even when another corpus stays live).
+  non-empty while `pointer` is `null` only before the first activation or after the last live corpus was removed.
+* **A corpus removal moves the pointer to a still-live corpus** (owner decision 2026-11-09, eighteenth set; memo
+  question 4 follow-up). `corpus-retire` (V54, `PublishStore.clear_pointer`) records a `retire` row for the removed
+  corpus and, when another corpus stays live in the live-by-corpus view, moves the pointer to the latest live version
+  of the **most recently activated remaining corpus** (highest activating pointer version: deterministic), writing a
+  `move` row whose reason names the removal (`pointer moved to still-live corpus <c> after corpus removal <plan>
+  (corpus=<removed>)`). A `move` row changes no corpus's liveness and is never a rollback target. The pointer is cleared
+  only when nothing is live. A resumed removal job runs the step twice; the second run is a no-op. `GET
+  /v1/publications/pointer` and the Save target therefore keep working for the remaining corpus.
 * **V53 and V20** take an optional `corpus`. With it, "previous version" is the latest earlier published version *of
   that corpus* that differs from its live one (from the history, other corpora ignored, never across a removal of that
   corpus); the toggle (B28) therefore works per corpus: asking again names the version rolled back from. The pointer then
@@ -173,18 +181,35 @@ additionally keeps a corpus only while its Tiled release marker names the versio
   with no earlier version is refused with 409 `conflict`, `reason = "no_previous_corpus_version"` (not retryable); a
   corpus with no live version with 404 `not_found`, `reason = "corpus_not_live"`. V20 stays refused on a replacement
   deployment (`rollback_replacement_required`) whatever `corpus` says.
-* **Without `corpus` nothing changes**: the previous pointer of any corpus (B28). **With several corpora live that is
-  ambiguous** (it can be a no-op that only moves the pointer, 3.1); it is *not* refused. Whether to refuse it is the
-  memo's open question 2 and is **owner-gated**.
+* **Without `corpus`, with exactly one live corpus, nothing changes**: the previous pointer (B28). **With several
+  corpora live a rollback that names no corpus is refused** (owner decision 2026-11-09, nineteenth set; memo question 2):
+  V53 and V20 answer 409 `conflict`, `reason = "corpus_required"`, not retryable, with a message naming the live
+  corpora; no job is created and nothing moves. "Live" is the live-by-corpus view (`PublishStore.live_by_corpus`).
+  On a replacement deployment V20 keeps answering `rollback_replacement_required` first.
 * `Publication.verify_agreement(ctx, target, scope)` compares the corpus's marker with that corpus's live version, not
   the target pointer (a false disagreement before).
 * Job `ui_state`: `published` while the job's receipt is the live version of its own corpus, `superseded` only when another
   version of the **same corpus** is live (publishing another corpus no longer supersedes it).
-* Save (`LocalSaveProvider.resolve(corpus=None)`): the default stays the pointer's corpus; naming a corpus selects its
-  live version. No route or UI selector uses the parameter (the UI is frozen).
-* Open owner questions (memo 8): 3 which corpus Save edits when several are live, 4 whether Save and the pointer move to X
-  after a corpus-X rollback (implemented as proposed: they do), 5 approval of a no-op rollback (decided, 3.1), 6 per-corpus
-  toggle (implemented as proposed), 7 `superseded` meaning (implemented as proposed); 1 and 2 are open as stated above.
+* **Save edits the corpus shown in the graph view** (owner decision 2026-11-09, eighteenth set; memo question 3).
+  `PATCH /graph/node/{id}` (frozen legacy route; body and status codes unchanged) takes, besides `source`, an optional
+  query `corpus`, recorded in the OpenAPI fixtures the way `source` was. The rule, in order:
+  - `source=tiled:<corpus>` is **editable iff `<corpus>` is live on the deployment's Save target** (the Model C
+    per-corpus view through `LocalSaveProvider.available(corpus)`; the snapshot, release record and scope checks of
+    `resolve` apply); the edit then goes to that corpus's live version through `LocalSaveProvider.resolve(corpus)`,
+    its own per-corpus journal and the import-time conflict block of that corpus. `GET /v1/graph/sources` lists such a
+    source `read_only: false`; the UI (`GraphMockup`, `liveAgent.updateGraphNode(id, body, source)`) shows Edit for it
+    and sends the viewer's `source` on Save and on the reload after it. After the Save the server drops its cached
+    Tiled scan so the next read of the source shows the edit.
+  - every `json:` source, and a `tiled:` source whose corpus is not live, stays `400 read_only_source` (unchanged).
+  - without a `source`, `corpus=<name>` names a live corpus directly (a non-live corpus is the typed 501, as before the
+    first publication; a malformed name is 400) and must agree with `source` when both are given (400 otherwise).
+  - with neither, the edit goes to **the active publication the editable default shows** (the pointer's corpus), exactly
+    as before. When the corpus edited is not the one the session graph shows, the effective record is materialized to a
+    scratch file (`<workdir>/kg.edit.<corpus>.json`) so the view on screen and retrieval over it are untouched.
+  - `can_save` keeps its meaning ("a Save target is reachable now": the pointer's corpus resolves).
+* Open owner questions (memo 8): 4 whether Save and the pointer move to X after a corpus-X rollback (implemented as
+  proposed: they do), 5 approval of a no-op rollback (decided, 3.1), 6 per-corpus toggle (implemented as proposed),
+  7 `superseded` meaning (implemented as proposed); 3 is decided above; 1 and 2 are open as stated above.
 
 ## 3.1 Rollback, replacement and the two-pointer toggle (T10B, owner decisions B28, B27, Q14, Q15)
 
