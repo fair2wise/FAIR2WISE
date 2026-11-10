@@ -183,3 +183,9 @@ not the other": confirmed (the plan's scope was e2e_demo only and bl1101's recor
 | Splash packet Q5-Q7: remaining Splash-era defaults | "Flip all three now (Recommended)" (config.yml and .env.example default `graph_source` to json; the UI Settings text corrected; NERSC scripts default to json with the path a parameter; wire tokens stay) |
 | Harvest politeness (arXiv 3 s spacing; honour 429 Retry-After) | "Add the 3 s arXiv pause and honour Retry-After (Recommended)" |
 | OpenAlex API key use | "Yes, header-only when exported (Recommended)" (read from the process environment only, never `.env`, never logged, never in a URL) |
+
+## Twentieth set (2026-11-10)
+
+| Question | Owner answer |
+|---|---|
+| First target deployment and priorities | "OK so the first target deployment will be a locally run demo in 1 month (december 10 or 11) not on this machine, but either my mac studio or another one. So we must prioritize the remaining work around this (ignore :als-dev and :als-prod work/decisions for now) to show an end-to-end demo. If possible, we want to test against our tiled-staging.als.lbl.gov/ tiled server, but let's make sure everything else is squared away first" (read as: the `:local` profile on a machine other than the development one is the first target; ALS image work and decisions are deferred; a test against tiled-staging.als.lbl.gov is a stretch goal after the local demo path is solid; it is a reachability and credential decision for the owner, never done by an agent without it) |
