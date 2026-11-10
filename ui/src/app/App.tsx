@@ -7,14 +7,15 @@ import {
   HubHeader,
   HubSidebar,
 } from '@blueskyproject/finch';
-import { Calculator, FlaskConical, Library, Share2 } from 'lucide-react';
+import { Calculator, ClipboardCheck, FlaskConical, Library, Share2 } from 'lucide-react';
+import { ApprovalsTab } from './components/ApprovalsTab';
 import { ExtractionTab } from './components/ExtractionTab';
 import { KeepAliveMainContent } from './components/KeepAliveMainContent';
 import { LibraryTab } from './components/LibraryTab';
 import { OperationsTab } from './components/OperationsTab';
 import { Toaster } from './components/ui/sonner';
 import { useLibraryProbe } from './components/libraryHooks';
-import { canRunOperations } from './components/capabilitiesApi';
+import { canApprove, canRunOperations } from './components/capabilitiesApi';
 import { useCapabilities } from './components/capabilitiesHooks';
 import { AppBookmarksButton } from './components/AppBookmarksButton';
 import { AppNewChatButton } from './components/AppNewChatButton';
@@ -107,7 +108,9 @@ export default function App() {
 
 function AppShell() {
   const libraryProbe = useLibraryProbe();
-  const operationsAllowed = canRunOperations(useCapabilities());
+  const capabilities = useCapabilities();
+  const operationsAllowed = canRunOperations(capabilities);
+  const approvalsAllowed = canApprove(capabilities);
   const [activeQuery, setActiveQuery] = useState<ExampleQuery>(EMPTY_QUERY);
   const [graph, setGraph] = useState(EMPTY_GRAPH);
   const [chatStore, setChatStore] = useState(() => loadChatSessionStore());
@@ -275,7 +278,20 @@ function AppShell() {
           },
         ]
       : []),
-  ], [activeQuery, activeSession.id, activeSession.messages, graph, libraryProbe.available, loadCatalog, operationsAllowed, reloadGraph, setActiveSessionMessages]);
+    // Pending Approvals (owner instruction 2026-11-09) exists only when `/v1/capabilities` confirms `can_approve`
+    // (`graph.publish`; on ALS a verified admin): :local always, ALS images for an admin; hidden otherwise and on
+    // 401/403/404.
+    ...(approvalsAllowed
+      ? [
+          {
+            path: '/approvals',
+            label: 'Pending Approvals',
+            element: <ApprovalsTab />,
+            icon: <ClipboardCheck size={28} />,
+          },
+        ]
+      : []),
+  ], [activeQuery, activeSession.id, activeSession.messages, approvalsAllowed, graph, libraryProbe.available, loadCatalog, operationsAllowed, reloadGraph, setActiveSessionMessages]);
 
   const headerLogoIcon = (
     <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-white">

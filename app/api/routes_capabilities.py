@@ -12,6 +12,9 @@ entry (T18D, TIL-22).
 * ``can_upload``: ``graph.upload`` (R11).
 * ``can_run_operations``: ``chat.ask`` (the entry capability of the ``GET /v1/operations/*`` reads, V25-V29;
   T19E frontend closure): the Operations tab shows only when this is true.
+* ``can_approve``: ``security.authorization.can_review_approvals`` (the entry check of ``GET /v1/approvals/pending``,
+  V82: ``graph.publish`` and, on ALS, a verified admin): the Pending Approvals page shows only when this is true
+  (owner instruction 2026-11-09).
 * ``role``: ``local_operator`` (``:local``, no sign-in), ``admin`` (verified Tiled admin) or ``user``.
 """
 
@@ -22,6 +25,7 @@ from typing import Any, cast
 from fastapi import Depends, FastAPI, Request
 
 from ..modules.contracts.context import RequestContext
+from ..modules.security.authorization import can_review_approvals
 from .routes_common import Prefixed, context, project
 
 
@@ -34,7 +38,7 @@ def capabilities_for_caller(ctx: RequestContext, *, editable_source: bool = True
         role = "admin" if ctx.principal.is_admin else "user"
     return {"role": role, "profile": ctx.profile.value, "can_edit": can_edit,
             "can_save": can_edit and editable_source, "can_upload": "graph.upload" in ctx.capabilities,
-            "can_run_operations": "chat.ask" in ctx.capabilities}
+            "can_run_operations": "chat.ask" in ctx.capabilities, "can_approve": can_review_approvals(ctx)}
 
 
 def install(app: FastAPI) -> FastAPI:

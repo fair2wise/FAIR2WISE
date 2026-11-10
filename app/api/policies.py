@@ -178,6 +178,17 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
        note="human only; dry_run default plans and reports; a real apply names the shown plan_sha256, the approval "
             "is created by create_approval (curation.approve) and every route runs the one canonicalization gate "
             "(closed until the C4 rerun: 501 gate_closed)" + _FRESH),
+    # Pending Approvals page (owner instruction 2026-11-09, sixteenth set): one aggregating read over the items that
+    # already wait for a human; every item names the existing route that approves or rejects it (V18, V08, V09, V13,
+    # V81). graph.publish is the capability that submits and applies those plans (owner-gated choice, see
+    # docs/migration/reviews/H6/pending_approvals.md); on ALS it is admin-only, and the handler re-checks the admin
+    # role explicitly (security.authorization.can_review_approvals). No write route is added.
+    _v("V82", "GET", "/approvals/pending", "graph.publish",
+       note="aggregated queue of items awaiting a human: publication/rollback/retire/purge plans (job id, kind, "
+            "scope, target, plan hash and counts), budget-paused jobs, curation cases awaiting review (ids and "
+            "counts only, when the caller holds curation.approve), an exceeded cost cap (jobs.admin) and corpora "
+            "with accepted merges to apply; each item carries the existing approve/reject route and body; ALS: "
+            "verified admin only"),
 )
 
 #: ``(METHOD, path) -> RoutePolicy`` for the ``/v1`` routes.

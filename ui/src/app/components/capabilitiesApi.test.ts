@@ -1,17 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { canEditNode, canRunOperations, fetchCapabilities, parseCapabilities } from './capabilitiesApi';
+import { canApprove, canEditNode, canRunOperations, fetchCapabilities, parseCapabilities } from './capabilitiesApi';
 
-const FULL = { role: 'user', profile: 'als', can_edit: false, can_save: false, can_upload: false, can_run_operations: true };
+const FULL = { role: 'user', profile: 'als', can_edit: false, can_save: false, can_upload: false, can_run_operations: true, can_approve: false };
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe('parseCapabilities', () => {
-  it('parses the six fields', () => {
+  it('parses the seven fields', () => {
     expect(parseCapabilities(FULL)).toEqual(FULL);
   });
   it('turns missing, malformed or non-boolean fields into null', () => {
     expect(parseCapabilities({ role: 'root', can_save: 'false', can_edit: 0, profile: 3 })).toEqual({
       role: null, profile: null, can_edit: null, can_save: null, can_upload: null, can_run_operations: null,
+      can_approve: null,
     });
     for (const bad of [null, undefined, 'x', 42, []]) {
       expect(parseCapabilities(bad).can_save).toBeNull();
@@ -40,6 +41,16 @@ describe('canRunOperations gate (T19E)', () => {
     expect(canRunOperations(parseCapabilities({ can_run_operations: 'true' }))).toBe(false);
     expect(canRunOperations(parseCapabilities({ can_run_operations: false }))).toBe(false);
     expect(canRunOperations(parseCapabilities({ can_run_operations: true }))).toBe(true);
+  });
+});
+
+describe('canApprove gate (Pending Approvals)', () => {
+  it('shows only on an explicit true; unknown, missing field, a string and false hide', () => {
+    expect(canApprove(undefined)).toBe(false);
+    expect(canApprove(parseCapabilities({}))).toBe(false);
+    expect(canApprove(parseCapabilities({ can_approve: 'true' }))).toBe(false);
+    expect(canApprove(parseCapabilities({ can_approve: false }))).toBe(false);
+    expect(canApprove(parseCapabilities({ can_approve: true }))).toBe(true);
   });
 });
 

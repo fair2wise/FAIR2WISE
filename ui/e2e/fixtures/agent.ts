@@ -199,6 +199,19 @@ export interface MockAgentOptions {
   canSave?: boolean | 'absent';
   /** T19E: GET /v1/capabilities `can_run_operations` (default true). 'omitted' leaves the field out (older server). */
   canRunOperations?: boolean | 'omitted';
+  /** Pending Approvals: GET /v1/capabilities `can_approve` (default false). 'omitted' leaves the field out. */
+  canApprove?: boolean | 'omitted';
+  /**
+   * Pending Approvals: `pending` is the GET /v1/approvals/pending body (a function is called per request, so a
+   * test can empty the queue after an approval); `answers` maps `"<METHOD> <path>"` (the item's action, path with
+   * a leading slash) to a 200 body or a typed error `{ status, code, message, reason? }`; unmapped actions answer
+   * 404. `requests` collects `"<METHOD> <path> <json body>"` of every action sent.
+   */
+  approvals?: {
+    pending: Record<string, unknown> | (() => Record<string, unknown>);
+    answers?: Record<string, Record<string, unknown> | { status: number; code: string; message: string; reason?: string }>;
+    requests?: string[];
+  };
   /**
    * T19E: GET /v1/operations/<route> answers, keyed by route segment (`statistics`, `compare`, `paper-subgraph`,
    * `recent`, `corpus-audit`): a ToolResult body (200) or a typed error `{ status, code, message }`. Unset
@@ -255,11 +268,31 @@ export async function mockAgent(page: Page, options: MockAgentOptions = {}) {
     if (path === '/v1/capabilities' && method === 'GET' && options.canSave !== 'absent') {
       const canSave = options.canSave ?? true;
       const ops = options.canRunOperations ?? true;
+      const approve = options.canApprove ?? false;
       await route.fulfill(json({
         role: canSave ? 'local_operator' : 'user', profile: canSave ? 'local' : 'als',
         can_edit: canSave, can_save: canSave, can_upload: canSave,
         ...(ops === 'omitted' ? {} : { can_run_operations: ops }),
+        ...(approve === 'omitted' ? {} : { can_approve: approve }),
       }));
+      return;
+    }
+
+    if (path === '/v1/approvals/pending' && method === 'GET' && options.approvals) {
+      const pending = options.approvals.pending;
+      await route.fulfill(json(typeof pending === 'function' ? pending() : pending));
+      return;
+    }
+
+    if (options.approvals?.answers && (method === 'POST' || method === 'PUT') && `${method} ${path}` in options.approvals.answers) {
+      options.approvals.requests?.push(`${method} ${path} ${request.postData() ?? ''}`);
+      const answer = options.approvals.answers[`${method} ${path}`];
+      if ('status' in answer && typeof answer.status === 'number' && 'code' in answer) {
+        const { status, ...body } = answer;
+        await route.fulfill(json({ retryable: false, ...body }, status));
+        return;
+      }
+      await route.fulfill(json(answer));
       return;
     }
 
