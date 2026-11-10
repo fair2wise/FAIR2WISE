@@ -79,6 +79,15 @@ export interface MockLibraryOptions {
   harvestDismisses?: string[];
   /** Captures `POST /v1/jobs/{id}/cancel` job ids. */
   cancels?: string[];
+  /**
+   * Publish to Tiled: captures `POST /v1/library/kgs/{name}/publish` bodies; `problems` are returned by the preview
+   * (and refuse the confirmed call); `failure` makes the job view report a failed adopt stage.
+   */
+  publish?: {
+    posts: Array<Record<string, unknown>>;
+    problems?: Array<{ reason: string; code: string; message: string }>;
+    failure?: { reason: string; message: string };
+  };
 }
 
 /** Build a paper under `folder` (`''` is the library root). */
@@ -256,6 +265,39 @@ export async function mockLibrary(page: Page, options: MockLibraryOptions = {}) 
       await route.fulfill(json({ logs }));
     } else if (/^\/v1\/jobs\/[^/]+\/stream$/.test(path)) {
       await route.fulfill({ status: 404, body: 'no stream in the mock; the tab polls the logs' });
+    } else if (/^\/v1\/library\/kgs\/[^/]+\/publish$/.test(path) && method === 'POST' && options.publish) {
+      const name = decodeURIComponent(path.split('/')[4]);
+      const body = request.postDataJSON() as { confirm: boolean };
+      options.publish.posts.push(body);
+      const preview = {
+        confirmed: false, name, corpus: name, snapshot_id: 'v2', snapshot_ref: `${name}/v2`,
+        target: 'http://127.0.0.1:8765', release_file: `matkg_${name}.json`, previous: null,
+        review_page: 'Pending Approvals', problems: options.publish.problems ?? [],
+      };
+      if (body.confirm !== true) {
+        await route.fulfill(json(preview));
+      } else if (preview.problems.length > 0) {
+        await route.fulfill(json({ code: 'conflict', reason: preview.problems[0].reason, retryable: false,
+          message: preview.problems[0].message }, 409));
+      } else {
+        await route.fulfill(json({ ...preview, confirmed: true, job_id: 'pub1', kind: 'library_publish',
+          state: 'queued', reused: false }));
+      }
+    } else if (/^\/v1\/jobs\/pub1\/view$/.test(path) && options.publish) {
+      const failure = options.publish.failure;
+      await route.fulfill(json({
+        job: { job_id: 'pub1', state: failure ? 'failed' : 'succeeded' }, ui_state: failure ? 'failed' : 'completed',
+        library_publish: {
+          bundle: 'demo', corpus: 'demo', snapshot_id: 'v2', snapshot_ref: 'demo/v2', target: 'http://127.0.0.1:8765',
+          stages: failure ? { export: 'completed', adopt: 'failed' }
+            : { export: 'completed', adopt: 'completed', stage: 'completed', plan: 'completed' },
+          publication_job_id: failure ? null : 'pubjob1', publication_state: failure ? null : 'staged',
+          plan: failure ? null : { plan_id: 'pl1', plan_sha256: 'abcdef0123456789'.repeat(4), creates: 12, links: 7,
+            supersessions: 0 },
+          review_page: 'Pending Approvals',
+          failure: failure ? { stage: 'adopt', reason: failure.reason, message: failure.message, code: 'invalid_input' } : null,
+        },
+      }));
     } else if (/^\/v1\/jobs\/[^/]+\/cancel$/.test(path) && method === 'POST') {
       const job = jobs.get(path.split('/')[3]);
       if (job) job.state = 'cancelled';

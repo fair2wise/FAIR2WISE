@@ -1,5 +1,5 @@
 import { Ban, CheckCircle2, Download, Loader2, XCircle } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { TERMINAL_JOB_STATES, type JobInfo, type JobLogEntry } from '../extractionApi';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -18,6 +18,8 @@ export interface ExtractionRunViewProps {
   exporting: boolean;
   onCancel: () => void;
   onExport: () => void;
+  /** Optional extra action shown beside Export once the run succeeded (the Publish to Tiled button). */
+  publishSlot?: ReactNode;
   /** Leave the finished run and return to the idle form. */
   onNew: () => void;
 }
@@ -42,7 +44,7 @@ export function progressPercent(progress: Record<string, number>): number | null
  * "New extraction" once it has ended.
  */
 export function ExtractionRunView({
-  job, kgName, lines, streaming, cancelling, exporting, onCancel, onExport, onNew,
+  job, kgName, lines, streaming, cancelling, exporting, onCancel, onExport, publishSlot, onNew,
 }: ExtractionRunViewProps) {
   const terminal = TERMINAL_JOB_STATES.has(job.state);
   const percent = progressPercent(job.progress);
@@ -78,6 +80,7 @@ export function ExtractionRunView({
               Export
             </Button>
           )}
+          {job.state === 'succeeded' && publishSlot}
           {terminal && (
             <Button type="button" variant="outline" size="sm" onClick={onNew}>
               New extraction

@@ -1,18 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { canApprove, canEditNode, canRunOperations, fetchCapabilities, parseCapabilities } from './capabilitiesApi';
+import { canApprove, canEditNode, canPublish, canRunOperations, fetchCapabilities, parseCapabilities } from './capabilitiesApi';
 
-const FULL = { role: 'user', profile: 'als', can_edit: false, can_save: false, can_upload: false, can_run_operations: true, can_approve: false };
+const FULL = { role: 'user', profile: 'als', can_edit: false, can_save: false, can_upload: false, can_run_operations: true, can_approve: false,
+  can_publish: false };
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe('parseCapabilities', () => {
-  it('parses the seven fields', () => {
+  it('parses the eight fields', () => {
     expect(parseCapabilities(FULL)).toEqual(FULL);
   });
   it('turns missing, malformed or non-boolean fields into null', () => {
     expect(parseCapabilities({ role: 'root', can_save: 'false', can_edit: 0, profile: 3 })).toEqual({
       role: null, profile: null, can_edit: null, can_save: null, can_upload: null, can_run_operations: null,
-      can_approve: null,
+      can_approve: null, can_publish: null,
     });
     for (const bad of [null, undefined, 'x', 42, []]) {
       expect(parseCapabilities(bad).can_save).toBeNull();
@@ -71,5 +72,15 @@ describe('fetchCapabilities', () => {
   it('rejects on a network error', async () => {
     const fetcher = vi.fn(async () => { throw new TypeError('down'); });
     await expect(fetchCapabilities(fetcher as unknown as typeof fetch)).rejects.toMatchObject({ status: 0 });
+  });
+});
+
+describe('canPublish gate (Publish to Tiled)', () => {
+  it('shows only on an explicit true', () => {
+    expect(canPublish(undefined)).toBe(false);
+    expect(canPublish(parseCapabilities({}))).toBe(false);
+    expect(canPublish(parseCapabilities({ can_publish: 'true' }))).toBe(false);
+    expect(canPublish(parseCapabilities({ can_publish: false }))).toBe(false);
+    expect(canPublish(parseCapabilities({ can_publish: true }))).toBe(true);
   });
 });

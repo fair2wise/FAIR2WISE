@@ -309,6 +309,7 @@ def create_api_app(
     # T34: the library kinds (local operator only; nothing is registered on ALS, so submissions are refused).
     # T35: the real library_verify handler runs over the mounted folder (:local only; ALS builds no service).
     library_handlers_: Any = None
+    library_pipelines_: dict[str, Any] = {}
     if settings.is_local:
         from ..modules.library.handlers import library_handlers
         from ..modules.library.service import LibraryService
@@ -326,7 +327,16 @@ def create_api_app(
         library_handlers_ = library_handlers(library_service, extractor=LibraryExtractor(
             library_service, BundleStore(Path(cfg.workdir) / BUNDLES_DIRNAME), env=startup_env),
             harvester=app.state.f2w_harvest)
-    register_library_jobs(operations.jobs, settings, handlers=library_handlers_)
+        # Publish to Tiled (owner decision 2026-11-10): export, adopt and stage a plan; the route and the job share it.
+        from ..modules.library.jobs import LIBRARY_PUBLISH_KIND
+        from ..modules.library.publish import LibraryPublisher
+        from .local_publication import SNAPSHOTS_DIRNAME
+
+        app.state.f2w_library_publisher = LibraryPublisher(
+            lambda: app.state.f2w_kg_library, operations, storage_kg=Path(cfg.workdir) / SNAPSHOTS_DIRNAME,
+            environ=startup_env)
+        library_pipelines_[LIBRARY_PUBLISH_KIND] = app.state.f2w_library_publisher.pipeline()
+    register_library_jobs(operations.jobs, settings, handlers=library_handlers_, pipelines=library_pipelines_)
     app.state.f2w_operations = operations
     if operations.curation is not None:
         # T17B P2 (owner decision 2026-11-09): the orchestrator's and debate's model calls count against the curation budgets.

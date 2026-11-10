@@ -22,6 +22,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { PaperPicker } from './PaperPicker';
+import { PublishToTiled } from './PublishToTiled';
 
 /** Props of {@link ExtractionIdleForm}. */
 export interface ExtractionIdleFormProps {
@@ -218,6 +219,7 @@ export function ExtractionIdleForm({ onStarted }: ExtractionIdleFormProps) {
               {exportKg.isPending ? <Loader2 aria-hidden="true" className="animate-spin" /> : <Download aria-hidden="true" />}
               Export
             </Button>
+            <PublishToTiled name={parentBundle?.name ?? null} />
           </div>
         )}
       </fieldset>

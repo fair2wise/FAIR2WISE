@@ -22,7 +22,8 @@ def test_the_policy_row_exists_and_needs_a_signed_in_reader():
 def test_til22_local_operator_can_edit_and_save(local):
     body = local.client().get("/v1/capabilities").json()
     assert body == {"role": "local_operator", "profile": "local", "can_edit": True, "can_save": True,
-                    "can_upload": True, "can_run_operations": True, "can_approve": True}
+                    "can_upload": True, "can_run_operations": True, "can_approve": True,
+                    "can_publish": False}  # no publication to its own Tiled wired in this fake world
 
 
 def test_til22_als_admin_can_edit_and_save(als):
@@ -35,10 +36,10 @@ def test_til22_als_non_admin_sees_no_edit_or_save_and_the_server_still_refuses(a
     body = user.get("/v1/capabilities").json()
     assert body == {"role": "user", "profile": "als-dev", "can_edit": False, "can_save": False, "can_upload": False,
                     "can_run_operations": True,  # T19E: every signed-in user holds chat.ask (V25-V29 reads)
-                    "can_approve": False}  # Pending Approvals (2026-11-09): graph.publish and a verified admin
+                    "can_approve": False, "can_publish": False}  # Pending Approvals (2026-11-09): graph.publish and a verified admin
     # The capability read never leaks more than the booleans and the role.
     assert set(body) == {"role", "profile", "can_edit", "can_save", "can_upload", "can_run_operations",
-                        "can_approve"}
+                        "can_approve", "can_publish"}
     # Forged headers do not change the answer.
     forged = als.client("user", headers=FORGED).get("/v1/capabilities").json()
     assert forged == body

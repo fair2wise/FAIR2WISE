@@ -97,6 +97,11 @@ label `org.opencontainers.image.revision` (`docker inspect -f '{{index .Config.L
 CI sets it, a local build sets it with `--build-arg GIT_COMMIT=$(git rev-parse HEAD)`, and an image built without
 it says `unknown`).
 
+**One button instead (owner decision 2026-11-10):** the Extract tab's **Publish to Tiled** button does the export of section 2, this adoption and the staging of section 4 in one job
+(`POST /v1/library/kgs/<name>/publish`), choosing the next free `<corpus>/v<N>` itself, and leaves the plan on **Pending Approvals** for you to approve; it approves nothing. It needs the
+image's commit: set `F2W_CODE_COMMIT=<40-hex>` in the container (the image build's `GIT_COMMIT` argument should set it; without it the button answers `no_commit_label` and nothing is
+invented). Design: `docs/migration/reviews/H6/publish_button.md`.
+
 An alternative layout (not exercised in the rehearsal) is to start the container
 with `F2W_KG_RELEASE_DIR=/var/lib/fair2wise/state/session/storage_kg` so that
 export and adoption share one folder and the copy step disappears.
