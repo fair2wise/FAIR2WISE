@@ -27,7 +27,6 @@ import json as json
 import shutil as shutil
 import subprocess as subprocess  # re-exported: tests patch bl1101_ingest.subprocess.run
 import sys
-from urllib.request import urlopen as urlopen  # re-exported: tests patch bl1101_ingest.urlopen
 
 from .cli_output import output as output
 from .graph.imports.bl1101 import cli as _cli
@@ -62,10 +61,12 @@ from .graph.imports.bl1101.common import should_skip_file as should_skip_file
 from .graph.imports.bl1101.common import slug as slug
 from .graph.imports.bl1101.common import strip_tags as strip_tags
 from .graph.imports.bl1101.common import utc_now as utc_now
-from .graph.imports.bl1101.fetch import ALLOWED_SCHEMES as ALLOWED_SCHEMES
+from .graph.imports.bl1101.fetch import JSONFetchError as JSONFetchError  # re-exported: tests fake the getter
+from .graph.imports.bl1101.fetch import PAGE_HEADERS as PAGE_HEADERS
 from .graph.imports.bl1101.fetch import _run_git as _run_git
 from .graph.imports.bl1101.fetch import fetch_url as fetch_url
 from .graph.imports.bl1101.fetch import git_sha as git_sha
+from .graph.imports.bl1101.fetch import hardened_get_bytes as hardened_get_bytes  # re-exported: tests patch it
 from .graph.imports.bl1101.fetch import sync_repo as sync_repo
 from .graph.imports.bl1101.parse_als import _clean_person_name as _clean_person_name
 from .graph.imports.bl1101.parse_als import _email_near as _email_near

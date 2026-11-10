@@ -184,4 +184,5 @@ def test_only_fetch_touches_network_and_git() -> None:
         if hit:
             offenders[file.name] = hit
     # fetch.py owns git and HTTP; cli.py only catches the subprocess errors that fetch.sync_repo/git_sha raise.
-    assert offenders == {"fetch.py": {"subprocess", "urllib"}, "cli.py": {"subprocess"}}
+    # no urllib anywhere: fetch_url goes through literature.legacy_download.hardened_get_bytes (owner, 2026-11-09)
+    assert offenders == {"fetch.py": {"subprocess"}, "cli.py": {"subprocess"}}

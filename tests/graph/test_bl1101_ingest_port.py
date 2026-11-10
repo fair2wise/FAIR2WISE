@@ -20,6 +20,7 @@ import re
 import shutil
 import types
 
+import httpx
 import pytest
 
 from app.modules import bl1101_ingest as legacy
@@ -37,6 +38,7 @@ from app.modules.graph.imports.bl1101 import (
     symbols,
     terms,
 )
+from app.modules.literature import legacy_download
 
 FIXTURES = Path(__file__).parent / "fixtures" / "bl1101"
 GOLDEN: JsonObject = json.loads((FIXTURES / "terms_golden.json").read_text(encoding="utf-8"))
@@ -210,13 +212,41 @@ def test_snapshot_versions_and_paths(tmp_path: Path) -> None:
 # ----------------------------------------------------------------------------- fetch hardening
 @pytest.mark.parametrize("url", ["file:///etc/passwd", "ftp://example.org/x", "gopher://h/", "/etc/passwd"])
 def test_fetch_url_refuses_non_http_schemes(url: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The egress policy inside the hardened getter refuses the URL before any transport is opened."""
     def boom(*_a: object, **_k: object) -> None:
-        raise AssertionError("urlopen must not be reached")
+        raise AssertionError("no HTTP transport may be opened for a blocked URL")
 
-    monkeypatch.setattr(legacy, "urlopen", boom)
+    monkeypatch.setattr(httpx.Client, "stream", boom)
+    monkeypatch.setattr(httpx.Client, "send", boom)
     dest = tmp_path / "x" / "p.html"
     out = fetch.fetch_url(url, dest)
     assert out["status"] == "failed" and "scheme" in out["reason"] and not dest.parent.exists()
+
+
+@pytest.mark.parametrize("url", ["http://user:pw@example.org/p", "https://example.org:8443/p", "http://127.0.0.1/p"])
+def test_fetch_url_applies_the_shared_egress_policy(url: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(*_a: object, **_k: object) -> None:
+        raise AssertionError("no HTTP transport may be opened for a blocked URL")
+
+    monkeypatch.setattr(httpx.Client, "stream", boom)
+    out = fetch.fetch_url(url, tmp_path / "p.html")
+    assert out["status"] == "failed" and out["reason"].startswith("blocked URL (")
+
+
+def test_fetch_url_uses_the_hardened_getter_with_header_and_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    def fake_get(url: str, *, headers: dict[str, str], timeout: float, **kwargs: object) -> bytes:
+        calls.append({"url": url, "headers": headers, "timeout": timeout, **kwargs})
+        return b"<html/>"
+
+    monkeypatch.setattr(legacy, "hardened_get_bytes", fake_get)  # reaches fetch.hardened_get_bytes through compat
+    dest = tmp_path / "pages" / "p.html"
+    monkeypatch.setattr(legacy, "REPO_ROOT", tmp_path)
+    out = fetch.fetch_url("https://als.lbl.gov/beamlines/11-0-1-2", dest, timeout=9)
+    assert calls == [{"url": "https://als.lbl.gov/beamlines/11-0-1-2", "headers": fetch.PAGE_HEADERS, "timeout": 9}]
+    assert out["status"] == "ok" and out["http_status"] == 200 and out["bytes"] == 7 and out["path"] == "pages/p.html"
+    assert dest.read_bytes() == b"<html/>"
 
 
 # ----------------------------------------------------------------------------- shim
@@ -251,16 +281,26 @@ def test_patching_repo_specs_on_legacy_reaches_hybrid_rag_sources(tmp_path: Path
     assert all(not str(d["doc_id"]).startswith(("bcs2sim", "bl11012")) for d in docs)
 
 
-def test_cli_and_snapshot_do_not_touch_the_network() -> None:
+def test_no_bl1101_module_imports_a_transport() -> None:
+    """No module under ``graph/imports/bl1101`` imports ``urllib.request`` (or any other transport): the only
+    HTTP path is ``literature.legacy_download.hardened_get_bytes`` in ``fetch.py``."""
     found: dict[str, set[str]] = {}
+    http_users: set[str] = set()
     for module in MODULES:
         tree = ast.parse(Path(str(module.__file__)).read_text(encoding="utf-8"))
-        roots = {a.name.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
-        roots |= {n.module.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module and n.level == 0}
+        imported = {a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
+        imported |= {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module and n.level == 0}
+        roots = {name.split(".")[0] for name in imported}
         hit = roots & {"urllib", "requests", "httpx", "socket"}
+        assert "urllib.request" not in imported, module.__name__
         if hit:
             found[module.__name__.rsplit(".", 1)[1]] = hit
-    assert found == {"fetch": {"urllib"}}
+        if "app.modules.literature.legacy_download" in imported:
+            http_users.add(module.__name__.rsplit(".", 1)[1])
+    assert found == {}
+    assert http_users == {"fetch"}
+    assert fetch.hardened_get_bytes is legacy_download.hardened_get_bytes
+    assert not hasattr(legacy, "urlopen")
 
 
 def test_module_alias_types() -> None:
