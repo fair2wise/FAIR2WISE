@@ -26,6 +26,8 @@ from .sqlite import OperationalDB
 #: ``ContractError.reason`` of a corpus rollback with no earlier version / of a corpus that is not live.
 NO_PREVIOUS_CORPUS_VERSION = "no_previous_corpus_version"
 CORPUS_NOT_LIVE = "corpus_not_live"
+#: History ``action`` of the pointer move that follows a corpus removal while another corpus stays live (2026-11-09).
+MOVE_ACTION = "move"
 
 SCHEMA = (
     "CREATE TABLE IF NOT EXISTS pub_plans (plan_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, plan TEXT NOT NULL, "
@@ -110,6 +112,8 @@ def corpus_of(snapshot_ref: str) -> str:
 def _live_from_rows(rows: Sequence[Mapping[str, Any]]) -> dict[str, LiveVersion]:
     live: dict[str, LiveVersion] = {}
     for row in rows:
+        if row["action"] == MOVE_ACTION:        # a pointer move after a corpus removal changes no corpus's liveness
+            continue
         record = json.loads(row["record"])
         corpus = corpus_of(str(record["snapshot_ref"]))
         if row["action"] == "retire":
@@ -129,6 +133,8 @@ def _previous_in_corpus(rows: Sequence[Mapping[str, Any]], corpus: str) -> dict[
     if live is None:
         return None
     for row in reversed(rows):
+        if row["action"] == MOVE_ACTION:
+            continue
         record = json.loads(row["record"])
         if corpus_of(str(record["snapshot_ref"])) != corpus:
             continue
@@ -398,7 +404,8 @@ class PublishStore:
         if row is None:
             return None
         hist = self.db.one(
-            "SELECT record FROM pub_pointer_history WHERE name=? AND version<? ORDER BY version DESC LIMIT 1",
+            "SELECT record FROM pub_pointer_history WHERE name=? AND version<? AND action NOT IN ('retire', 'move') "
+            "ORDER BY version DESC LIMIT 1",
             (name, row["version"]),
         )
         return cast(dict[str, Any], json.loads(hist["record"])) if hist else None
@@ -415,8 +422,8 @@ class PublishStore:
             if row is None:
                 raise ContractError(ErrorCode.NOT_FOUND, "no active pointer to roll back")
             history = con.execute(
-                "SELECT version, record FROM pub_pointer_history WHERE name=? AND version<? ORDER BY version DESC "
-                "LIMIT 1",
+                "SELECT version, record FROM pub_pointer_history WHERE name=? AND version<? "
+                "AND action NOT IN ('retire', 'move') ORDER BY version DESC LIMIT 1",
                 (name, row["version"]),
             ).fetchone()
             if history is None:
@@ -453,39 +460,51 @@ class PublishStore:
         return Pointer(name, version, **record)
 
     def clear_pointer(self, name: str, *, actor: str, reason: str, corpus: str | None = None) -> Pointer | None:
-        """Point ``name`` at nothing after a corpus removal (T08D); history keeps the retired record.
+        """Record a corpus removal (T08D) and keep the pointer on a still-live corpus.
 
-        Returns the pointer that was active, or ``None`` when nothing was (then nothing is recorded). A later
-        publication starts again at version ``history + 1``; ``rollback`` needs an active pointer and so
-        cannot undo a removal: re-import from the committed JSON instead.
+        Owner decision 2026-11-09 (eighteenth set): when another corpus stays live (per the live-by-corpus view,
+        Model C) the pointer is **moved** to the latest live version of the most recently activated remaining corpus
+        (the one with the highest activating pointer version: deterministic) instead of cleared; it is cleared only
+        when nothing is live. History keeps the ``retire`` row of the removed corpus and, when the pointer moved, a
+        ``move`` row whose reason names the removal; a ``move`` row changes no corpus's liveness. A removal whose
+        corpus is not live any more is a no-op (a resumed job runs this twice). ``rollback`` needs an active pointer
+        and cannot undo a removal: re-import from the committed JSON instead.
+
+        Returns the pointer that was active, or ``None`` when nothing was (or the removal was already recorded).
         """
         with self.db.tx() as con:
             row = con.execute("SELECT version, record FROM pub_pointers WHERE name=?", (name,)).fetchone()
-            tagged = f"{reason[:250]} corpus={corpus}" if corpus is not None else reason
-            if row is not None:
-                version = row["version"] + 1
-                con.execute("DELETE FROM pub_pointers WHERE name=?", (name,))
-                con.execute(
-                    "INSERT INTO pub_pointer_history VALUES (?, ?, ?, 'retire', ?, ?, ?)",
-                    (name, version, row["record"], tagged[:300], actor, self.clock()),
-                )
-                return Pointer(name, row["version"], **json.loads(row["record"]))
-            if corpus is None:
-                return None
             rows = con.execute(
                 "SELECT version, record, action, reason FROM pub_pointer_history WHERE name=? ORDER BY version", (name,)
             ).fetchall()
-            live = _live_from_rows(rows).get(corpus)
-            if live is not None:
-                # Another removal already cleared the pointer, but this corpus is still live in the history view.
-                record = {"snapshot_ref": live.snapshot_ref, "snapshot_sha256": live.snapshot_sha256,
-                          "receipt_id": live.receipt_id, "index_ref": live.index_ref}
-                con.execute(
-                    "INSERT INTO pub_pointer_history VALUES (?, ?, ?, 'retire', ?, ?, ?)",
-                    (name, max(int(r["version"]) for r in rows) + 1, canonical_json(record), tagged[:300], actor,
-                     self.clock()),
-                )
-        return None
+            before = _live_from_rows(rows)
+            active = Pointer(name, row["version"], **json.loads(row["record"])) if row is not None else None
+            removed = corpus if corpus is not None else (corpus_of(active.snapshot_ref) if active else None)
+            if removed is None or removed not in before:
+                return None          # nothing is active, or this removal is already recorded (a resumed job)
+            gone = before[removed]
+            retired_record = {"snapshot_ref": gone.snapshot_ref, "snapshot_sha256": gone.snapshot_sha256,
+                              "receipt_id": gone.receipt_id, "index_ref": gone.index_ref}
+            tagged = f"{reason[:250]} corpus={corpus}" if corpus is not None else reason
+            version = max([int(r["version"]) for r in rows] + [int(row["version"]) if row is not None else 0]) + 1
+            con.execute("INSERT INTO pub_pointer_history VALUES (?, ?, ?, 'retire', ?, ?, ?)",
+                        (name, version, canonical_json(retired_record), tagged[:300], actor, self.clock()))
+            remaining = _live_from_rows([*rows, {"version": version, "record": canonical_json(retired_record),
+                                                 "action": "retire", "reason": tagged}])
+            if not remaining:
+                con.execute("DELETE FROM pub_pointers WHERE name=?", (name,))
+                return active
+            target = max(remaining.values(), key=lambda v: v.pointer_version)
+            record = {"snapshot_ref": target.snapshot_ref, "snapshot_sha256": target.snapshot_sha256,
+                      "receipt_id": target.receipt_id, "index_ref": target.index_ref}
+            moved = version + 1
+            blob = canonical_json(record)
+            con.execute("INSERT OR REPLACE INTO pub_pointers VALUES (?, ?, ?)", (name, moved, blob))
+            con.execute("INSERT INTO pub_pointer_history VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (name, moved, blob, MOVE_ACTION,
+                         f"pointer moved to still-live corpus {target.corpus} after {reason[:150]} (corpus={removed})"[:300],
+                         actor, self.clock()))
+            return active
 
     def pointer_history(self, name: str) -> list[dict[str, Any]]:
         """All pointer movements for ``name``."""
@@ -500,5 +519,5 @@ def utc(moment: float) -> datetime:
     return datetime.fromtimestamp(moment, tz=UTC)
 
 
-__all__ = ("CORPUS_NOT_LIVE", "LiveVersion", "NO_PREVIOUS_CORPUS_VERSION", "PlanRecord", "Pointer", "PublishStore",
+__all__ = ("CORPUS_NOT_LIVE", "LiveVersion", "MOVE_ACTION", "NO_PREVIOUS_CORPUS_VERSION", "PlanRecord", "Pointer", "PublishStore",
            "SCHEMA", "corpus_of", "utc")

@@ -118,6 +118,15 @@ owner-gated open questions (corpus-less rollback with several corpora live; whic
 `docs/migration/api/README.md` section 3.2. Tests: `tests/jobs/test_replacement_publication.py` (two corpora, two
 versions each, rollback of A while B stays live, rollback of B) and `tests/api_v1/test_v1_corpus_pointer.py`.
 
+## Corpus removal moves the pointer (owner decision 2026-11-09, eighteenth set)
+
+`corpus-retire` no longer clears the target pointer while another corpus is live: `PublishStore.clear_pointer` writes
+the `retire` row, then moves the pointer to the latest live version of the most recently activated remaining corpus
+(`move` history row, reason naming the removal); the pointer is cleared only when nothing is live. `GET
+/v1/publications/pointer` and the UI Save target (`LocalSaveProvider.resolve()`) keep working for the remaining corpus.
+Tests: `tests/jobs/test_replacement_publication.py` (three corpora, removal order, resume is a no-op) and
+`tests/api_wiring/test_local_save.py` (Save after the removal).
+
 ## Zero-operation rollback auto-approval (owner decision 2026-11-09, `:local` only)
 
 On `:local` a rollback-replacement plan that is a no-op (zero creates/links/supersessions, a covering receipt valid

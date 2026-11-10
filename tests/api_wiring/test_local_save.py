@@ -463,3 +463,26 @@ def test_json_and_non_live_tiled_sources_stay_read_only(w):
         resp = w.client.patch(f"/graph/node/{NODE}", params={"source": sid}, json={"label": "x"})
         assert resp.status_code == 400 and resp.json()["detail"]["code"] == "read_only_source", sid
     assert journal_records(w, SCOPE) == [] and live_nodes(w.tiled())[NODE]["name"] != "x"
+
+
+def test_a_corpus_removal_moves_the_pointer_and_save_keeps_working_for_the_remaining_corpus(w):
+    """Owner decision 2026-11-09 (eighteenth set): the pointer moves to a still-live corpus, it is not cleared."""
+    w.freeze("v1", w.payload)
+    w.publish("v1")
+    freeze_as(w, OTHER, "v1", renamed(w.payload, OTHER))
+    publish_as(w, OTHER)
+    w.editable()
+    assert w.provider.resolve().scope == OTHER
+    ctx = w.ops.cli_context()
+    handle = w.ops.submit_corpus_retire(ctx, OTHER, w.target, confirm_scope=OTHER)
+    assert w.ops.jobs.work_one("w1") == (handle.job_id, JobState.AWAITING_REVIEW)
+    w.ops.approve_publication(ctx, handle.job_id, w.ops.current_plan(ctx, handle.job_id).plan_sha256)
+    assert w.ops.jobs.work_one("w1") == (handle.job_id, JobState.SUCCEEDED)
+
+    pointer = w.client.get("/v1/publications/pointer", params={"target": w.target}).json()
+    assert pointer["pointer"]["snapshot_ref"] == f"{SCOPE}/v1" and list(pointer["corpora"]) == [SCOPE]
+    assert w.provider.resolve().scope == SCOPE and w.can_save() is True
+    resp = w.client.patch(f"/graph/node/{NODE}", json={"label": "Edited after the other corpus was removed"})
+    assert resp.status_code == 200, resp.text
+    assert live_nodes(w.tiled())[NODE]["name"] == "Edited after the other corpus was removed"
+    assert journal_records(w, SCOPE)[-1]["scope"] == [SCOPE]

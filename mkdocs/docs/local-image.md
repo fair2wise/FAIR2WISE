@@ -154,7 +154,9 @@ curl -fsS "${H[@]}" -X POST $API/v1/publications/rollback-replacement \
   the last two pointers (a second rollback is a roll-forward) and is itself a
   planned, approved job. Candidates, receipts and snapshots are never deleted.
 - **A rollback moves the pointer; it never removes a corpus.** Removing a corpus
-  is a separate plan (`corpus-retire`).
+  is a separate plan (`corpus-retire`); when another corpus stays live, that
+  removal moves the pointer (and so the Save target) to the most recently
+  activated remaining corpus instead of clearing it.
 - The pointer-only `POST /v1/publications/rollback` answers
   `409 conflict` with reason `rollback_replacement_required` on this image;
   use `rollback-replacement`.

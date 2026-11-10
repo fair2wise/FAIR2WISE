@@ -395,13 +395,69 @@ def test_live_versions_follow_corpus_removal_and_markers(world):
     assert world.work() == (retire.job_id, JobState.AWAITING_REVIEW)
     world.approve(retire.job_id)
     assert world.work() == (retire.job_id, JobState.SUCCEEDED)
-    assert world.pubstore.pointer(world.target) is None
-    assert list(world.pub.live_versions(world.ctx, world.target)) == [OTHER], "B is live although the pointer is None"
+    # Owner decision 2026-11-09 (eighteenth set): the pointer moves to the still-live corpus instead of clearing.
+    assert world.pubstore.pointer(world.target).snapshot_ref == f"{OTHER}/v1"
+    assert list(world.pub.live_versions(world.ctx, world.target)) == [OTHER]
     assert world.agree() == {"agree": True, "pointer_snapshot_id": None, "marker_snapshot_id": None}
     assert world.pub.verify_agreement(world.ctx, world.target, OTHER)["pointer_snapshot_id"] == "v1"
     # A marker that no longer names the version history says is live drops it from the view.
     world.step.release_marker = lambda ctx, scope: {"snapshot_id": "v9"}  # type: ignore[method-assign]
     assert world.pub.live_versions(world.ctx, world.target) == {}
+
+
+# --- corpus removal moves the pointer to a still-live corpus (owner decision 2026-11-09, eighteenth set) ---
+
+def retire(world, corpus: str) -> None:
+    handle = world.pub.submit_retire(world.ctx, corpus, world.target, confirm_scope=corpus)
+    assert world.work() == (handle.job_id, JobState.AWAITING_REVIEW)
+    world.approve(handle.job_id)
+    assert world.work() == (handle.job_id, JobState.SUCCEEDED)
+
+
+def test_corpus_removal_moves_the_pointer_to_the_most_recently_activated_remaining_corpus(world):
+    derive_corpus(world.v1, OTHER)
+    derive_corpus(world.v1, "thirdcorpus")
+    world.publish("v1")
+    world.publish("v2")                                    # A/v2: pointer 2
+    submit_finish(world, OTHER, "v1")                      # B/v1: pointer 3
+    submit_finish(world, "thirdcorpus", "v1")              # C/v1: pointer 4 (the pointer's corpus)
+    assert world.pubstore.pointer(world.target).snapshot_ref == "thirdcorpus/v1"
+
+    retire(world, "thirdcorpus")                           # the pointer's own corpus goes: B is the latest remaining
+    pointer = world.pubstore.pointer(world.target)
+    assert pointer.snapshot_ref == f"{OTHER}/v1" and pointer.version == 6
+    history = world.pubstore.pointer_history(world.target)
+    assert [h["action"] for h in history[-2:]] == ["retire", "move"]
+    assert "corpus removal" in history[-1]["reason"] and "thirdcorpus" in history[-1]["reason"]
+    assert set(world.pub.live_versions(world.ctx, world.target)) == {SCOPE, OTHER}
+    assert world.pubstore.live_by_corpus(world.target)[OTHER].pointer_version == 3, "liveness of B is unchanged"
+
+    retire(world, OTHER)                                   # then A/v2 is the only one left
+    assert world.pubstore.pointer(world.target).snapshot_ref == f"{SCOPE}/v2"
+    assert list(world.pubstore.live_by_corpus(world.target)) == [SCOPE]
+
+    retire(world, SCOPE)                                   # nothing is live: the pointer is cleared
+    assert world.pubstore.pointer(world.target) is None and world.pubstore.live_by_corpus(world.target) == {}
+
+
+def test_removing_a_corpus_that_is_not_the_pointers_keeps_the_pointer_on_a_live_corpus(world):
+    derive_corpus(world.v1, OTHER)
+    world.publish("v1")
+    submit_finish(world, OTHER, "v1")                      # the pointer names B
+    retire(world, SCOPE)
+    assert world.pubstore.pointer(world.target).snapshot_ref == f"{OTHER}/v1"
+    assert list(world.pubstore.live_by_corpus(world.target)) == [OTHER]
+
+
+def test_a_resumed_removal_does_not_move_the_pointer_again(world):
+    derive_corpus(world.v1, OTHER)
+    world.publish("v1")
+    submit_finish(world, OTHER, "v1")
+    retire(world, OTHER)
+    before = (world.pubstore.pointer(world.target), len(world.pubstore.pointer_history(world.target)))
+    assert world.pubstore.clear_pointer(world.target, actor="x", reason="corpus removal again", corpus=OTHER) is None
+    assert (world.pubstore.pointer(world.target), len(world.pubstore.pointer_history(world.target))) == before
+    assert world.pubstore.pointer(world.target).snapshot_ref == f"{SCOPE}/v1"
 
 
 # --- zero-operation rollback auto-approval (owner decision 2026-11-09: :local only) -----------------------

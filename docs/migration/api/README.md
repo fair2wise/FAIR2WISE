@@ -161,7 +161,15 @@ additionally keeps a corpus only while its Tiled release marker names the versio
 
 * **V19** `GET /v1/publications/pointer?target=` keeps `pointer` unchanged and adds a top-level `corpora` map
   `{corpus: {snapshot_ref, version_of_pointer_that_activated_it, receipt_id}}` (`{}` when nothing is live). It can be
-  non-empty while `pointer` is `null` (a corpus removal clears the pointer even when another corpus stays live).
+  non-empty while `pointer` is `null` only before the first activation or after the last live corpus was removed.
+* **A corpus removal moves the pointer to a still-live corpus** (owner decision 2026-11-09, eighteenth set; memo
+  question 4 follow-up). `corpus-retire` (V54, `PublishStore.clear_pointer`) records a `retire` row for the removed
+  corpus and, when another corpus stays live in the live-by-corpus view, moves the pointer to the latest live version
+  of the **most recently activated remaining corpus** (highest activating pointer version: deterministic), writing a
+  `move` row whose reason names the removal (`pointer moved to still-live corpus <c> after corpus removal <plan>
+  (corpus=<removed>)`). A `move` row changes no corpus's liveness and is never a rollback target. The pointer is cleared
+  only when nothing is live. A resumed removal job runs the step twice; the second run is a no-op. `GET
+  /v1/publications/pointer` and the Save target therefore keep working for the remaining corpus.
 * **V53 and V20** take an optional `corpus`. With it, "previous version" is the latest earlier published version *of
   that corpus* that differs from its live one (from the history, other corpora ignored, never across a removal of that
   corpus); the toggle (B28) therefore works per corpus: asking again names the version rolled back from. The pointer then
