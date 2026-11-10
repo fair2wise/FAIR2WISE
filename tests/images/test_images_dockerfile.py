@@ -292,3 +292,16 @@ def test_pixi_environments_install_only_from_the_lock():
     # Every PyPI artifact in the lock carries a sha256 (pixi writes one per artifact).
     entries = re.split(r"(?m)^- pypi: ", PIXI_LOCK)[1:]
     assert entries and all("  sha256: " in e.split("\n- ")[0] for e in entries)
+
+
+@pytest.mark.parametrize("name", FINALS)
+def test_finals_record_the_build_commit_in_the_revision_label(name):
+    """The demo seed reads the revision label for ``f2w-kg-adopt --code-commit``; a build without the ARG says so."""
+    stage = DF.stage(name)
+    args = [i.args.strip() for i in stage.of("ARG")]
+    assert args == ["GIT_COMMIT=unknown"], args  # never a made-up hash as the default
+    labels = {k: v.strip('"') for k, v in stage.labels().items()}
+    assert labels["org.opencontainers.image.revision"] == "${GIT_COMMIT}"
+    arg_line = stage.of("ARG")[0].line
+    label_line = min(i.line for i in stage.of("LABEL"))
+    assert arg_line < label_line  # an ARG is visible only after it is declared in the stage
