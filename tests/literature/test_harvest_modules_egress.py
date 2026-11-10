@@ -55,6 +55,28 @@ def test_helper_calls_pass_their_getter_explicitly():
     assert seen >= {"openalex_get", "openalex_pages", "openalex_work", "unpaywall_oa_pdfs", "arxiv_results", "openalex_search"}
 
 
+OPENALEX_HELPERS = {"openalex_get", "openalex_pages", "openalex_work", "openalex_search"}
+
+
+def _is_key_call(node: ast.expr | None) -> bool:
+    return isinstance(node, ast.Call) and getattr(node.func, "id", "") == "openalex_api_key" and not node.args
+
+
+def test_openalex_calls_pass_the_exported_key_through_the_helper_only():
+    # Owner decision 2026-11-09: the key comes from the process environment through legacy_download.openalex_api_key()
+    # at request time, as the api_key argument (the helper sends it as the Authorization header; never a URL parameter).
+    seen: set[str] = set()
+    for name, module in MODULES.items():
+        for node in ast.walk(_tree(module)):
+            if isinstance(node, ast.Call) and getattr(node.func, "id", "") in OPENALEX_HELPERS:
+                seen.add(node.func.id)  # type: ignore[attr-defined]
+                keyed = [k.value for k in node.keywords if k.arg == "api_key"]
+                assert keyed and _is_key_call(keyed[0]), f"{name}: {node.func.id} without api_key=openalex_api_key()"  # type: ignore[attr-defined]
+        assert "OPENALEX_API_KEY" not in Path(module.__file__).read_text(encoding="utf-8"), name  # type: ignore[attr-defined]
+    assert seen == OPENALEX_HELPERS
+    assert harvest_rsoxs.openalex_api_key is api.openalex_api_key is legacy_download.openalex_api_key
+
+
 def test_the_getters_are_the_hardened_ones():
     assert harvest_rsoxs.hardened_get_json is legacy_download.hardened_get_json
     assert harvest_rsoxs.hardened_get_bytes is legacy_download.hardened_get_bytes

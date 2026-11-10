@@ -37,6 +37,7 @@ from ..literature.legacy_download import (
     hardened_download_pdf,
     hardened_get_bytes,
     hardened_get_json,
+    openalex_api_key,
     openalex_search,
     openalex_work,
     unpaywall_oa_pdfs,
@@ -405,16 +406,20 @@ class DownloadAgent(Agent):
 
     # ------------------------------------------------------------------
     def _search_one(self, search_text: str, pool: int) -> list[dict[str, Any]]:
-        """Search OpenAlex for ``search_text``, retrying without the OA filter on failure."""
+        """Search OpenAlex for ``search_text``, retrying without the OA filter on failure.
+
+        The exported OpenAlex key (if any) travels as the ``Authorization`` header only; it is read per
+        request and never kept on the agent.
+        """
         try:
             return list(openalex_search(search_text, min(pool, 50), oa_only=True, mailto=self._mailto,
-                                        get_json=hardened_get_json))
+                                        api_key=openalex_api_key(), get_json=hardened_get_json))
         except Exception as e:
             logger.warning("OpenAlex OA search failed for %r (%s); retrying without OA filter", search_text, e)
 
         try:
             return list(openalex_search(search_text, min(pool, 50), oa_only=False, mailto=self._mailto,
-                                        get_json=hardened_get_json))
+                                        api_key=openalex_api_key(), get_json=hardened_get_json))
         except Exception as e:
             logger.warning("OpenAlex fallback search failed for %r (%s)", search_text, e)
             return []
@@ -561,7 +566,8 @@ class DownloadAgent(Agent):
         work_id = _openalex_work_id(candidate)
         if work_id:
             try:
-                work = openalex_work(work_id, mailto=self._mailto, get_json=hardened_get_json)
+                work = openalex_work(work_id, mailto=self._mailto, api_key=openalex_api_key(),
+                                     get_json=hardened_get_json)
                 if isinstance(work, dict):
                     urls.extend(_pdf_urls(work))
                     selected, _, _ = _dl.select_openalex_oa_pdfs(work)

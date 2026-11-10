@@ -10,6 +10,7 @@ the one documented addition), identity headers and results. No test here touches
 
 from __future__ import annotations
 
+from dataclasses import fields
 from functools import partial
 import json
 import logging
@@ -180,8 +181,9 @@ def test_openalex_key_stays_in_the_header_and_out_of_logs(caplog: pytest.LogCapt
         list(openalex_pages(search="x", per_page=2, api_key=key, mailto=MAILTO, get_json=seq.getter(hardened_get_json)))
     assert all(key not in u for u in seq.urls) and key not in caplog.text
     assert all(r.headers["authorization"] == f"Bearer {key}" for r in seq.requests)
-    for call in (hv.Works, hv.Authors):  # the harvest builders never read or send a key at all
+    for call in (hv.Works, hv.Authors):  # the harvest builders never hold a key: it is read from the environment per request
         assert "api_key" not in call.__code__.co_varnames
+        assert "api_key" not in [f.name for f in fields(hv._OpenAlexQuery)]
 
 
 # the previous implementation of harvest_rsoxs._paginate_works, verbatim (the oracle, run on real pyalex queries)

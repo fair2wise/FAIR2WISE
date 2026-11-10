@@ -21,6 +21,7 @@ from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 import json
 import logging
+import os
 from pathlib import Path
 import re
 import tempfile
@@ -352,6 +353,24 @@ ATOM_HEADERS = {"User-Agent": DOWNLOAD_HEADERS["User-Agent"], "Accept": "applica
 
 GetJson = Callable[..., JsonValue]
 GetBytes = Callable[..., bytes]
+
+
+#: The OpenAlex key's environment name. It is read from the process environment only (owner decision 2026-11-09):
+#: :mod:`app.modules.dotenv_entry` drops a ``.env``-sourced value, and the container start script passes the
+#: variable through only when it is already exported.
+OPENALEX_API_KEY_ENV = "OPENALEX_API_KEY"
+
+
+def openalex_api_key(env: Mapping[str, str] | None = None) -> str | None:
+    """The exported ``OPENALEX_API_KEY`` (stripped), or ``None`` when unset or blank.
+
+    Read at request time from ``env`` (the process environment by default), so nothing holds the key between
+    requests: it is never stored on an object, never in a ``repr``, never logged and only ever sent as the
+    ``Authorization: Bearer`` header built by :func:`_openalex_headers`.
+    """
+    source = os.environ if env is None else env
+    value = (source.get(OPENALEX_API_KEY_ENV) or "").strip()
+    return value or None
 
 
 def _openalex_headers(mailto: str | None, api_key: str | None) -> dict[str, str]:
@@ -701,6 +720,6 @@ UNPAYWALL_SAFE = "!$&'()*+,/:;=@[]~%"
 
 __all__ = ("ARXIV_LIMITER", "ARXIV_MIN_INTERVAL_SECONDS", "ARXIV_QUERY_URL", "DOWNLOAD_HEADERS", "RETRY_AFTER_CAP_SECONDS",
            "ArxivEntry", "ArxivHit", "HardenedResponse", "JSONFetchError", "RateLimiter", "default_fetcher",
-           "hardened_download_pdf", "hardened_get_bytes", "hardened_get_json", "hardened_get_response", "openalex_get",
-           "openalex_pages", "openalex_search", "openalex_work", "arxiv_results", "arxiv_search", "parse_arxiv_atom",
-           "parse_arxiv_feed", "retry_after_wait", "unpaywall_oa_pdfs")
+           "hardened_download_pdf", "hardened_get_bytes", "hardened_get_json", "hardened_get_response", "openalex_api_key",
+           "openalex_get", "openalex_pages", "openalex_search", "openalex_work", "arxiv_results", "arxiv_search",
+           "parse_arxiv_atom", "parse_arxiv_feed", "retry_after_wait", "unpaywall_oa_pdfs")

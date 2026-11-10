@@ -47,7 +47,7 @@ from ..graph.backends.tiled_lookup import (
 )
 from ..graph.legacy_save import SaveTarget, StaleSave, TiledSaveBackend
 from ..hybrid_rag.pipeline import hybrid_rag_enabled
-from ..literature.legacy_download import hardened_get_json, openalex_search
+from ..literature.legacy_download import hardened_get_json, openalex_api_key, openalex_search
 from ..project_config import config_value, get_config
 from ..runtime_bridge.selection import attach_read_path, attach_summary_path
 from ..security.authorization import SETTINGS_DEPLOYMENT_FIELDS, StartupConfigError
@@ -2578,6 +2578,7 @@ def _search_openalex_publications(query: str, max_results: int) -> list[dict[str
             min(max_results * 2, 50),
             oa_only=False,
             mailto=mailto,
+            api_key=openalex_api_key(),
             get_json=hardened_get_json,
         )
     except Exception as exc:
