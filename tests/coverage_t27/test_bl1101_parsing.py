@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 import subprocess
 from types import SimpleNamespace
-from urllib.error import URLError
 
 import pytest
 
@@ -55,34 +54,25 @@ def test_rel_and_make_term_shapes():
 
 
 # ----------------------------------------------------------------------------- fetch_url
-class _Resp:
-    def __init__(self, body=b"<html/>", status=200):
-        self.body, self.status = body, status
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *a):
-        return False
-
-    def read(self):
-        return self.body
-
-
+# fetch_url goes through literature.legacy_download.hardened_get_bytes (owner decision 2026-11-09, seventeenth set).
+# These two tests used to patch ``bi.urlopen`` and read the ``Request`` header and the positional timeout; they
+# now fake the hardened getter and keep what they proved: the User-Agent header and the timeout reach the getter,
+# the success record carries hash, size, status and the repo-relative path, and a failure is a record, not a raise.
 def test_fetch_url_success_records_hash_and_repo_relative_path(monkeypatch):
     dest = bi.REPO_ROOT / ".cache" / "t27_test_fetch" / "page.html"
     seen = {}
 
-    def fake_open(request, timeout):
-        seen.update(ua=request.get_header("User-agent"), timeout=timeout)
-        return _Resp(b"hello", 200)
+    def fake_get(url, *, headers, timeout, **_kwargs):
+        seen.update(url=url, ua=headers["User-Agent"], accept=headers["Accept"], timeout=timeout)
+        return b"hello"
 
-    monkeypatch.setattr(bi, "urlopen", fake_open)
+    monkeypatch.setattr(bi, "hardened_get_bytes", fake_get)
     try:
         rec = bi.fetch_url("https://example.org/p", dest, timeout=7)
         assert rec["status"] == "ok" and rec["bytes"] == 5 and rec["sha256"] == bi.sha256_bytes(b"hello")
         assert rec["path"] == ".cache/t27_test_fetch/page.html" and rec["http_status"] == 200
         assert dest.read_bytes() == b"hello" and seen["timeout"] == 7 and "FAIR2WISE" in seen["ua"]
+        assert seen["url"] == "https://example.org/p" and seen["accept"].startswith("text/html")
     finally:
         import shutil
 
@@ -90,12 +80,12 @@ def test_fetch_url_success_records_hash_and_repo_relative_path(monkeypatch):
 
 
 def test_fetch_url_failure_is_reported_not_raised_and_writes_nothing(monkeypatch, tmp_path):
-    def boom(request, timeout):
-        raise URLError("no route")
+    def boom(url, **_kwargs):
+        raise bi.JSONFetchError("network error (ConnectError): no route")
 
-    monkeypatch.setattr(bi, "urlopen", boom)
+    monkeypatch.setattr(bi, "hardened_get_bytes", boom)
     out = bi.fetch_url("https://example.org/p", tmp_path / "x" / "p.html")
-    assert out["status"] == "failed" and "no route" in out["reason"] and not (tmp_path / "x" / "p.html").exists()
+    assert out["status"] == "failed" and "no route" in out["reason"] and not (tmp_path / "x").exists()
 
 
 # ----------------------------------------------------------------------------- ALS page / people

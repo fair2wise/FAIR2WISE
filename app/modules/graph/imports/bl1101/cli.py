@@ -31,7 +31,14 @@ from .paths import (
     TERMS_DIR,
     WORK_DIR,
 )
-from .snapshot import next_snapshot_version, run_motor_link_promote, snapshot_paths
+from .snapshot import (
+    LEGACY_WRITER_MAX_VERSION,
+    next_snapshot_version,
+    run_motor_link_promote,
+    snapshot_paths,
+    uses_legacy_writer,
+    write_standard_snapshot,
+)
 from .specs import ALS_PAGE_URL, BEAMLINE_ID, INGEST_VERSION, NAMESPACE, REPO_SPECS, SCHEMA_VERSION, RepoSpec
 from .symbols import (
     expand_globs,
@@ -249,25 +256,45 @@ def _ingest_repos(offline: bool) -> tuple[list[dict[str, Any]], list[dict[str, A
     return landed, skipped, payloads
 
 
-def run_ingest(*, from_scratch: bool = False, offline: bool = False) -> dict[str, Any]:
+def run_ingest(
+    *,
+    from_scratch: bool = False,
+    offline: bool = False,
+    legacy_writer: bool = False,
+    code_commit: str | None = None,
+) -> dict[str, Any]:
     """Run the full BL 11.0.1.2 ingest and write the next snapshot.
 
     Fetches (or reads from cache) the ALS page, parses the blueprint, syncs the
     configured repos, builds terms, and writes the extracted-terms file and the
-    graph as the next unused version.
+    graph as the next unused version. The writer follows
+    :func:`~app.modules.graph.imports.bl1101.snapshot.uses_legacy_writer`: a version in
+    the frozen range (``v1``-``v9``) or ``legacy_writer=True`` uses the legacy document
+    writer; ``v10`` on goes through ``graph.snapshot.create_snapshot`` (nested
+    ``storage/kg/bl1101/v<N>/`` with manifest and validation report plus the flat
+    compatibility copy).
 
     Args:
         from_scratch: Delete the work and page-snapshot directories first.
         offline: Do not fetch or clone. Cached pages and repos are used when
             present, otherwise the source is skipped. A missing ALS page falls back
             to built-in ALS facts.
+        legacy_writer: Force the legacy document writer for a version past the
+            frozen range (``--legacy-writer``).
+        code_commit: Full Git object id recorded by the standard writer (default:
+            read from ``.git`` without a shell). Ignored by the legacy writer.
 
     Returns:
         Dict with ``kg_path``, ``terms_path``, ``version``, ``nodes``, ``edges``,
-        ``sources_landed``, ``sources_skipped`` and the ``graph``.
+        ``sources_landed``, ``sources_skipped``, the ``graph`` and ``writer``
+        (``"legacy"`` or ``"standard"``). The standard writer adds ``snapshot_dir``,
+        ``manifest_path``, ``validation_status``, ``disclosure_status``,
+        ``commit_ready`` and ``warnings``.
 
     Raises:
         FileNotFoundError: If the blueprint file is missing.
+        SnapshotError: The standard writer refused (existing version, json2kg
+            rejection, unresolvable code commit).
     """
     _clear_work(from_scratch)
     sources_landed: list[dict[str, Any]] = []
@@ -381,26 +408,45 @@ def run_ingest(*, from_scratch: bool = False, offline: bool = False) -> dict[str
     KG_DIR.mkdir(parents=True, exist_ok=True)
     terms_path.write_text(json.dumps(records_out, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    graph = records_to_graph(records, metadata)
-    tmp = kg_path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
-    digest = sha256_file(tmp)
-    graph["metadata"]["graph_snapshot"].update(
-        {
-            "sha256": digest,
-            "nodes": len(graph["things"]),
-            "edges": len(graph["associations"]),
-            "path": str(kg_path.relative_to(REPO_ROOT)),
+    details: dict[str, Any]
+    if uses_legacy_writer(version, legacy_writer=legacy_writer):
+        graph = records_to_graph(records, metadata)
+        tmp = kg_path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
+        digest = sha256_file(tmp)
+        graph["metadata"]["graph_snapshot"].update(
+            {
+                "sha256": digest,
+                "nodes": len(graph["things"]),
+                "edges": len(graph["associations"]),
+                "path": str(kg_path.relative_to(REPO_ROOT)),
+            }
+        )
+        tmp.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(kg_path)
+        details = {"writer": "legacy"}
+    else:
+        frozen = write_standard_snapshot(
+            terms_path, version, kg_dir=KG_DIR, sources_landed=sources_landed, code_commit=code_commit
+        )
+        kg_path = frozen.flat_path
+        graph = json.loads(frozen.graph_path.read_text(encoding="utf-8"))
+        details = {
+            "writer": "standard",
+            "snapshot_dir": frozen.directory,
+            "manifest_path": frozen.manifest_path,
+            "validation_status": frozen.validation_status,
+            "disclosure_status": frozen.disclosure.status,
+            "commit_ready": frozen.commit_ready,
+            "warnings": list(frozen.warnings),
         }
-    )
-    tmp.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
-    tmp.replace(kg_path)
 
     LOGGER.info(
-        "Wrote %s (%d nodes, %d edges); terms %s; skipped %d sources",
+        "Wrote %s (%d nodes, %d edges; %s writer); terms %s; skipped %d sources",
         kg_path,
         len(graph["things"]),
         len(graph["associations"]),
+        details["writer"],
         terms_path,
         len(sources_skipped),
     )
@@ -413,6 +459,7 @@ def run_ingest(*, from_scratch: bool = False, offline: bool = False) -> dict[str
         "sources_landed": sources_landed,
         "sources_skipped": sources_skipped,
         "graph": graph,
+        **details,
     }
 
 
@@ -452,6 +499,19 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Override storage/schema/bl1101_motor_stage_map.yaml",
     )
+    parser.add_argument(
+        "--legacy-writer",
+        action="store_true",
+        help=(
+            f"Write with the legacy flat document writer of v1-v{LEGACY_WRITER_MAX_VERSION} even for a later "
+            "version (default: v10 on use graph.snapshot.create_snapshot; required by --from-graph past v9)"
+        ),
+    )
+    parser.add_argument(
+        "--code-commit",
+        default=None,
+        help="Full Git object id recorded by the standard writer (default: HEAD, read without a shell)",
+    )
     parser.add_argument("--verbose", "-v", action="store_true")
     return parser.parse_args(argv)
 
@@ -463,7 +523,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         argv: Argument list. Defaults to ``sys.argv[1:]``.
 
     Returns:
-        Process exit code, always ``0``; failures surface as exceptions.
+        Process exit code: ``0``, or ``1`` when ``--from-graph`` targets a version past
+        the legacy range without ``--legacy-writer`` (the promote copies a graph and has
+        no terms input for the standard writer). Other failures surface as exceptions.
     """
     args = parse_args(argv)
     logging.basicConfig(
@@ -472,6 +534,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         format="%(levelname)s: %(message)s",
     )
     if args.from_graph:
+        target = args.snapshot if args.snapshot is not None else next_snapshot_version(KG_DIR)
+        if not uses_legacy_writer(target, legacy_writer=args.legacy_writer):
+            output.info(
+                f"ERROR: --from-graph copies an existing graph and has no terms input for the standard "
+                f"create_snapshot writer; v{target} is past the legacy range (v1-v{LEGACY_WRITER_MAX_VERSION}). "
+                "Pass --legacy-writer to write it with the legacy document writer."
+            )
+            return 1
         result = run_motor_link_promote(
             source_kg=args.from_graph,
             version=args.snapshot,
@@ -486,10 +556,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"+{result['stats']['aliased']} alias related_to"
         )
         return 0
-    result = run_ingest(from_scratch=args.from_scratch, offline=args.offline)
+    result = run_ingest(
+        from_scratch=args.from_scratch,
+        offline=args.offline,
+        legacy_writer=args.legacy_writer,
+        code_commit=args.code_commit,
+    )
     output.info(
         f"bl1101 v{result['version']}: {result['nodes']} nodes, {result['edges']} edges → {result['kg_path']}"
     )
+    if result.get("snapshot_dir") is not None:
+        output.info(
+            f"snapshot: {result['snapshot_dir']} (validation {result.get('validation_status')}, "
+            f"disclosure {result.get('disclosure_status')}, commit_ready {result.get('commit_ready')})"
+        )
     landed = ", ".join(item.get("name", "?") for item in result["sources_landed"]) or "(none)"
     output.info(f"landed: {landed}")
     if result["sources_skipped"]:

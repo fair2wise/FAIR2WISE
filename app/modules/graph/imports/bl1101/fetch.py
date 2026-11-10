@@ -1,4 +1,10 @@
-"""Network and git access for the BL11.0.1.2 ingest: page download and repo clone/sync."""
+"""Network and git access for the BL11.0.1.2 ingest: page download and repo clone/sync.
+
+The page download goes through :func:`app.modules.literature.legacy_download.hardened_get_bytes`, the egress
+policy of every other downloader in the application (http/https only, ports 80/443, no credentials in the URL,
+public addresses, every redirect hop re-checked, body size cap). Nothing here imports ``urllib.request``. The
+``git`` sync stays behind ``subprocess`` with ``check=True``, captured output and a timeout.
+"""
 
 from __future__ import annotations
 
@@ -6,44 +12,42 @@ from collections.abc import Sequence
 from pathlib import Path
 import subprocess
 from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+
+# Re-exported (``X as X``): the legacy ``bl1101_ingest`` path exposes both so tests can fake the getter.
+from app.modules.literature.legacy_download import JSONFetchError as JSONFetchError
+from app.modules.literature.legacy_download import hardened_get_bytes as hardened_get_bytes
 
 from .common import LOGGER, sha256_bytes, utc_now
 from .paths import REPO_ROOT
 from .specs import USER_AGENT, RepoSpec
 
-ALLOWED_SCHEMES = frozenset({"http", "https"})
+#: Request headers of the page download (the ingest's own ``User-Agent``; HTML preferred).
+PAGE_HEADERS = {"User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml"}
 
 
 def fetch_url(url: str, dest: Path, timeout: int = 45) -> dict[str, Any]:
-    """Download ``url`` to ``dest`` and describe the result.
+    """Download ``url`` to ``dest`` under the hardened egress policy and describe the result.
 
     Args:
         url: Page to fetch.
-        dest: File to write. Parent directories are created.
-        timeout: Request timeout in seconds.
+        dest: File to write. Parent directories are created only when the download succeeded.
+        timeout: Request timeout in seconds, passed to the hardened getter.
 
     Returns:
         On success, a snapshot record with ``status`` ``"ok"``, ``fetched_at``,
-        repo-relative ``path``, ``sha256``, ``http_status`` and ``bytes``. On an
-        HTTP, URL, timeout or OS error, ``{"url", "status": "failed", "reason"}``;
-        the error is logged and not raised and ``dest`` is not written. A URL whose
-        scheme is not ``http`` or ``https`` (``file:``, ``ftp:``) is refused the same way.
+        repo-relative ``path``, ``sha256``, ``http_status`` (always ``200``: the getter
+        accepts no other final status) and ``bytes``. When the policy blocks the URL or
+        a redirect target (scheme, port, credentials, non-public address), the server
+        answers with a non-200 status, the body exceeds the size cap, or the transport
+        fails or times out, ``{"url", "status": "failed", "reason"}``; the error is
+        logged and not raised and ``dest`` is not written.
     """
-    if urlsplit(url).scheme not in ALLOWED_SCHEMES:
-        LOGGER.warning("Refusing to fetch %s: scheme is not http or https", url)
-        return {"url": url, "status": "failed", "reason": "unsupported URL scheme"}
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml"})
     try:
-        with urlopen(request, timeout=timeout) as response:
-            body = response.read()
-            status = getattr(response, "status", 200)
-    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        body = hardened_get_bytes(url, headers=dict(PAGE_HEADERS), timeout=timeout)
+    except JSONFetchError as exc:
         LOGGER.warning("Failed to fetch %s: %s", url, exc)
         return {"url": url, "status": "failed", "reason": str(exc)}
+    dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(body)
     return {
         "url": url,
@@ -51,7 +55,7 @@ def fetch_url(url: str, dest: Path, timeout: int = 45) -> dict[str, Any]:
         "fetched_at": utc_now(),
         "path": str(dest.relative_to(REPO_ROOT)),
         "sha256": sha256_bytes(body),
-        "http_status": status,
+        "http_status": 200,
         "bytes": len(body),
     }
 

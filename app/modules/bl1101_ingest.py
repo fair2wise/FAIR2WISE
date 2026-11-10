@@ -27,7 +27,6 @@ import json as json
 import shutil as shutil
 import subprocess as subprocess  # re-exported: tests patch bl1101_ingest.subprocess.run
 import sys
-from urllib.request import urlopen as urlopen  # re-exported: tests patch bl1101_ingest.urlopen
 
 from .cli_output import output as output
 from .graph.imports.bl1101 import cli as _cli
@@ -62,10 +61,12 @@ from .graph.imports.bl1101.common import should_skip_file as should_skip_file
 from .graph.imports.bl1101.common import slug as slug
 from .graph.imports.bl1101.common import strip_tags as strip_tags
 from .graph.imports.bl1101.common import utc_now as utc_now
-from .graph.imports.bl1101.fetch import ALLOWED_SCHEMES as ALLOWED_SCHEMES
+from .graph.imports.bl1101.fetch import JSONFetchError as JSONFetchError  # re-exported: tests fake the getter
+from .graph.imports.bl1101.fetch import PAGE_HEADERS as PAGE_HEADERS
 from .graph.imports.bl1101.fetch import _run_git as _run_git
 from .graph.imports.bl1101.fetch import fetch_url as fetch_url
 from .graph.imports.bl1101.fetch import git_sha as git_sha
+from .graph.imports.bl1101.fetch import hardened_get_bytes as hardened_get_bytes  # re-exported: tests patch it
 from .graph.imports.bl1101.fetch import sync_repo as sync_repo
 from .graph.imports.bl1101.parse_als import _clean_person_name as _clean_person_name
 from .graph.imports.bl1101.parse_als import _email_near as _email_near
@@ -95,11 +96,17 @@ from .graph.imports.bl1101.paths import REPO_ROOT as REPO_ROOT
 from .graph.imports.bl1101.paths import SCHEMA_PATH as SCHEMA_PATH
 from .graph.imports.bl1101.paths import TERMS_DIR as TERMS_DIR
 from .graph.imports.bl1101.paths import WORK_DIR as WORK_DIR
+from .graph.imports.bl1101.snapshot import CORPUS as CORPUS
+from .graph.imports.bl1101.snapshot import EXTRACTOR as EXTRACTOR
+from .graph.imports.bl1101.snapshot import LEGACY_WRITER_MAX_VERSION as LEGACY_WRITER_MAX_VERSION
+from .graph.imports.bl1101.snapshot import _SHA256 as _SHA256
 from .graph.imports.bl1101.snapshot import _terms_snapshot_for_kg as _terms_snapshot_for_kg
 from .graph.imports.bl1101.snapshot import next_snapshot_version as next_snapshot_version
 from .graph.imports.bl1101.snapshot import run_motor_link_promote as run_motor_link_promote
 from .graph.imports.bl1101.snapshot import snapshot_paths as snapshot_paths
+from .graph.imports.bl1101.snapshot import uses_legacy_writer as uses_legacy_writer
 from .graph.imports.bl1101.snapshot import write_kg_snapshot as write_kg_snapshot
+from .graph.imports.bl1101.snapshot import write_standard_snapshot as write_standard_snapshot
 from .graph.imports.bl1101.specs import ALS_PAGE_URL as ALS_PAGE_URL
 from .graph.imports.bl1101.specs import ALS_SOURCE as ALS_SOURCE
 from .graph.imports.bl1101.specs import BCS2SIM_PATH_GLOBS as BCS2SIM_PATH_GLOBS
