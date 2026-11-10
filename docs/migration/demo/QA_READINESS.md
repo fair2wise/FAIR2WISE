@@ -27,8 +27,8 @@ model, which is why the off-domain gate in section 4 was needed. The evidence de
 publication provider for `backend()` with no corpus, i.e. the corpus of the **active publication pointer**
 (`app/api/local_save.py:109-130`), and writes its effective record (snapshot plus in-flight journal, JSON) to the session graph file
 (`api.py:2897`, `_materialize_effective_graph`). Retrieval reads that file. Before any publication the startup graph files stay
-(`F2W_GRAPH` = `matkg_rsoxs_v1.json` and `matkg_bl1101_v2.json`, `docker/profiles/local.json:43`). **With two corpora live, QA answers
-from the pointer's corpus only**; the viewer's Source selector (`ui/src/app/components/graphSourceStore.ts`, used by `GraphMockup`,
+(`F2W_GRAPH` = `matkg_rsoxs_v1.json` and `matkg_bl1101_v2.json`, `docker/profiles/local.json:43`). **With two corpora live, QA answered
+from the pointer's corpus only (before section 10; it now searches every live corpus)**; the viewer's Source selector (`ui/src/app/components/graphSourceStore.ts`, used by `GraphMockup`,
 `GraphSourceSelect`, not by `ChatSidebar`) and `tiled:<corpus>` edits (`graph_sources.py`) do not change what chat reads. If the user opens
 Settings and picks "JSON", the chat reads `storage/kg/*.json` files instead (UI default list `agentSettings.ts:108`: rsoxs_v1 and
 **bl1101_v1**), and the JSON-mode ingest rules in `_ask_locked` apply (section 3).
@@ -113,7 +113,7 @@ Owner decision needed: default on (as shipped) or off.
 
 ## 6. Demo question set and probe
 
-`docs/migration/demo/qa_questions.json`: 12 questions (4 `e2e_demo`, 3 `bl1101`, 2 `rsoxs_v1`, 3 unanswerable). `bl1101` and
+(Superseded by section 10: version 2 of the set.) `docs/migration/demo/qa_questions.json`: 12 questions (4 `e2e_demo`, 3 `bl1101`, 2 `rsoxs_v1`, 3 unanswerable). `bl1101` and
 `rsoxs_v1` carry curated `expected_node_ids` checked by `scripts/demo/qa_expected_nodes.py --check` (real lexical retriever over
 `storage/kg/matkg_rsoxs_v1.json` + `matkg_bl1101_v4.json`; all within the first 31 hits under every `PYTHONHASHSEED` tried). The
 `e2e_demo` graph is **not in the repository** (the owner's container exported it; `papers/e2e_demo` holds only its 5 arXiv PDFs and manifest),
@@ -177,7 +177,7 @@ Value for the demo: it makes "answers from what is in Tiled" literally true; tod
 | G1 | high | CBORG not reachable on demo day (needs LBLnet/VPN; 403 elsewhere): QA returned an error | **Fixed**: labelled retrieval-only answer with citations (section 5). Still verify the machine reaches CBORG; rehearse both |
 | G2 | high | Out-of-KG question answered with a rambling leeway answer and confidence ~0.98 | **Fixed** per the owner decision: sentence first, then the model's ordinary answer (section 4). Residual: one shared common word defeats the gate; proposal: make `_confidence` 0.35 for leeway answers |
 | G3 | high | Hedging opener on in-domain answers ("The knowledge graph lacks specific slots...") | Proposal: LEEWAY_SYSTEM and JUDGE rule 1 to answer first, one closing line for gaps; needs a live A/B on the 12 questions (cannot be validated with fakes) |
-| G4 | high | Chat reads only the active pointer's corpus; a demo that switches the viewer to the other corpus then asks QA gets the first corpus' answers | Demo script: activate the corpus you will ask about (pointer), or implement (b)'s corpus choice from the viewer selection (M). Add to the runbook |
+| G4 | high | Chat reads only the active pointer's corpus; a demo that switches the viewer to the other corpus then asks QA gets the first corpus' answers | **Fixed** (owner decision 2026-11-10, section 10): the chat searches the union of every corpus live on the target, the corpus named on every citation |
 | G5 | high | `e2e_demo` KG file is not in the repo; expected nodes for it cannot be curated here | Owner exports `graph.json`; run `qa_expected_nodes.py --graph <it>`; seed script must publish it before QA |
 | G6 | medium | Latency 13-38 s per turn, no token streaming (the UI uses `/chat/stream` but only for progress steps; the answer arrives whole after sequential judge + leeway calls, each a fully collected CBORG stream) | Progress steps hide some; proposals (none implemented): add `token` SSE events from the CBORG stream (needs a UI change, L); run judge and leeway concurrently only when the judge is predicted insufficient; cap context (`KG_RAG_CTX_CHARS`, default 16000) to cut judge time; `--slow` in the probe flags regressions; also skip the leeway call when judge missing_topics are slot gaps (saves one call), stream tokens (L); keep `--slow 45` in probe; rehearse timings |
 | G7 | medium | JSON source selected in Settings turns unanswerable/low-evidence questions into OpenAlex searches and download offers (needs internet) | Keep the default source for the demo; runbook line |
@@ -191,3 +191,96 @@ Value for the demo: it makes "answers from what is in Tiled" literally true; tod
 **Only verifiable live with a real model:** answer quality and citation tokens on the 12 questions (run the probe), the hedging opener and its
 fix, the exact split of the 38 s (trace), whether the leeway call fires on the demo questions, semantic-backend startup in the image, and
 that the fallback label shows in the UI when CBORG is cut (disconnect VPN and ask).
+
+## 10. QA over every live corpus (owner decision 2026-11-10, twenty-second set)
+
+The demo corpora are the most complete RSoXS KG (`rsoxs/v4`, 22,012 things) and the 580-paper OPV KG
+(`qwen3_235b_580papers/v1`, 15,815 things), both live on the one local target; the chat must answer over both and say
+which corpus each cited node comes from. Gap G4 (above) is closed by this design. Code: `app/modules/f2w_agent/corpus_union.py`
+(new), `AgentPipelineService._load_union` / `_ask_locked_body` / `_response` in `api.py`, `LocalSaveProvider.live_corpora`
+(`app/api/local_save.py`), an opt-in KG cache in `retrieval_agent.py`. Tests: `tests/api_wiring/test_local_chat_multicorpus.py`
+(full stack, real lexical retrieval over real publication jobs, fake model) and `tests/demo_qa/test_qa_corpus_union.py` (the
+set builder with fake backends).
+
+**Which graphs the chat searches (`:local`, a Tiled save provider attached, editable source).** Per turn, `_ask_locked` asks
+the provider for `live_corpora()`: every corpus of `PublishStore.live_by_corpus(target)` (the Model C per-corpus view,
+`docs/migration/api/README.md` 3.2), the active pointer's corpus first, the others by name.
+
+| Live corpora | The chat searches | Why |
+|---|---|---|
+| none (before a publication), or a provider without `live_corpora`, or ALS (`tiled_save` at startup) | the startup seed / session graph exactly as before | unchanged |
+| exactly one | the session graph (the effective record of the pointer's corpus) exactly as before: same graph id, same ids, same response | single-corpus behaviour unchanged (regression test) |
+| two or more | the union: the effective record of **each** live corpus, each as its own graph | this section |
+| Settings "JSON", or `graph_source=json` on `/chat` | the selected `storage/kg` files as before | legacy mode unchanged; `json_graph_path(s)` still only apply there |
+
+**Per-corpus record and cache.** The record of a corpus is `TiledSaveBackend.effective_graph()` (frozen snapshot, hash-checked,
+plus the in-flight journal entries: a journaled Save shows up). It is staged once at
+`<workdir>/chat_corpora/<corpus>/matkg_<corpus>.json` (compact JSON, atomic replace), so the retrieval agent's graph id is the
+corpus name, and cached by **`(corpus, snapshot, sha256, journal stamp)`**. A turn with nothing new costs one `stat` per
+corpus. A new publication of a corpus, a rollback, a corpus retirement, or a Save changes the key (or the live list) and the
+next question uses it, with no restart; a retired corpus's file and cache entry are removed (no leak of old versions). The
+KnowledgeGraph objects are cached in a dedicated retrieval agent (`enable_kg_cache`, keyed by file path, mtime, size; stale
+entries dropped on each reload), so a corpus is indexed once, not on every question. That agent is separate from
+`self.retrieval`: the viewer (graph view, node search, Save) keeps reading the single session graph and is not affected
+(tested). `turn_retrieval` hands the langgraph read path the same agent for the turn.
+
+**Ids shared by two corpora.** Graphs are never concatenated: hits are `(graph_id, node id)` (`merge_hits`), context blocks
+and citation lists are per graph, and the response sub-graph (`query_graph_payload`) already qualifies an id that two graphs
+share as `<graph_id>:<id>` so the viewer can show both. The two real KGs share **2,063** node ids (for example `matkg:P3HT`,
+`matkg:SVAtreatment`), so this is not hypothetical.
+
+**Where the corpus is named (frozen `/chat` shape unchanged: `CHAT_RESPONSE_FIELDS` and `openapi_ui.json` are untouched).**
+- Answer text: the citation syntax is unchanged, `[KG: <graph_id>: <Name>]`, and the graph id **is** the corpus name
+  (`[KG: rsoxs: P3HT]`, `[KG: qwen3_235b_580papers: P3HT]`); the UI renders it as before.
+- `graph.nodes[].graph_id` / `graph_label` (existing fields) and `node_ids` (a shared id is prefixed `<corpus>:`, existing rule).
+- `publications[].corpus` and `corpora` (additive keys of the free-form publication dicts; a paper in both corpora is
+  listed once with both), and `supporting_nodes[].graph_id` / `corpus`.
+- `rounds[].retrieval.corpora` (`[{corpus, graph_id, snapshot, nodes, edges}]`) and `corpora_skipped`: additive keys of the
+  free-form round dict; the disclosure projection (`security/disclosure.py _project_verdict`) lets only those scalar fields through.
+- Trace: `selected_hits[].graph_id` (already recorded) and a `corpora_selected` progress event ("Searching 2 corpora: rsoxs
+  (22012 things), qwen3_235b_580papers (15815 things)", with `corpora` and `skipped` data), also an SSE progress event.
+  No trace key was added (`RETRIEVAL_KEYS` and the recorded `traces_get` fixtures are unchanged).
+
+**Bounds.** A corpus whose frozen graph is over `F2W_QA_MAX_CORPUS_MB` (default 150 MB; checked by `stat`, before anything is
+read), or with more than `F2W_QA_MAX_CORPUS_NODES` things (default 60,000), or that would take the union over
+`F2W_QA_MAX_UNION_NODES` (default 120,000) is **not loaded**; the answer ends with `*Not searched: <corpus> (<reason>).*`
+and `rounds[].retrieval.corpora_skipped` names it. If every corpus is left out the turn is a `retrieval_error` that starts with
+the usual `No knowledge graphs loaded` and says why (it never silently answers from one corpus). The defaults are about 3x the
+two demo corpora together (37,827 things); the staging cost grows linearly, the per-turn retrieval cost with the node count.
+The query cap `kg_query_max_nodes` (UI default 1000) still bounds the hits per turn, shared by the corpora in score order.
+
+**Offline measurement** (real lexical retriever, no model, no network; this machine, Python 3.12, cold process, files
+`storage/kg/matkg_rsoxs_v4.json` 43.9 MB and `matkg_qwen3_235b_580papers.json` 13.7 MB; `scripts/demo/qa_expected_nodes.py --time`):
+
+| Step | rsoxs v4 (22,012 things, 57,575 links) | qwen3_235b_580papers (15,815 things, 20,096 links) |
+|---|---|---|
+| read + sha256 + parse the frozen graph | 0.26 s | 0.10 s |
+| stage the effective record (compact dump + write) | 0.21 s (33 MB) | 0.08 s (10 MB) |
+| build the lexical `KnowledgeGraph` | 0.81 s | 0.29 s |
+| load of both into one agent (cold) | 1.0 to 1.4 s | |
+| peak process RSS with both loaded (and the app's other imports not counted) | about 750 MB | |
+| retrieval, 11 demo questions, both graphs, 1000 hits | 0.25 to 0.64 s per question (median 0.39 s) | |
+
+So the first question after a publication pays about 1.5 s of staging and indexing; every later question pays the
+retrieval time only (0.3 to 0.6 s), against 13 to 38 s for the model calls. Not measured here: the same through the container
+(memory limit of the image) and with `KG_RAG_RETRIEVAL_BACKEND=semantic` (it would encode 38k node texts on first use: minutes on CPU; keep `lexical`).
+
+**Quality effect worth knowing.** With both KGs in one search the lexical hits of a question are split by score, not by topic:
+for the RSoXS questions 5 to 30 % of the 1000 hits come from the OPV KG, and for the OPV questions 60 to 73 % come from
+the RSoXS KG (the RSoXS KG itself contains a lot of OPV content: P3HT, PM6 and Y6 have 42, 35 and 32 papers there). The judge
+reads the best-scored 16k characters, which are the on-topic ones, and each citation names its corpus, so the answers can be
+told apart; the demo questions (`qa_questions.json`) are chosen so that the expected node of the expected corpus is within the
+first 40 hits under every hash seed. The off-domain gate (section 4) is weaker on 38k nodes: only 3 of 8 general-knowledge
+probes tripped it (the three kept in the set), because a common word shared with some node of 1000 hits defeats it (gap G2).
+
+**Question set and probe.** `docs/migration/demo/qa_questions.json` (version 2): 4 RSoXS questions (`corpus: rsoxs`), 4 OPV
+questions (`corpus: qwen3_235b_580papers`) and the 3 unanswerable ones. `scripts/demo/qa_expected_nodes.py --graph
+rsoxs=...v4.json --graph qwen3_235b_580papers=...json --check` loads both KGs as the chat does (each linked as
+`matkg_<corpus>.json`, so the graph id is the corpus name) and checks every expected node **from its corpus**.
+`scripts/demo/qa_probe.py` PASSes an answerable question only when an expected node of that corpus is among the returned nodes
+(`graph.nodes[].graph_id`, or the `<corpus>:` prefix), and says which corpora answered when it does not. It still only calls
+`/chat` or `/chat/stream`.
+
+**Only verifiable live:** that the container's `:local` profile has both corpora live and the image's memory holds the
+union (about 750 MB for the KGs alone); the answers and the `[KG: <corpus>: ...]` chips with a real model; the staging time
+on the container's disk; that `qa_probe.py` passes the 8 answerable questions with a real model (hedging, G3).
