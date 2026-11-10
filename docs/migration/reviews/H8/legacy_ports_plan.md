@@ -113,7 +113,7 @@ wraps it unchanged), `openalex_search`, `openalex_work`, `arxiv_search` + `parse
   retried; a failure retried as the package retried.
 - OpenAlex API key: the agent never used one (pyalex `api_key` unset, no env read). The helpers accept `api_key` and send
   `Authorization: Bearer` only as a header, never in the URL, never logged (tested), but the agent does not pass one: wiring
-  `OPENALEX_API_KEY` is a new secrets path and is owner-gated.
+  `OPENALEX_API_KEY` is a new secrets path and is owner-gated (decided 2026-11-09, see P1c).
 - Quota/`Retry-After`: neither pyalex (`max_retries=0`) nor the agent handled them, and `hardened_get_json` does not expose response
   headers, so a 429 is a failed lookup (warning, fallback, empty), as before. Honouring `Retry-After` needs a getter variant returning headers: owner-gated.
 - Dependencies: `pyalex` and `arxiv` were NOT unused at that point: `f2w_agent/api.py` (publication search), `commands/harvest_rsoxs.py`,
@@ -162,6 +162,25 @@ including an empty later page, next page while `start < totalResults`), `parse_a
   `pyalex` can leave the runtime dependencies (`pyproject.toml` `dependencies`, `pixi.toml` default `[pypi-dependencies]`) but has to stay in the dev/test environment
   while the parity tests drive the real client as the oracle (and the `pyalex.*` mypy override can go with it only if the tests are typed separately). `arxiv` has to stay until
   `library/harvest.py` is ported, then likewise remains a test-only oracle dependency. `pixi.lock` is not edited here.
+
+
+### P1c. Harvest politeness and the OpenAlex key (DONE 2026-11-09, branch `forge_merge-T-harvest-polite`, not merged)
+
+Both P1 owner-gated items were decided on 2026-11-09 (nineteenth set) and are done.
+
+- **arXiv spacing.** `legacy_download.RateLimiter` (thread-safe, injectable clock and sleep) and the process-wide `ARXIV_LIMITER` space every
+  `arxiv_results`/`arxiv_search` request at least 3 s apart (`ARXIV_MIN_INTERVAL_SECONDS`); `delay_seconds` is now a floor of 3 s
+  (the harvest's 15 s is kept). Same URLs and headers, only paused. Callers: `DownloadAgent`, `harvest_rsoxs`, `download_pdfs.search_arxiv`.
+- **Retry-After.** New `hardened_get_response` returns `HardenedResponse(body, status, headers)` under the same egress policy (non-2xx body not read;
+  `repr` hides headers); `hardened_get_bytes`/`hardened_get_json` are built on it with unchanged signature and behaviour, their `JSONFetchError` now also
+  carries `status` and the parsed `retry_after`. `openalex_get/pages/search/work`, `arxiv_results` and `unpaywall_oa_pdfs` wait a 429/503
+  `Retry-After` once (cap 60 s, injectable `sleep`) and repeat the identical request once, then fail as before; a 429 without `Retry-After` (daily quota) is not retried.
+  Only host and status are logged.
+- **OpenAlex key.** `openalex_api_key()` reads `OPENALEX_API_KEY` from the process environment per request; `DownloadAgent`, `_search_openalex_publications`,
+  `harvest_rsoxs` and `download_pdfs.run_openalex_workflow` pass it, sent as `Authorization: Bearer` only. `dotenv_entry.PROCESS_ONLY_VARS` drops a `.env` value;
+  `scripts/run_local_container.sh` already passes it through only when exported. Tests: `test_legacy_download_polite.py`, `test_openalex_api_key.py` (URL/log/repr tripwires);
+  egress pins now require `api_key=openalex_api_key()`; parity tests unchanged.
+- Follow-up (not done, another session owns it): `app/modules/library/harvest.py` (`arxiv` package client, `OpenAlexClient`) should get the same 3 s arXiv spacing and Retry-After handling.
 
 ### P2. `orchestrator_agent.py` + `debate_agent.py` -> `agent_runtime/` and `curation/`
 

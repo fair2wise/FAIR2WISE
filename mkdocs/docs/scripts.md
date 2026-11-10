@@ -48,6 +48,15 @@ redirect hop must be http(s) on port 80/443 with no credentials and a public add
 link-local and CGNAT hosts are refused); redirects are limited to five; a PDF is capped at 100 MiB and 120 s and must
 start with `%PDF-`; metadata answers are capped at 8 MiB; refused or non-PDF answers are not retried.
 
+Politeness (owner decision 2026-11-09): every arXiv request made by these paths and by `download_pdfs`/`DownloadAgent`
+is spaced at least 3 seconds apart per process (one shared monotonic limiter; a larger `delay_seconds`, such as the harvest's
+15 s, is kept, a smaller one is raised to 3 s). A 429 or 503 from OpenAlex, arXiv or Unpaywall that carries `Retry-After`
+is waited out once (capped at 60 s) and the identical request is repeated once; a second refusal, or a 429 without
+`Retry-After`, fails as before. When `OPENALEX_API_KEY` is exported in the environment of the process, OpenAlex requests
+carry it as `Authorization: Bearer <key>` (header only: never in a URL, a log line, a `repr` or a report). It is read from the
+process environment only; a `.env` file is not used for it, and `scripts/run_local_container.sh` passes it into the
+container only when already exported. `library/harvest.py` is separate and unchanged.
+
 ## Other entry points
 
 | File | Use |
