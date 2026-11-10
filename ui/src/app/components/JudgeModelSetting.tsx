@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { RefreshCw, Save } from 'lucide-react';
 import { ButtonWithIcon } from '@blueskyproject/finch';
+import { FreeModelNotice } from './FreeModelNotice';
 import {
   fetchJudgeModel,
+  judgeDraft,
   judgeOptions,
   saveJudgeModel,
   type JudgeModelState,
@@ -30,7 +32,7 @@ export function JudgeModelSetting({ open, disabled = false }: { open: boolean; d
     try {
       const next = await fetchJudgeModel(fetch, refresh);
       setState(next);
-      setDraft(next?.judge_model ?? '');
+      setDraft(next ? judgeDraft(next).draft : '');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -74,8 +76,18 @@ export function JudgeModelSetting({ open, disabled = false }: { open: boolean; d
       </Label>
       <p className="text-xs text-slate-500">
         Judges semantic checks in validation runs (binary suite). Deployment-wide; on ALS only admins can change it.
-        It must differ from the labelling model and the model under test.
+        It must differ from the labelling model and the model under test. Only free LBL-hosted CBORG models are
+        offered (owner decision 2026-11-09).
       </p>
+      {state?.judge_model && state.judge_model_allowed === false && (
+        <FreeModelNotice
+          model={state.judge_model}
+          allowed={state.available_models}
+          fallback={state.model_policy.default_model}
+          role="judge"
+          refused
+        />
+      )}
       {state && (
         <div className="flex items-center gap-2">
           <select

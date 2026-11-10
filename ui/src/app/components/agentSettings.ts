@@ -327,3 +327,19 @@ export function defaultModelForBackend(
   }
   return options?.available_cborg_models?.[0]?.trim() || DEFAULT_CBORG_MODEL;
 }
+
+/**
+ * Free-model policy (owner decision 2026-11-09): the picked CBORG id when the server offers it, else the
+ * server's fallback (the default free model). `allowed` is the list the server returned, already limited
+ * to free LBL-hosted ids; while it is empty nothing is known and the pick is kept.
+ */
+export function freeModelFallback(
+  model: string,
+  allowed: readonly string[],
+  fallback: string = DEFAULT_CBORG_MODEL,
+): { model: string; replaced: boolean } {
+  const cleaned = normalizeCborgModel(model || '');
+  if (!cleaned) return { model: fallback, replaced: false };
+  if (allowed.length === 0 || allowed.includes(cleaned)) return { model: cleaned, replaced: false };
+  return { model: fallback, replaced: true };
+}

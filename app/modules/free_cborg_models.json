@@ -1,0 +1,40 @@
+{
+  "policy": "free_cborg_models",
+  "decision": "owner decision 2026-11-09 (seventeenth set, docs/migration/reviews/owner_decisions_2026-11-03.md): \"we should only allow free models via CBORG at the moment\"",
+  "source": "CBORG models page (https://cborg.lbl.gov/models), LBL-hosted models priced $0 per token",
+  "as_of": "2026-11-06",
+  "default_model": "lbl/cborg-chat",
+  "free_models": [
+    "lbl/cborg-chat",
+    "lbl/cborg-coder",
+    "lbl/cborg-coder-ultra",
+    "lbl/cborg-coder-max",
+    "lbl/cborg-coder-fast",
+    "lbl/cborg-deepthought",
+    "lbl/cborg-mini",
+    "lbl/cborg-mini-fast",
+    "lbl/cborg-vision",
+    "lbl/cborg-ocr",
+    "lbl/cborg-safeguard",
+    "lbl/cborg-privacy-filter",
+    "lbl/gpt-oss-120b",
+    "lbl/gpt-oss-20b",
+    "lbl/gemma-4",
+    "lbl/gemma-4-thinking",
+    "lbl/gemma-4-mini",
+    "lbl/glm-5.3-flash",
+    "lbl/inkling-small",
+    "lbl/nomic-embed-text",
+    "lbl/nomic-embed-code",
+    "lbl/nomic-embed-vision"
+  ],
+  "aliases": {
+    "mistral-large-4": "lbl/cborg-coder-ultra"
+  },
+  "notes": [
+    "Edit this file to change the policy; no code change is needed (F2W_MODEL_POLICY_FILE points at another copy).",
+    "A bare id (cborg-chat, gpt-oss-120b) is the same model as its lbl/ form; both spellings are accepted.",
+    "An id with another provider prefix (openai/, anthropic/, google/, amazon/, ...) is never free and is refused.",
+    "When the live CBORG listing carries a price for a model, the model is allowed only if that price is 0."
+  ]
+}

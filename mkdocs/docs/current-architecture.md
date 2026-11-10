@@ -102,7 +102,9 @@ Any other value is a startup error (`config_rejected`).
 The binary evaluation suite is separate validation, never part of a chat turn
 (H3 B). Its judge model is a deployment-wide setting chosen in the settings
 panel from the provider's live model list (`GET/PUT /v1/validation/judge-model`,
-owner O-U2); each report records the judge used.
+owner O-U2); each report records the judge used. Only free LBL-hosted CBORG
+models are offered or accepted (owner decision 2026-11-09, `app/modules/model_policy.py`;
+see [Model policy](configuration.md#model-policy-free-cborg-models-only)).
 
 ## Pending owner decisions that affect operation
 

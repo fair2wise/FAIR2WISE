@@ -156,6 +156,13 @@ connected to the same agent can change them.
 The backend may return different available models, graph files, or server
 defaults. Model aliases from older Gemini names are normalized during load.
 
+Only free LBL-hosted CBORG models are offered (owner decision 2026-11-09; see
+[Model policy](configuration.md#model-policy-free-cborg-models-only)). A saved
+preference that names another model is not used: the server falls back to the
+default free model and the panel shows a notice under the model picker. The
+validation judge dropdown offers the same free ids and flags a saved judge the
+policy refuses.
+
 ## Browser persistence
 
 | Local-storage key | Content |

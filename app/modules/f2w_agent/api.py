@@ -634,18 +634,28 @@ class ChatSessionContext:
 
 
 def default_runtime_model(backend: str, configured: str | None = None) -> str:
-    """Resolve the default LLM model name for the given backend."""
+    """Resolve the default LLM model name for the given backend.
+
+    For CBORG the result is always a free LBL-hosted model (owner decision 2026-11-09): a configured, saved
+    or environment id the policy refuses falls back to the policy's default free model (logged once per
+    distinct id; the UI shows the notice).
+    """
+    if backend != "ollama":  # cborg (and the cborg-openai spelling)
+        return _free_cborg_model(_configured_cborg_model(configured))
+    if configured and str(configured).strip():
+        return str(configured).strip()
+    for env_name in ("KG_RAG_OLLAMA_MODEL", "KG_RAG_MODEL"):
+        env_value = os.environ.get(env_name)
+        if env_value and env_value.strip():
+            return env_value.strip()
+    return str(config_value("kg_rag.ollama.model", DEFAULT_OLLAMA_MODEL) or DEFAULT_OLLAMA_MODEL)
+
+
+def _configured_cborg_model(configured: str | None) -> str:
+    """The CBORG id named by the argument, the environment or config.yml, aliases applied (not yet checked)."""
     if configured and str(configured).strip():
         model = str(configured).strip()
-        if backend == "cborg":
-            model = normalize_cborg_model(model) or model
-        return model
-    if backend == "ollama":
-        for env_name in ("KG_RAG_OLLAMA_MODEL", "KG_RAG_MODEL"):
-            env_value = os.environ.get(env_name)
-            if env_value and env_value.strip():
-                return env_value.strip()
-        return str(config_value("kg_rag.ollama.model", DEFAULT_OLLAMA_MODEL) or DEFAULT_OLLAMA_MODEL)
+        return normalize_cborg_model(model) or model
     for env_name in ("KG_RAG_CBORG_MODEL", "KG_RAG_MODEL", "F2W_MODEL"):
         env_value = os.environ.get(env_name)
         if env_value and env_value.strip():
@@ -655,22 +665,48 @@ def default_runtime_model(backend: str, configured: str | None = None) -> str:
     return normalize_cborg_model(default) or default
 
 
+_REFUSED_MODELS_LOGGED: set[str] = set()
+
+
+def _free_cborg_model(model: str) -> str:
+    """``model`` when the free-model policy allows it, else the policy's default free model (noted in the log)."""
+    from ..model_policy import fallback_free_model
+
+    chosen, replaced = fallback_free_model(model)
+    if replaced and model not in _REFUSED_MODELS_LOGGED:
+        _REFUSED_MODELS_LOGGED.add(model)
+        logger.warning("CBORG model %r is not a free LBL-hosted model (owner decision 2026-11-09); using %r",
+                       model, chosen)
+    return chosen
+
+
 def list_cborg_models(*, current_model: str | None = None) -> list[str]:
-    """Return configured CBORG model names, ensuring the current model is included."""
+    """The CBORG models the Settings picker offers: configured ids the free-model policy allows, the current one first.
+
+    ``f2w_agent.cborg_models`` (config.yml) is filtered by :mod:`app.modules.model_policy`; without a
+    configured list the policy's own free list is offered. A current model the policy refuses is not listed
+    (the server falls back to the default free model and the UI shows the notice).
+    """
+    from ..model_policy import free_cborg_models, load_policy
+
+    policy = load_policy()
     configured = get_config("f2w_agent.cborg_models", [])
     models: list[str] = []
     seen: set[str] = set()
     if isinstance(configured, list):
         for item in configured:
             normalized = normalize_cborg_model(str(item).strip())
-            if normalized and normalized not in seen:
+            if normalized and normalized not in seen and policy.is_allowed(normalized):
                 seen.add(normalized)
                 models.append(normalized)
+    if not models:
+        models = free_cborg_models()
+        seen.update(models)
     if not models:
         models = [default_runtime_model("cborg")]
         seen.update(models)
     normalized_current = normalize_cborg_model(current_model)
-    if normalized_current and normalized_current not in seen:
+    if normalized_current and normalized_current not in seen and policy.is_allowed(normalized_current):
         models = [normalized_current, *models]
     return models
 
@@ -3164,6 +3200,10 @@ class AgentPipelineService:
                 normalized = normalize_cborg_model(update.model.strip()) or ""
                 if not normalized:
                     raise ValueError("Model name cannot be empty")
+                if self.runtime.backend == "cborg":
+                    # Free-model policy (owner decision 2026-11-09): the frozen route keeps its shape; a paid
+                    # id is replaced by the default free model (the UI shows the notice).
+                    normalized = _free_cborg_model(normalized)
                 if normalized != self.runtime.model:
                     self.runtime.model = normalized
                     self.cfg.model = normalized

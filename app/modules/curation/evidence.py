@@ -270,10 +270,14 @@ class EvidenceDebater:
     Args:
         asker: ``(question, probe, candidates, round_no) -> parsed reply``; blocking, run on a worker thread.
         hooks: Injected legacy hooks.
+        model_calls_enabled: Injected opt-in predicate (the legacy facade passes
+            ``model_policy.helper_model_calls_enabled``, default off in the product); false means the asker is
+            never called and the heuristic decision is used.
     """
 
     def __init__(self, *, asker: Callable[[str, dict[str, Any], list[dict[str, Any]], int], dict[str, Any]],
-                 hooks: DebateHooks) -> None:
+                 hooks: DebateHooks, model_calls_enabled: Callable[[], bool] = lambda: True) -> None:
+        self._model_calls_enabled = model_calls_enabled
         self._asker = asker
         self._hooks = hooks
         graph = StateGraph(DebateState)
@@ -288,6 +292,10 @@ class EvidenceDebater:
         self.graph = graph.compile()
 
     async def _ask(self, run: DebateState) -> DebateState:
+        if not self._model_calls_enabled():
+            # Owner decision 2026-11-09: helper-agent model calls are opt-in; the heuristic decision is used.
+            logger.debug("evidence debate model call skipped (model calls not enabled); heuristic decision")
+            return {"failed": True}
         loop = asyncio.get_event_loop()
         try:
             reply = await loop.run_in_executor(

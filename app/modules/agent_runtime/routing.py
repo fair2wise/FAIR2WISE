@@ -492,10 +492,14 @@ class WorkflowRouter:
         classifier: ``(user_turn, state) -> classification dict``; blocking, run on a worker thread.
         hooks: Injected legacy hooks.
         max_steps: Orchestration step budget.
+        model_calls_enabled: Injected opt-in predicate (the legacy facade passes
+            ``model_policy.helper_model_calls_enabled``, default off in the product); when it is false the
+            classifier is never called and the deterministic fallback decides. This package reads no environment.
     """
 
     def __init__(self, *, classifier: Callable[[str, dict[str, Any]], dict[str, Any]], hooks: RoutingHooks,
-                 max_steps: int = DEFAULT_MAX_STEPS) -> None:
+                 max_steps: int = DEFAULT_MAX_STEPS, model_calls_enabled: Callable[[], bool] = lambda: True) -> None:
+        self._model_calls_enabled = model_calls_enabled
         self._classifier = classifier
         self._hooks = hooks
         self.max_steps = max(1, int(max_steps or DEFAULT_MAX_STEPS))
@@ -530,6 +534,10 @@ class WorkflowRouter:
         return {"fallback": fallback}
 
     async def _classify(self, run: RoutingState) -> RoutingState:
+        if not self._model_calls_enabled():
+            # Owner decision 2026-11-09: helper-agent model calls are opt-in; the deterministic route decides.
+            logger.debug("orchestrator classifier skipped (model calls not enabled); deterministic fallback decides")
+            return {"classification": {}}
         loop = asyncio.get_event_loop()
         try:
             classification = await loop.run_in_executor(

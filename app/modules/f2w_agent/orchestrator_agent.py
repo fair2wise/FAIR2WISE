@@ -31,6 +31,7 @@ from ..agent_runtime.routing import (
     fresh_turn_decision,
     validate_decision,
 )
+from ..model_policy import helper_model_calls_enabled
 from .admitted_chat import legacy_admitted_chat
 from .retrieval_agent import _is_ops_layout_question
 from .trace import bind_context, note_error, note_precheck
@@ -69,6 +70,7 @@ class WorkflowOrchestratorAgent:
             classifier=lambda turn, state: self._llm_classify(turn, state),  # looked up per call (tests replace it)
             hooks=HOOKS,
             max_steps=self.max_steps,
+            model_calls_enabled=helper_model_calls_enabled,  # opt-in (F2W_HELPER_AGENT_LLM), default off
         )
 
     def _safe_fallback(self, user_turn: str, state: dict[str, Any], route_hint: str | None) -> dict[str, Any]:

@@ -66,10 +66,15 @@ class KgLibrary:
         return {"schemas": [{k: v for k, v in s.items() if k != "path"} for s in list_schemas(self._registry())]}
 
     def models(self, *, refresh: bool = False) -> dict[str, Any]:
-        """The live model list for extraction; ``available=false`` without a backend. Never writes settings."""
+        """The free models of the live list (model policy); ``available=false`` without a backend. Never writes settings."""
+        from ..model_policy import load_policy
+
         listing = self.catalog.get(refresh=refresh)
-        return {"available": bool(listing.available), "models": list(listing.models), "source": listing.source,
-                "error": listing.error, "backend": listing.backend}
+        policy = load_policy()
+        # Free-model policy (owner decision 2026-11-09): the picker offers only the free ids of the live list.
+        models = policy.filter(listing.models, listing) if listing.available else []
+        return {"available": bool(listing.available), "models": models, "source": listing.source,
+                "error": listing.error, "backend": listing.backend, "model_policy": policy.describe()}
 
     # -------------------------------------------------------------- estimate
     def _facts(self, paper_ids: list[str]) -> list[PaperFacts]:

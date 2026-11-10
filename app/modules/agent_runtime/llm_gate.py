@@ -35,6 +35,10 @@ class LlmBudgetRefused(LlmCallRefused):
     """The curation budget would be exceeded; the call was not made."""
 
 
+class LlmModelRefused(LlmCallRefused):
+    """The model is refused by the injected model policy (not a free model); the call was not made."""
+
+
 class ChatClientPort(Protocol):
     """The synchronous single-prompt client the F2W chat clients implement."""
 
@@ -79,8 +83,11 @@ class AdmittedChat:
         admission: Required; ``None`` is rejected (no call without admission).
         run_with_deadline: Deadline helper; required.
         budget: Optional budget port. Without one the call is admitted but not cost-counted.
-        local: A local model is never reserved (it is not billed).
+        local: A local model is never reserved (it is not billed) and never checked by ``model_check``.
         admission_key: Provider key for the admission slot.
+        model_check: Injected policy for remote models (``app.modules.model_policy.require_free_cborg_model``
+            in the legacy wiring): called with the model id before the reservation; whatever it raises is
+            re-raised as :class:`LlmModelRefused` and nothing else happens (no slot, no client, no call).
     """
 
     def __init__(
@@ -93,6 +100,7 @@ class AdmittedChat:
         budget: BudgetPort | None = None,
         local: bool = False,
         admission_key: str = AGENT_ADMISSION_KEY,
+        model_check: Callable[[str], object] | None = None,
     ) -> None:
         if admission is None or not (callable(getattr(admission, "slot", None))):
             raise TypeError("an admission with slot(provider) is required; LLM calls are never made without one")
@@ -103,15 +111,22 @@ class AdmittedChat:
         self._budget = budget
         self._local = local
         self._key = admission_key
+        self._model_check = model_check
 
     def complete(self, prompt: str, *, timeout: int, label: str, temperature: float = 0.0) -> str:
         """Return the model's reply.
 
         Raises:
+            LlmModelRefused: The model policy refused the model (no reservation, no call was made).
             LlmBudgetRefused: A cap would be exceeded (no call was made).
             TimeoutError: The deadline passed (the reservation stays charged as unknown).
             Exception: Whatever the client raised, after settlement.
         """
+        if self._model_check is not None and not self._local:
+            try:
+                self._model_check(self._model)
+            except Exception as exc:
+                raise LlmModelRefused(f"LLM call '{label}' refused: {exc}") from exc
         reservation: str | None = None
         if self._budget is not None and not self._local:
             reservation = self._budget.reserve(model=self._model, label=label)
@@ -144,4 +159,4 @@ class AdmittedChat:
 
 
 __all__ = ("AGENT_ADMISSION_KEY", "AdmittedChat", "BudgetPort", "ChatClientPort", "DeadlineRunner",
-           "LlmBudgetRefused", "LlmCallRefused")
+           "LlmBudgetRefused", "LlmCallRefused", "LlmModelRefused")

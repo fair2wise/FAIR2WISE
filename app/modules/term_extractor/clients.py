@@ -17,6 +17,7 @@ from ..cborg_http import (
 )
 from ..cborg_limiter import sync_slot
 from ..f2w_agent.trace import record_llm_call
+from ..model_policy import require_free_cborg_model
 
 logger = logging.getLogger(__name__)
 
@@ -115,11 +116,15 @@ class CBorgChatClient(ChatClient):
     """OpenAI-compatible CBORG client for https://api.cborg.lbl.gov.
 
     Env: CBORG_API_KEY, CBORG_BASE_URL
+
+    Raises:
+        ModelPolicyError: ``model`` is not a free LBL-hosted model (owner decision 2026-11-09); checked
+            before the key is read and before any client exists, so no request can be made with it.
     """
 
     def __init__(self, model: str, api_key: str | None = None, base_url: str | None = None):
         import os
-        self.model = model
+        self.model = require_free_cborg_model(model, context="CBORG chat client")
         self.client = openai.OpenAI(
             api_key=require_cborg_api_key(api_key),
             base_url=(base_url or os.environ.get("CBORG_BASE_URL") or "https://api.cborg.lbl.gov").rstrip("/"),

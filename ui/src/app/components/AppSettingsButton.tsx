@@ -590,11 +590,19 @@ export function AppSettingsButton({
                   CBORG model
                 </Label>
                 {availableCborgModels.length > 0 ? (
-                  <CborgModelPicker
-                    value={draftSettings.model}
-                    disabled={loading || saving}
-                    onOpenPicker={() => setCborgPickerOpen(true)}
-                  />
+                  <>
+                    <CborgModelPicker
+                      value={draftSettings.model}
+                      disabled={loading || saving}
+                      onOpenPicker={() => setCborgPickerOpen(true)}
+                    />
+                    <FreeModelNotice
+                      model={draftSettings.model}
+                      allowed={availableCborgModels}
+                      fallback={availableCborgModels[0]}
+                      role="chat model"
+                    />
+                  </>
                 ) : (
                   <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                     {loading ? 'Loading CBORG models…' : 'No CBORG models configured.'}
@@ -875,6 +883,8 @@ export function AppSettingsButton({
   );
 }
 
-// O-U2 judge-model picker. Imported last so the frozen-contract line references above stay
-// unchanged (tests/contracts/legacy_ui pins line numbers in this file); ES imports are hoisted.
+// O-U2 judge-model picker and the free-model notice (owner decision 2026-11-09). Imported last so the
+// frozen-contract line references above stay unchanged (tests/contracts/legacy_ui pins line numbers in
+// this file); ES imports are hoisted.
 import { JudgeModelSetting } from './JudgeModelSetting';
+import { FreeModelNotice } from './FreeModelNotice';

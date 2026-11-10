@@ -30,6 +30,7 @@ from ..curation.evidence import (
     fallback_decide,
     resolve_decision,
 )
+from ..model_policy import helper_model_calls_enabled
 from .admitted_chat import legacy_admitted_chat
 from .trace import bind_context, note_error
 
@@ -58,6 +59,7 @@ class EvidenceDebateAgent:
         self._debater = EvidenceDebater(
             asker=lambda q, probe, cands, rnd: self._ask(q, probe, cands, rnd),  # looked up per call
             hooks=HOOKS,
+            model_calls_enabled=helper_model_calls_enabled,  # opt-in (F2W_HELPER_AGENT_LLM), default off
         )
 
     def _fallback_decide(

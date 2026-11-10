@@ -284,6 +284,11 @@ class LibraryExtractor:
         """The ``library_extract`` stage body (see the module docstring)."""
         args = self.parse(ctx.inputs.params)
         backend = self.backend()
+        if backend["name"] == "cborg":
+            # Free-model policy (owner decision 2026-11-09): refused before the lock, the bundle or any client.
+            from ..model_policy import require_free_cborg_model
+
+            require_free_cborg_model(args["model"], context="library_extract model")
         root = self.service._require_root()  # noqa: SLF001 - one trusted package
         self.service.refresh(max_probe=0)  # hash new and changed files; no probe, no network
         rows = self.resolve_papers(args["papers"])

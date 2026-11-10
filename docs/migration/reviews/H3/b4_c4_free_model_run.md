@@ -4,6 +4,11 @@ Date: 2026-11-06. Authority: owner decision 2026-11-06 (thirteenth set, `owner_d
 
 ## Models (the only ids sent to CBORG)
 
+Policy since 2026-11-09 (seventeenth owner decision set): the three ids below are in the free-model
+allowlist (`app/modules/free_cborg_models.json`, enforced by `app/modules/model_policy.py` on every CBORG
+call path; see the mkdocs Configuration page, "Model policy"). Any other CBORG id is refused before a
+request is made, so a rerun of this experiment cannot use a paid model by accident.
+
 | Role | Model id |
 |---|---|
 | Model under test (did the extraction) | `lbl/cborg-chat` |

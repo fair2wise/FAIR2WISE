@@ -28,8 +28,9 @@ from modules.legacy.extract_terms_cli import run_extraction
 # The repo .env is loaded by the __main__ block below through app.modules.dotenv_entry
 # (F2W_DOTENV governs it; AUD-02). Importing this module never loads a dotenv file.
 
+# Only free LBL-hosted CBORG models (owner decision 2026-11-09; app/modules/model_policy.py refuses others).
 EVALUATION_MODELS = [
-    "google/gemini-flash-lite",
+    "lbl/cborg-chat",
 ]
 
 # Checkpoint folders (incremental buckets of 25 papers)

@@ -150,6 +150,10 @@ packages = [
 ]
 include-package-data = false
 
+[tool.setuptools.package-data]
+# The free-model policy allowlist (app/modules/model_policy.py) is data the owner edits; it ships with the package.
+"f2w.modules" = ["free_cborg_models.json"]
+
 # T27 code-quality closure (docs/migration/reviews/H7/sniff_findings.md). The tools are pinned in
 # pixi.lock (pixi feature `quality`) and run by the `python-quality` job of forge-merge-ci.yml, which only
 # reports (counts per rule, per module) until the findings are cleared; none of this alters runtime
