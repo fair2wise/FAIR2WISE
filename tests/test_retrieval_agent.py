@@ -78,6 +78,7 @@ def test_query_no_evidence_skips_context_and_llm(monkeypatch):
 
 
 def test_query_judge_error_returns_insufficient(monkeypatch):
+    monkeypatch.setenv("F2W_QA_OFFLINE_FALLBACK", "0")
     agent = RetrievalAgent(graph_source="json")
     agent._kg = FakeKG(direct_evidence=True)
 

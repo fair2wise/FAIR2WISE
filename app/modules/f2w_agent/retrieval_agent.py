@@ -9,9 +9,10 @@ numeric measurement claims still need explicit slots or snippets.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 import json
 import logging
+import os
 from pathlib import Path
 import re
 from types import SimpleNamespace
@@ -290,6 +291,89 @@ def _parse_judge(raw: str) -> dict[str, Any]:
                 obj["sufficient"] = False
             return obj
     return {"sufficient": False, "answer": None, "missing_topics": [], "raw": raw}
+
+
+#: Words that carry no topic: a question made only of these (plus words no retrieved node mentions) is off-domain.
+_OFF_DOMAIN_STOPWORDS = frozenset(
+    "the and for are was were what which who whom whose when where why how does did doing done have has had "
+    "can could would should will shall may might must tell explain describe discuss discussed discusses list "
+    "show give find about with from into onto this that these those there their them they you your our "
+    "any some most more much many other another please also than then its not but all one two out use used "
+    "using knowledge graph graphs kg question questions answer today".split()
+)
+
+
+def _off_domain(question: str, hits: Sequence[ScoredHit], graphs: dict[str, Any], *, limit: int = 300) -> bool:
+    """True when no topic word of ``question`` occurs in the name, description or category of any retrieved node.
+
+    The lexical backend scores every node that shares any query word, including "the" or "what", so an
+    unrelated question still retrieves hundreds of nodes. This is the deterministic check that none of them is
+    about the question. Questions with no topic word (follow-ups such as "tell me more"), hits from the live
+    Tiled graph and experiment-identity questions are never reported here (the Tiled path owns them); an empty hit
+    list with a topic word is off-domain.
+    """
+    topic = {t for t in re.findall(r"[a-z0-9]{3,}", str(question or "").lower()) if t not in _OFF_DOMAIN_STOPWORDS}
+    if not topic or is_experiment_identity_question(question) or any(hit.graph_id == TILED_GRAPH_ID for hit in hits):
+        return False
+    if not hits:
+        return True
+    words: set[str] = set()
+    for hit in hits[:limit]:
+        raw = (getattr(graphs.get(hit.graph_id), "nodes", None) or {}).get(hit.id) or {}
+        parts = [hit.id, hit.name, hit.category]
+        if isinstance(raw, dict):
+            parts += [str(raw.get(key) or "") for key in ("name", "description", "category", "paper_title")]
+        words.update(re.findall(r"[a-z0-9]{3,}", " ".join(str(part) for part in parts).lower()))
+    if not words:
+        return False  # hits carry no text at all: nothing to compare
+    prefixes = {w[:5] for w in words if len(w) >= 5}
+    return not any(t in words or (len(t) >= 5 and t[:5] in prefixes) for t in topic)
+
+
+def describe_llm_failure(exc: BaseException) -> str:
+    """One user-presentable sentence for a failed model call (HTTP status errors are not shown raw)."""
+    status = getattr(exc, "status_code", None)
+    if status == 403:
+        return (
+            "The language model service refused the request (HTTP 403). CBORG answers only from the LBL "
+            "network or VPN; check the connection and ask again."
+        )
+    if status == 429:
+        return "The language model service is rate limited (HTTP 429); wait a minute and ask again."
+    if isinstance(status, int):
+        return f"The language model service returned HTTP {status}; ask again in a moment."
+    return str(exc)
+
+
+OFFLINE_FALLBACK_ENV = "F2W_QA_OFFLINE_FALLBACK"
+OFFLINE_ANSWER_LABEL = "Answered without a language model"
+
+
+def offline_fallback_enabled(environ: Mapping[str, str] | None = None) -> bool:
+    """True unless ``F2W_QA_OFFLINE_FALLBACK`` is ``0``/``false``/``no``/``off`` (default on)."""
+    env = os.environ if environ is None else environ
+    return (env.get(OFFLINE_FALLBACK_ENV) or "").strip().lower() not in {"0", "false", "no", "off"}
+
+
+def offline_answer(hits: Sequence[ScoredHit], graphs: dict[str, Any], reason: str, *, limit: int = 5) -> str:
+    """Retrieval-only answer: the best-matching nodes with their descriptions and ``[KG: graph: name]`` citations.
+
+    Used when the model call fails; the first line says plainly that no language model wrote it.
+    """
+    lines = [
+        f"**{OFFLINE_ANSWER_LABEL}** ({reason}) These are the best-matching knowledge graph entries, "
+        "not a synthesized answer:",
+        "",
+    ]
+    for hit in hits[:limit]:
+        raw = (getattr(graphs.get(hit.graph_id), "nodes", None) or {}).get(hit.id) or {}
+        raw = raw if isinstance(raw, dict) else {}
+        name = str(hit.name or raw.get("name") or hit.id)
+        text = " ".join(str(raw.get("description") or raw.get("abstract_text") or raw.get("paper_title") or "").split())
+        category = f" ({hit.category})" if hit.category else ""
+        detail = f": {text[:220]}{'...' if len(text) > 220 else ''}" if text else ""
+        lines.append(f"- [KG: {hit.graph_id}: {name}]{category}{detail}")
+    return "\n".join(lines)
 
 
 def _has_direct_evidence(kg: object, node_info: object) -> bool:
@@ -614,8 +698,8 @@ class RetrievalAgent(Agent):
         result = self._active_graphs()
         if not result:
             raise RuntimeError(
-                "No knowledge graphs loaded; cannot answer questions. "
-                "Check graph file paths and logs above."
+                "No knowledge graphs loaded; publish or adopt a corpus (or pick a graph in Settings), "
+                "then ask again."
             )
         return result
 
@@ -1301,7 +1385,8 @@ class RetrievalAgent(Agent):
         conceptual = _is_conceptual_question(question)
         numeric = _is_numeric_claim(question)
         has_mp = bool(mp_context.strip())
-        no_evidence = (
+        off_domain = chunk_count == 0 and not has_mp and _off_domain(question, hits, graphs)
+        no_evidence = off_domain or (
             len(selected) == 0 and chunk_count == 0 and not has_mp
         ) or (
             direct_evidence_count == 0 and chunk_count == 0 and not conceptual and not has_mp
@@ -1332,9 +1417,10 @@ class RetrievalAgent(Agent):
                 "sufficient": False,
                 "answer": None,
                 "missing_topics": [question],
-                "selected": selected,
-                "selected_hits": selected_hits,
+                "selected": [] if off_domain else selected,
+                "selected_hits": [] if off_domain else selected_hits,
                 "no_evidence": True,
+                "off_domain": off_domain,
                 "direct_evidence_count": 0,
                 **meta,
                 **hybrid_meta,
@@ -1392,6 +1478,26 @@ class RetrievalAgent(Agent):
         except Exception as exc:
             logger.warning("Retrieval judge failed for %r: %s", question, exc)
             note_error("RetrievalAgent.query.judge", exc)
+            if hits and offline_fallback_enabled():
+                reason = describe_llm_failure(exc)
+                self._publish_retrieval_trace(
+                    question, hits=hits, meta=meta, hybrid_meta=hybrid_meta, sufficient=True, no_evidence=False,
+                    direct_evidence_count=direct_evidence_count, missing_topics=[],
+                )
+                return {
+                    "status": "success",
+                    "question": question,
+                    "sufficient": True,
+                    "answer": offline_answer(hits, graphs, reason),
+                    "missing_topics": [],
+                    "selected": selected,
+                    "selected_hits": selected_hits,
+                    "no_evidence": False,
+                    "offline_fallback": True,
+                    "direct_evidence_count": direct_evidence_count,
+                    **meta,
+                    **hybrid_meta,
+                }
             self._publish_retrieval_trace(
                 question,
                 hits=hits,
@@ -1412,7 +1518,7 @@ class RetrievalAgent(Agent):
                 "selected_hits": selected_hits,
                 "no_evidence": False,
                 "direct_evidence_count": direct_evidence_count,
-                "error": str(exc),
+                "error": describe_llm_failure(exc),
                 **meta,
                 **hybrid_meta,
             }

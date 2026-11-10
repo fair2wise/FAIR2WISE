@@ -1969,6 +1969,12 @@ def _extraction_outcome_text(result: dict[str, Any]) -> str:
     return "Extraction completed: " + "; ".join(parts) + "."
 
 
+KG_NO_INFORMATION_ANSWER = (
+    "The knowledge graph has no information on this question. It covers the loaded corpora only, and "
+    "none of the retrieved nodes mention what you asked about. Try a question about those topics, or ask me "
+    "to find papers on the subject."
+)
+
 JSON_GRAPH_NO_EVIDENCE_REFUSAL = (
     "The selected JSON graph did not contain enough direct evidence to answer this question."
 )
@@ -2204,6 +2210,8 @@ def _json_graph_search_missing_topics(question: str, verdict: dict[str, Any]) ->
 
 def _json_graph_should_search_candidates(question: str, verdict: dict[str, Any]) -> bool:
     """JSON mode offers paper ingest unless on-topic nodes actually answer the ask."""
+    if verdict.get("offline_fallback"):
+        return False  # a retrieval-only answer stands; no paper search while the model is unreachable
     if verdict.get("operation"):
         return False  # D3.16: a knowledge-operation figure answered the turn; no retrieval to supplement
     if _json_graph_wants_paper_ingest(question):
@@ -5597,6 +5605,19 @@ class AgentPipelineService:
                 return self._response(
                     "retrieval_error",
                     f"Retrieval failed: {verdict.get('error') or verdict.get('status')}",
+                    False,
+                    verdict,
+                    rounds,
+                    active_graph_path,
+                )
+
+            if verdict.get("off_domain") and not _direct_download_request(question):
+                # No retrieved node mentions any topic word of the question: say so, never improvise an answer
+                # from unrelated nodes and never offer unrelated papers.
+                self.workflow.update(phase="stop_insufficient")
+                return self._response(
+                    "stop_insufficient",
+                    KG_NO_INFORMATION_ANSWER,
                     False,
                     verdict,
                     rounds,
