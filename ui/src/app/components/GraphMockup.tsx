@@ -39,6 +39,19 @@ import {
 } from './data/liveAgent';
 import { getNodeColor, isUnknownNodeCategory, SCHEMA_NODE_CLASSES } from './kgNodeColors';
 import {
+  capNeighborhood,
+  clampOverviewStep,
+  forceLayoutAllowed,
+  isLargeGraph,
+  nextOverviewStep,
+  overviewIsSlow,
+  overviewStepLabel,
+  overviewOptions,
+  overviewSelection,
+  OVERVIEW_DEFAULT_NODES,
+  SLOW_LAYOUT_NODE_LIMIT,
+} from './largeGraphPolicy';
+import {
   collectNodeSourceLinks,
   graphDisplayName,
   isLiteraturePublication,
@@ -1615,9 +1628,12 @@ const CITED_SCALE = 1.35;
 function LayoutModeSwitcher({
   value,
   onChange,
+  forceDisabled = false,
 }: {
   value: KgLayoutMode;
   onChange: (mode: KgLayoutMode) => void;
+  /** Force-directed layout is unavailable (too many nodes shown). */
+  forceDisabled?: boolean;
 }) {
   const buttonClass = (active: boolean) =>
     `h-8 whitespace-nowrap rounded px-3 text-xs font-medium transition ${
@@ -1645,7 +1661,11 @@ function LayoutModeSwitcher({
         type="button"
         aria-label="Force-directed"
         aria-pressed={value === 'force'}
-        className={buttonClass(value === 'force')}
+        disabled={forceDisabled}
+        title={forceDisabled
+          ? `Force-directed layout is disabled above ${SLOW_LAYOUT_NODE_LIMIT.toLocaleString('en-US')} nodes: show fewer nodes or focus a node`
+          : undefined}
+        className={`${buttonClass(value === 'force')} ${forceDisabled ? 'cursor-not-allowed opacity-50' : ''}`}
         onClick={() => onChange('force')}
       >
         Force-directed
@@ -1684,7 +1704,10 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
   // The source whose catalog the KG viewer shows; chat mode always reads the default graph.
   const viewerSource = isKgViewer ? graphSourceFromPath(graph.source_path) : null;
   const [drag, setDrag] = useState<DragState | null>(null);
-  const [layoutMode, setLayoutMode] = useState<KgLayoutMode>('existing');
+  const [requestedLayout, setLayoutMode] = useState<KgLayoutMode>('existing');
+  // Large-graph overview (largeGraphPolicy.ts): the step the viewer shows and whether Unknown placeholders are in it.
+  const [overviewStep, setOverviewStep] = useState<number>(OVERVIEW_DEFAULT_NODES);
+  const [includeUnknown, setIncludeUnknown] = useState(false);
   const [hideWeak, setHideWeak] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1729,7 +1752,19 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
     [highlightedNodeIds, resolvedFocusId],
   );
   const cited = useMemo(() => new Set(citedNodeIds), [citedNodeIds]);
-  const displayGraph = useMemo<GraphPayload>(() => {
+  const largeCatalog = isKgViewer && isLargeGraph(catalogGraph.nodes.length);
+  const unknownCount = useMemo(
+    () => (largeCatalog ? catalogGraph.nodes.filter(node => isUnknownNodeCategory(node.type)).length : 0),
+    [catalogGraph.nodes, largeCatalog],
+  );
+  const eligibleCount = catalogGraph.nodes.length - (includeUnknown ? 0 : unknownCount);
+  const effectiveStep = clampOverviewStep(overviewStep, eligibleCount);
+  const overviewActive = largeCatalog && !activeFocusId && highlightedNodeIds.length === 0;
+  const overview = useMemo(
+    () => (largeCatalog ? overviewSelection(catalogGraph, effectiveStep, { includeUnknown }) : null),
+    [catalogGraph, effectiveStep, includeUnknown, largeCatalog],
+  );
+  const display = useMemo<{ graph: GraphPayload; cap: { shown: number; total: number } | null }>(() => {
     if (activeFocusId) {
       const mergedFocus = retrievedGraph && tiledFocusGraph
         ? mergeGraphPayloads(tiledFocusGraph, retrievedGraph)
@@ -1766,29 +1801,38 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
             type: 'Entity',
             description: '',
           };
-        return { nodes: [stub], edges: [], source_path: source.source_path };
+        return { graph: { nodes: [stub], edges: [], source_path: source.source_path }, cap: null };
       }
-      return {
+      const focused: GraphPayload = {
         nodes,
         edges: neighborhood.edges.filter(edge => visible.has(edge.source) && visible.has(edge.target)),
         source_path: neighborhood.source_path,
       };
+      // A neighbourhood read out of a large catalog is capped like the server route (FOCUS_NEIGHBORHOOD_MAX_NODES).
+      if (!tiledFocus && isLargeGraph(source.nodes.length)) {
+        const capped = capNeighborhood(focused, seedId);
+        return { graph: capped.graph, cap: capped.truncated ? { shown: capped.graph.nodes.length, total: capped.total } : null };
+      }
+      return { graph: focused, cap: null };
     }
     if (highlightedNodeIds.length > 0) {
       if (retrievedGraph && retrievedGraph.nodes.length > 0) {
-        return retrievedGraph;
+        return { graph: retrievedGraph, cap: null };
       }
-      return inducedSubgraph(catalogGraph, highlightedNodeIds);
+      return { graph: inducedSubgraph(catalogGraph, highlightedNodeIds), cap: null };
     }
     if (isKgViewer) {
-      if (kgViewerNodeLimit === 'all') return catalogGraph;
-      return connectedGraphSubset(
-        catalogGraph,
-        kgViewerNodeLimit,
-      );
+      // Large graph: the overview replaces "All" (largeGraphPolicy.ts).
+      if (overviewActive && overview) return { graph: overview.graph, cap: null };
+      if (kgViewerNodeLimit === 'all') return { graph: catalogGraph, cap: null };
+      return { graph: connectedGraphSubset(catalogGraph, kgViewerNodeLimit), cap: null };
     }
-    return { nodes: [], edges: [], source_path: catalogGraph.source_path };
-  }, [activeFocusHops, activeFocusId, catalogGraph, focusedHops, graph, highlightedNodeIds, isKgViewer, kgViewerNodeLimit, resolvedFocusId, retrievedGraph, searchedNodeId, tiledFocus, tiledFocusGraph]);
+    return { graph: { nodes: [], edges: [], source_path: catalogGraph.source_path }, cap: null };
+  }, [activeFocusHops, activeFocusId, catalogGraph, focusedHops, graph, highlightedNodeIds, isKgViewer, kgViewerNodeLimit, overview, overviewActive, resolvedFocusId, retrievedGraph, searchedNodeId, tiledFocus, tiledFocusGraph]);
+  const displayGraph = display.graph;
+  // Force-directed layout is offered only up to SLOW_LAYOUT_NODE_LIMIT displayed nodes; above it the fixed layout is used.
+  const forceAllowed = forceLayoutAllowed(displayGraph.nodes.length);
+  const layoutMode: KgLayoutMode = requestedLayout === 'force' && !forceAllowed ? 'existing' : requestedLayout;
   const layout = useMemo(
     () => (layoutMode === 'force' ? { nodes: [] as LayoutNode[], width: W, height: H } : layoutGraph(displayGraph)),
     [displayGraph, layoutMode],
@@ -1860,6 +1904,12 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
       cancelled = true;
     };
   }, [activeFocusId, retrievedGraph, tiledFocus, tiledFocusGraph]);
+
+  useEffect(() => {
+    // A different graph (source) starts again at the first overview.
+    setOverviewStep(OVERVIEW_DEFAULT_NODES);
+    setIncludeUnknown(false);
+  }, [graph.source_path]);
 
   useEffect(() => {
     if (citeFocusNodeId) return;
@@ -2123,7 +2173,24 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
     return presets;
   }, [kgViewerNodeLimit]);
 
-  const kgViewerLimitControl = isKgViewer && onKgViewerNodeLimitChange ? (
+  const largeOptions = largeCatalog ? overviewOptions(eligibleCount) : [];
+  const kgViewerLimitControl = largeCatalog ? (
+    <label className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-500">
+      Nodes
+      <select
+        aria-label="Nodes to render"
+        title="Nodes to render"
+        data-kg-large="true"
+        value={effectiveStep}
+        onChange={event => setOverviewStep(Number(event.target.value))}
+        className="bg-transparent text-sm font-medium text-slate-700 outline-none"
+      >
+        {largeOptions.map(option => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+    </label>
+  ) : isKgViewer && onKgViewerNodeLimitChange ? (
     <label className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-500">
       Nodes
       <select
@@ -2150,6 +2217,7 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
   const layoutModeSwitcher = (
     <LayoutModeSwitcher
       value={layoutMode}
+      forceDisabled={!forceAllowed}
       onChange={mode => {
         setLayoutMode(mode);
         setHideWeak(false);
@@ -2168,6 +2236,64 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
           {id}
         </span>
       ))}
+    </div>
+  ) : null;
+
+  const overviewShown = overview?.shown ?? 0;
+  const nextStep = nextOverviewStep(effectiveStep);
+  const stepFits = nextStep !== null && effectiveStep < eligibleCount;
+  const largeGraphBanner = largeCatalog && overviewActive && overview ? (
+    <div
+      role="status"
+      data-testid="kg-overview-banner"
+      className="relative z-20 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-sky-100 bg-sky-50/95 px-4 py-1.5 text-[11px] text-sky-900"
+    >
+      <span>
+        {overviewShown >= eligibleCount
+          ? `Showing all ${overviewShown.toLocaleString('en-US')} of ${overview.total.toLocaleString('en-US')} nodes.`
+          : `Showing the ${overviewShown.toLocaleString('en-US')} most connected of ${overview.total.toLocaleString('en-US')} nodes: search or focus a node to explore, or show more.`}
+        {overview.unknownHidden > 0
+          ? ` ${overview.unknownHidden.toLocaleString('en-US')} Unknown placeholder nodes are hidden.`
+          : ''}
+      </span>
+      {stepFits ? (
+        <button
+          type="button"
+          data-testid="kg-overview-show-more"
+          className="rounded border border-sky-300 bg-white px-2 py-0.5 font-semibold text-sky-700 hover:bg-sky-100"
+          onClick={() => setOverviewStep(Math.min(nextStep as number, eligibleCount))}
+        >
+          Show more ({overviewStepLabel(Math.min(nextStep as number, eligibleCount))})
+        </button>
+      ) : null}
+      {unknownCount > 0 ? (
+        <label className="inline-flex items-center gap-1">
+          <input
+            type="checkbox"
+            data-testid="kg-overview-include-unknown"
+            checked={includeUnknown}
+            onChange={event => setIncludeUnknown(event.target.checked)}
+          />
+          Include Unknown placeholders
+        </label>
+      ) : null}
+      {overviewIsSlow(overviewShown) ? (
+        <span data-testid="kg-overview-slow-warning" className="font-medium text-amber-800">
+          Above {SLOW_LAYOUT_NODE_LIMIT.toLocaleString('en-US')} nodes the layout will be slow; force-directed layout is disabled (fixed layout only).
+        </span>
+      ) : null}
+    </div>
+  ) : largeCatalog && !overviewActive && searchedNodeId && !citeFocusNodeId ? (
+    <div className="relative z-20 flex shrink-0 items-center gap-3 border-b border-sky-100 bg-sky-50/95 px-4 py-1.5 text-[11px] text-sky-900">
+      <span>Showing the neighbourhood of the selected node.</span>
+      <button
+        type="button"
+        data-testid="kg-overview-back"
+        className="rounded border border-sky-300 bg-white px-2 py-0.5 font-semibold text-sky-700 hover:bg-sky-100"
+        onClick={() => setSearchedNodeId(null)}
+      >
+        Back to overview
+      </button>
     </div>
   ) : null;
 
@@ -2250,6 +2376,8 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
         data-cite-focus-id={resolvedFocusId || activeFocusId || ''}
         data-kg-node-count={String(displayGraph.nodes.length)}
         data-kg-edge-count={String(displayGraph.edges.length)}
+        data-kg-total-nodes={String(catalogGraph.nodes.length)}
+        data-kg-overview={overviewActive ? 'true' : 'false'}
         data-kg-layout={layoutMode}
       >
       <svg className="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
@@ -2273,7 +2401,10 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
                 style={{ background: '#0ea5e9', boxShadow: '0 0 6px #0ea5e9' }}
               />
               <span className="text-xs" style={{ color: 'rgba(0,0,0,0.45)' }}>
-                <span style={{ color: '#0ea5e9' }}>{displayGraph.nodes.length}</span> nodes
+                <span style={{ color: '#0ea5e9' }}>
+                  {overviewActive && overview ? overview.shown.toLocaleString('en-US') : displayGraph.nodes.length}
+                </span>
+                {overviewActive && overview ? ` of ${overview.total.toLocaleString('en-US')}` : ''} nodes
                 {citeFocusNodeId ? ' · 3-hop focus' : ''}
                 {tiledFocusLoading ? ' · loading neighbors' : ''}
               </span>
@@ -2288,6 +2419,15 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
                 >
                   Neighbourhood limited to {tiledFocusGraph.nodes.length.toLocaleString()} nodes;{' '}
                   {tiledFocusGraph.nodes.length.toLocaleString()}+ nodes match
+                </span>
+              ) : display.cap ? (
+                <span
+                  role="status"
+                  data-testid="graph-neighborhood-truncated"
+                  className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-800"
+                >
+                  Neighbourhood limited to {display.cap.shown.toLocaleString()} nodes;{' '}
+                  {display.cap.total.toLocaleString()} nodes match
                 </span>
               ) : null}
             </div>
@@ -2343,6 +2483,8 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
         </div>
       </div>
 
+      {largeGraphBanner}
+
       <div className="relative z-10 min-h-0 flex-1">
         <ResizablePanelGroup direction="vertical">
           <ResizablePanel defaultSize={45} minSize={30}>
@@ -2375,14 +2517,20 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
                     <span>
                       <strong>{nodes.length.toLocaleString()} nodes</strong> — SVG layout may lag at this scale.
                     </span>
-                    <button
-                      type="button"
-                      className="font-semibold underline hover:text-amber-900"
-                      onClick={() => setLayoutMode('force')}
-                    >
-                      Switch to Force layout
-                    </button>
-                    <span className="text-amber-600">(Canvas · handles 10k+ nodes)</span>
+                    {forceAllowed ? (
+                      <>
+                        <button
+                          type="button"
+                          className="font-semibold underline hover:text-amber-900"
+                          onClick={() => setLayoutMode('force')}
+                        >
+                          Switch to Force layout
+                        </button>
+                        <span className="text-amber-600">(Canvas · handles 10k+ nodes)</span>
+                      </>
+                    ) : (
+                      <span className="text-amber-600">Force-directed layout is disabled at this size.</span>
+                    )}
                   </div>
                 </div>
               )}

@@ -57,10 +57,40 @@ to the previously retrieved or viewer graph.
 Select **KG Viewer** for a full-width graph. Select **Agent KG Viewer** to
 return to the resizable chat/graph layout.
 
-The node control offers **All** and 10-node increments through 100; the default
-is 100. Limited views choose a deterministic, connected-first subset beginning
+The node control offers **All**, 10-node increments through 100, 1,000 and
+10,000; the default is **All** (graphs above 1,500 nodes behave differently, see
+[Large graphs](#large-graphs)). Limited views choose a deterministic, connected-first subset beginning
 with high-degree nodes and then continue across disconnected components. The
 edge set is induced from the selected nodes.
+
+#### Large graphs
+
+A graph of more than 1,500 nodes (the two demo graphs: the RSoXS KG with 22,012
+nodes and the 580-paper OPV KG with 15,815) never opens on **All**. Drawing the
+whole graph used to block the browser tab for tens of seconds, so the viewer
+opens on an **overview** instead:
+
+- The overview is the 300 most connected nodes (degree counted among the shown
+  candidates, ties by label) with the edges between them. A banner says
+  "Showing the 300 most connected of 22,012 nodes: search or focus a node to
+  explore, or show more", and the header reads "300 of 22,012 nodes".
+- `Unknown` placeholder nodes, which paper-derived graphs use as the target of
+  most edges, are hidden by default. The banner says how many are hidden, and
+  **Include Unknown placeholders** brings them back.
+- **Show more** steps the overview 300, 1,000, 2,000 and 5,000. The **Nodes**
+  control lists the same sizes and always matches the banner. Sizes above 2,000
+  are marked "(slow)": the banner warns that the layout will be slow and
+  **Force-directed** is disabled (fixed layout only) above 2,000 displayed
+  nodes. Expect several seconds for 2,000 nodes and much longer for 5,000.
+- **Search nodes** still covers every node of the source, not only the overview.
+  Choosing a result shows that node's neighbourhood. A neighbourhood read out of
+  a large graph is capped at 500 nodes (the node plus the most connected others),
+  with the notice "Neighbourhood limited to 500 nodes; N nodes match" (the same
+  cap as `GET /graph/neighborhood/{id}`). **Back to overview** returns.
+- Choosing another graph source starts again at the 300-node overview.
+
+Graphs of 1,500 nodes or fewer, including every current demo graph of 268 to 421
+nodes, are unchanged: **Nodes** defaults to **All** and no banner appears.
 
 #### Graph source
 
@@ -239,6 +269,9 @@ classes such as `ConjugatedPolymer`, `PhotovoltaicCell`, `OFET`, and
 
 - Layout is memoized by the displayed graph subset.
 - Large viewer graphs use viewport culling.
+- Graphs above 1,500 nodes open on a 300-node overview, not on **All**
+  (see [Large graphs](#large-graphs)); id lookups on them use an index, so
+  focusing a node is immediate.
 - Limited viewer modes use connected subsets rather than arbitrary slicing.
 - Node-search neighborhoods avoid laying out the entire graph.
 - Streaming updates deduplicate nodes by ID and edges by
