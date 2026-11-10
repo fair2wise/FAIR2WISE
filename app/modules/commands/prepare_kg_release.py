@@ -168,8 +168,12 @@ def cmd_export(args: argparse.Namespace) -> int:
         raise ReleaseRefused("record_invalid", "not a T26A data-release descriptor")
     done: list[dict[str, Any]] = releases.export_snapshot_selection(
         args.repo.resolve(), str(descriptor.get("data_commit")), descriptor.get("artifacts") or [], args.dest)
+    graph = next((f["path"] for f in done if f["path"].endswith("/graph.json")), None)
+    record = str(releases.release_commit_path((Path(args.dest) / graph).parent).relative_to(Path(args.dest))) \
+        if graph else None
     output.info(json.dumps({"status": "exported", "release_id": descriptor.get("release_id"),
-                      "data_commit": descriptor.get("data_commit"), "files": done}, indent=2, sort_keys=True))
+                      "data_commit": descriptor.get("data_commit"), "files": done,
+                      "release_commit_record": record}, indent=2, sort_keys=True))
     return EXIT_OK
 
 

@@ -222,6 +222,24 @@ publication:
   refused with `CONFLICT` until the edit is reconciled or a reviewed resolution
   is attached (the import-time conflict block).
 
+### Reconciling edits into a new version
+
+A reconciled edit becomes part of the corpus's JSON, not just of Tiled. Two explicit steps, run in the container
+(no network, no model, nothing written to Tiled or Git); the journal is the one Save writes,
+`<ops-root>/publication-state/<target-slug>/<corpus-slug>/edits.jsonl`:
+
+1. `f2w-kg-snapshot --corpus <corpus> --reconcile-edits --parent <live vN> --storage-kg <workdir>/storage_kg
+   --state-dir <ops-root>/publication-state --target <tiled-url>` (or `--journal <file>`). It writes
+   `<workdir>/storage_kg/<corpus>/v<N+1>/` (graph, manifest with relation `edit_reconciliation`, validation
+   report) and the flat copy, prints the paths and sha256, and only then, after re-reading and hash-checking the
+   files, marks the edits `reconciled`.
+2. Commit the new version with the release tooling (`f2w-kg-release prepare`, `verify-committed`, then the printed
+   git commands), then `f2w-kg-snapshot --corpus <corpus> --confirm-commit <40-hex> --snapshot-id v<N+1> --repo
+   <repo> --storage-kg <workdir>/storage_kg --journal <file>` to record the commit on those edits.
+
+Publish `<corpus>/v<N+1>` as usual; the edits are inside its lineage, so the conflict block passes. A mount made by
+`f2w-kg-release export` carries `<vN>.release_commit.json`, so the receipt records the data commit.
+
 ## Accepted merge proposals (route V81)
 
 `POST /v1/curation/merges/apply` plans the accepted canonicalization proposals
