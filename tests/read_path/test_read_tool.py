@@ -167,6 +167,7 @@ def test_all_failure_and_empty_states_are_distinguishable_end_to_end():
 
 def test_provider_unavailability_from_the_real_agent_is_never_empty_or_ok(tmp_path, monkeypatch):
     install_fake_inference(monkeypatch, QuestionKeyedClient(fail=ConnectionError("cborg down")))
+    monkeypatch.setenv("F2W_QA_OFFLINE_FALLBACK", "0")  # the supervisor route reports the raw unavailability
     from app.modules.application import F2WApplication
 
     app = F2WApplication(settings=local_settings(), retrieval=retrieval_service([write_graph(tmp_path)]))

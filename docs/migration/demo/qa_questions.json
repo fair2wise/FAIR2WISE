@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "description": "Demo QA question set. answerable=false questions must still get a normal answer that opens with the italic sentence 'The knowledge graph has no information on this question.' (owner decision 2026-11-10). expected_node_ids are curated ids that the real lexical retriever (scripts/demo/qa_expected_nodes.py --check) returns within the first 40 hits under every PYTHONHASHSEED tried (the order of hits is not stable, so the probe tests membership, not rank). e2e_demo has no tracked graph (it was exported from the demo container), so it carries expected_terms only; pass its graph.json to qa_expected_nodes.py to curate node ids for it.",
+  "graph_files": [
+    "storage/kg/matkg_rsoxs_v1.json",
+    "storage/kg/matkg_bl1101_v4.json"
+  ],
+  "questions": [
+    {
+      "id": "e2e-laser-rsoxs",
+      "corpus": "e2e_demo",
+      "question": "What does the laser-driven resonant soft X-ray scattering work show about picosecond dynamics?",
+      "answerable": true,
+      "expected_node_ids": [],
+      "expected_terms": [
+        "laser",
+        "picosecond",
+        "resonant"
+      ]
+    },
+    {
+      "id": "e2e-ilgad-nk",
+      "corpus": "e2e_demo",
+      "question": "Which sensor was used to detect soft X-rays down to the nitrogen K-edge?",
+      "answerable": true,
+      "expected_node_ids": [],
+      "expected_terms": [
+        "ilgad",
+        "nitrogen",
+        "k-edge"
+      ]
+    },
+    {
+      "id": "e2e-cyclotron",
+      "corpus": "e2e_demo",
+      "question": "What cyclotron line energy was reported for the ultraluminous X-ray source NGC 4861 X-2?",
+      "answerable": true,
+      "expected_node_ids": [],
+      "expected_terms": [
+        "cyclotron",
+        "4861",
+        "1.89"
+      ]
+    },
+    {
+      "id": "e2e-submonolayer",
+      "corpus": "e2e_demo",
+      "question": "How are molecular states tracked at buried interfaces with sub-monolayer sensitivity?",
+      "answerable": true,
+      "expected_node_ids": [],
+      "expected_terms": [
+        "buried",
+        "interface",
+        "molecular"
+      ]
+    },
+    {
+      "id": "bl-epu-polarization",
+      "corpus": "bl1101",
+      "question": "Which motors control the EPU polarization at beamline 11.0.1.2?",
+      "answerable": true,
+      "expected_node_ids": [
+        "beamline:Motor-epu-polarization",
+        "beamline:AnalogInput-epu-polarization-ai"
+      ],
+      "expected_terms": [
+        "epu",
+        "polarization"
+      ]
+    },
+    {
+      "id": "bl-axis-sxr40",
+      "corpus": "bl1101",
+      "question": "How is the AXIS-SXR-40 detector connected in the 11.0.1.2 beamline?",
+      "answerable": true,
+      "expected_node_ids": [
+        "beamline:Detector-AXIS-SXR-40",
+        "beamline:Software-ADAxisSXR40",
+        "beamline:stage-Detector"
+      ],
+      "expected_terms": [
+        "axis",
+        "sxr"
+      ]
+    },
+    {
+      "id": "bl-bluesky",
+      "corpus": "bl1101",
+      "question": "What Bluesky software and plans exist for beamline 11.0.1.2?",
+      "answerable": true,
+      "expected_node_ids": [
+        "beamline:Software-Bluesky",
+        "beamline:doc-bl11012-bluesky-README"
+      ],
+      "expected_terms": [
+        "bluesky"
+      ]
+    },
+    {
+      "id": "rsoxs-polymer-films",
+      "corpus": "rsoxs_v1",
+      "question": "What is RSoXS used for in studying thin polymer films?",
+      "answerable": true,
+      "expected_node_ids": [
+        "matkg:thinpolymerfilms",
+        "beamline:Sample-polymer-thin-films"
+      ],
+      "expected_terms": [
+        "polymer",
+        "rsoxs"
+      ]
+    },
+    {
+      "id": "rsoxs-bhj-photovoltaics",
+      "corpus": "rsoxs_v1",
+      "question": "What do the papers say about bulk heterojunction photovoltaic thin films?",
+      "answerable": true,
+      "expected_node_ids": [
+        "matkg:BulkHeterojunctionPhotovoltaicThinFilms"
+      ],
+      "expected_terms": [
+        "heterojunction",
+        "photovoltaic"
+      ]
+    },
+    {
+      "id": "ooc-capital",
+      "corpus": "none",
+      "question": "What is the capital of France?",
+      "answerable": false,
+      "expected_node_ids": [],
+      "expected_terms": []
+    },
+    {
+      "id": "ooc-sourdough",
+      "corpus": "none",
+      "question": "How do I bake sourdough bread?",
+      "answerable": false,
+      "expected_node_ids": [],
+      "expected_terms": []
+    },
+    {
+      "id": "ooc-worldcup",
+      "corpus": "none",
+      "question": "Who won the football World Cup in 2022?",
+      "answerable": false,
+      "expected_node_ids": [],
+      "expected_terms": []
+    }
+  ],
+  "retrieval_rank_max": 40
+}
