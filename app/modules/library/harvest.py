@@ -36,9 +36,19 @@ import httpx
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..jobs.pipeline import StageContext, StageResult
+from ..literature.legacy_download import (
+    ARXIV_MIN_INTERVAL_SECONDS,
+    GetBytes,
+    GetJson,
+    arxiv_results,
+    hardened_get_bytes,
+    hardened_get_json,
+    openalex_api_key,
+    openalex_get,
+)
 from ..literature.safe_fetch import BlockedURL, NetworkPolicy
 from .arrange import is_valid_folder_name
-from .service import LibraryService
+from .service import LibraryService, VerifyUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -153,23 +163,31 @@ def arxiv_queries(topic: str) -> list[str]:
     return queries
 
 
-def arxiv_searcher() -> Searcher:
-    """A searcher over the pinned ``arxiv`` package (newest first, one polite request at a time)."""
-    def search(topic: str, per_query: int) -> list[Candidate]:
-        import arxiv
+def arxiv_searcher(*, get_bytes: GetBytes = hardened_get_bytes) -> Searcher:
+    """A searcher over the hardened arXiv helper (newest first; every request spaced and policy-checked).
 
-        client = arxiv.Client(page_size=min(per_query, 50), delay_seconds=3.0, num_retries=3)
+    Same requests as the ``arxiv`` package it replaces (page size ``min(per_query, 50)``, three retries, newest
+    submissions first) through :func:`arxiv_results`: every request goes out under the egress policy and is kept at
+    least 3 s after the previous one by the process-wide limiter (owner decision 2026-11-09); a 429/503 with
+    ``Retry-After`` is waited out once before the retry rule applies.
+
+    Args:
+        get_bytes: The hardened byte getter (tests patch it); the egress policy rides on it.
+    """
+    def search(topic: str, per_query: int) -> list[Candidate]:
         found: list[Candidate] = []
         for query in arxiv_queries(topic):
             logger.info("arXiv search %r", query)
-            request = arxiv.Search(query=query, max_results=per_query, sort_by=arxiv.SortCriterion.SubmittedDate,
-                                   sort_order=arxiv.SortOrder.Descending)
-            for result in client.results(request):
-                arxiv_id = str(result.entry_id).rsplit("/", 1)[-1]
+            for entry in arxiv_results(query, per_query, sort_by="submittedDate", page_size=min(per_query, 50),
+                                       delay_seconds=ARXIV_MIN_INTERVAL_SECONDS, retries=3, get_bytes=get_bytes):
+                # The package's ``entry_id`` was the Atom ``<id>`` (``http://arxiv.org/abs/<short id>``) and the id
+                # kept here its last path segment (an old-style ``cat/NNNNNNN`` id loses its category, as before).
+                arxiv_id = entry["short_id"].rsplit("/", 1)[-1]
                 found.append(Candidate(
-                    title=" ".join(str(result.title).split()), source="arxiv", year=result.published.year,
-                    doi=clean_doi(result.doi), arxiv_id=arxiv_id, abstract=" ".join(str(result.summary).split()),
-                    landing_url=str(result.entry_id), pdf_urls=[f"https://arxiv.org/pdf/{arxiv_id}"]))
+                    title=" ".join(entry["title"].split()), source="arxiv", year=entry["year"],
+                    doi=clean_doi(entry["doi"]), arxiv_id=arxiv_id, abstract=" ".join(entry["summary"].split()),
+                    landing_url=f"http://arxiv.org/abs/{entry['short_id']}",
+                    pdf_urls=[f"https://arxiv.org/pdf/{arxiv_id}"]))
         return found
 
     return search
@@ -179,26 +197,41 @@ _OPENALEX_FIELDS = ("id,doi,title,publication_year,primary_location,best_oa_loca
                     "abstract_inverted_index")
 
 
-def openalex_searcher(get_fetch: Callable[[], Callable[..., Any]]) -> Searcher:
-    """A searcher over an OpenAlex ``fetch`` (``get_fetch`` may raise when OpenAlex is not configured)."""
+def openalex_searcher(contact: Callable[[], str] = lambda: "", *, get_json: GetJson = hardened_get_json,
+                      sleep: Callable[[float], None] | None = None) -> Searcher:
+    """A searcher over the hardened OpenAlex helper (relevance order, open-access links collected).
+
+    The key is read from the process environment at request time (:func:`openalex_api_key`) and sent only as the
+    ``Authorization: Bearer`` header; without one the source cannot run (OpenAlex has required a key since
+    2026-02-13) and the harvest skips it, as it did when the key was missing from the settings.
+
+    Args:
+        contact: ``() -> polite-pool address`` (``""`` for none); read per search.
+        get_json: The hardened JSON getter (tests patch it); the egress policy rides on it.
+        sleep: Pause function for the one ``Retry-After`` wait.
+    """
     from ..literature.acquire import openalex_work_urls
-    from ..literature.openalex import abstract_from_inverted_index, raise_for_no_data
+    from ..literature.openalex import abstract_from_inverted_index
 
     def search(topic: str, per_query: int) -> list[Candidate]:
-        fetch = get_fetch()
-        params = {"search": " ".join(topic_terms(topic)) or topic, "per_page": min(per_query, 100),
-                  "sort": "relevance_score:desc", "select": _OPENALEX_FIELDS}
-        data = fetch("works", params, timeout=30.0)
-        raise_for_no_data(data)
+        if openalex_api_key() is None:
+            raise VerifyUnavailable("OPENALEX_API_KEY is not configured")
+        rows, _cursor = openalex_get("works", search=" ".join(topic_terms(topic)) or topic,
+                                     per_page=min(per_query, 100),
+                                     params={"sort": "relevance_score:desc", "select": _OPENALEX_FIELDS},
+                                     mailto=contact() or None, api_key=openalex_api_key(), get_json=get_json,
+                                     sleep=sleep)
         found: list[Candidate] = []
-        for work in data.get("results", []):
+        for work in rows:
             doi = clean_doi(work.get("doi"))
-            primary = (work.get("primary_location") or {}).get("landing_page_url") or ""
+            location = work.get("primary_location")
+            primary = (location.get("landing_page_url") if isinstance(location, dict) else None) or ""
+            year = work.get("publication_year")
             found.append(Candidate(
                 title=" ".join(str(work.get("title") or "").split()), source="openalex",
-                year=work.get("publication_year"), doi=doi,
+                year=year if isinstance(year, int) else None, doi=doi,
                 abstract=abstract_from_inverted_index(work.get("abstract_inverted_index")) or "",
-                landing_url=f"https://doi.org/{doi}" if doi else (primary or str(work.get("id") or "")),
+                landing_url=f"https://doi.org/{doi}" if doi else (str(primary) or str(work.get("id") or "")),
                 pdf_urls=openalex_work_urls(work)))
         return found
 
@@ -462,7 +495,7 @@ class Harvester:
     def _search_functions(self) -> Mapping[str, Searcher]:
         if self._searchers is not None:
             return self._searchers
-        return {"arxiv": arxiv_searcher(), "openalex": openalex_searcher(self.service._get_fetch)}
+        return {"arxiv": arxiv_searcher(), "openalex": openalex_searcher(lambda: self.service.contact_email)}
 
     # -- the job ----------------------------------------------------------------------------------
 

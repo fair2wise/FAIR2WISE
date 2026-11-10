@@ -164,6 +164,8 @@ class LibraryService:
         self.index_dir = Path(index_dir) if index_dir else None
         self._chunker = chunker
         self._indexer: Any = None
+        #: Polite-pool contact for OpenAlex lookups the harvester makes (``""``: none); set by :meth:`from_startup`.
+        self.contact_email = ""
 
     @property
     def indexer(self) -> Any:  # noqa: ANN401  # Any: donor indexer (untyped legacy class)
@@ -198,7 +200,9 @@ class LibraryService:
         breaker = kw.pop("breaker", None)
         kw.setdefault("fetch_factory", _openalex_fetch_factory(
             startup, state / "openalex_cache.sqlite", breaker if breaker is not None else DEFAULT_BREAKER))
-        return cls(library_dir, state / "catalog.sqlite", settings=settings, breaker=breaker, **kw)
+        service = cls(library_dir, state / "catalog.sqlite", settings=settings, breaker=breaker, **kw)
+        service.contact_email = OpenAlexSettings.from_mapping(startup).polite_mailto
+        return service
 
     # -- the mount -------------------------------------------------------------------------------
 
