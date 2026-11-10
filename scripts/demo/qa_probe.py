@@ -7,9 +7,11 @@ settings route. Each answered question costs real model calls on the server, so 
 
     python scripts/demo/qa_probe.py [--base http://127.0.0.1:8080/fair2wise/api] [--stream] [--only ID ...]
 
-Verdicts. An answerable question PASSes when an expected node id is among the returned nodes, or (corpora whose
-graph is not tracked) when an expected term occurs in the answer or in a returned node name; it WARNs when the
-status is not an answer, no evidence matches, the answer opens with a hedge, or it was slower than ``--slow``.
+Verdicts. An answerable question names its expected ``corpus`` and PASSes when an expected node id **of that corpus** is
+among the returned nodes (the chat names the corpus on every node: ``graph.nodes[].graph_id``, and prefixes an id that two
+corpora share with ``<corpus>:``), or (questions without curated node ids) when an expected term occurs in the answer or in
+a returned node name; it WARNs when the status is not an answer, no evidence of the expected corpus matches (the reason
+says which corpora did answer), the answer opens with a hedge, or it was slower than ``--slow``.
 An unanswerable question PASSes only when the answer opens with the sentence saying the knowledge graph has no information
 (it must still be a normal answer, not an error).
 Exit code: 0 normally, 1 with ``--strict`` and any WARN, 2 when the API is unreachable.
@@ -69,6 +71,28 @@ def sources(resp: dict) -> tuple[list[str], list[str]]:
     return ids, [*names, *titles]
 
 
+def node_pairs(resp: dict) -> list[tuple[str | None, str]]:
+    """``(corpus, node id)`` of the returned nodes: ``graph.nodes[]`` carry ``graph_id`` (the corpus) and an id that is
+    ``<corpus>:<id>`` when two corpora share it; ids only in ``node_ids`` have no corpus (``None``)."""
+    pairs: list[tuple[str | None, str]] = []
+    seen: set[str] = set()
+    for node in (resp.get("graph") or {}).get("nodes") or []:
+        if not isinstance(node, dict) or not node.get("id"):
+            continue
+        gid, nid = node.get("graph_id"), str(node["id"])
+        seen.add(nid)
+        if gid and nid.startswith(f"{gid}:"):
+            nid = nid[len(gid) + 1:]
+        pairs.append((str(gid) if gid else None, nid))
+    pairs += [(None, str(n)) for n in resp.get("node_ids") or [] if str(n) not in seen]
+    return pairs
+
+
+def corpus_matches(graph_id: str | None, corpus: str) -> bool:
+    """A node of ``graph_id`` belongs to ``corpus`` (an unknown corpus, or a JSON-mode graph id such as ``rsoxs_v4``)."""
+    return graph_id is None or graph_id == corpus or graph_id.startswith(f"{corpus}_")
+
+
 def judge(item: dict, resp: dict, latency: float, slow: float) -> tuple[str, list[str]]:
     """``("PASS"|"WARN", reasons)`` for one question."""
     answer = str(resp.get("answer") or "")
@@ -88,8 +112,17 @@ def judge(item: dict, resp: dict, latency: float, slow: float) -> tuple[str, lis
     expected = set(item.get("expected_node_ids") or [])
     terms = [t.lower() for t in item.get("expected_terms") or []]
     haystack = " ".join([answer, *ids, *names]).lower()
-    if expected and not expected & set(ids):
-        reasons.append("no expected node among the returned nodes")
+    corpus = str(item.get("corpus") or "")
+    if expected and corpus in {"", "none"}:
+        found = bool(expected & {nid for _gid, nid in node_pairs(resp)})
+        other: set[str] = set()
+    elif expected:
+        pairs = node_pairs(resp)
+        found = any(nid in expected and corpus_matches(gid, corpus) for gid, nid in pairs)
+        other = {str(gid) for gid, nid in pairs if nid in expected and gid and not corpus_matches(gid, corpus)}
+    if expected and not found:
+        where = f" (an expected node came only from {sorted(other)})" if other else ""
+        reasons.append(f"no expected node of corpus {corpus or 'any'} among the returned nodes{where}")
     elif not expected and terms and not any(t in haystack for t in terms):
         reasons.append("no expected term in answer or nodes")
     if HEDGE_RE.search(answer):
@@ -128,6 +161,9 @@ def main() -> int:
         if http != 200 and verdict == "PASS":
             verdict, reasons = "WARN", [f"http {http}"]
         ids, names = sources(resp)
+        by_corpus: dict[str, int] = {}
+        for gid, _nid in node_pairs(resp):
+            by_corpus[gid or "?"] = by_corpus.get(gid or "?", 0) + 1
         print(f"\n[{item['id']}] ({item['corpus']}) {item['question']}")
         print(f"  {verdict}  http={http} status={resp.get('status')} sufficient={resp.get('sufficient')} "
               f"confidence={resp.get('confidence')} latency={latency:.1f}s turn={resp.get('turn_id')}")
@@ -135,7 +171,7 @@ def main() -> int:
             print(f"  why: {'; '.join(reasons)}")
         answer = " ".join(str(resp.get("answer") or "").split())
         print(f"  answer: {answer[:args.width]}{'...' if len(answer) > args.width else ''}")
-        print(f"  sources: {len(ids)} node(s) {ids[:5]}; publications {[t for t in names if t][:3]}")
+        print(f"  sources: {len(ids)} node(s) {ids[:5]}; by corpus {by_corpus}; publications {[t for t in names if t][:3]}")
         results.append((item["id"], verdict, latency))
     warns = [r for r in results if r[1] == "WARN"]
     print(f"\nSUMMARY: {len(results) - len(warns)} PASS, {len(warns)} WARN of {len(results)}; "

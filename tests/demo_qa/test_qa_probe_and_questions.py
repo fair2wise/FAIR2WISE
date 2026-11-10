@@ -16,35 +16,54 @@ probe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(probe)
 
 
-def test_question_set_shape_and_expected_nodes_exist_in_tracked_graphs():
+def test_question_set_shape_and_expected_nodes_exist_in_the_expected_corpus():
     data = json.loads(QUESTIONS.read_text(encoding="utf-8"))
     items = data["questions"]
-    assert len(items) == 12 and len({i["id"] for i in items}) == 12
+    assert len(items) == 11 and len({i["id"] for i in items}) == 11
     assert sum(not i["answerable"] for i in items) == 3
-    assert {i["corpus"] for i in items if i["answerable"]} == {"e2e_demo", "bl1101", "rsoxs_v1"}
-    known: set[str] = set()
-    for rel in data["graph_files"]:
-        known |= {t["id"] for t in json.loads((ROOT / rel).read_text(encoding="utf-8"))["things"]}
-    for item in items:
-        assert all(n in known for n in item["expected_node_ids"]), item["id"]
-        if item["answerable"]:
-            assert item["expected_node_ids"] or item["expected_terms"], item["id"]
+    corpora = set(data["graph_files"])
+    assert corpora == {"rsoxs", "qwen3_235b_580papers"}
+    answerable = [i for i in items if i["answerable"]]
+    assert {c: sum(i["corpus"] == c for i in answerable) for c in corpora} == {"rsoxs": 4, "qwen3_235b_580papers": 4}
+    assert all(i["corpus"] == "none" for i in items if not i["answerable"])
+    known = {c: {t["id"] for t in json.loads((ROOT / rel).read_text(encoding="utf-8"))["things"]}
+             for c, rel in data["graph_files"].items()}
+    for item in answerable:
+        assert item["expected_node_ids"], item["id"]
+        assert all(n in known[item["corpus"]] for n in item["expected_node_ids"]), item["id"]
 
 
 def test_judge_answerable_and_unanswerable():
-    item = {"answerable": True, "expected_node_ids": ["n1"], "expected_terms": []}
-    ok = {"status": "answered", "answer": "Fine.", "node_ids": ["n1", "n2"]}
+    item = {"answerable": True, "corpus": "rsoxs", "expected_node_ids": ["n1"], "expected_terms": []}
+    ok = {"status": "answered", "answer": "Fine.", "node_ids": ["n1", "n2"],
+          "graph": {"nodes": [{"id": "n1", "graph_id": "rsoxs"}, {"id": "n2", "graph_id": "rsoxs"}]}}
     assert probe.judge(item, ok, 5, 45) == ("PASS", [])
-    assert probe.judge(item, {**ok, "node_ids": ["n9"]}, 5, 45)[0] == "WARN"
+    assert probe.judge(item, {**ok, "node_ids": ["n9"], "graph": {"nodes": []}}, 5, 45)[0] == "WARN"
     assert "hedge" in " ".join(probe.judge(item, {**ok, "answer": "The knowledge graph lacks slots."}, 5, 45)[1])
     assert "slow" in " ".join(probe.judge(item, ok, 60, 45)[1])
-    terms = {"answerable": True, "expected_node_ids": [], "expected_terms": ["cyclotron"]}
+    terms = {"answerable": True, "corpus": "x", "expected_node_ids": [], "expected_terms": ["cyclotron"]}
     assert probe.judge(terms, {"status": "answered", "answer": "A cyclotron line", "node_ids": []}, 1, 45)[0] == "PASS"
     refuse = {"answerable": False}
     said = "*The knowledge graph has no information on this question.*\n\nParis."
     assert probe.judge(refuse, {"status": "answered", "answer": said}, 1, 45)[0] == "PASS"
     assert probe.judge(refuse, {"status": "answered", "answer": "Paris."}, 1, 45)[0] == "WARN"
     assert probe.judge(refuse, {"status": "retrieval_error", "answer": said}, 1, 45)[0] == "WARN"
+
+
+def test_judge_requires_the_expected_node_from_the_expected_corpus():
+    item = {"answerable": True, "corpus": "opv", "expected_node_ids": ["matkg:P3HT"], "expected_terms": []}
+    base = {"status": "answered", "answer": "Fine."}
+    # The shared id comes back prefixed (two corpora share it): the opv copy counts, the rsoxs copy does not.
+    both = {**base, "node_ids": ["rsoxs:matkg:P3HT", "opv:matkg:P3HT"],
+            "graph": {"nodes": [{"id": "rsoxs:matkg:P3HT", "graph_id": "rsoxs"}, {"id": "opv:matkg:P3HT", "graph_id": "opv"}]}}
+    assert probe.judge(item, both, 5, 45) == ("PASS", [])
+    wrong = {**base, "node_ids": ["matkg:P3HT"], "graph": {"nodes": [{"id": "matkg:P3HT", "graph_id": "rsoxs"}]}}
+    verdict, why = probe.judge(item, wrong, 5, 45)
+    assert verdict == "WARN" and "corpus opv" in why[0] and "only from ['rsoxs']" in why[0]
+    ids_only = {**base, "node_ids": ["matkg:P3HT"]}                       # an older server: no graph ids, ids still count
+    assert probe.judge(item, ids_only, 5, 45)[0] == "PASS"
+    json_mode = {**base, "node_ids": ["matkg:P3HT"], "graph": {"nodes": [{"id": "matkg:P3HT", "graph_id": "opv_2"}]}}
+    assert probe.judge(item, json_mode, 5, 45)[0] == "PASS"               # a suffixed graph id of the same corpus
 
 
 class _Handler(http.server.BaseHTTPRequestHandler):
@@ -55,8 +74,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         _Handler.seen.append({"path": self.path, "origin": self.headers.get("Origin"), **body})
         refuse = "France" in body["message"]
         payload = {"status": "answered", "sufficient": not refuse,
-                   "answer": "*The knowledge graph has no information on this question.*\n\nParis." if refuse else "EPU polarization motor.",
-                   "node_ids": [] if refuse else ["beamline:Motor-epu-polarization"], "confidence": 0.5,
+                   "answer": "*The knowledge graph has no information on this question.*\n\nParis." if refuse else "CyRSoXS simulates RSoXS.",
+                   "node_ids": [] if refuse else ["matkg:CyRSoXS"], "confidence": 0.5,
+                   "graph": {"nodes": [] if refuse else [{"id": "matkg:CyRSoXS", "graph_id": "rsoxs"}]},
                    "turn_id": "t1"}
         if self.path.endswith("/stream"):
             raw = f"event: progress\ndata: {json.dumps({'phase': 'x'})}\n\nevent: complete\ndata: {json.dumps(payload)}\n\n"
@@ -77,7 +97,7 @@ def test_probe_runs_against_a_loopback_api_and_only_posts_chat(capsys, stream):
     _Handler.seen.clear()
     try:
         base = f"http://127.0.0.1:{server.server_port}/fair2wise/api"
-        argv = ["--base", base, "--only", "bl-epu-polarization", "ooc-capital"] + (["--stream"] if stream else [])
+        argv = ["--base", base, "--only", "rsoxs-simulation", "ooc-capital"] + (["--stream"] if stream else [])
         import sys
         old = sys.argv
         sys.argv = ["qa_probe.py", *argv]
