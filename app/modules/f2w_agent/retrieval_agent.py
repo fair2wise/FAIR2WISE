@@ -318,14 +318,16 @@ def _off_domain(question: str, hits: Sequence[ScoredHit], graphs: dict[str, Any]
     if not hits:
         return True
     words: set[str] = set()
+    named = False
     for hit in hits[:limit]:
         raw = (getattr(graphs.get(hit.graph_id), "nodes", None) or {}).get(hit.id) or {}
+        raw = raw if isinstance(raw, dict) else {}
+        named = named or bool(raw.get("name")) or bool(hit.name and hit.name != hit.id)
         parts = [hit.id, hit.name, hit.category]
-        if isinstance(raw, dict):
-            parts += [str(raw.get(key) or "") for key in ("name", "description", "category", "paper_title")]
+        parts += [str(raw.get(key) or "") for key in ("name", "description", "category", "paper_title")]
         words.update(re.findall(r"[a-z0-9]{3,}", " ".join(str(part) for part in parts).lower()))
-    if not words:
-        return False  # hits carry no text at all: nothing to compare
+    if not named:
+        return False  # the hits carry no names to compare with
     prefixes = {w[:5] for w in words if len(w) >= 5}
     return not any(t in words or (len(t) >= 5 and t[:5] in prefixes) for t in topic)
 
