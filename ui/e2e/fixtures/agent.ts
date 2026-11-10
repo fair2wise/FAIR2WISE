@@ -201,6 +201,8 @@ export interface MockAgentOptions {
   canRunOperations?: boolean | 'omitted';
   /** Pending Approvals: GET /v1/capabilities `can_approve` (default false). 'omitted' leaves the field out. */
   canApprove?: boolean | 'omitted';
+  /** Publish to Tiled: GET /v1/capabilities `can_publish` (default false). 'omitted' leaves the field out. */
+  canPublish?: boolean | 'omitted';
   /**
    * Pending Approvals: `pending` is the GET /v1/approvals/pending body (a function is called per request, so a
    * test can empty the queue after an approval); `answers` maps `"<METHOD> <path>"` (the item's action, path with
@@ -269,11 +271,13 @@ export async function mockAgent(page: Page, options: MockAgentOptions = {}) {
       const canSave = options.canSave ?? true;
       const ops = options.canRunOperations ?? true;
       const approve = options.canApprove ?? false;
+      const publish = options.canPublish ?? false;
       await route.fulfill(json({
         role: canSave ? 'local_operator' : 'user', profile: canSave ? 'local' : 'als',
         can_edit: canSave, can_save: canSave, can_upload: canSave,
         ...(ops === 'omitted' ? {} : { can_run_operations: ops }),
         ...(approve === 'omitted' ? {} : { can_approve: approve }),
+        ...(publish === 'omitted' ? {} : { can_publish: publish }),
       }));
       return;
     }

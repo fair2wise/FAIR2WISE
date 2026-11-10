@@ -162,6 +162,67 @@ a custom pipeline), `app/api/routes_library_kgs.py` (route), `app/api/policies.p
 `app/modules/workers/factories.py` (wiring). UI: see section 5. Docs: this file, `docs/migration/api/README.md`,
 `mkdocs/docs/local-image.md`.
 
-## 3. Behaviour in the order the operator sees it
+## 3. Behaviour (as tested)
 
-(Filled in with the results of the tests below.)
+Backend, `tests/api_v1/test_v1_library_publish.py` (real `create_api_app`, real replacement importer on the in-memory
+Tiled double, real adopted releases, a real bundle fixture built from the `core_dict` snapshot graph):
+
+* policy row V83 (`POST`, `graph.publish`, `on_als=False`), every route declared, ALS answers 404 for the route (preview
+  and confirm) and `can_publish: false`; `can_publish` is true only where a publication reaches the deployment's Tiled;
+* a preview writes nothing (no release file, no job) and names `demo/v1`; an unknown bundle is 404;
+* the job ends `succeeded` after `export`, `adopt`, `stage`, `plan`; `matkg_Demo.json` is in the release directory, the
+  frozen release is `demo/v1` (manifest `created.code_commit` = the label, `created.run_id` = the job id), with its flat
+  copy `matkg_demo_v1.json`; the `publish` job sits in `awaiting_review`, `GET /v1/approvals/pending` lists it, its plan
+  hash equals the one in the job view, **no approval exists** and nothing of the corpus is in Tiled;
+* a double click returns the same job; with the plan pending a second publish is `409 plan_pending`;
+* after the first plan is cancelled, an unchanged bundle returns the finished job, `again` previews and adopts `demo/v2`
+  and `demo/v1` is byte-identical; a CLI-adopted `v1` and a `v3` make the next version `v4`;
+* an R7 field (`full_text`) fails the `adopt` stage with `disclosure_refused` naming `R7`, leaves no release and no flat
+  copy, creates no publication job, keeps the export;
+* no commit label (also the value `unknown`) is `501 no_commit_label` before anything is written; an empty bundle is
+  `nothing_to_publish`;
+* the module contains no approval creation or submission call.
+
+UI: `PublishToTiled.test.tsx` (hidden for an older server, `can_publish` false, 403 and 404, disabled without a bundle,
+preview and dialog text, progress, success with the Pending Approvals link and no approval call, preview problems,
+refused disclosure rule from a failed stage, typed `plan_pending`, new-version checkbox, hide on a 404 preview) and
+`capabilitiesApi.test.ts`; Playwright `e2e/publish.spec.ts` in the mock-agent fixtures (confirm and link, refused rule,
+no commit label, hidden without `can_publish`).
+
+## 4. Try it on a running container
+
+1. Make sure the image knows its commit: `-e F2W_CODE_COMMIT=$(git rev-parse HEAD)` (or the image sets it from `GIT_COMMIT`).
+2. Extract or continue a KG in the Extract tab. Click **Publish to Tiled**, read the dialog, confirm.
+3. Watch the four steps; the dialog ends with the plan hash and **Open Pending Approvals**.
+4. On Pending Approvals approve the plan (existing approval route). Only then does anything reach Tiled.
+5. The same without the UI: `curl -X POST .../v1/library/kgs/<name>/publish -d '{"confirm":false}'` previews;
+   with `{"confirm":true}` it submits; `GET /v1/jobs/<job_id>/view` shows `library_publish`.
+
+## 5. UI files
+
+`ui/src/app/components/extraction/PublishToTiled.tsx` (button, dialog, progress, result), `publishApi.ts`,
+`publishHooks.ts`, `capabilitiesApi.ts` (`can_publish`, `canPublish`), the Export row of `extraction/ExtractionIdleForm.tsx`
+and the finished-run header (`ExtractionRunView.publishSlot`, filled by `ExtractionTab.tsx`). `App.tsx` is untouched.
+
+## 6. What did not change
+
+Frozen legacy routes and contract tests are untouched; no new approval path; the `:local` auto-approval stays confined to
+zero-operation rollbacks; `adopt_legacy` is not used; `Dockerfile` and `scripts/demo/` are not edited; `adoption.py` and
+the `f2w-kg-adopt` CLI are unchanged (the new code calls the same function).
+
+## 7. Limits
+
+* A refusal by the disclosure check surfaces from the job (the export is written first); a pre-check would need the export
+  bytes.
+* The job waits up to 120 s for the plan on its worker thread (the image runs two): with both busy the job still
+  succeeds and the view shows the plan as soon as the publication job has planned.
+* Two bundles whose names differ only in case share a corpus and become successive versions of it.
+
+## 8. Owner-gated and follow-up items
+
+* **Image commit variable.** `GIT_COMMIT` is a build ARG and a label; the process cannot read a label. One line beside the
+  ARG in the `local` stage of the `Dockerfile` (`ENV F2W_CODE_COMMIT=${GIT_COMMIT}`) makes the button work without
+  `docker run -e`. Not edited here because the demo-tooling branch edits those lines; add it when merging.
+* Corpus naming for a name that ends in `_v<N>` (`x_v2` is corpus `x_v2`, version `v1`, not `x` `v2` as the CLI would map
+  the file name) and "next free = highest + 1, gaps not reused": confirm.
+* Wait budget of the `plan` stage and "the library job ends `succeeded`, the review state lives on the `publish` job".

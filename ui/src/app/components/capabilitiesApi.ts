@@ -22,6 +22,11 @@ export interface Capabilities {
    * and, on ALS, a verified admin). The sidebar entry shows only on an explicit `true`.
    */
   can_approve: boolean | null;
+  /**
+   * Publish to Tiled (owner decision 2026-11-10): `:local`, the caller may export and publish, and the deployment's
+   * publication reaches its own Tiled (the checks of `POST /v1/library/kgs/{name}/publish`). Shown only on `true`.
+   */
+  can_publish: boolean | null;
 }
 
 const ROLES: ReadonlySet<string> = new Set(['local_operator', 'admin', 'user']);
@@ -38,6 +43,7 @@ export function parseCapabilities(raw: unknown): Capabilities {
     can_upload: flag(body.can_upload),
     can_run_operations: flag(body.can_run_operations),
     can_approve: flag(body.can_approve),
+    can_publish: flag(body.can_publish),
   };
 }
 
@@ -55,6 +61,14 @@ export function canRunOperations(caps: Capabilities | null | undefined): boolean
  */
 export function canApprove(caps: Capabilities | null | undefined): boolean {
   return caps?.can_approve === true;
+}
+
+/**
+ * Whether the "Publish to Tiled" button shows. Only an explicit `true` shows it: an older server without the field, an
+ * ALS profile, a 401/403/404 or a network error hides it (the route's own refusal stays the backstop).
+ */
+export function canPublish(caps: Capabilities | null | undefined): boolean {
+  return caps?.can_publish === true;
 }
 
 /** `GET /v1/capabilities`. Rejects with `ApiError` on 401/404/other failures (callers keep defaults). */

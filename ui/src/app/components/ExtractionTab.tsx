@@ -5,6 +5,7 @@ import { TERMINAL_JOB_STATES } from './extractionApi';
 import { extractionKeys, useCancelJob, useExportKg, useJob, useRunningExtraction } from './extractionHooks';
 import { ExtractionIdleForm } from './extraction/ExtractionIdleForm';
 import { ExtractionRunView } from './extraction/ExtractionRunView';
+import { PublishToTiled } from './extraction/PublishToTiled';
 import { useJobLogStream } from './extraction/useJobLogStream';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -41,6 +42,7 @@ export function ExtractionTab() {
         streaming={logs.streaming}
         cancelling={cancel.isPending}
         exporting={exportKg.isPending}
+        publishSlot={<PublishToTiled name={watch.name} />}
         onCancel={() => cancel.mutate(watch.id, { onError: error => toast.error(error.message) })}
         onExport={() => {
           if (!watch.name) return;

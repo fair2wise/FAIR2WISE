@@ -15,6 +15,10 @@ Without a configured model backend the tab says so and Start stays disabled: set
 
 Progress bar (papers done of total), a live log (bounded to the latest lines), and **Cancel**. Cancelling stops between PDFs and keeps what finished. A run is resumable: a PDF is re-processed only if its bytes, the model or the schema changed. When the job succeeds, **Export** writes the KG to the configured release folder; **New extraction** returns to the idle view.
 
+## Publish to Tiled
+
+On the `:local` image a **Publish to Tiled** button sits next to **Export** (in the finished run and beside the "Existing KG" picker). It runs the three manual steps in one go: it exports `matkg_<name>.json`, adopts it as a frozen release `<corpus>/<vN>` (the corpus is the KG name, the version is the next free one, an earlier release is never overwritten) and stages a publication plan for this container's own Tiled. A dialog first states exactly that, and that **the plan still needs your approval**: nothing is published until you approve it on **Pending Approvals** ([approvals](ui-approvals.md)); the button never approves anything. Progress is shown per step; when the plan is staged the dialog shows its hash and links to Pending Approvals. Refusals are shown by reason: the disclosure check (rule and count, for example `R7 x2`), an image without a commit label (set `F2W_CODE_COMMIT`, see [the local image](local-image.md)), an empty KG, or a plan already pending for this corpus. The button is hidden when the server does not offer it (an ALS image, no managed Tiled).
+
 ## What gets written
 
 Each KG is a bundle under the server's work directory (`kgs/<name>/`) with the terms, the KG, a manifest, `processed_pdfs.json` and `extraction_manifest.json` in the shape the command-line coordinator writes, so the CLI and the tab agree.
