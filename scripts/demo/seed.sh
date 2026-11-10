@@ -18,15 +18,25 @@
 # already waiting for approval is reused (its hash is re-read). Re-run it after any 409 stale_approval.
 # Environment: F2W_CONTAINER_NAME, F2W_HOST_PORT. Prints no secrets and reads no dotenv file.
 #
-# The demo corpora, one "corpus:flat-file:snapshot_ref" per entry (edit this list to change the demo):
-#   e2e_demo : the arXiv-harvested corpus of the 2026-11-06 rehearsal (268 things); file supplied with --file
-#   bl1101   : matkg_bl1101_v4.json, the file the rehearsal published as bl1101/v4 (421 things, 937 links,
-#              the smallest recent bl1101 version, baked into the image; v8 is 654 things, v9 435).
-DEMO_CORPORA="e2e_demo:matkg_e2e_demo.json:e2e_demo/v1 bl1101:matkg_bl1101_v4.json:bl1101/v4"
+# The demo corpora, one "corpus:flat-file:snapshot_ref" per entry (owner decision 2026-11-10, twenty-second set;
+# measured in docs/migration/demo/BIG_CORPUS_FEASIBILITY.md). Both files are baked into the image.
+#   rsoxs                : matkg_rsoxs_v4.json, the most complete RSoXS KG (22,012 things, 57,575 links, 246 papers)
+#   qwen3_235b_580papers : matkg_qwen3_235b_580papers.json, the 580-paper OPV KG (15,815 things, 20,096 links)
+# SEEDING IS SLOW: the two publications write 117,000 records one HTTP call at a time into the local Tiled.
+# Plan on about 65 minutes for the two approvals (45 for rsoxs, 20 for the OPV KG);
+# adoption and staging take about 2 minutes. Seed the day before and keep the volumes; never publish them live.
+DEMO_CORPORA="rsoxs:matkg_rsoxs_v4.json:rsoxs/v4 qwen3_235b_580papers:matkg_qwen3_235b_580papers.json:qwen3_235b_580papers/v1"
+# Optional third corpus, added only when its flat file is passed with --file (it is not baked into the image):
+#   e2e_demo : the arXiv-harvested corpus of the 2026-11-06 rehearsal (268 things)
+DEMO_OPTIONAL_CORPORA="e2e_demo:matkg_e2e_demo.json:e2e_demo/v1"
+# Seconds to wait for a staged plan to appear and for an approved plan to reach "published" (the large corpora
+# need minutes of planning and tens of minutes of apply; the old 180 s and 300 s limits would have aborted them).
+STAGE_WAIT_SECONDS="${DEMO_STAGE_WAIT_SECONDS:-900}"
+PUBLISH_WAIT_SECONDS="${DEMO_PUBLISH_WAIT_SECONDS:-5400}"
 set -euo pipefail
 . "$(cd "$(dirname "$0")" && pwd)/_common.sh"
 
-usage() { sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; }
 COMMIT=""; ADOPT_ONLY=0; I_APPROVE=0; HOSTFILES=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -37,6 +47,12 @@ while [ "$#" -gt 0 ]; do
     --i-approve) I_APPROVE=1; shift ;;
     *) usage >&2; demo_die "unknown argument: $1" ;;
   esac
+done
+for spec in $DEMO_OPTIONAL_CORPORA; do
+  rest="${spec#*:}"; ofile="${rest%%:*}"
+  for hf in ${HOSTFILES[@]+"${HOSTFILES[@]}"}; do
+    [ "$(basename "$hf")" != "$ofile" ] || DEMO_CORPORA="$DEMO_CORPORA $spec"
+  done
 done
 demo_need docker curl
 demo_docker_ok || demo_die "docker is not running"
@@ -59,9 +75,9 @@ A_CODE=""; A_BODY=""
 api_call() {  # api_call METHOD PATH [BODY] -> A_CODE A_BODY (never fails the script)
   local method="$1" path="$2" body="${3:-}" out rc=0
   if [ "$method" = GET ]; then
-    out="$(curl -sS --max-time 60 -w '\n%{http_code}' -X GET "${API}${path}" 2>&1)" || rc=$?
+    out="$(curl -sS --max-time 300 -w '\n%{http_code}' -X GET "${API}${path}" 2>&1)" || rc=$?
   else
-    out="$(curl -sS --max-time 60 -w '\n%{http_code}' -H "$H_CT" -H "$H_OR" -X "$method" "${API}${path}" -d "$body" 2>&1)" || rc=$?
+    out="$(curl -sS --max-time 300 -w '\n%{http_code}' -H "$H_CT" -H "$H_OR" -X "$method" "${API}${path}" -d "$body" 2>&1)" || rc=$?
   fi
   A_CODE="${out##*$'\n'}"; A_BODY="${out%$'\n'*}"
   case "$A_CODE" in [0-9][0-9][0-9]) ;; *) A_CODE="000"; A_BODY="${out:-curl failed (exit $rc)}" ;; esac
@@ -152,7 +168,7 @@ for spec in $DEMO_CORPORA; do
     state="$(printf '%s' "$A_BODY" | demo_json_py 'import json,sys; print(json.load(sys.stdin).get("ui_state",""))' 2>/dev/null || true)"
     [ "$state" != "staged" ] || break
     case "$state" in published|superseded) break ;; failed|quarantined|cancelled|denied) demo_die "$corpus: job $job is $state; see ${BASE}/ (Jobs) or docker logs ${NAME}" ;; esac
-    [ "$waited" -lt 180 ] || demo_die "$corpus: job $job is still '${state:-unknown}' after 180s"
+    [ "$waited" -lt "$STAGE_WAIT_SECONDS" ] || demo_die "$corpus: job $job is still '${state:-unknown}' after ${STAGE_WAIT_SECONDS}s"
     sleep 3; waited=$((waited + 3))
   done
   [ "$state" = staged ] && STAGED="${STAGED}${corpus}|${snap}|${job}
@@ -204,7 +220,7 @@ if [ "$I_APPROVE" -eq 1 ] && [ -n "$STAGED" ]; then
       state="$(printf '%s' "$A_BODY" | demo_json_py 'import json,sys; print(json.load(sys.stdin).get("ui_state",""))' 2>/dev/null || true)"
       [ "$state" != published ] || break
       case "$state" in failed|quarantined|cancelled|denied) demo_die "$corpus: job $job is $state" ;; esac
-      [ "$waited" -lt 300 ] || demo_die "$corpus: job $job is still '${state:-unknown}' after 300s"
+      [ "$waited" -lt "$PUBLISH_WAIT_SECONDS" ] || demo_die "$corpus: job $job is still '${state:-unknown}' after ${PUBLISH_WAIT_SECONDS}s (it keeps running in the worker; watch the Jobs page)"
       sleep 3; waited=$((waited + 3))
     done
     demo_info "$corpus: published"

@@ -149,7 +149,7 @@ if name == "docker":
             if "--dry-run" in rest:
                 out(json.dumps({"would_adopt": [f]}))
             stem = f[len("matkg_"):-len(".json")]
-            snap = "e2e_demo/v1" if stem == "e2e_demo" else stem.replace("_v", "/v")
+            snap = {"e2e_demo": "e2e_demo/v1", "qwen3_235b_580papers": "qwen3_235b_580papers/v1"}.get(stem) or stem.replace("_v", "/v")
             st["files"].append("/var/lib/fair2wise/state/session/storage_kg/%s/graph.json" % snap); save(st)
             out(json.dumps({"adopted": [f]}))
         sys.exit(0)
@@ -425,7 +425,7 @@ def test_seed_never_approves_without_the_flag_and_prints_the_commands(env):
     assert r.returncode == 0, r.stdout + r.stderr
     assert _approval_posts(env) == []
     posts = [h for h in http(env) if h[0] == "POST"]
-    assert [json.loads(b)["snapshot_ref"] for _m, u, b in posts if u.endswith("/v1/publications")] == ["e2e_demo/v1", "bl1101/v4"]
+    assert [json.loads(b)["snapshot_ref"] for _m, u, b in posts if u.endswith("/v1/publications")] == ["rsoxs/v4", "qwen3_235b_580papers/v1"]
     assert all(json.loads(b)["target"] == "http://127.0.0.1:8765" for _m, _u, b in posts)
     assert r.stdout.count("/approval") == 2 and r.stdout.count('"plan_sha256":"') == 2
     assert "Nothing was approved by this script" in r.stdout
@@ -448,6 +448,22 @@ def test_seed_is_idempotent(env):
     assert "reusing the plan already waiting" in r2.stdout and _approval_posts(env) == []
 
 
+def test_seed_adds_the_optional_e2e_corpus_only_when_its_file_is_given(env, tmp_path):
+    e2e = tmp_path / "matkg_e2e_demo.json"; e2e.write_text("{}")
+    r, env = _seed(env, "--file", str(e2e))
+    assert r.returncode == 0, r.stdout + r.stderr
+    posts = [h for h in http(env) if h[0] == "POST" and h[1].endswith("/v1/publications")]
+    assert [json.loads(b)["snapshot_ref"] for _m, _u, b in posts] == ["rsoxs/v4", "qwen3_235b_580papers/v1", "e2e_demo/v1"]
+
+
+def test_seed_default_list_is_the_two_big_demo_corpora_and_waits_long_enough_for_them():
+    text = (DEMO / "seed.sh").read_text()
+    assert 'DEMO_CORPORA="rsoxs:matkg_rsoxs_v4.json:rsoxs/v4 qwen3_235b_580papers:matkg_qwen3_235b_580papers.json:qwen3_235b_580papers/v1"' in text
+    # the 117,000-record apply takes tens of minutes: the old 300 s publish wait would abort it
+    assert int(re.search(r"DEMO_PUBLISH_WAIT_SECONDS:-(\d+)", text).group(1)) >= 3600
+    assert int(re.search(r"DEMO_STAGE_WAIT_SECONDS:-(\d+)", text).group(1)) >= 600
+
+
 def test_seed_with_i_approve_waits_five_seconds_then_posts_the_approval(env):
     r, env = _seed(env, "--i-approve")
     assert r.returncode == 0, r.stdout + r.stderr
@@ -456,8 +472,8 @@ def test_seed_with_i_approve_waits_five_seconds_then_posts_the_approval(env):
     sleeps = [c for c in log[:first] if c[0] == "sleep"]
     assert sum(int(c[1]) for c in sleeps) >= 5
     assert len(_approval_posts(env)) == 2
-    assert "About to approve e2e_demo" in r.stdout and "Approving in 5 seconds" in r.stdout
-    assert "live corpora: bl1101=bl1101/v4, e2e_demo=e2e_demo/v1" in r.stdout
+    assert "About to approve rsoxs" in r.stdout and "Approving in 5 seconds" in r.stdout
+    assert "live corpora: qwen3_235b_580papers=qwen3_235b_580papers/v1, rsoxs=rsoxs/v4" in r.stdout
 
 
 @pytest.mark.parametrize("label", ["unknown", ""])
@@ -494,7 +510,7 @@ def test_smoke_fails_on_tiled_unavailable_missing_corpora_and_paid_models(env):
     r = run("smoke.sh", [], env)  # nothing seeded: both corpora missing
     assert r.returncode == 1
     assert re.search(r"^FAIL\s+graph sources.*unavailable", r.stdout, re.M)
-    assert re.search(r"^FAIL\s+pointer corpora.*MISSING: e2e_demo bl1101", r.stdout, re.M)
+    assert re.search(r"^FAIL\s+pointer corpora.*MISSING: rsoxs qwen3_235b_580papers", r.stdout, re.M)
     assert re.search(r"^FAIL\s+models: extraction.*claude-opus", r.stdout, re.M)
     r2 = run("smoke.sh", ["--expect", ""], dict(env, STUB_TILED_STATUS="ok", STUB_MODELS="lbl/cborg-chat"))
     assert r2.returncode == 0 and re.search(r"^WARN\s+pointer corpora", r2.stdout, re.M)

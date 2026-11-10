@@ -2,7 +2,7 @@
 # GET-only checks of a running :local container, printed as a PASS/WARN/FAIL table.
 #
 # Usage: scripts/demo/smoke.sh [--expect "corpus corpus"]
-#   --expect LIST   corpora that must be live on the local Tiled (default "e2e_demo bl1101", the seed
+#   --expect LIST   corpora that must be live on the local Tiled (default "rsoxs qwen3_235b_580papers", the seed
 #                   list); pass --expect "" when the demo is not seeded yet (the row becomes a WARN).
 # Exit code: 0 when no row FAILs (WARN rows need a look), 1 otherwise.
 # Checks: container health; gateway and API health; capabilities (profile local, approvals reachable);
@@ -15,7 +15,7 @@ set -euo pipefail
 . "$(cd "$(dirname "$0")" && pwd)/_common.sh"
 
 usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; }
-EXPECT="e2e_demo bl1101"
+EXPECT="rsoxs qwen3_235b_580papers"
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -h|--help) usage; exit 0 ;;
@@ -35,7 +35,7 @@ row() {  # row STATUS NAME DETAIL
 A_CODE=""; A_BODY=""
 get() {  # get URL -> A_CODE A_BODY
   local out rc=0
-  out="$(curl -sS --max-time 30 -w '\n%{http_code}' -X GET "$1" 2>&1)" || rc=$?
+  out="$(curl -sS --max-time 300 -w '\n%{http_code}' -X GET "$1" 2>&1)" || rc=$?
   A_CODE="${out##*$'\n'}"; A_BODY="${out%$'\n'*}"
   case "$A_CODE" in [0-9][0-9][0-9]) ;; *) A_CODE="000"; A_BODY="${out:-curl failed (exit $rc)}" ;; esac
   return 0
