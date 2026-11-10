@@ -514,6 +514,8 @@ class RetrievalAgent(Agent):
         self._kg: krag.KnowledgeGraph | None = None
         self._graphs: dict[str, Any] = {}
         self._skipped: list[dict[str, str]] = []
+        #: Opt-in KG object cache (:meth:`enable_kg_cache`): ``path -> ((mtime_ns, size, source), KG)``.
+        self._kg_cache: dict[str, tuple[tuple[int, int, str], Any]] | None = None
         self._source_rag = hybrid_rag_enabled() if source_rag is None else bool(source_rag)
         self._hybrid = HybridSourceRAG.from_env()
         cfg = load_tiled_config(uri=tiled_uri, enabled=live_tiled)
@@ -549,6 +551,29 @@ class RetrievalAgent(Agent):
         kg.graph_path = str(path)
         return gid
 
+    def enable_kg_cache(self) -> None:
+        """Keep the loaded KGs between reloads, keyed by file (path, mtime, size, source) (the chat's corpus union).
+
+        A reload then rebuilds only the files that changed and drops the entries of files no longer listed, so a
+        22k-node corpus is indexed once, not on every question. Off by default: every other mode rebuilds as before.
+        """
+        if self._kg_cache is None:
+            self._kg_cache = {}
+
+    def _cached_kg(self, path: str) -> Any:  # noqa: ANN401  # Any: donor KnowledgeGraph (untyped legacy class)
+        """Build the KG of *path*, or return the cached one when the file is unchanged (cache enabled only)."""
+        cache = self._kg_cache
+        if cache is None:
+            return krag.KnowledgeGraph(str(path), graph_source=self._graph_source)
+        stat = Path(path).stat()
+        key = (stat.st_mtime_ns, stat.st_size, self._graph_source)
+        held = cache.get(path)
+        if held is not None and held[0] == key:
+            return held[1]
+        kg = krag.KnowledgeGraph(str(path), graph_source=self._graph_source)
+        cache[path] = (key, kg)
+        return kg
+
     def _skip_reason(self, path: str) -> str | None:
         """Return why *path* cannot be loaded, or None if the file looks usable."""
         candidate = Path(path)
@@ -575,7 +600,7 @@ class RetrievalAgent(Agent):
                 skipped.append({"path": path, "reason": reason})
                 continue
             try:
-                kg = krag.KnowledgeGraph(str(path), graph_source=self._graph_source)
+                kg = self._cached_kg(path)
             except Exception as exc:
                 logger.warning("Skipping KG %s: %s", path, exc)
                 skipped.append({"path": path, "reason": str(exc)})
@@ -587,6 +612,9 @@ class RetrievalAgent(Agent):
             gid = self._annotate_kg(kg, path, existing=graphs)
             graphs[gid] = kg
         self._skipped = skipped
+        if self._kg_cache is not None:
+            for stale in [p for p in self._kg_cache if p not in self._graph_files]:
+                del self._kg_cache[stale]
         return graphs
 
     def set_query_limits(self, *, hops: int | None = None, max_nodes: int | None = None) -> None:

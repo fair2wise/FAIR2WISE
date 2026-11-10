@@ -1138,6 +1138,13 @@ class DisclosureProjector:
             if isinstance(verdict.get(meta), Mapping):
                 out[meta] = {k: v for k, v in verdict[meta].items()
                              if isinstance(v, (bool, int, float)) or k in ("status", "skipped", "source")}
+        for corpora in ("corpora", "corpora_skipped"):       # multi-corpus chat turn: corpus names and sizes only
+            if isinstance(verdict.get(corpora), list):
+                out[corpora] = [
+                    {k: (self._safe_str(v, 200) if isinstance(v, str) else v) for k, v in c.items()
+                     if k in ("corpus", "graph_id", "snapshot", "nodes", "edges", "reason")
+                     and isinstance(v, (str, int))}
+                    for c in verdict[corpora] if isinstance(c, Mapping)]
         if verdict.get("error"):
             out["error_code"] = ErrorCode.INTERNAL.value
         return out

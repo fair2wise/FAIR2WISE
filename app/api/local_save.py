@@ -47,7 +47,7 @@ from ..modules.graph.imports.corpus_scope import JOURNAL_FILENAME, ReleaseState,
 from ..modules.graph.imports.tiled_json import Clock
 from ..modules.graph.legacy_save import SaveTarget, TiledSaveBackend
 from ..modules.graph.ports import ContractError, ErrorCode
-from ..modules.jobs.publish_store import Pointer, PublishStore
+from ..modules.jobs.publish_store import Pointer, PublishStore, corpus_of
 from ..modules.security.authorization import DeploymentSettings
 
 #: Owner wording (2026-11-03) for the state where Tiled holds no copy the UI could edit (``kg_update``).
@@ -162,6 +162,16 @@ class LocalSaveProvider:
                     del self._cached[old]
                 backend = self._cached[key] = TiledSaveBackend(target)
             return backend
+
+    def live_corpora(self) -> list[str]:
+        """Every corpus live on this target (Model C per-corpus view), the active pointer's corpus first.
+
+        What the QA chat searches over (``app/modules/f2w_agent/corpus_union.py``); empty before a publication.
+        """
+        live = self.store.live_by_corpus(self.target)
+        pointer = self.store.pointer(self.target)
+        first = corpus_of(pointer.snapshot_ref) if pointer is not None else None
+        return sorted(live, key=lambda name: (name != first, name))
 
     def available(self, corpus: str | None = None) -> bool:
         """Whether a Save could reach a target now (``can_save`` of ``GET /v1/capabilities``).

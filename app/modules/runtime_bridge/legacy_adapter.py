@@ -194,7 +194,7 @@ def build_legacy_read_path(pipeline: Any, environ: Mapping[str, str] | None = No
     settings = legacy_deployment_settings(environ)
     route = qa_route(environ)
     service = LegacyRetrievalService(
-        agent_provider=lambda: pipeline.retrieval,
+        agent_provider=lambda: getattr(pipeline, "turn_retrieval", None) or pipeline.retrieval,
         tiled_uri_provider=lambda: getattr(getattr(pipeline, "runtime", None), "tiled_uri", None),
     )
     chat_model = None

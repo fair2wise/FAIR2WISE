@@ -52,6 +52,7 @@ from ..project_config import config_value, get_config
 from ..runtime_bridge.selection import attach_read_path, attach_summary_path
 from ..security.authorization import SETTINGS_DEPLOYMENT_FIELDS, StartupConfigError
 from .coordinator import Coordinator, CoordinatorConfig
+from .corpus_union import ChatCorpusUnion, ChatGraphSet
 from .debate_agent import EvidenceDebateAgent
 from .download_agent import (
     DownloadAgent,
@@ -2690,6 +2691,45 @@ def publications_for_selected_nodes(graph_path: Path, node_ids: list[str]) -> li
     )
 
 
+def union_publications(
+    chosen: ChatGraphSet, selected_hits: object, selected_ids: list[str]
+) -> list[dict[str, Any]]:
+    """Publications behind the selected nodes of a multi-corpus turn, each naming its corpus (additive keys).
+
+    The hits are grouped by graph (``graph_id`` is the corpus); a publication found in more than one corpus is listed
+    once with ``corpus`` (the first) and ``corpora`` (all), and each ``supporting_nodes`` entry carries its
+    ``graph_id``, so a node id shared by two corpora is told apart.
+    """
+    by_graph: dict[str, list[str]] = {}
+    hits = selected_hits if isinstance(selected_hits, list) else []
+    for raw in hits:
+        if isinstance(raw, dict) and raw.get("id"):
+            by_graph.setdefault(_string_value(raw.get("graph_id")) or chosen.corpora[0].graph_id, []).append(
+                str(raw["id"]))
+    if not by_graph:
+        by_graph = {chosen.corpora[0].graph_id: list(selected_ids)}
+    merged: dict[str, dict[str, Any]] = {}
+    for gid, ids in by_graph.items():
+        entry = chosen.entry_for_graph(gid)
+        if entry is None:
+            continue
+        for pub in publications_for_selected_nodes(entry.path, ids):
+            nodes = [{**node, "graph_id": entry.graph_id, "corpus": entry.corpus} for node in pub["supporting_nodes"]]
+            key = _publication_key(pub)
+            held = merged.get(key)
+            if held is None:
+                merged[key] = {**pub, "corpus": entry.corpus, "corpora": [entry.corpus], "supporting_nodes": nodes}
+                continue
+            if entry.corpus not in held["corpora"]:
+                held["corpora"].append(entry.corpus)
+            held["supporting_nodes"].extend(nodes)
+    return sorted(
+        merged.values(),
+        key=lambda pub: (str(pub.get("paper_title") or pub.get("source_paper") or "").lower(),
+                         str(pub.get("doi") or "").lower()),
+    )
+
+
 class _NoSplash:
     """Stand-in for the Splash client when Saves go to Tiled (T18D).
 
@@ -2754,6 +2794,12 @@ class AgentPipelineService:
     tiled_save_provider: SaveBackendProvider | None = None
     #: The provider backend whose effective record the session graph last showed (``_refresh_session_graph``).
     _shown_backend: TiledSaveBackend | None = None
+    #: The chat's multi-corpus graph set (``:local`` with two or more corpora live; ``corpus_union.py``), built lazily.
+    _corpus_union: ChatCorpusUnion | None = None
+    #: The retrieval agent over that set (separate from ``self.retrieval``, which keeps the viewer's single graph).
+    _union_agent: Any = None
+    #: The set of the running chat turn; ``None`` when the turn used the single-corpus path.
+    _union_set: ChatGraphSet | None = None
 
     def __init__(self, cfg: CoordinatorConfig) -> None:
         """Initialize coordinator, session state, runtime settings, and agents."""
@@ -2952,25 +2998,70 @@ class AgentPipelineService:
         if backend is not self._shown_backend and self._sync_session_graph_from_splash():
             self._shown_backend = backend
 
+    @property
+    def turn_retrieval(self) -> Any:  # noqa: ANN401  # Any: the retrieval agent (fakes in tests)
+        """The retrieval agent of the running chat turn: the multi-corpus one during a union turn, else ``self.retrieval``."""
+        return self._union_agent if self._union_set is not None and self._union_agent is not None else self.retrieval
+
+    async def _load_union(self) -> ChatGraphSet | None:
+        """``:local``, editable mode, two or more corpora live: load the chat's multi-corpus graph set, else ``None``.
+
+        The set is refreshed from the publication state on every turn (cheap when unchanged) and handed to a
+        dedicated retrieval agent whose KGs are cached per corpus file, so the viewer's agent and session graph are
+        untouched and a new publication or a rollback shows up on the next question.
+        """
+        provider = self.tiled_save_provider
+        if provider is None or self.tiled_save is not None or not callable(getattr(provider, "live_corpora", None)):
+            return None
+        if self._corpus_union is None:
+            self._corpus_union = ChatCorpusUnion(self.coord.workdir / "chat_corpora")
+        union = self._corpus_union
+        loop = asyncio.get_event_loop()
+        try:
+            chosen = await loop.run_in_executor(None, union.refresh, cast(Any, provider))
+        except Exception as exc:                     # never let the union break a turn: the single-corpus path answers
+            logger.warning("Multi-corpus chat graph set not built, using the active corpus only: %s", exc)
+            return None
+        if chosen is None:
+            return None
+        if not chosen.corpora:
+            return chosen
+        agent = self._union_agent
+        if agent is None:
+            agent = self._union_agent = self._make_retrieval(chosen.files[0], chosen.files, "splash")
+            enable = getattr(agent, "enable_kg_cache", None)
+            if callable(enable):
+                enable()
+        return chosen
+
     def _active_model(self) -> str:
         """Return the resolved model name for the current backend."""
         return default_runtime_model(self.runtime.backend, self.runtime.model)
 
-    def _rebuild_agents(self) -> None:
-        """Recreate retrieval, download, debate, orchestrator, and extractor agents."""
-        model = self._active_model()
-        graph_file = str(self.graph_path())
-        self.retrieval = RetrievalAgent(
+    def _make_retrieval(self, graph_file: str, graph_files: list[str], graph_source: str) -> RetrievalAgent:
+        """A retrieval agent with the current runtime settings over ``graph_files``."""
+        return RetrievalAgent(
             graph_file=graph_file,
-            graph_files=self._runtime_json_paths() if self.runtime.graph_source == "json" else [graph_file],
-            graph_source=self._loader_source(self.runtime.graph_source),
+            graph_files=graph_files,
+            graph_source=self._loader_source(graph_source),
             backend=self.runtime.backend,
-            model=model,
+            model=self._active_model(),
             kg_query_hops=self.runtime.kg_query_hops,
             kg_query_max_nodes=self.runtime.kg_query_max_nodes,
             source_rag=self.runtime.source_rag,
             live_tiled=self.runtime.use_live_tiled,
             tiled_uri=self.runtime.tiled_uri,
+        )
+
+    def _rebuild_agents(self) -> None:
+        """Recreate retrieval, download, debate, orchestrator, and extractor agents."""
+        model = self._active_model()
+        graph_file = str(self.graph_path())
+        self._union_agent = None            # rebuilt lazily with the new settings
+        self.retrieval = self._make_retrieval(
+            graph_file,
+            self._runtime_json_paths() if self.runtime.graph_source == "json" else [graph_file],
+            self.runtime.graph_source,
         )
         self.download = DownloadAgent(
             backend=self.runtime.backend,
@@ -3366,7 +3457,7 @@ class AgentPipelineService:
     def _retrieval_graph_paths(self, fallback: Path) -> dict[str, Path]:
         """Map retrieval graph ids to existing filesystem paths, skipping Tiled."""
         mapping: dict[str, Path] = {}
-        graphs = getattr(self.retrieval, "_graphs", None) or {}
+        graphs = getattr(self.turn_retrieval, "_graphs", None) or {}
         if isinstance(graphs, dict):
             for gid, kg in graphs.items():
                 if str(gid) == TILED_GRAPH_ID:
@@ -3390,7 +3481,7 @@ class AgentPipelineService:
             selected_hits=selected_hits if isinstance(selected_hits, list) else [],
             graph_path=graph_path,
             graph_paths_by_id=self._retrieval_graph_paths(graph_path),
-            graphs_by_id=getattr(self.retrieval, "_graphs", None),
+            graphs_by_id=getattr(self.turn_retrieval, "_graphs", None),
         )
 
     def _query_graph_event(self, payload: GraphPayload) -> dict[str, Any]:
@@ -4131,9 +4222,10 @@ class AgentPipelineService:
         *,
         graph_source: str,
         graph_files: list[str] | None = None,
+        agent: Any = None,  # noqa: ANN401  # Any: a retrieval agent (the multi-corpus one for a union turn)
     ) -> dict[str, Any]:
         """Reload the retrieval agent KG, falling back if graph_files is unsupported."""
-        reload = self.retrieval.reload_kg
+        reload = (agent if agent is not None else self.retrieval).reload_kg
         graph_source = self._loader_source(graph_source)
         try:
             return await reload(graph_file, graph_source=graph_source, graph_files=graph_files)
@@ -4153,22 +4245,23 @@ class AgentPipelineService:
         tiled_enabled = (
             self.runtime.use_live_tiled if use_live_tiled is None else bool(use_live_tiled)
         )
+        agent = self.turn_retrieval
         read_path = getattr(self, "_read_path", None)
         if read_path is not None:
-            return cast(dict[str, Any], note_retrieval(self.retrieval, await read_path.query(
+            return cast(dict[str, Any], note_retrieval(agent, await read_path.query(
                 question, history=history, source_rag=enabled, use_live_tiled=tiled_enabled
             )))
-        tiled_setter = getattr(self.retrieval, "set_live_tiled", None)
+        tiled_setter = getattr(agent, "set_live_tiled", None)
         if callable(tiled_setter):
             tiled_setter(tiled_enabled, uri=self.runtime.tiled_uri)
-        query = self.retrieval.query
+        query = agent.query
         try:
-            return note_retrieval(self.retrieval, await query(question, history=history, source_rag=enabled))
+            return note_retrieval(agent, await query(question, history=history, source_rag=enabled))
         except TypeError:
             try:
-                return note_retrieval(self.retrieval, await query(question, history=history))
+                return note_retrieval(agent, await query(question, history=history))
             except TypeError:
-                return note_retrieval(self.retrieval, await query(question))
+                return note_retrieval(agent, await query(question))
 
     def _trace_env(self) -> dict[str, Any]:
         """Git sha, models, settings, and graph fingerprints for the open turn."""
@@ -5517,6 +5610,29 @@ class AgentPipelineService:
         source_rag: bool | None = None,
         use_live_tiled: bool | None = None,
     ) -> ChatResponse:
+        """Run one chat turn's retrieval rounds (:meth:`_ask_locked_body`); the multi-corpus set lives for this turn only."""
+        self._union_set = None
+        try:
+            return await self._ask_locked_body(
+                question, emit, graph_source=graph_source, json_graph_path=json_graph_path,
+                json_graph_paths=json_graph_paths, history=history, source_rag=source_rag,
+                use_live_tiled=use_live_tiled,
+            )
+        finally:
+            self._union_set = None
+
+    async def _ask_locked_body(
+        self,
+        question: str,
+        emit: ProgressEmitter | None,
+        *,
+        graph_source: str | None,
+        json_graph_path: str | None,
+        json_graph_paths: list[str] | None = None,
+        history: list[dict[str, str]] | None = None,
+        source_rag: bool | None = None,
+        use_live_tiled: bool | None = None,
+    ) -> ChatResponse:
         """Run the retrieval rounds of a chat turn up to the download offer.
 
         Each round queries the KG and either answers, refuses (JSON mode), stops, or runs the
@@ -5554,12 +5670,26 @@ class AgentPipelineService:
             active_graph_path = self._session_graph_path()
             active_graph_source = "splash"
             resolved_files = [str(active_graph_path)]
+            union = await self._load_union()
+            if union is not None and not union.corpora:
+                self.workflow.update(phase="retrieval_error")
+                return self._response(
+                    "retrieval_error",
+                    f"No knowledge graphs loaded; none of the live corpora can be searched by the chat. {union.notice()}",
+                    False, {}, [], active_graph_path,
+                )
+            if union is not None:
+                # Owner decision 2026-11-10: with two or more corpora live the chat searches all of them.
+                self._union_set = union
+                active_graph_path = union.primary
+                resolved_files = union.files
 
         try:
             await self._reload_retrieval(
                 str(active_graph_path),
                 graph_source=active_graph_source,
                 graph_files=resolved_files,
+                agent=self.turn_retrieval,
             )
         except Exception as exc:
             self.workflow.update(phase="retrieval_error")
@@ -5570,6 +5700,17 @@ class AgentPipelineService:
                 {},
                 [],
                 active_graph_path,
+            )
+
+        if self._union_set is not None:
+            union_set = self._union_set
+            names = ", ".join(f"{e.corpus} ({e.nodes} things)" for e in union_set.corpora)
+            await self._emit(
+                emit,
+                "corpora_selected",
+                f"Searching {len(union_set.corpora)} corpora: {names}",
+                corpora=union_set.describe(),
+                skipped=[item.as_dict() for item in union_set.skipped],
             )
 
         for round_no in range(1, self.cfg.max_rounds + 1):
@@ -5594,6 +5735,10 @@ class AgentPipelineService:
                     active_graph_path,
                 )
             last_verdict = verdict
+            if self._union_set is not None:     # additive: the corpora this verdict was drawn from (rounds[].retrieval)
+                verdict["corpora"] = self._union_set.describe()
+                if self._union_set.skipped:
+                    verdict["corpora_skipped"] = [item.as_dict() for item in self._union_set.skipped]
             round_info: dict[str, Any] = {
                 "round": round_no,
                 "retrieval": verdict,
@@ -7009,11 +7154,17 @@ class AgentPipelineService:
         selected_ids = [str(n) for n in (verdict.get("selected") or [])]
         query_graph = self._query_graph_payload(verdict, graph_path)
         display_ids = [node.id for node in query_graph.nodes] or selected_ids
-        publications = (
-            publications_override
-            if publications_override is not None
-            else publications_for_selected_nodes(graph_path, selected_ids)
-        )
+        union_set = self._union_set
+        if union_set is not None and graph_path != union_set.primary:
+            union_set = None
+        if publications_override is not None:
+            publications = publications_override
+        elif union_set is not None:
+            publications = union_publications(union_set, verdict.get("selected_hits"), selected_ids)
+        else:
+            publications = publications_for_selected_nodes(graph_path, selected_ids)
+        if union_set is not None and union_set.skipped and status in {"answered", "retrieval_error"}:
+            answer = f"{answer}\n\n{union_set.notice()}"
         return ChatResponse(
             status=status,
             answer=answer,
