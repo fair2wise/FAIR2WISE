@@ -151,7 +151,7 @@ GRAPH_FILE = str(
         "storage/kg/matkg_qwen3_235b_580papers.json",
     )
 )
-GRAPH_SOURCE = str(config_value("kg_rag.retrieval.graph_source", "splash")).lower()
+GRAPH_SOURCE = str(config_value("kg_rag.retrieval.graph_source", "json")).lower()
 SPLASH_LINKS_URI = str(
     config_value("kg_rag.retrieval.splash_uri", "splash://localhost:8081")
 )
@@ -2021,7 +2021,7 @@ if __name__ == "__main__":
         "--graph-source",
         choices=["splash", "splash_links", "splash-links", "json"],
         default=GRAPH_SOURCE,
-        help="KG source: splash-links database by default, or local JSON.",
+        help="KG source: local JSON by default, or the legacy splash-links database.",
     )
     ap.add_argument(
         "--splash-uri",

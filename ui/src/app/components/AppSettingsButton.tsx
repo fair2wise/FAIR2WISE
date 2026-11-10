@@ -629,12 +629,12 @@ export function AppSettingsButton({
                 <SettingOption
                   id="splash_links"
                   label="splash_links"
-                  description="Load the live knowledge graph from splash_links (requires a running splash server on :8081)."
+                  description="Editable knowledge graph backed by Tiled Graph: edits in the graph view are saved to the Tiled publication target."
                 />
                 <SettingOption
                   id="json"
                   label="JSON"
-                  description="Load a MatKG JSON file from storage/kg (default)."
+                  description="Read-only: load MatKG JSON files from storage/kg (retrieval only, no graph edits)."
                 />
               </RadioGroup>
             </div>

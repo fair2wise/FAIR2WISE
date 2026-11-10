@@ -76,7 +76,7 @@ directory by the standard launcher.
 
 | Variable | Default/typical | Meaning |
 |---|---:|---|
-| `KG_RAG_GRAPH_SOURCE` | `json` in Compose, the start scripts and the images; `config.yml` keeps the legacy `splash` default for the bare `kg_rag_api.py` CLI | `json` or the legacy `splash` |
+| `KG_RAG_GRAPH_SOURCE` | `json` everywhere (Compose, the start scripts, the images, `config.yml` and `scripts/.env.example`; owner decision 2026-11-09, Splash packet Q5) | `json` or the legacy editable `splash` |
 | `TILED_URI` | `http://127.0.0.1:8000` | Live Tiled catalog base (no `/api/graphql` suffix). ALS/11.0.1.2 uses the beamline Tiled host. |
 | `TILED_API_KEY` | unset | Tiled `Authorization: Apikey …` (or `TILED_API_KEY_SCHEME`). Never commit. Unsigned GraphQL returns empty lists. |
 | `F2W_LIVE_TILED` | unset (on if `TILED_URI` is set) | Chat ESAF/proposal/sample/scan lookup via Tiled GraphQL. JSON sim is fallback. |
