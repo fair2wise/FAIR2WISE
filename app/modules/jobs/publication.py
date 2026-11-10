@@ -362,9 +362,18 @@ class Publication:
         if lease is None:
             raise ContractError(ErrorCode.CONFLICT, "another publisher holds this target", retryable=True)
 
+        renewed_at = [sc.store.clock()]
+
         def guard() -> None:
             sc.guard()
-            sc.store.check_lease(lease)
+            # The import is one long effect (a 22k-node corpus takes about half an hour) and the per-target lease
+            # lasts ``lease_seconds``; renew it a few times per lease so only a takeover ever stops the run.
+            now = sc.store.clock()
+            if now - renewed_at[0] >= sc.store.lease_seconds / 4:
+                sc.store.renew_lease(lease)  # LeaseLost when expired or taken over, as check_lease
+                renewed_at[0] = now
+            else:
+                sc.store.check_lease(lease)
 
         def effect() -> dict[str, Any]:
             return self.deps.audit.guard(
