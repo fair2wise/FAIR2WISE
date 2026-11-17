@@ -36,6 +36,13 @@ Rules (``DEPLOYMENT_STRATEGY.md`` section 2, ``docker_profile_contract.md`` sect
   last). Each process group gets its ``stop_signal``, then SIGKILL after
   ``stop_timeout`` seconds. The worker re-queues running jobs on SIGTERM (T10).
 
+Optional profile keys (used by the ``cluster`` profile, absent from the others, whose behaviour is
+unchanged): ``deployment_profile`` (the ``F2W_DEPLOYMENT_PROFILE`` value when it differs from the
+image profile name), ``enum_env`` (names restricted to listed values, refused with 78 otherwise),
+``when_env`` on a service or on a preflight step given as ``{"argv": [...], "when_env": {...}}``
+(it is skipped unless every named variable has one of the listed values), and
+``no_proxy_append`` (entries added to ``NO_PROXY``/``no_proxy`` so internal traffic is never proxied).
+
 Exit codes: 0 clean stop; 1 stop needed SIGKILL or a child reported an unclean stop;
 70 a required child died; 71 a required child failed its startup health check;
 78 configuration or preflight refused (no service was started).
@@ -116,6 +123,7 @@ class Service:
     stop_signal: int = signal.SIGTERM
     stop_timeout: float = 15.0
     cwd: Optional[str] = None
+    when_env: Mapping[str, Tuple[str, ...]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -132,6 +140,10 @@ class Profile:
     stripped_env: Tuple[str, ...] = ()
     cwd: Optional[str] = None
     raw: Mapping[str, Any] = field(default_factory=dict, compare=False)
+    deployment_profile: str = ""
+    enum_env: Mapping[str, Tuple[str, ...]] = field(default_factory=dict)
+    no_proxy_append: Tuple[str, ...] = ()
+    preflight_when: Tuple[Mapping[str, Tuple[str, ...]], ...] = ()
 
 
 def _strs(value: Any, what: str) -> Tuple[str, ...]:
@@ -144,6 +156,20 @@ def _str_map(value: Any, what: str) -> Dict[str, str]:
     if not isinstance(value, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in value.items()):
         raise ProfileError(f"{what} must map names to strings")
     return dict(value)
+
+
+def _when(value: Any, what: str) -> Dict[str, Tuple[str, ...]]:
+    """Parse a ``{NAME: [allowed values]}`` condition (values compared lower-case, stripped)."""
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ProfileError(f"{what} must map names to lists of values")
+    return {str(k): tuple(v.strip().lower() for v in _strs(vals, f"{what}[{k}]")) for k, vals in value.items()}
+
+
+def condition_holds(when: Mapping[str, Tuple[str, ...]], env: Mapping[str, str]) -> bool:
+    """Whether every ``when_env`` entry matches ``env`` (an empty condition always holds)."""
+    return all((env.get(name) or "").strip().lower() in allowed for name, allowed in when.items())
 
 
 def parse_profile(data: Mapping[str, Any]) -> Profile:
@@ -181,15 +207,26 @@ def parse_profile(data: Mapping[str, Any]) -> Profile:
             health=health, restart_max=restart_max, restart_backoff=float(restart.get("backoff", 2.0)),
             no_restart_exit_codes=tuple(int(c) for c in raw.get("no_restart_exit_codes", [])),
             stop_signal=_SIGNALS[stop_signal], stop_timeout=float(raw.get("stop_timeout", 15.0)),
-            cwd=raw.get("cwd")))
+            cwd=raw.get("cwd"), when_env=_when(raw.get("when_env"), f"service {raw['name']} when_env")))
     if not services:
         raise ProfileError("profile has no services")
     names = [s.name for s in services]
-    if len(set(names)) != len(names):
+    if len(set(names)) != len(names) and not all(s.when_env for s in services if names.count(s.name) > 1):
         raise ProfileError(f"duplicate service names: {names}")
     locked = _str_map(data.get("locked_env", {}), "locked_env")
-    if locked.get("F2W_DEPLOYMENT_PROFILE") != name:
+    deployment = str(data.get("deployment_profile") or name)
+    if locked.get("F2W_DEPLOYMENT_PROFILE") != deployment:
         raise ProfileError("locked_env must pin F2W_DEPLOYMENT_PROFILE to the profile name")
+    steps: List[Tuple[str, ...]] = []
+    step_when: List[Dict[str, Tuple[str, ...]]] = []
+    for step in data.get("preflight", []):
+        if isinstance(step, dict):
+            steps.append(_strs(step.get("argv"), "preflight step argv"))
+            step_when.append(_when(step.get("when_env"), "preflight step when_env"))
+        else:
+            steps.append(_strs(step, "preflight step"))
+            step_when.append({})
+    enum_env = _when(data.get("enum_env"), "enum_env")
     defaults = _str_map(data.get("env", {}), "env")
     forbidden = _strs(data.get("forbidden_env", []), "forbidden_env")
     overlap = (set(defaults) | set(locked)) & set(forbidden)
@@ -197,10 +234,12 @@ def parse_profile(data: Mapping[str, Any]) -> Profile:
         raise ProfileError(f"variables both set and forbidden: {sorted(overlap)}")
     return Profile(
         profile=name, tiled_mode=str(data.get("tiled_mode") or ""), services=tuple(services),
-        preflight=tuple(_strs(step, "preflight step") for step in data.get("preflight", [])),
+        preflight=tuple(steps),
         env=defaults, locked_env=locked, forbidden_env=forbidden,
         stripped_env=_strs(data.get("stripped_env", []), "stripped_env"),
-        cwd=data.get("cwd"), raw=dict(data))
+        cwd=data.get("cwd"), raw=dict(data), deployment_profile=deployment, enum_env=enum_env,
+        no_proxy_append=_strs(data.get("no_proxy_append", []), "no_proxy_append"),
+        preflight_when=tuple(step_when))
 
 
 def load_profile(path: Path) -> Profile:
@@ -267,8 +306,34 @@ def resolve_environment(
     for name, value in profile.env.items():
         if not (env.get(name) or "").strip():
             env[name] = value
+    for name, allowed in profile.enum_env.items():
+        value = (env.get(name) or "").strip().lower()
+        if value not in allowed:
+            raise ProfileError(f"{name}={env.get(name)!r} is not one of {', '.join(allowed)} on the "
+                               f"{profile.profile} image")
+        env[name] = value
+    if profile.no_proxy_append:
+        notes.append(merge_no_proxy(env, profile.no_proxy_append))
     env[DOTENV_VAR] = "off"
     return env, notes
+
+
+def merge_no_proxy(env: Dict[str, str], extra: Sequence[str]) -> str:
+    """Add ``extra`` to ``NO_PROXY`` and ``no_proxy`` (both spellings carry the same merged list).
+
+    Internal traffic (loopback, the gateway upstream, the bundled Tiled) must never reach an egress
+    proxy configured through ``HTTP_PROXY``/``HTTPS_PROXY``. Existing entries keep their order and
+    are never removed. Returns a log note (entries only, never a proxy URL).
+    """
+    merged: List[str] = []
+    for key in ("no_proxy", "NO_PROXY"):
+        for entry in re.split(r"[,\s]+", env.get(key) or ""):
+            if entry and entry.lower() not in (m.lower() for m in merged):
+                merged.append(entry)
+    added = [e for e in extra if e.lower() not in (m.lower() for m in merged)]
+    merged.extend(added)
+    env["NO_PROXY"] = env["no_proxy"] = ",".join(merged)
+    return f"NO_PROXY gained {len(added)} internal entries ({len(merged)} in total)"
 
 
 def substitute(argv: Sequence[str], env: Mapping[str, str]) -> List[str]:
@@ -349,7 +414,8 @@ class Supervisor:
         self.stop_signal_name: Optional[str] = None
         self.ready_logged = False
         self.units = [Running(s, substitute(s.argv, env), substitute([s.health.http], env)[0]
-                              if s.health.http else None) for s in profile.services]
+                              if s.health.http else None)
+                      for s in profile.services if condition_holds(s.when_env, env)]
 
     # -- signals ----------------------------------------------------------------
     def install_signal_handlers(self) -> None:
@@ -377,7 +443,10 @@ class Supervisor:
 
     # -- preflight --------------------------------------------------------------
     def run_preflight(self) -> bool:
-        for step in self.profile.preflight:
+        whens = self.profile.preflight_when or ({},) * len(self.profile.preflight)
+        for step, when in zip(self.profile.preflight, whens):
+            if not condition_holds(when, self.env):
+                continue
             argv = substitute(step, self.env)
             log("preflight", argv=argv)
             try:
@@ -557,10 +626,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     for note in notes:
         log("note", detail=note)
     if args.check:
-        shown = sorted(set(profile.locked_env) | set(profile.env) | {DOTENV_VAR})
+        shown = sorted(set(profile.locked_env) | set(profile.env) | {DOTENV_VAR}
+                       | ({"NO_PROXY"} if profile.no_proxy_append else set()))
         print(json.dumps({"profile": profile.profile, "tiled_mode": profile.tiled_mode,
                           "env": {k: env[k] for k in shown},
-                          "preflight": [substitute(s, env) for s in profile.preflight],
+                          "preflight": [substitute(s, env) for s, w in zip(
+                              profile.preflight, profile.preflight_when or ({},) * len(profile.preflight))
+                              if condition_holds(w, env)],
                           "services": [{"name": u.service.name, "argv": u.argv, "required": u.service.required,
                                         "health": u.health_url or f"alive_for={u.service.health.alive_for}"}
                                        for u in supervisor.units]}, indent=2))

@@ -13,6 +13,7 @@ Status: candidate for H4. Built and run only by the owner; nothing here has been
 | `local` | `runtime-base` | + the Tiled server environment, linked as `/opt/tiled/venv`, `profiles/local.json`, `/var/lib/fair2wise/tiled` mount point |
 | `als-dev` | `runtime-base` | + `profiles/als-dev.json` (`https://tiled-staging.als.lbl.gov`) |
 | `als-prod` | `runtime-base` | + `profiles/als-prod.json` (`https://tiled.als.lbl.gov`) |
+| `cluster` | `runtime-base` | Kubernetes (restricted Pod Security): `:local`'s trust model and Tiled with `profiles/cluster.json`, optional nginx (`F2W_GATEWAY=off|on`), `/livez` and `/readyz`, declared writable mounts, `HOME` and caches on `/var/lib/fair2wise/cache`. Not one of the three published channels (`scripts/ci/image_checks.py` and `release_manifest.py` still enumerate only `local`, `als-dev`, `als-prod`). See `mkdocs/docs/cluster-image.md` |
 | `agent` | `runtime-base` | legacy compose API-only target (`scripts/start_agent_backend.sh`, root, no supervisor) plus Splash/pixi (`splash_links`, `pixi install --locked`) for `compose.splash.yaml`; Splash stays here until its approved retirement gate (T16B/H7 or H8) and is never in the three images |
 
 Not in any layer: `papers/`, PDFs, parsed bodies, crops, `storage/source_index`, Tiled catalogs,
@@ -62,6 +63,10 @@ return to `queued`), api (20 s), tiled (25 s; data kept), then SIGKILL per proce
 Supervisor exit codes: 0 clean stop, 1 stop needed SIGKILL / unclean worker stop, 70 required
 child died, 71 required child missed its startup health check, 78 profile/env/preflight refused.
 Status: `/run/fair2wise/supervisor.json`.
+
+The `cluster` target runs the same services; with `F2W_GATEWAY=off` (its default) the `gateway` row is absent and
+the `api` service is the one listener on `F2W_GATEWAY_PORT` and serves the UI itself. `docker build --target cluster -t fair2wise:cluster .`
+builds it; its tests are `tests/images/test_images_cluster.py`.
 
 ## Fixed profile
 

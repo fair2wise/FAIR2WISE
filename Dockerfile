@@ -291,6 +291,46 @@ LABEL org.opencontainers.image.title="fair2wise" \
       f2w.tiled_version="0.2.18"
 
 
+# Kubernetes (K3s pilot) final: the :local trust model and bundled Tiled, for a pod that runs under Pod
+# Security "restricted" (non-root, read-only root filesystem, all capabilities dropped) behind an ingress
+# that terminates TLS and sign-in. Every writable path is a declared mount (docker/profiles/cluster.json,
+# docs/cluster-profile.md); the nginx gateway is optional (F2W_GATEWAY=off, the default here).
+FROM runtime-base AS cluster
+
+USER root
+COPY --from=tiled-server-build /opt/tiled/ws/.pixi/envs/tiled-server /opt/tiled/ws/.pixi/envs/tiled-server
+RUN ln -s /opt/tiled/ws/.pixi/envs/tiled-server /opt/tiled/venv
+COPY docker/profiles/cluster.json /etc/fair2wise/profile.json
+RUN mkdir -p /var/lib/fair2wise/tiled && \
+    chown 10001:10001 /var/lib/fair2wise/tiled && \
+    chmod 0700 /var/lib/fair2wise/tiled
+USER 10001:10001
+
+# F2W_DEPLOYMENT_PROFILE stays `local` (trust model and Tiled settings are the :local ones); the image
+# profile is `cluster`. HOME and the caches point at the writable cache mount: the numeric uid needs no
+# passwd entry and nothing writes below the read-only root.
+ENV F2W_DEPLOYMENT_PROFILE=local \
+    F2W_AUTHORIZATION_MODE=local_trusted \
+    F2W_TILED_MODE=managed \
+    F2W_TILED_DATA_DIR=/var/lib/fair2wise/tiled \
+    F2W_TILED_PYTHON=/opt/tiled/venv/bin/python \
+    F2W_TILED_PORT=8765 \
+    HOME=/var/lib/fair2wise/cache/home \
+    XDG_CACHE_HOME=/var/lib/fair2wise/cache/xdg \
+    MPLCONFIGDIR=/var/lib/fair2wise/cache/matplotlib \
+    TMPDIR=/tmp
+
+ARG GIT_COMMIT=unknown
+ENV F2W_CODE_COMMIT=${GIT_COMMIT}
+LABEL org.opencontainers.image.title="fair2wise" \
+      org.opencontainers.image.revision="${GIT_COMMIT}" \
+      org.opencontainers.image.description="FAIR2WISE :cluster - UI, API, worker and managed Tiled 0.2.18 for Kubernetes (restricted PSS)" \
+      f2w.profile="cluster" \
+      f2w.base_path="/fair2wise" \
+      f2w.tiled_mode="managed" \
+      f2w.tiled_version="0.2.18"
+
+
 # Splash/pixi for the legacy editable mode (compose.splash.yaml, F2W_KG_MODE=splash). Used
 # only by the agent target below; never by runtime-base, local, als-dev or als-prod.
 FROM ghcr.io/prefix-dev/pixi:0.70.2 AS pixi
