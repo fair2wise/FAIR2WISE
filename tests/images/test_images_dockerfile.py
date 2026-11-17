@@ -22,7 +22,7 @@ FINALS = ("local", "als-dev", "als-prod")
 ALS = ("als-dev", "als-prod")
 SUPERVISOR = "/opt/fair2wise/entrypoint/f2w_supervisor.py"
 PROFILE_PATH = "/etc/fair2wise/profile.json"
-PIXI_VERSION = "0.66.0"  # the pixi that wrote pixi.lock
+PIXI_VERSION = "0.84.2"  # the pixi that wrote pixi.lock
 PIXI_LOCK = (REPO / "pixi.lock").read_text(encoding="utf-8")
 PIXI_TOML = (REPO / "pixi.toml").read_text(encoding="utf-8")
 TILED_ENV = "/opt/tiled/ws/.pixi/envs/tiled-server"
@@ -39,17 +39,40 @@ def test_stage_layout():
         assert DF.stage(name).base == "runtime-base", name
     assert DF.stage("runtime-base").base == "${PYTHON_IMAGE}"
     # Dependency installs run in pixi stages (pixi.lock, --locked); only runtime-base is a plain Python image.
-    assert DF.stage("pixi-app").base == f"ghcr.io/prefix-dev/pixi:{PIXI_VERSION}"
+    assert DF.stage("pixi-app").base == "${PIXI_IMAGE}"
+    assert DF.global_args["PIXI_IMAGE"].startswith(f"ghcr.io/prefix-dev/pixi:{PIXI_VERSION}@sha256:")
     for name in ("docs-build", "app-env-build", "tiled-server-build"):
         assert DF.stage(name).base == "pixi-app", name
-    assert DF.global_args["PYTHON_IMAGE"].startswith("python:3.12")
+    assert DF.global_args["PYTHON_IMAGE"].startswith("python:3.12-slim@sha256:")
+    assert DF.global_args["NODE_IMAGE"].startswith("node:22-bookworm-slim@sha256:")  # UI build on Node 22 LTS
+    assert DF.stage("frontend-build").base == "${NODE_IMAGE}"
+
+
+DIGEST_PIN = re.compile(r"^[a-z0-9./_-]+(?::[A-Za-z0-9._-]+)?@sha256:[0-9a-f]{64}$")
+
+
+def test_every_from_is_pinned_by_digest_through_an_overridable_build_arg():
+    """Each FROM is a stage name or ``${ARG}`` whose global default is ``name:tag@sha256:<64 hex>`` (the
+    multi-arch index digest), so a rebuild gets the same bytes and a deployment can override the pin."""
+    stage_names = set(DF.names)
+    for stage in DF.stages:
+        if stage.base in stage_names:
+            continue
+        match = re.fullmatch(r"\$\{([A-Z0-9_]+)\}", stage.base)
+        assert match, f"stage {stage.name}: FROM {stage.base} is neither a stage nor a ${{BUILD_ARG}}"
+        default = DF.global_args.get(match.group(1))
+        assert default and DIGEST_PIN.match(default), f"{match.group(1)} default {default!r} has no sha256 digest"
+    raw = [m for m in re.findall(r"^FROM\s+(\S+)", (REPO / "Dockerfile").read_text(encoding="utf-8"), re.M)]
+    assert raw and not [b for b in raw if "@sha256:" in b], "digests belong in the ARG defaults, not in FROM lines"
+    assert {"PYTHON_IMAGE", "NODE_IMAGE", "NGINX_IMAGE", "PIXI_IMAGE", "PIXI_LEGACY_IMAGE"} <= set(DF.global_args)
 
 
 def test_t24c_stages_are_kept():
     text = (REPO / "Dockerfile").read_text(encoding="utf-8")
     assert "ENV F2W_PUBLIC_PREFIX=/fair2wise" in text
     assert "COPY docker/nginx.conf /etc/nginx/templates/default.conf.template" in text
-    assert DF.stage("frontend").base == "nginx:1.27-alpine"
+    assert DF.stage("frontend").base == "${NGINX_IMAGE}"
+    assert DF.global_args["NGINX_IMAGE"].startswith("nginx:1.27-alpine@sha256:")
     base = DF.stage("runtime-base").copies()
     assert ("frontend-build", ["/build/ui/dist"], "/usr/share/nginx/html/fair2wise") in base
     assert ("docs-build", ["/build/site"], "/usr/share/nginx/html/fair2wise/docs") in base
@@ -189,7 +212,8 @@ def test_agent_target_stays_compatible_with_compose():
 def test_splash_stays_only_in_the_legacy_agent_target():
     """Splash retirement waits for its gate (T16B/H7 or H8): agent keeps it, the new images do not."""
     agent = DF.stage("agent")
-    assert DF.stage("pixi").base == "ghcr.io/prefix-dev/pixi:0.70.2"
+    assert DF.stage("pixi").base == "${PIXI_LEGACY_IMAGE}"
+    assert DF.global_args["PIXI_LEGACY_IMAGE"].startswith("ghcr.io/prefix-dev/pixi:0.70.2@sha256:")
     assert ("pixi", ["/usr/local/bin/pixi"], "/usr/local/bin/pixi") in agent.copies()
     assert (None, ["splash_links"], "./splash_links") in agent.copies()
     assert agent.env()["SPLASH_LINKS_REPO"] == "/app/splash_links"

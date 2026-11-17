@@ -8,7 +8,7 @@ set -euo pipefail
 # with --locked, so only hash-checked packages are installed). The scripts that follow
 # (`source .venv/bin/activate`) keep working: this script writes $VENV_DIR/bin/activate as a
 # small shim that activates the pixi environment. pixi must already be on PATH on the remote
-# (the version in pixi.lock is 0.66.0; see https://pixi.sh/latest/installation/).
+# (the version in pixi.lock is 0.84.2; see https://pixi.sh/latest/installation/).
 
 REPO_DIR="${1:-$(pwd)}"
 VENV_DIR="${VENV_DIR:-.venv}"

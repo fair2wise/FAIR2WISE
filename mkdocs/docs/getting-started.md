@@ -47,7 +47,7 @@ paper extract). Linux Docker should enable IPv6 on the Compose network.
 ## Local-development prerequisites
 
 - Python 3.12
-- Node.js 20 or newer, including npm 10 or newer
+- Node.js 22 (what CI and the image build use; `ui/package.json` accepts 20 or newer), including npm 10 or newer
 - **Legacy only:** Pixi for the vendored Splash Links environment
 - `curl` for readiness checks
 - A CBORG API key for the default hosted model, or a local Ollama server
@@ -74,7 +74,7 @@ cd ..
 Use `pixi install --locked -e dev` when contributing code or documentation, and
 run tools with `pixi run -e dev ...`. `pixi.toml` and `pixi.lock` are the single
 source of truth for Python dependencies (Python 3.12); edit `pixi.toml`, run
-`pixi lock` (pixi 0.66.0), and commit `pixi.lock` rather than hand-editing it.
+`pixi lock` (pixi 0.84.2), and commit `pixi.lock` rather than hand-editing it.
 The `default` environment includes the semantic retrieval stack.
 
 Set `CBORG_API_KEY` in `.env` when using CBORG. For Ollama, set the backend and

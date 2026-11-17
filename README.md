@@ -136,7 +136,7 @@ Writes the next snapshot `storage/kg/matkg_bl1101_vN.json` (v1, then v2, …; ne
 
 For local development without Docker:
 
-- [Pixi](https://pixi.sh/latest/installation/) (0.66.0 wrote `pixi.lock`); it provisions Python 3.12 and the locked Python dependencies
+- [Pixi](https://pixi.sh/latest/installation/) (0.84.2 wrote `pixi.lock`); it provisions Python 3.12 and the locked Python dependencies
 - Node.js 20+ (including npm); npm installs the pinned local Vite 6 toolchain from `ui/package.json`
 - **Legacy only:** a separate Pixi workspace for the vendored `splash_links` database server (`F2W_KG_MODE=splash`)
 - A [CBORG](https://cborg.lbl.gov/) API key (default LLM backend). CBORG requires LBLnet/VPN or an authorized IP — see [CBORG IP authorization](https://api.cborg.lbl.gov/key/manage).
@@ -1378,7 +1378,7 @@ and copied into `runtime-base`; the Tiled server environment is built in
 `tiled-server-build`. CI installs pixi with `scripts/ci/install_pixi.sh`
 (pinned release, sha256-verified).
 
-To change a dependency, edit `pixi.toml`, run `pixi lock` with pixi 0.66.0 (the
+To change a dependency, edit `pixi.toml`, run `pixi lock` with pixi 0.84.2 (the
 version that wrote the lock; the Dockerfile and `scripts/ci/install_pixi.sh`
 use the same pin), and commit `pixi.lock`. Do not hand-edit the lock.
 Application pins are exact; the semantic retrieval stack (faiss-cpu,

@@ -60,13 +60,13 @@ osx-arm64). Never hand-edit `pixi.lock`.
 
 ```bash
 pixi install --locked -e dev
-# edit pixi.toml, then regenerate the lock with pixi 0.66.0
+# edit pixi.toml, then regenerate the lock with pixi 0.84.2
 pixi lock
 pixi install --locked -e dev
 pixi run -e dev test
 ```
 
-Use pixi 0.66.0, the version that wrote the lock; the Dockerfile and
+Use pixi 0.84.2, the version that wrote the lock; the Dockerfile and
 `scripts/ci/install_pixi.sh` pin the same version. Environments are `default`
 (application runtime), `dev`, `docs`, and the isolated `globus`, `legacy`, and
 `tiled-server`. `globus` conflicts with linkml-runtime and `tiled-server` pins

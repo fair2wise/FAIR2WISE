@@ -12,7 +12,7 @@ change-impact analysis.
 | `config.yml` | Central non-secret defaults and environment mappings |
 | `.env.example` | Local environment template |
 | `pixi.toml` | Dependency workspace: environments `default`, `dev`, `docs`, `globus`, `legacy`, `tiled-server`, and their tasks |
-| `pixi.lock` | Generated lock (pixi 0.66.0) with sha256 for every conda package and PyPI artifact; never hand-edited |
+| `pixi.lock` | Generated lock (pixi 0.84.2) with sha256 for every conda package and PyPI artifact; never hand-edited |
 | `compose.yaml` | Product agent+UI Compose stack (JSON KG, ports 5175/8090) |
 | `compose.splash.yaml` | Optional Splash + agent + Nginx `/api` stack |
 | `compose.hostnet.yaml` | Linux overlay: agent `network_mode: host` for IPv6 |

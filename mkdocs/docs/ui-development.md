@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 20 or newer;
+- Node.js 22 (CI and the image build use it; 20 or newer is accepted by `package.json`);
 - npm 10 or newer;
 - the FAIR2WISE agent API for live features; and
 - Splash when the agent uses the default editable graph source.

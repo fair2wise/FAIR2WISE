@@ -103,7 +103,7 @@ any subset. Other tasks: `lint`, `typecheck`, `ruff`, `isort-check`,
 `coverage`, `docs`.
 Runtime containers install the pixi `default` environment from `pixi.lock`
 with `--locked`. After editing a dependency in `pixi.toml`, run `pixi lock`
-(pixi 0.66.0) and commit `pixi.lock`; `tests/packaging/test_pixi_lock.py`
+(pixi 0.84.2) and commit `pixi.lock`; `tests/packaging/test_pixi_lock.py`
 checks the lock.
 
 `pytest.ini` sets the repository on `pythonpath` and limits default discovery to

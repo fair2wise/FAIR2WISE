@@ -22,7 +22,7 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.12"
-  NODE_VERSION: "20"
+  NODE_VERSION: "22"
   # Re-pinned 2026-10-16 (owner O-U1): T24C build-base router/logo change for /fair2wise.
   # Re-pinned 2026-10-16 (owner O-U2): T11B additive validation judge-model dropdown in the
   # settings panel (JudgeModelSetting, judgeModel.ts, e2e judge-model.spec.ts); previous 2cc7ccd3.

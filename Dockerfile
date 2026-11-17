@@ -1,9 +1,20 @@
 # syntax=docker/dockerfile:1.7
 
-# Python base for the T24B runtime stages; pin a digest here when releasing (T24D).
-ARG PYTHON_IMAGE=python:3.12-slim
+# Base images, each pinned as tag@sha256:<multi-arch index digest> so linux/amd64 and
+# linux/arm64 both resolve and a rebuild gets the same bytes. Every FROM below goes through
+# one of these ARGs, so a deployment can override it (--build-arg NODE_IMAGE=...), e.g. to
+# point at a mirror or a newer pin; the defaults are the reviewed pins. Digests resolved
+# 2026-11-17 with `docker buildx imagetools inspect <tag>` (Docker Hub / ghcr.io index digest);
+# see docs/migration/reviews/H7/base_image_pins.md for the table and the refresh procedure.
+# tests/images/test_images_dockerfile.py fails if any FROM lacks a digest.
+ARG PYTHON_IMAGE=python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
+ARG NODE_IMAGE=node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
+ARG NGINX_IMAGE=nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+ARG PIXI_IMAGE=ghcr.io/prefix-dev/pixi:0.84.2@sha256:8201f134655a8261f382ee565ddf1498e5f215887bb14e812e1f47c09f4f7196
+# Legacy `agent` target only (splash_links keeps the pixi that its own lock was written with).
+ARG PIXI_LEGACY_IMAGE=ghcr.io/prefix-dev/pixi:0.70.2@sha256:c2d3c9b7041293d90039857bb3cff4c0bbe8c78af1d68254b230575154b85f65
 
-FROM node:20-bookworm-slim AS frontend-build
+FROM ${NODE_IMAGE} AS frontend-build
 
 WORKDIR /build/ui
 COPY ui/package.json ui/package-lock.json ./
@@ -21,7 +32,7 @@ RUN npm run build && grep -q '"public_prefix": "/fair2wise"' dist/f2w-build.json
 # only guaranteed byte-stable under the writing version). Used by the build stages only; the
 # pixi binary never reaches an image the supervisor runs (the legacy `agent` target keeps its
 # own pixi for splash_links below).
-FROM ghcr.io/prefix-dev/pixi:0.66.0 AS pixi-app
+FROM ${PIXI_IMAGE} AS pixi-app
 
 # MkDocs site served by the gateway at /fair2wise/docs/ (owner decision O-A7). Built with the
 # locked pixi `docs` environment (mkdocs 1.6.1, mkdocs-material 9.7.7), at the path it is used from.
@@ -38,7 +49,7 @@ RUN python gateway.py mkdocs-config --source mkdocs/mkdocs.yml --out mkdocs/.mkd
     mkdocs build --strict -f mkdocs/.mkdocs.image.yml -d /build/site
 
 
-FROM nginx:1.27-alpine AS frontend
+FROM ${NGINX_IMAGE} AS frontend
 
 # docker/nginx.conf is the /fair2wise gateway template; the image entrypoint fills
 # only F2W_* placeholders (the private API host:port and the listen port) into
@@ -62,7 +73,7 @@ LABEL Name="fair2wise-frontend" \
 # ---------------------------------------------------------------------------------------
 # T24B: one shared runtime base and three supervised finals (D23-D25, D29; owner O-T1/O-D1).
 #
-#   pixi-app            pixi 0.66.0, the version that wrote pixi.lock (build stages only)
+#   pixi-app            pixi 0.84.2, the version that wrote pixi.lock (build stages only)
 #   app-env-build       pixi `default` environment from pixi.lock (`--locked`: every conda
 #                       package and PyPI artifact is checked against the lock's sha256)
 #   tiled-server-build  isolated Tiled 0.2.18 server environment (pixi `tiled-server`), :local only
@@ -293,7 +304,7 @@ LABEL org.opencontainers.image.title="fair2wise" \
 
 # Splash/pixi for the legacy editable mode (compose.splash.yaml, F2W_KG_MODE=splash). Used
 # only by the agent target below; never by runtime-base, local, als-dev or als-prod.
-FROM ghcr.io/prefix-dev/pixi:0.70.2 AS pixi
+FROM ${PIXI_LEGACY_IMAGE} AS pixi
 
 
 # Legacy developer target for compose.yaml / compose.splash.yaml (agent API only, no

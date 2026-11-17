@@ -6,8 +6,9 @@ Promotion is a registry-side re-tag of the exact tested bytes; nothing is built 
 from the runner. The approved O06 tag rules (docs/migration/reviews/H6/o06_tag_rules_proposal.md,
 APPROVED 2026-10-30, owner decisions O-O6 D2.1-D2.10) are enforced here and fail closed:
 
-1. the target ``REPO@sha256:...`` is a single-platform manifest whose ``f2w.profile`` label is
-   the channel and whose ``org.opencontainers.image.revision`` label is a full commit;
+1. the target ``REPO@sha256:...`` is a single-platform manifest, or a multi-arch index every
+   platform image of which carries the same ``f2w.profile`` label (the channel) and the same
+   ``org.opencontainers.image.revision`` label (a full commit);
 2. the immutable ``sha-<commit>-<variant>`` tag written by the publish job points at that
    same digest (so only published, tested candidates can be promoted);
 3. a forward promotion never moves a channel backwards: the channel's current revision must
@@ -75,11 +76,28 @@ class Registry:
         desc = self.descriptor(ref)
         return desc.get("digest") if isinstance(desc, dict) else None
 
-    def labels(self, ref: str) -> Dict[str, str]:
+    def _image_labels(self, ref: str) -> Dict[str, str]:
         image = self._inspect(ref, "{{json .Image}}")
         if not isinstance(image, dict) or "config" not in image:
             raise PromotionRefused(f"{ref}: not a single-platform image config")
         return (image.get("config") or {}).get("Labels") or {}
+
+    def labels(self, ref: str) -> Dict[str, str]:
+        """Labels of a single-platform image, or of a multi-arch index whose platform images agree."""
+        desc = self.descriptor(ref)
+        if not (isinstance(desc, dict) and desc.get("mediaType") in INDEX_TYPES):
+            return self._image_labels(ref)
+        repo = ref.split("@", 1)[0]
+        kids = [m["digest"] for m in desc.get("manifests") or []
+                if (m.get("platform") or {}).get("os") not in (None, "unknown")
+                and (m.get("platform") or {}).get("architecture") not in (None, "unknown")]
+        if not kids:
+            raise PromotionRefused(f"{ref}: index lists no platform image")
+        seen = [self._image_labels(f"{repo}@{kid}") for kid in kids]
+        for key in ("f2w.profile", "org.opencontainers.image.revision"):
+            if len({labels.get(key) for labels in seen}) != 1:
+                raise PromotionRefused(f"{ref}: platform images disagree on label {key}")
+        return seen[0]
 
     def retag(self, tag_ref: str, source_ref: str) -> None:
         proc = self.runner(["docker", "buildx", "imagetools", "create", "--tag", tag_ref, source_ref])
@@ -107,8 +125,6 @@ def promote(reg: Registry, *, variant: str, digest: str, rollback: bool, reason:
     desc = reg.descriptor(target_ref)
     if not isinstance(desc, dict) or desc.get("digest") != digest:
         raise PromotionRefused(f"{target_ref} is not in the registry")
-    if desc.get("mediaType") in INDEX_TYPES:
-        raise PromotionRefused("multi-platform indexes are not promoted until O08 settles platforms")
     labels = reg.labels(target_ref)
     if labels.get("f2w.profile") != variant:
         raise PromotionRefused(f"target is a {labels.get('f2w.profile')!r} image, not {variant}")
