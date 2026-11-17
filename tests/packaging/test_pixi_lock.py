@@ -28,17 +28,25 @@ def lock() -> Dict[str, Any]:
     return yaml.safe_load((REPO / "pixi.lock").read_text(encoding="utf-8"))
 
 
+def _env_platform(lock: Dict[str, Any], env: str, platform: str) -> Any:
+    """The package list of ``env`` on ``platform``. Lock format v7 (pixi >= 0.82) keys an environment that
+    needs macOS 14 (faiss-cpu wheels, [system-requirements]) as osx-arm64-macos-14-0 instead of osx-arm64."""
+    packages = lock["environments"][env]["packages"]
+    return packages.get(platform) or packages[f"{platform}-macos-14-0"]
+
+
 def _pypi_packages(lock: Dict[str, Any], env: str, platform: str = "linux-64") -> Set[str]:
     """Names of the PyPI packages ``env`` installs on ``platform`` (from the locked package list)."""
     by_url = {p["pypi"]: p for p in lock["packages"] if "pypi" in p}
     return {by_url[e["pypi"]]["name"].lower().replace("_", "-")
-            for e in lock["environments"][env]["packages"][platform] if "pypi" in e}
+            for e in _env_platform(lock, env, platform) if "pypi" in e}
 
 
 def test_lock_declares_every_environment_on_every_platform(lock):
     assert tuple(sorted(lock["environments"])) == tuple(sorted(ENVIRONMENTS))
     for env in ENVIRONMENTS:
-        assert set(lock["environments"][env]["packages"]) == set(PLATFORMS), env
+        keys = {re.sub(r"-macos-\d+-\d+$", "", k) for k in lock["environments"][env]["packages"]}
+        assert keys == set(PLATFORMS), env
 
 
 def test_every_pypi_artifact_is_hashed(lock):
