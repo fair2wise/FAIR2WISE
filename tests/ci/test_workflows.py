@@ -228,14 +228,15 @@ def test_build_never_logs_in_pushes_or_publishes(build: Dict[str, Any]) -> None:
 def test_build_builds_all_three_variants_from_one_commit(build: Dict[str, Any]) -> None:
     job = build["jobs"]["build-candidates"]
     assert job["needs"] == "image-static-tests"
-    scripts = {s.get("name"): s.get("run", "") for s in job["steps"]}
-    build_script = scripts["Build the three variants"]
+    build_script = next(s["run"] for s in job["steps"] if s.get("name", "").startswith("Build the three variants"))
     assert "for variant in local als-dev als-prod" in build_script
     assert '--target "$variant"' in build_script
     assert "--label \"org.opencontainers.image.revision=$GITHUB_SHA\"" in build_script
     assert "--provenance=false" in build_script and "--sbom=false" in build_script
     assert "--secret" not in build_script and "--ssh" not in build_script
-    assert re.findall(r"--build-arg\s+\"?([A-Z_]+)=", build_script) == ["PYTHON_IMAGE"]
+    # Base images and pixi come from the digest-pinned ARG defaults of the Dockerfile, not from the workflow.
+    assert "--build-arg" not in build_script
+    assert '--platform "$PLATFORM"' in build_script and '-t "$CANDIDATE:$variant-$ARCH"' in build_script
     # The single checkout is the commit under test; nothing else is checked out.
     checkouts = [s for s in job["steps"] if str(s.get("uses", "")).startswith("actions/checkout@")]
     assert len(checkouts) == 1 and "ref" not in (checkouts[0].get("with") or {})
@@ -264,16 +265,46 @@ def test_release_manifest_artifact_and_trusted_only_images(build: Dict[str, Any]
         assert f"checks-{variant}.json" in manifest["run"]
     # D2.9: the resolved base-image references go into the manifest; D2.10: the newest binary
     # report is referenced (information only).
-    assert '--base-image "$BASE_PYTHON_IMAGE=$PYTHON_REF" --base-image "$BASE_NODE_IMAGE=$NODE_REF"' in manifest["run"]
+    assert "candidate/manifest/base-images.txt" in manifest["run"] and '--platform "$PLATFORM"' in manifest["run"]
+    pull = next(s["run"] for s in job["steps"] if s.get("name", "").startswith("Pull the Dockerfile"))
+    assert "scripts/ci/base_images.py" in pull and '--platform "$PLATFORM"' in pull
     assert "--binary-report latest" in manifest["run"]
     uploads = [s for s in job["steps"] if str(s.get("uses", "")).startswith("actions/upload-artifact@")]
     by_name = {s["with"]["name"]: s for s in uploads}
-    assert set(by_name) == {"release-manifest", "release-images"}
+    assert set(by_name) == {"release-manifest-${{ matrix.arch }}", "release-images-${{ matrix.arch }}"}
+    by_name = {k.split("-${{")[0]: v for k, v in by_name.items()}
     assert all(s["with"]["retention-days"] == 90 for s in uploads), "D2.7: GitHub's maximum, nothing shorter"
     assert by_name["release-images"]["if"] == "github.event_name != 'pull_request'"
     save = next(s for s in job["steps"] if s.get("name", "").startswith("Save the tested images"))
     assert save["if"] == "github.event_name != 'pull_request'"
-    assert all(f'"$CANDIDATE:{v}"' in save["run"] for v in VARIANTS)
+    assert all(f'"$CANDIDATE:{v}-$ARCH"' in save["run"] for v in VARIANTS)
+
+
+def test_images_are_built_natively_on_both_architectures_without_qemu(build: Dict[str, Any]) -> None:
+    """K3s pilot: linux/amd64 on ubuntu-latest and linux/arm64 on the native arm64 runner; no emulation,
+    no new action (the runner's docker builds; every action stays one of the reviewed SHA pins)."""
+    job = build["jobs"]["build-candidates"]
+    assert job["runs-on"] == "${{ matrix.runner }}"
+    assert job["strategy"]["fail-fast"] is False, "one platform failing must not hide the other's result"
+    matrix = {m["platform"]: (m["arch"], m["runner"]) for m in job["strategy"]["matrix"]["include"]}
+    assert matrix == {"linux/amd64": ("amd64", "ubuntu-latest"), "linux/arm64": ("arm64", "ubuntu-24.04-arm")}
+    text = BUILD.read_text(encoding="utf-8") + PUBLISH.read_text(encoding="utf-8")
+    for word in ("qemu", "binfmt", "setup-qemu", "docker/setup-buildx", "build-push-action"):
+        assert word not in text.lower(), word
+    assert job["env"] == {"PLATFORM": "${{ matrix.platform }}", "ARCH": "${{ matrix.arch }}"}
+    # The post-build checks and the release manifest run per platform and record it.
+    checks = next(s["run"] for s in job["steps"] if s.get("name", "").startswith("Post-build checks"))
+    assert '--image "$CANDIDATE:$variant-$ARCH"' in checks
+
+
+def test_publish_joins_both_platforms_into_one_index(publish: Dict[str, Any]) -> None:
+    run = "\n".join(s.get("run", "") for s in publish["jobs"]["publish"]["steps"])
+    assert "for arch in amd64 arm64" in run
+    assert '-n "release-manifest-$arch"' in run and '-n "release-images-$arch"' in run
+    assert '--platform "linux/$arch"' in run
+    assert ("--manifest candidate/amd64/manifest/release-manifest.json "
+            "candidate/arm64/manifest/release-manifest.json") in run
+    assert "docker load" in run and "docker build" not in run
 
 
 def test_main_side_effects_stay_main_only(build: Dict[str, Any]) -> None:
@@ -394,7 +425,7 @@ def test_publish_never_rebuilds_and_verifies_the_tested_bytes(publish: Dict[str,
     run = "\n".join(s.get("run", "") for s in job["steps"])
     # Only this run's own artifacts (built by the candidate job of the same commit) are published.
     assert 'gh run download "$GITHUB_RUN_ID"' in run and "build_run_id" not in PUBLISH.read_text(encoding="utf-8")
-    assert "-n release-manifest" in run and "-n release-images" in run
+    assert "-n \"release-manifest-$arch\"" in run and "-n \"release-images-$arch\"" in run
     assert '--commit "$GITHUB_SHA"' in run
     assert run.index("release_manifest.py verify") < run.index("docker load") < run.index("--inspect")
     assert run.index("--inspect") < run.index("publish_candidate.py") < run.index("promote_channel.py")
@@ -492,12 +523,16 @@ def test_ci_installs_pixi_from_the_pinned_checksummed_script_not_a_new_action() 
     release digest is pinned and verified before the binary runs, at the version of pixi.lock/Dockerfile."""
     script = (REPO / "scripts/ci/install_pixi.sh").read_text(encoding="utf-8")
     version = re.search(r'^PIXI_VERSION="([\d.]+)"', script, re.M).group(1)
-    assert re.search(r'^PIXI_SHA256="[0-9a-f]{64}"', script, re.M)
+    # one pinned sha256 per supported architecture (the arm64 jobs run on native aarch64 runners)
+    assert len(re.findall(r'^\s+PIXI_SHA256="[0-9a-f]{64}"', script, re.M)) == 2
+    assert "pixi-x86_64-unknown-linux-musl" in script and "pixi-aarch64-unknown-linux-musl" in script
+    assert tuple(int(p) for p in version.split(".")) >= (0, 82, 1)  # eMudhra CA certificate-validation fix
     assert "sha256sum -c -" in script and script.index("sha256sum -c") < script.index("chmod +x")
     code = "\n".join(line for line in script.splitlines() if not line.lstrip().startswith("#"))
     assert not re.search(r"\|\s*(sh|bash)\b", code) and "bash -c" not in code  # never curl | sh
     dockerfile = (REPO / "Dockerfile").read_text(encoding="utf-8")
-    assert f"FROM ghcr.io/prefix-dev/pixi:{version} AS pixi-app" in dockerfile
+    assert "FROM ${PIXI_IMAGE} AS pixi-app" in dockerfile
+    assert re.search(rf"^ARG PIXI_IMAGE=ghcr\.io/prefix-dev/pixi:{re.escape(version)}@sha256:[0-9a-f]{{64}}$", dockerfile, re.M)
     for wf in ("forge-merge-ci.yml", "build-app.yml"):
         text = (WORKFLOWS / wf).read_text(encoding="utf-8")
         assert "scripts/ci/install_pixi.sh" in text and "pixi install --locked" in text, wf

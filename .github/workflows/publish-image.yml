@@ -20,8 +20,9 @@
 #
 # Nothing is rebuilt at publication: the saved images are loaded and their ids and layers must
 # equal the release manifest. Commit tags are immutable: an existing sha-* tag that resolves to
-# other bytes refuses the publication, it is never overwritten. Only linux/amd64 is published
-# (D2.8); the legacy compose `agent` image is not published at all (D2.6). Nothing expires
+# other bytes refuses the publication, it is never overwritten. Each commit is published as
+# a multi-arch index (linux/amd64 + linux/arm64, K3s pilot; D2.8 was amd64 only) over per-platform
+# images built and tested on native runners; the legacy compose `agent` image is not published at all (D2.6). Nothing expires
 # (D2.7): no GHCR retention policy, workflow artifacts at GitHub's 90-day maximum.
 #
 # Safety switch: every run fails in the `gate` job unless the repository variable O06_APPROVED
@@ -32,7 +33,8 @@
 # deployment branches/tags to main and v*.
 #
 # Credentials: only the job's GITHUB_TOKEN with packages: write, for ghcr.io
-# (ghcr.io/fair2wise/fair2wise, public, D2.4). No repository or environment secret is
+# (ghcr.io/<repository owner, lowercased>/fair2wise; D2.4 asked for public, which GitHub only grants
+# when the owner sets the package visibility to public after the first publication). No repository or environment secret is
 # referenced, so CBORG, Tiled and other runtime credentials never reach these jobs. Nothing here
 # deploys to a host: Ansible rollout by digest is T24E/H7.
 name: Publish images and move channels (O06)
@@ -166,25 +168,29 @@ jobs:
         env:
           O06_APPROVED: ${{ vars.O06_APPROVED }}
         run: test "$O06_APPROVED" = "true"
-      - name: Download this run's manifest and tested images (built by the candidate job)
+      - name: Download this run's manifests and tested images, one set per platform (built by the candidate job)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" -n release-manifest -D candidate/manifest
-          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" -n release-images -D candidate/images
-      - name: Verify the manifest, then load and verify the images
+          for arch in amd64 arm64; do
+            gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" -n "release-manifest-$arch" -D "candidate/$arch/manifest"
+            gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" -n "release-images-$arch" -D "candidate/$arch/images"
+          done
+      - name: Verify each manifest, then load and verify the images
         run: |
           set -euo pipefail
-          python3 scripts/ci/release_manifest.py verify \
-            --manifest candidate/manifest/release-manifest.json --commit "$GITHUB_SHA"
-          (cd candidate/images && sha256sum -c images.tar.gz.sha256)
-          gunzip -c candidate/images/images.tar.gz | docker load
-          docker image inspect f2w-candidate:local f2w-candidate:als-dev f2w-candidate:als-prod > "$RUNNER_TEMP/loaded.json"
-          python3 scripts/ci/release_manifest.py verify \
-            --manifest candidate/manifest/release-manifest.json --commit "$GITHUB_SHA" \
-            --inspect "$RUNNER_TEMP/loaded.json" \
-            --ref local=f2w-candidate:local --ref als-dev=f2w-candidate:als-dev --ref als-prod=f2w-candidate:als-prod
+          for arch in amd64 arm64; do
+            python3 scripts/ci/release_manifest.py verify \
+              --manifest "candidate/$arch/manifest/release-manifest.json" --commit "$GITHUB_SHA" --platform "linux/$arch"
+            (cd "candidate/$arch/images" && sha256sum -c images.tar.gz.sha256)
+            gunzip -c "candidate/$arch/images/images.tar.gz" | docker load
+            docker image inspect "f2w-candidate:local-$arch" "f2w-candidate:als-dev-$arch" "f2w-candidate:als-prod-$arch" > "$RUNNER_TEMP/loaded-$arch.json"
+            python3 scripts/ci/release_manifest.py verify \
+              --manifest "candidate/$arch/manifest/release-manifest.json" --commit "$GITHUB_SHA" --platform "linux/$arch" \
+              --inspect "$RUNNER_TEMP/loaded-$arch.json" \
+              --ref "local=f2w-candidate:local-$arch" --ref "als-dev=f2w-candidate:als-dev-$arch" --ref "als-prod=f2w-candidate:als-prod-$arch"
+          done
       - name: Log in to ghcr.io with the job token
         env:
           GH_TOKEN: ${{ github.token }}
@@ -196,7 +202,8 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/ci/publish_candidate.py \
-            --manifest candidate/manifest/release-manifest.json --repository "$IMAGE_REPOSITORY" \
+            --manifest candidate/amd64/manifest/release-manifest.json candidate/arm64/manifest/release-manifest.json \
+            --repository "$IMAGE_REPOSITORY" \
             --commit "$GITHUB_SHA" --semver "$SEMVER" \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --actor "$GITHUB_ACTOR" \
             --out publication/release-publication.json

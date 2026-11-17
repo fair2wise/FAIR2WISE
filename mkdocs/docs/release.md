@@ -114,24 +114,28 @@ changes, and known issues.
 Two workflows handle the FAIR2WISE images (T24D):
 
 - `.github/workflows/build-app.yml` builds the `local`, `als-dev` and `als-prod`
-  targets (linux/amd64) from one commit on pushes to `forge_merge`, on pull
+  targets from one commit, natively for linux/amd64 (ubuntu-latest) and linux/arm64
+  (ubuntu-24.04-arm, no emulation; free for public repositories only) on pushes to `forge_merge`, on pull
   requests to `main` and `forge_merge`, and, through a `workflow_call` from the
   publish workflow, on every push to `main` or `v*` tag. It runs the
   `tests/images` checks and the post-build image checks from
   `docker/profiles/README.md` on each image, without network. These include a
   preflight run with state mounted (and, on the ALS images, `F2W_CORS_ORIGINS`
   set) that must render the gateway on port 8080, and the exit-78 refusals.
-  Each run writes a `release-manifest` artifact with the commit, each variant's
+  Each platform writes a `release-manifest-<arch>` artifact (it records the platform) with the commit, each variant's
   image id and layers, the lock hashes, the Tiled wheel hash, the frozen UI
   tree, the resolved base-image digests and a reference to the newest binary
   evaluation report (information only). It never logs in to a registry.
 - `.github/workflows/publish-image.yml` runs on every push to `main` (a merged
   pull request) and on a protected `vX.Y.Z` tag, inside the `ghcr-publish` /
   `ghcr-als-prod` environments, which the owner reviews.
-    - It pushes the tested images without rebuilding them as
-      `sha-<full commit>-<variant>` (and `vX.Y.Z-<variant>`) to the public
-      `ghcr.io/fair2wise/fair2wise`. An existing commit tag is never
-      overwritten.
+    - It pushes the tested images without rebuilding them: one image per
+      platform as `sha-<full commit>-<variant>-<arch>`, then a multi-arch index
+      `sha-<full commit>-<variant>` (and `vX.Y.Z-<variant>`) over exactly
+      those images, to `ghcr.io/<repository owner, lowercased>/fair2wise`. The
+      package is private until the owner sets its visibility to public in the
+      GitHub package settings after the first publication. An existing commit
+      tag is never overwritten.
     - It then moves all three channel tags `:local`, `:als-dev` and
       `:als-prod` to the digests it just published.
     - A manual dispatch moves one channel to an already published digest
@@ -179,7 +183,7 @@ Use this maintenance sequence:
 6. Upgrade one ecosystem at a time when practical so rollback is clear.
 
 Do not widen a version range just to make resolution pass. Preserve Python
-3.12, Node 20/npm 10, and the locked Pixi environment unless the runtime
+3.12, Node 22/npm 10, and the locked Pixi environment unless the runtime
 support policy is intentionally changing.
 
 ## Database compatibility expectations

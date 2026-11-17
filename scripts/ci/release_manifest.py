@@ -5,8 +5,9 @@
 three candidates of one commit were built and checked by ``scripts/ci/image_checks.py``:
 the commit, the identity of each variant (image id, rootfs layer digests, platform, labels,
 check results), the dependency lock hashes, the pinned Tiled wheel hash, the frozen UI tree,
-the base images that were used with their resolved digests (owner decision O-O6 D2.9: base
-images stay tag-referenced in the Dockerfile, CI records the digests) and, when the
+the base images that were used with their resolved digests (owner decision O-O6 D2.9; since the
+K3s pilot the Dockerfile pins them by digest itself and CI still records what it resolved), the
+platform the manifest describes (``linux/amd64`` or ``linux/arm64``, one manifest per platform) and, when the
 repository holds one, a reference to the newest binary evaluation report (O-O6 D2.10:
 recorded for information, never gating). Nothing in it is a credential.
 
@@ -41,6 +42,9 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence
 SCHEMA = "f2w.release-manifest/v1"
 PUBLICATION_SCHEMA = "f2w.release-publication/v1"
 VARIANTS = ("local", "als-dev", "als-prod")
+# One manifest is written per platform (each built and checked on a native runner); publication
+# joins them in a multi-arch index.
+PLATFORMS = ("linux/amd64", "linux/arm64")
 TILED_MODE = {"local": "managed", "als-dev": "external", "als-prod": "external"}
 TILED_URL = {"local": None, "als-dev": "https://tiled-staging.als.lbl.gov", "als-prod": "https://tiled.als.lbl.gov"}
 REQUIRED_RUNTIME_ENV = {"local": [], "als-dev": ["F2W_CORS_ORIGINS"], "als-prod": ["F2W_CORS_ORIGINS"]}
@@ -309,7 +313,8 @@ def latest_binary_report(root: Path) -> Optional[str]:
 def build_manifest(*, root: Path, commit: str, ref: str, event: str, repository: str, image_repository: str,
                    run_id: str, run_attempt: str, server_url: str, checks: Mapping[str, Mapping[str, Any]],
                    base_images: Mapping[str, str], binary_report: Optional[str] = None,
-                   refuse_shipped_untracked: bool = REFUSE_SHIPPED_UNTRACKED_FILES) -> Dict[str, Any]:
+                   refuse_shipped_untracked: bool = REFUSE_SHIPPED_UNTRACKED_FILES,
+                   platform: Optional[str] = None) -> Dict[str, Any]:
     """Assemble the manifest; ``candidate_ok`` says whether it may ever be published.
 
     ``problems`` holds refusals and, prefixed :data:`WARNING_PREFIX`, warnings that are recorded
@@ -319,7 +324,8 @@ def build_manifest(*, root: Path, commit: str, ref: str, event: str, repository:
     ``base_images`` maps each tag the Dockerfile names to the reference CI resolved it to
     (``repo@sha256:...``); the digests are recorded separately (D2.9). ``binary_report`` is a
     repository-relative report path to reference, or ``None`` for none (D2.10); its verdict is
-    recorded and never consulted.
+    recorded and never consulted. ``platform`` (``linux/arm64``) is the platform the images were built
+    for; every variant's recorded platform must equal it, otherwise the candidate is refused.
     """
     if not COMMIT_RE.match(commit):
         raise ManifestError(f"commit must be a full 40-hex object id, got {commit!r}")
@@ -355,6 +361,8 @@ def build_manifest(*, root: Path, commit: str, ref: str, event: str, repository:
             problems.append(f"{variant}: checks failed: {', '.join(failed) or 'none recorded'}")
         if labels.get("org.opencontainers.image.revision") != commit:
             problems.append(f"{variant}: image revision label is not {commit}")
+        if platform and identity.get("platform") != platform:
+            problems.append(f"{variant}: image platform {identity.get('platform')!r} is not {platform}")
         variants[variant] = {
             "docker_target": variant,
             "image_id": identity.get("image_id"),
@@ -373,6 +381,8 @@ def build_manifest(*, root: Path, commit: str, ref: str, event: str, repository:
             "checks_passed": bool(report.get("passed")),
         }
     platforms = sorted({v["platform"] for v in variants.values() if v.get("platform")})
+    if platform is None and len(platforms) == 1:
+        platform = platforms[0]
     return {
         "schema": SCHEMA,
         "repository": repository,
@@ -391,6 +401,7 @@ def build_manifest(*, root: Path, commit: str, ref: str, event: str, repository:
         "tiled": tiled,
         "base_images": dict(sorted(base_images.items())),
         "base_image_digests": dict(sorted(digests.items())),
+        "platform": platform,
         "platforms_tested": platforms,
         "variants": variants,
         "binary_report": binary,
@@ -404,12 +415,14 @@ def build_manifest(*, root: Path, commit: str, ref: str, event: str, repository:
     }
 
 
-def verify_manifest(manifest: Mapping[str, Any], *, commit: str) -> None:
-    """Refuse anything but a passed three-variant candidate of ``commit``."""
+def verify_manifest(manifest: Mapping[str, Any], *, commit: str, platform: Optional[str] = None) -> None:
+    """Refuse anything but a passed three-variant candidate of ``commit`` (for ``platform``, when given)."""
     if manifest.get("schema") != SCHEMA:
         raise ManifestError(f"unexpected schema {manifest.get('schema')!r}")
     if manifest.get("commit") != commit:
         raise ManifestError(f"manifest commit {manifest.get('commit')!r} is not {commit!r}")
+    if platform is not None and manifest.get("platform") != platform:
+        raise ManifestError(f"manifest platform {manifest.get('platform')!r} is not {platform!r}")
     if manifest.get("event") == "pull_request":
         raise ManifestError("a pull_request candidate is never published")
     if not manifest.get("candidate_ok") or refusals(list(manifest.get("problems") or [])):
@@ -471,14 +484,20 @@ def binary_reference(root: Path, rel_path: str) -> Dict[str, Any]:
 
 
 def build_publication(manifest: Mapping[str, Any], *, digests: Mapping[str, str], tags: Mapping[str, List[str]],
-                      run_url: str, actor: str, binary: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
-    """The publication record; ``binary`` defaults to the manifest's own report reference (D2.10)."""
+                      run_url: str, actor: str, binary: Optional[Mapping[str, Any]] = None,
+                      platform_digests: Optional[Mapping[str, Mapping[str, str]]] = None,
+                      manifests: Optional[Mapping[str, Mapping[str, Any]]] = None) -> Dict[str, Any]:
+    """The publication record; ``binary`` defaults to the manifest's own report reference (D2.10).
+
+    Multi-arch: ``digests`` are the index digests, ``platform_digests`` maps variant -> platform -> digest of
+    the per-platform image, and ``manifests`` (platform -> manifest) records every platform's manifest.
+    """
     if binary is None:
         binary = manifest.get("binary_report")
     for variant in VARIANTS:
         if not DIGEST_RE.match(str(digests.get(variant))):
             raise ManifestError(f"{variant}: published digest {digests.get(variant)!r} is not a sha256 digest")
-    return {
+    record = {
         "schema": PUBLICATION_SCHEMA,
         "manifest_commit": manifest["commit"],
         "image_repository": manifest["image_repository"],
@@ -491,12 +510,19 @@ def build_publication(manifest: Mapping[str, Any], *, digests: Mapping[str, str]
                 "digest": digests[v],
                 "reference": f"{manifest['image_repository']}@{digests[v]}",
                 "tags": tags.get(v, []),
+                **({"platforms": {
+                    plat: {"digest": dg, "reference": f"{manifest['image_repository']}@{dg}",
+                           "image_id": (manifests or {}).get(plat, {}).get("variants", {}).get(v, {}).get("image_id")}
+                    for plat, dg in platform_digests[v].items()}} if platform_digests else {}),
             }
             for v in VARIANTS
         },
         "binary_report": binary,
         "manifest": manifest,
     }
+    if manifests:
+        record["manifests"] = dict(manifests)
+    return record
 
 
 def _pairs(values: Sequence[str]) -> Dict[str, str]:
@@ -528,11 +554,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     b.add_argument("--binary-report", default="latest",
                    help="repository path of a binary evaluation report to reference, 'latest' (default: the "
                         "newest committed report under docs/migration/reviews) or 'none'; information only")
+    b.add_argument("--platform", choices=PLATFORMS, default=None,
+                   help="platform the images were built for; every variant must report it")
     b.add_argument("--out", type=Path, required=True)
 
     v = sub.add_parser("verify")
     v.add_argument("--manifest", type=Path, required=True)
     v.add_argument("--commit", required=True)
+    v.add_argument("--platform", choices=PLATFORMS, default=None, help="refuse a manifest of another platform")
     v.add_argument("--inspect", type=Path, help="docker image inspect JSON of the loaded images")
     v.add_argument("--ref", action="append", default=[], help="VARIANT=LOCAL_TAG")
 
@@ -549,7 +578,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 root=args.root, commit=args.commit, ref=args.ref, event=args.event, repository=args.repository,
                 image_repository=args.image_repository, run_id=args.run_id, run_attempt=args.run_attempt,
                 server_url=args.server_url, checks=load_checks(args.checks), base_images=_pairs(args.base_image),
-                binary_report=binary_report)
+                binary_report=binary_report, platform=args.platform)
             args.out.parent.mkdir(parents=True, exist_ok=True)
             args.out.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
             for problem in manifest["problems"]:
@@ -560,7 +589,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return 0 if manifest["candidate_ok"] else 1
         if args.command == "verify":
             manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
-            verify_manifest(manifest, commit=args.commit)
+            verify_manifest(manifest, commit=args.commit, platform=args.platform)
             if args.inspect:
                 verify_images(manifest, json.loads(args.inspect.read_text(encoding="utf-8")), _pairs(args.ref))
             print(f"release manifest ok: {args.commit}")

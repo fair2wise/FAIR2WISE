@@ -422,6 +422,8 @@ class FakeRegistry:
         self.calls: List[List[str]] = []
         self.local: Dict[str, Dict[str, Any]] = {}
         self.retag_to: Optional[str] = None
+        self.platform_of: Dict[str, str] = {}
+        self.index: Dict[str, Dict[str, str]] = {}  # index digest -> {platform: image digest}
 
     def add(self, dg: str, variant: str, revision: str, layers: Optional[List[str]] = None, *tags: str) -> None:
         self.configs[dg] = {"config": {"Labels": {"f2w.profile": variant, "org.opencontainers.image.revision": revision}},
@@ -443,12 +445,28 @@ class FakeRegistry:
             if dg is None:
                 return done(1, err="not found")
             if cmd[6] == "{{json .Manifest}}":
-                return done(out=json.dumps({"digest": dg, "mediaType": self.media.get(
-                    dg, "application/vnd.oci.image.manifest.v1+json")}))
+                desc: Dict[str, Any] = {"digest": dg, "mediaType": self.media.get(
+                    dg, "application/vnd.oci.image.manifest.v1+json")}
+                if dg in self.index:
+                    desc["mediaType"] = "application/vnd.oci.image.index.v1+json"
+                    desc["manifests"] = [{"digest": d, "platform": {"os": plat.split("/")[0],
+                                                                    "architecture": plat.split("/")[1]}}
+                                         for plat, d in self.index[dg].items()]
+                    desc["manifests"].append({"digest": digest("d"), "platform": {"os": "unknown",
+                                                                                  "architecture": "unknown"}})
+                return done(out=json.dumps(desc))
             return done(out=json.dumps(self.configs[dg]))
         if cmd[:4] == ["docker", "buildx", "imagetools", "create"]:
-            source = self.resolve(cmd[6])
-            self.tags[cmd[5]] = self.retag_to or source
+            sources = [self.resolve(s) for s in cmd[6:]]
+            if len(sources) > 1:  # a new multi-arch index over the given platform images
+                kids = {self.platform_of[s]: s for s in sources}
+                idx = "sha256:" + format(abs(hash(tuple(sorted(kids.items())))) % 16 ** 8, "08x") * 8
+                self.index[idx] = kids
+                labels = self.configs[sources[0]]
+                self.configs[idx] = labels
+                self.tags[cmd[5]] = idx
+                return done()
+            self.tags[cmd[5]] = self.retag_to or sources[0]
             return done()
         if cmd[:2] == ["docker", "tag"]:
             self.local[cmd[3]] = self.local[cmd[2]]
@@ -456,6 +474,8 @@ class FakeRegistry:
         if cmd[:2] == ["docker", "push"]:
             image = self.local[cmd[2]]
             self.add(image["digest"], image["variant"], image["revision"], image["layers"])
+            if image.get("platform"):
+                self.platform_of[image["digest"]] = image["platform"]
             self.tags[cmd[2]] = image["digest"]
             return done()
         if cmd[:2] == ["git", "-C"] and cmd[3:5] == ["merge-base", "--is-ancestor"]:
@@ -593,3 +613,97 @@ def test_base_image_gpg_key_is_allowed_but_other_credential_names_are_not() -> N
     report = ic.Checker("local", "img:local", commit=COMMIT, tiled_version="0.2.18", runner=fake).run_all()
     bad = next(r for r in report.results if r.name == "no credential names in the image environment")
     assert not bad.ok and "MP_API_KEY" in bad.detail and "GPG_KEY" not in bad.detail
+
+
+# ------------------------------------------------------------------ multi-arch ------------
+def _multiarch_registry(variant: str = "als-dev") -> FakeRegistry:
+    reg = FakeRegistry()
+    for arch, dg, layer in (("amd64", digest("4"), "2"), ("arm64", digest("5"), "3")):
+        reg.local[f"f2w-candidate:{variant}-{arch}"] = {
+            "digest": dg, "variant": variant, "revision": COMMIT, "layers": _entry(layer)["rootfs_layers"],
+            "platform": f"linux/{arch}"}
+    return reg
+
+
+def _publish_multi(reg: FakeRegistry, variant: str = "als-dev", semver: str = "") -> Dict[str, Any]:
+    return pc.Publisher(REPO_IMG, runner=reg).publish_multiarch(
+        variant, {"linux/amd64": _entry("2"), "linux/arm64": _entry("3")}, commit=COMMIT, semver=semver,
+        local_refs={"linux/amd64": f"f2w-candidate:{variant}-amd64", "linux/arm64": f"f2w-candidate:{variant}-arm64"})
+
+
+def test_multiarch_publish_pushes_each_platform_then_one_immutable_index() -> None:
+    reg = _multiarch_registry()
+    out = _publish_multi(reg, semver="v1.2.3")
+    assert out["platform_digests"] == {"linux/amd64": digest("4"), "linux/arm64": digest("5")}
+    assert reg.tags[f"{REPO_IMG}:sha-{COMMIT}-als-dev-amd64"] == digest("4")
+    assert reg.tags[f"{REPO_IMG}:sha-{COMMIT}-als-dev-arm64"] == digest("5")
+    index = reg.tags[f"{REPO_IMG}:sha-{COMMIT}-als-dev"]
+    assert out["digest"] == index and reg.index[index] == out["platform_digests"]
+    assert reg.tags[f"{REPO_IMG}:v1.2.3-als-dev"] == index
+    assert f"{REPO_IMG}:als-dev" not in reg.tags, "channels are never written by publication"
+    # A re-run is idempotent: same platform digests, same index, nothing new pushed.
+    pushes = len([c for c in reg.calls if c[:2] == ["docker", "push"]])
+    assert _publish_multi(reg, semver="v1.2.3")["digest"] == index
+    assert len([c for c in reg.calls if c[:2] == ["docker", "push"]]) == pushes
+
+
+def test_multiarch_publish_refuses_an_existing_index_over_other_images() -> None:
+    reg = _multiarch_registry()
+    _publish_multi(reg)
+    index = reg.tags[f"{REPO_IMG}:sha-{COMMIT}-als-dev"]
+    reg.index[index] = {"linux/amd64": digest("4"), "linux/arm64": digest("6")}
+    with pytest.raises(pc.PublishRefused, match="other platform images"):
+        _publish_multi(reg)
+
+
+def test_multiarch_index_can_be_promoted_when_its_platform_images_agree() -> None:
+    reg = _multiarch_registry()
+    out = _publish_multi(reg)
+    record = promote(reg, "als-dev", out["digest"])
+    assert record["changed"] and reg.tags[f"{REPO_IMG}:als-dev"] == out["digest"]
+    # An index whose platform images disagree on the profile is refused.
+    reg2 = _multiarch_registry()
+    out2 = _publish_multi(reg2)
+    reg2.configs[digest("5")] = {"config": {"Labels": {"f2w.profile": "local",
+                                                       "org.opencontainers.image.revision": COMMIT}},
+                                 "rootfs": {"diff_ids": [digest("3")]}}
+    with pytest.raises(pr.PromotionRefused, match="disagree"):
+        promote(reg2, "als-dev", out2["digest"])
+
+
+def test_publication_record_lists_every_platform_image() -> None:
+    manifest = {"commit": COMMIT, "image_repository": REPO_IMG, "workflow_run": {"id": "1"},
+                "variants": {v: {"image_id": digest("1")} for v in rm.VARIANTS}, "binary_report": None}
+    per = {v: {"linux/amd64": digest("4"), "linux/arm64": digest("5")} for v in rm.VARIANTS}
+    record = rm.build_publication(manifest, digests={v: digest("9") for v in rm.VARIANTS}, tags={}, run_url="u",
+                                  actor="a", platform_digests=per,
+                                  manifests={"linux/amd64": manifest, "linux/arm64": manifest})
+    entry = record["variants"]["local"]
+    assert entry["digest"] == digest("9") and set(entry["platforms"]) == {"linux/amd64", "linux/arm64"}
+    assert entry["platforms"]["linux/arm64"]["reference"] == f"{REPO_IMG}@{digest('5')}"
+    assert set(record["manifests"]) == {"linux/amd64", "linux/arm64"}
+
+
+@needs_git
+def test_manifest_records_and_enforces_the_platform(tmp_path: Path) -> None:
+    ok = _manifest(tmp_path, platform="linux/amd64")
+    assert ok["platform"] == "linux/amd64" and not [p for p in ok["problems"] if "platform" in p]
+    wrong = _manifest(tmp_path, platform="linux/arm64")  # the fake checks report linux/amd64 images
+    assert any("image platform 'linux/amd64' is not linux/arm64" in p for p in wrong["problems"])
+    assert wrong["candidate_ok"] is False
+    wrong.update(candidate_ok=True, problems=[])
+    wrong["frozen_ui_tree"]["matches"] = True
+    with pytest.raises(rm.ManifestError, match="platform"):
+        rm.verify_manifest(wrong, commit=wrong["commit"], platform="linux/amd64")
+
+
+def test_base_images_are_read_from_the_dockerfile_pins_and_must_carry_digests() -> None:
+    bi = _load("base_images")
+    pins = bi.read_pins((REPO / "Dockerfile").read_text(encoding="utf-8"))
+    assert set(pins) == set(bi.DEFAULT_NAMES)
+    resolved = bi.manifest_arguments(pins)
+    assert "node:22-bookworm-slim" in resolved and all("@sha256:" in v for v in resolved.values())
+    with pytest.raises(bi.BaseImageError, match="not pinned"):
+        bi.read_pins("ARG NODE_IMAGE=node:22\nFROM x\n", ("NODE_IMAGE",))
+    with pytest.raises(bi.BaseImageError, match="not a global ARG"):
+        bi.read_pins("FROM x\n", ("NODE_IMAGE",))
