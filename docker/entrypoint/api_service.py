@@ -15,6 +15,10 @@ API keeps its development defaults on ``:local`` only: an ALS profile
 (``F2W_DEPLOYMENT_PROFILE=als-*``) with no origin is refused here as in preflight (C7). The
 gateway is same-origin and needs none.
 
+``--front`` (the ``cluster`` image with ``F2W_GATEWAY=off``) lets the API listen beyond loopback
+(``--host 0.0.0.0``) and makes ``run_api`` serve the built UI and docs itself
+(``app.modules.deployment.front``); without it the loopback-only rule above applies unchanged.
+
 No ``.env`` is read here: the supervisor already applied an explicit ``F2W_DOTENV`` and
 passes ``F2W_DOTENV=off``.
 """
@@ -26,6 +30,8 @@ import sys
 from typing import List, Mapping, Optional, Sequence
 
 LOOPBACK = ("127.0.0.1", "::1", "localhost")
+FRONT_FLAG = "--front"
+FRONT_HOSTS = ("0.0.0.0", "::")
 CORS_ENV = "F2W_CORS_ORIGINS"
 
 
@@ -43,10 +49,12 @@ def command(argv: Sequence[str], environ: Mapping[str, str]) -> List[str]:
     """
     from app.modules.f2w_agent import cli
 
+    front = FRONT_FLAG in argv
+    argv = [a for a in argv if a != FRONT_FLAG]
     args = cli.build_parser().parse_args(list(argv))
     if args.command != "api":
         raise SystemExit("api_service runs only the 'api' command")
-    if args.host not in LOOPBACK:
+    if args.host not in LOOPBACK and not (front and args.host in FRONT_HOSTS):
         raise SystemExit(f"the image API binds loopback only (got --host {args.host}); the gateway is public")
     origins = cors_origins(environ)
     if origins and args.cors_origin:
@@ -64,7 +72,10 @@ def command(argv: Sequence[str], environ: Mapping[str, str]) -> List[str]:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     from app.modules.f2w_agent import cli
 
-    return cli.main(command(sys.argv[1:] if argv is None else argv, os.environ))
+    raw = list(sys.argv[1:] if argv is None else argv)
+    if FRONT_FLAG in raw:
+        os.environ["F2W_API_FRONT"] = "1"  # read by run_api (app.modules.deployment.front)
+    return cli.main(command(raw, os.environ))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,385 @@
+{
+  "schema": "f2w.image.profile/v1",
+  "profile": "cluster",
+  "deployment_profile": "local",
+  "image_tag": "cluster",
+  "docker_target": "cluster",
+  "authorization_mode": "local_trusted",
+  "tiled_mode": "managed",
+  "tiled_url": null,
+  "cors_origins_required": false,
+  "bundles_tiled_server": true,
+  "cwd": "/app",
+  "locked_env": {
+    "F2W_DEPLOYMENT_PROFILE": "local",
+    "F2W_AUTHORIZATION_MODE": "local_trusted",
+    "F2W_TILED_MODE": "managed",
+    "F2W_PUBLIC_PREFIX": "/fair2wise",
+    "F2W_API_UPSTREAM": "127.0.0.1:8090",
+    "F2W_RESOURCE_ROOT": "/app",
+    "PYTHONPATH": "/app",
+    "F2W_TILED_DATA_DIR": "/var/lib/fair2wise/tiled",
+    "F2W_TILED_PYTHON": "/opt/tiled/venv/bin/python",
+    "F2W_TILED_PORT": "8765"
+  },
+  "forbidden_env": [
+    "F2W_TILED_URL",
+    "F2W_TILED_WRITER_SECRET",
+    "F2W_TILED_API_KEY",
+    "F2W_TILED_WRITER_KEY"
+  ],
+  "stripped_env": [
+    "TILED_URI",
+    "TILED_API_KEY",
+    "TILED_API_KEY_SCHEME",
+    "TILED_CATALOG_URI",
+    "TILED_GRAPH_ENABLED",
+    "TILED_SINGLE_USER_API_KEY",
+    "F2W_LIVE_TILED"
+  ],
+  "enum_env": {
+    "F2W_GATEWAY": [
+      "on",
+      "off"
+    ]
+  },
+  "no_proxy_append": [
+    "127.0.0.1",
+    "localhost",
+    "::1"
+  ],
+  "env": {
+    "F2W_GATEWAY_PORT": "8080",
+    "F2W_BACKEND": "cborg",
+    "F2W_MODEL": "lbl/cborg-chat",
+    "F2W_GRAPH": "storage/kg/matkg_rsoxs_v1.json,storage/kg/matkg_bl1101_v2.json",
+    "F2W_SCHEMA": "storage/schema/rsoxs_schema.yaml",
+    "F2W_WORKDIR": "/var/lib/fair2wise/state/session",
+    "F2W_JOB_DB": "/var/lib/fair2wise/state/session/operations/jobs.sqlite3",
+    "F2W_LIBRARY_DIR": "/var/lib/fair2wise/library",
+    "HYBRID_RAG_LITERATURE_INDEX": "/var/lib/fair2wise/state/session/source_index/literature",
+    "F2W_WORKER_FACTORY": "app.modules.workers.factories:library_service",
+    "F2W_WORKER_CONCURRENCY": "2",
+    "F2W_TRACE_ENABLED": "1",
+    "F2W_TRACE_DIR": "/var/lib/fair2wise/state/traces",
+    "F2W_SUPERVISOR_STATUS": "/run/fair2wise/supervisor.json",
+    "KG_RAG_GRAPH_SOURCE": "json",
+    "KG_RAG_RETRIEVAL_BACKEND": "lexical",
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1",
+    "F2W_GATEWAY": "off",
+    "F2W_SAFE_FETCH_TRUST_PROXY": "0"
+  },
+  "required_mounts": [
+    {
+      "path": "/var/lib/fair2wise/state",
+      "writable": true,
+      "purpose": "jobs, sessions, approvals, audit and traces (single writer)"
+    },
+    {
+      "path": "/var/lib/fair2wise/tiled",
+      "writable": true,
+      "purpose": "managed Tiled catalog, writable storage and generated writer key"
+    },
+    {
+      "path": "/var/lib/fair2wise/cache",
+      "writable": true,
+      "ephemeral": true,
+      "purpose": "HOME, XDG, matplotlib, fontconfig and pystow caches (rebuilt on demand)"
+    },
+    {
+      "path": "/run/fair2wise",
+      "writable": true,
+      "ephemeral": true,
+      "purpose": "supervisor status, nginx configuration, pid and temp files"
+    },
+    {
+      "path": "/tmp",
+      "writable": true,
+      "ephemeral": true,
+      "purpose": "scratch space of PDF parsing, uploads and libraries (tempfile)"
+    }
+  ],
+  "optional_mounts": [
+    {
+      "path": "/var/lib/fair2wise/library",
+      "writable": true,
+      "purpose": "reference papers (papers/sourcedoc) for the Library tab (T35); optional, read-write for uid 10001; without it the library reports mounted=false"
+    }
+  ],
+  "ensure_dirs": [
+    "/var/lib/fair2wise/cache/home",
+    "/var/lib/fair2wise/cache/xdg",
+    "/var/lib/fair2wise/cache/matplotlib",
+    "/var/lib/fair2wise/cache/pystow"
+  ],
+  "gateway": {
+    "build_manifest": "/usr/share/nginx/html/fair2wise/f2w-build.json",
+    "template": "/etc/fair2wise/nginx/gateway.conf.template",
+    "rendered": "/run/fair2wise/nginx/conf.d/default.conf",
+    "runtime_dirs": [
+      "/run/fair2wise/nginx/tmp/client_body",
+      "/run/fair2wise/nginx/tmp/proxy",
+      "/run/fair2wise/nginx/tmp/fastcgi",
+      "/run/fair2wise/nginx/tmp/uwsgi",
+      "/run/fair2wise/nginx/tmp/scgi"
+    ],
+    "switch_env": "F2W_GATEWAY"
+  },
+  "preflight": [
+    [
+      "@python",
+      "/opt/fair2wise/entrypoint/preflight.py",
+      "--profile-file",
+      "${F2W_PROFILE_FILE}"
+    ],
+    {
+      "argv": [
+        "nginx",
+        "-t",
+        "-q",
+        "-e",
+        "stderr",
+        "-c",
+        "/opt/fair2wise/entrypoint/nginx-main.conf"
+      ],
+      "when_env": {
+        "F2W_GATEWAY": [
+          "on"
+        ]
+      }
+    }
+  ],
+  "services": [
+    {
+      "name": "tiled",
+      "argv": [
+        "@python",
+        "/opt/fair2wise/entrypoint/tiled_service.py"
+      ],
+      "required": false,
+      "health": {
+        "http": "http://127.0.0.1:${F2W_TILED_PORT}/healthz",
+        "timeout": 150,
+        "interval": 1.0
+      },
+      "restart": {
+        "max": 3,
+        "backoff": 5
+      },
+      "no_restart_exit_codes": [
+        78
+      ],
+      "stop_timeout": 25
+    },
+    {
+      "name": "api",
+      "argv": [
+        "@python",
+        "/opt/fair2wise/entrypoint/api_service.py",
+        "--backend",
+        "${F2W_BACKEND}",
+        "--model",
+        "${F2W_MODEL}",
+        "--kg-mode",
+        "splash",
+        "--graph",
+        "${F2W_GRAPH}",
+        "--schema",
+        "${F2W_SCHEMA}",
+        "--workdir",
+        "${F2W_WORKDIR}",
+        "api",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8090"
+      ],
+      "required": true,
+      "health": {
+        "http": "http://127.0.0.1:8090/health",
+        "timeout": 240,
+        "interval": 1.0
+      },
+      "stop_timeout": 20,
+      "when_env": {
+        "F2W_GATEWAY": [
+          "on"
+        ]
+      }
+    },
+    {
+      "name": "api",
+      "argv": [
+        "@python",
+        "/opt/fair2wise/entrypoint/api_service.py",
+        "--backend",
+        "${F2W_BACKEND}",
+        "--model",
+        "${F2W_MODEL}",
+        "--kg-mode",
+        "splash",
+        "--graph",
+        "${F2W_GRAPH}",
+        "--schema",
+        "${F2W_SCHEMA}",
+        "--workdir",
+        "${F2W_WORKDIR}",
+        "api",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "${F2W_GATEWAY_PORT}",
+        "--front"
+      ],
+      "required": true,
+      "health": {
+        "http": "http://127.0.0.1:${F2W_GATEWAY_PORT}/fair2wise/api/health",
+        "timeout": 240,
+        "interval": 1.0
+      },
+      "stop_timeout": 20,
+      "when_env": {
+        "F2W_GATEWAY": [
+          "off"
+        ]
+      }
+    },
+    {
+      "name": "worker",
+      "argv": [
+        "@python",
+        "-m",
+        "app.modules.workers",
+        "--db",
+        "${F2W_JOB_DB}",
+        "--factory",
+        "${F2W_WORKER_FACTORY}",
+        "--concurrency",
+        "${F2W_WORKER_CONCURRENCY}"
+      ],
+      "required": true,
+      "health": {
+        "alive_for": 3,
+        "timeout": 30
+      },
+      "stop_timeout": 45
+    },
+    {
+      "name": "gateway",
+      "argv": [
+        "nginx",
+        "-e",
+        "stderr",
+        "-c",
+        "/opt/fair2wise/entrypoint/nginx-main.conf"
+      ],
+      "required": true,
+      "health": {
+        "http": "http://127.0.0.1:${F2W_GATEWAY_PORT}/fair2wise/healthz",
+        "timeout": 30
+      },
+      "stop_signal": "SIGQUIT",
+      "stop_timeout": 15,
+      "when_env": {
+        "F2W_GATEWAY": [
+          "on"
+        ]
+      }
+    }
+  ],
+  "writable_paths": [
+    {
+      "path": "/var/lib/fair2wise/state",
+      "purpose": "sessions, job/curation/audit SQLite stores, traces, library index and KG bundles",
+      "size": "1 GiB to tens of GiB (grows with corpus and traces)",
+      "persist": true,
+      "writer": "api, worker",
+      "relocate_env": "F2W_WORKDIR, F2W_JOB_DB, F2W_TRACE_DIR, HYBRID_RAG_LITERATURE_INDEX",
+      "required": "required",
+      "subpaths": []
+    },
+    {
+      "path": "/var/lib/fair2wise/tiled",
+      "purpose": "managed Tiled catalog, writable storage, server log and generated secrets/writer.key",
+      "size": "1 GiB and up (graph artifacts)",
+      "persist": true,
+      "writer": "tiled",
+      "relocate_env": "F2W_TILED_DATA_DIR (locked on this image)",
+      "required": "required",
+      "subpaths": []
+    },
+    {
+      "path": "/var/lib/fair2wise/cache",
+      "purpose": "HOME and the XDG, matplotlib and pystow caches",
+      "size": "under 200 MiB",
+      "persist": false,
+      "writer": "api, worker",
+      "relocate_env": "HOME, XDG_CACHE_HOME, MPLCONFIGDIR, PYSTOW_HOME",
+      "required": "required",
+      "subpaths": [
+        {
+          "path": "/var/lib/fair2wise/cache/home",
+          "purpose": "HOME of the process",
+          "env": "HOME"
+        },
+        {
+          "path": "/var/lib/fair2wise/cache/xdg",
+          "purpose": "fontconfig and generic XDG caches",
+          "env": "XDG_CACHE_HOME"
+        },
+        {
+          "path": "/var/lib/fair2wise/cache/matplotlib",
+          "purpose": "matplotlib config and font cache",
+          "env": "MPLCONFIGDIR"
+        },
+        {
+          "path": "/var/lib/fair2wise/cache/pystow",
+          "purpose": "pystow data (ontology and vocabulary downloads)",
+          "env": "PYSTOW_HOME"
+        }
+      ]
+    },
+    {
+      "path": "/run/fair2wise",
+      "purpose": "supervisor status file, rendered nginx configuration, nginx pid and temp files",
+      "size": "under 64 MiB (memory-backed is fine)",
+      "persist": false,
+      "writer": "supervisor, preflight, nginx",
+      "relocate_env": "F2W_SUPERVISOR_STATUS (status file only)",
+      "required": "required",
+      "subpaths": [
+        {
+          "path": "/run/fair2wise/supervisor.json",
+          "purpose": "supervisor status (read by /readyz)",
+          "env": "F2W_SUPERVISOR_STATUS"
+        },
+        {
+          "path": "/run/fair2wise/nginx",
+          "purpose": "rendered gateway configuration, nginx pid, client-body and proxy temp files (F2W_GATEWAY=on only)",
+          "env": ""
+        }
+      ]
+    },
+    {
+      "path": "/tmp",
+      "purpose": "tempfile scratch: uploads being parsed, PDF rendering, Docling and RapidOCR work files",
+      "size": "up to a few GiB while parsing large PDFs",
+      "persist": false,
+      "writer": "api, worker, tiled",
+      "relocate_env": "TMPDIR",
+      "required": "required",
+      "subpaths": []
+    },
+    {
+      "path": "/var/lib/fair2wise/library",
+      "purpose": "reference papers for the Library tab (optional mount)",
+      "size": "as large as the library",
+      "persist": true,
+      "writer": "api, worker",
+      "relocate_env": "F2W_LIBRARY_DIR",
+      "required": "optional",
+      "subpaths": []
+    }
+  ]
+}

@@ -26,6 +26,13 @@ exactly what the API would refuse later:
    template renders for it and for ``F2W_GATEWAY_PORT`` (default 8080, not the API or Tiled
    port) (``app.modules.deployment.gateway``), written to the runtime dir.
 
+8. ``cluster`` profile only (keys absent from the other profiles, whose checks are unchanged): a
+   mount marked ``"ephemeral": true`` (``/tmp``, ``/run/fair2wise``, the cache) must exist and be
+   writable but need not be a mount point; ``ensure_dirs`` are created (they sit on those mounts);
+   ``F2W_GATEWAY=off`` (``gateway.switch_env``) skips rendering the nginx configuration because the
+   API process serves the UI itself (``app.modules.deployment.front``), but still checks the UI
+   build manifest, the docs bundle and the listen port.
+
 Prints one JSON summary; exit 0 when every check passes, 78 otherwise.
 """
 
@@ -90,7 +97,7 @@ def check_mounts(mounts: Sequence[Mapping[str, Any]], *, mountinfo: Path = MOUNT
         if item.get("writable", True) and not os.access(path, os.W_OK | os.X_OK):
             problems.append(f"{path} is not writable by uid {os.getuid()}: give the mount to that uid "
                             "(the image never chowns host data)")
-        if points is not None and not _on_mount(path, points):
+        if points is not None and not item.get("ephemeral") and not _on_mount(path, points):
             problems.append(f"{path} is not a mount point: its data would be lost with the container ({purpose})")
     return problems
 
@@ -101,9 +108,10 @@ def check(env: Mapping[str, str], profile: Mapping[str, Any], *, mountinfo: Path
     problems: List[str] = []
     facts: Dict[str, Any] = {"profile": profile.get("profile")}
     name = profile.get("profile")
-    if env.get("F2W_DEPLOYMENT_PROFILE") != name:
+    expected_deployment = profile.get("deployment_profile") or name  # ``cluster`` runs the local trust model
+    if env.get("F2W_DEPLOYMENT_PROFILE") != expected_deployment:
         problems.append(f"F2W_DEPLOYMENT_PROFILE={env.get('F2W_DEPLOYMENT_PROFILE')!r} differs from the image "
-                        f"profile {name!r}")
+                        f"profile {expected_deployment!r}")
 
     from app.api.legacy_ui import deployment_settings_from
     from app.modules.security.authorization import StartupConfigError
@@ -153,6 +161,11 @@ def check(env: Mapping[str, str], profile: Mapping[str, Any], *, mountinfo: Path
     problems += check_cors(env, profile)
     facts["cors_origins"] = len([o for o in (env.get(CORS_ENV) or "").split(",") if o.strip()])
 
+    for sub in profile.get("ensure_dirs", []):
+        try:
+            Path(sub).mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            problems.append(f"cannot create {sub}: {exc.strerror or type(exc).__name__} (is its mount writable?)")
     gateway = profile.get("gateway") or {}
     if gateway:
         from app.modules.deployment import gateway as gw
@@ -166,15 +179,25 @@ def check(env: Mapping[str, str], profile: Mapping[str, Any], *, mountinfo: Path
                      (env.get("F2W_TILED_PORT") or "").strip(): "F2W_TILED_PORT"}
             if str(port) in taken:
                 raise gw.PrefixConfigError(f"{gw.GATEWAY_PORT_ENV}={port} is already {taken[str(port)]}")
-            text = gw.render_nginx_conf(Path(gateway["template"]).read_text(encoding="utf-8"),
-                                        upstream=upstream, layout=layout, listen_port=port)
             facts["gateway_port"] = port
-            out = Path(gateway["rendered"])
-            out.parent.mkdir(parents=True, exist_ok=True)
-            for sub in gateway.get("runtime_dirs", []):
-                Path(sub).mkdir(parents=True, exist_ok=True)
-            out.write_text(text, encoding="utf-8")
-            facts["gateway_conf"] = str(out)
+            switch = gateway.get("switch_env")
+            facts["gateway"] = "nginx"
+            if switch and (env.get(switch) or "").strip().lower() == "off":
+                # The API process serves the UI and docs itself: nothing to render, but the bundles must be there.
+                facts["gateway"] = "off"
+                bundle = Path(gateway["build_manifest"]).parent
+                for needed in (bundle / "index.html", bundle / "docs" / "index.html"):
+                    if not needed.is_file():
+                        raise OSError(f"{needed} is missing from the image")
+            else:
+                text = gw.render_nginx_conf(Path(gateway["template"]).read_text(encoding="utf-8"),
+                                            upstream=upstream, layout=layout, listen_port=port)
+                out = Path(gateway["rendered"])
+                out.parent.mkdir(parents=True, exist_ok=True)
+                for sub in gateway.get("runtime_dirs", []):
+                    Path(sub).mkdir(parents=True, exist_ok=True)
+                out.write_text(text, encoding="utf-8")
+                facts["gateway_conf"] = str(out)
         except (gw.PrefixConfigError, OSError, ValueError, KeyError) as exc:
             problems.append(f"gateway: {exc}")
     return {"ok": not problems, "problems": problems, "facts": facts}

@@ -24,6 +24,8 @@ ALS sign-in handlers, access control and disclosure projection) and adds:
   them, plus the deployment's Tiled graphs read-only on every profile, ``:local`` included,
   owner decision D3.17), plus the ``knowledge_operation`` job kind (``ops.run``) registered
   on the shared operations when no trusted wiring did so;
+* ``GET /livez`` and ``GET /readyz`` for Kubernetes probes (:mod:`app.api.probes`), answered by an outermost
+  middleware (unauthenticated, no route, no secret);
 * the browser-origin gate (:mod:`app.api.origin_gate`) and the request-body cap
   (:mod:`app.api.upload_limits`) on ``/v1/`` and ``/auth/`` (``create_app`` itself gates the
   legacy routes and caps their bodies at 128 MiB, AUD-04);
@@ -58,11 +60,13 @@ from typing import TYPE_CHECKING, Any
 from fastapi import FastAPI
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from ..modules.deployment.front import FrontApp, front_enabled, ui_root_from_env
 from ..modules.deployment.gateway import MODEL_API_MOUNT, layout_from_env
 from ..modules.security.authorization import StartupConfigError
 from .auth import undeclared_routes, warn_if_exposed
 from .operations import F2WOperations, PublicationGate, build_operations
 from .origin_gate import OriginGateMiddleware
+from .probes import ProbeMiddleware
 from .upload_limits import DEFAULT_MAX_BODY_BYTES, MaxBodySizeMiddleware
 
 if TYPE_CHECKING:
@@ -394,6 +398,8 @@ def create_api_app(
     allowed = effective_cors_origins(cors_origins, is_local=settings.is_local)
     app.add_middleware(MaxBodySizeMiddleware, max_bytes=max_body_bytes, path_prefixes=GUARDED_PREFIXES)
     app.add_middleware(OriginGateMiddleware, allowed_origins=allowed, path_prefixes=GUARDED_PREFIXES)
+    # Outermost: kubelet probes (``/livez``, ``/readyz``) carry no credentials and touch no route or policy.
+    app.add_middleware(ProbeMiddleware, workdir=getattr(cfg, "workdir", None))
     missing = undeclared_routes(app)
     if missing:  # DEP-19 at startup: every mounted route carries a declared policy (fail closed)
         raise StartupConfigError(f"config_rejected: routes without a declared access policy: {', '.join(missing)}")
@@ -439,7 +445,13 @@ def run_api(cfg: object, *, host: str, port: int, cors_origins: list[str] | None
                          credential_store=credential_store, model_api=True,
                          model_api_root_path=layout.model_api_root_path, local_publication=True)
     warn_if_exposed(app, host)  # AUD-16: :local beyond loopback serves raw traces to every caller
-    uvicorn.run(app, host=host, port=port, **options)
+    served: Any = app
+    if front_enabled(os.environ):
+        # ``F2W_GATEWAY=off`` (cluster image): this process is the only listener and serves the UI itself;
+        # the front sets ``root_path`` per request, so uvicorn must not.
+        served = FrontApp(app, layout, ui_root_from_env(os.environ))
+        options = {}
+    uvicorn.run(served, host=host, port=port, **options)
 
 
 __all__ = ("GUARDED_PREFIXES", "PublicRootPath", "create_api_app", "run_api")
