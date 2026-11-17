@@ -574,3 +574,22 @@ def test_publish_refuses_to_overwrite_an_immutable_tag_or_push_other_bytes() -> 
     with pytest.raises(pc.PublishRefused, match="v1.2.3-local"):
         pc.Publisher(REPO_IMG, runner=reg3).publish_variant("local", _entry("1"), commit=COMMIT,
                                                             local_ref="f2w-candidate:local", semver="v1.2.3")
+
+
+def test_private_file_find_prunes_only_the_locked_third_party_environment() -> None:
+    """Package data in the pixi environment is not project data; ``/app`` and the data paths stay searched."""
+    assert "-path /opt/fair2wise/pixi/.pixi -prune -o" in ic.PRIVATE_FIND
+    assert ic.PRIVATE_FIND.rstrip().endswith("-print 2>/dev/null")
+    for pattern in ('"*.pdf"', '"*source_index*"', '"tiled_catalog*"', '".env"', '"*.sqlite*"', '"/app/papers*"'):
+        assert pattern in ic.PRIVATE_FIND
+    assert "/app" not in ic.PRIVATE_FIND.split("-prune")[0]
+
+
+def test_base_image_gpg_key_is_allowed_but_other_credential_names_are_not() -> None:
+    fake = FakeImage("local", env=["GPG_KEY=ABC123"])
+    report = ic.Checker("local", "img:local", commit=COMMIT, tiled_version="0.2.18", runner=fake).run_all()
+    assert next(r for r in report.results if r.name == "no credential names in the image environment").ok
+    fake = FakeImage("local", env=["GPG_KEY=ABC123", "MP_API_KEY=x"])
+    report = ic.Checker("local", "img:local", commit=COMMIT, tiled_version="0.2.18", runner=fake).run_all()
+    bad = next(r for r in report.results if r.name == "no credential names in the image environment")
+    assert not bad.ok and "MP_API_KEY" in bad.detail and "GPG_KEY" not in bad.detail

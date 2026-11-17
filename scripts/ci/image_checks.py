@@ -56,13 +56,16 @@ MOUNTS = {
 }
 
 # docker/profiles/README.md, "Static checks on the built images".
+# The locked third-party environment is pruned: its packages ship their own PDFs and sqlite files (matplotlib
+# toolbar icons, pymatgen symmetry data), which are not project data.
 PRIVATE_FIND = (
-    'find / -xdev \\( -iname "*.pdf" -o -path "*source_index*" -o -name "tiled_catalog*" -o -name ".env" '
-    '-o -name "*.sqlite*" -o -path "/app/papers*" \\) 2>/dev/null'
+    'find / -xdev -path /opt/fair2wise/pixi/.pixi -prune -o \\( -iname "*.pdf" -o -path "*source_index*" '
+    '-o -name "tiled_catalog*" -o -name ".env" -o -name "*.sqlite*" -o -path "/app/papers*" \\) -print 2>/dev/null'
 )
 SECRET_NAME = re.compile(r"(KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL)", re.IGNORECASE)
-# Baked names that match SECRET_NAME but carry no credential (file paths, switches).
-SECRET_NAME_ALLOWED = frozenset()
+# Baked names that match SECRET_NAME but carry no credential (file paths, switches). ``GPG_KEY`` is set by the
+# python base image to the public fingerprint of the key that signed the interpreter source.
+SECRET_NAME_ALLOWED = frozenset({"GPG_KEY"})
 
 
 @dataclass
