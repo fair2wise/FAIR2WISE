@@ -9,7 +9,11 @@ The donor checked only the *first* URL (``assert_public_http_url``) and then let
   private addresses are refused; an unresolvable host is refused;
 * redirects are followed manually, each ``Location`` re-checked, with a hop limit;
 * where the transport reports the connected peer, it is checked too (defence
-  against DNS rebinding between the check and the connect);
+  against DNS rebinding between the check and the connect). Behind an HTTP(S) proxy the peer is
+  the proxy, so with the explicit opt-in ``F2W_SAFE_FETCH_TRUST_PROXY=1`` the peer of a request
+  that really goes through the configured proxy may be that proxy's own address (and nothing
+  else); the target host is still resolved here and refused unless every address is public.
+  Without the opt-in the direct path is exactly as above;
 * a declared ``Content-Length`` over the limit is refused before reading;
 * the body is streamed into the store with a byte limit, a total deadline and a
   ``%PDF-`` signature check on the first bytes; nothing partial is kept.
@@ -24,10 +28,11 @@ from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 import ipaddress
 import logging
+import os
 from pathlib import Path
 import socket
 import time
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from urllib.parse import urljoin, urlsplit
 
 import httpx
@@ -36,13 +41,13 @@ from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
 from .store import AssetKind, AssetTooLarge, FileDocumentStore, StoreError
 
-if TYPE_CHECKING:
-    import os
-
 logger = logging.getLogger(__name__)
 
 PDF_MAGIC = b"%PDF-"
 _SHARED_ADDRESS_SPACE = ipaddress.ip_network("100.64.0.0/10")
+
+#: Opt-in (``1``/``true``/``yes``/``on``): trust the HTTP(S) proxy named by ``HTTP_PROXY``/``HTTPS_PROXY``.
+TRUST_PROXY_ENV = "F2W_SAFE_FETCH_TRUST_PROXY"
 
 #: ``resolve(host) -> [ip strings]``; raises ``OSError`` when the host does not resolve.
 Resolver = Callable[[str], Sequence[str]]
@@ -67,6 +72,100 @@ def is_public_address(address: str) -> bool:
                 or ip.is_unspecified) and ip.is_global
 
 
+def trust_proxy_from_env(environ: Mapping[str, str] | None = None) -> bool:
+    """Whether ``F2W_SAFE_FETCH_TRUST_PROXY`` is set to a true value (default: no)."""
+    env = os.environ if environ is None else environ
+    return str(env.get(TRUST_PROXY_ENV, "")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_value(environ: Mapping[str, str], name: str) -> str:
+    """Proxy variable ``name`` in either case (lower case wins, as in curl and ``urllib``); empty when unset."""
+    for key in (name.lower(), name.upper()):
+        value = str(environ.get(key, "")).strip()
+        if value:
+            return value
+    return ""
+
+
+def no_proxy_matches(host: str, port: int | None, no_proxy: str) -> bool:
+    """Standard ``NO_PROXY`` semantics: ``*``, host names and domain suffixes, IP literals, CIDR blocks.
+
+    Entries are comma or whitespace separated, case-insensitive; ``example.com``, ``.example.com`` and
+    ``*.example.com`` match the host and its subdomains; an entry may carry a ``:port``.
+    """
+    host = host.strip("[]").lower().rstrip(".")
+    try:
+        host_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = ipaddress.ip_address(host)
+    except ValueError:
+        host_ip = None
+    for raw in no_proxy.replace(",", " ").split():
+        entry = raw.strip().lower()
+        if entry == "*":
+            return True
+        entry_port: int | None = None
+        if entry.startswith("["):  # [v6]:port or [v6]
+            end = entry.find("]")
+            addr_part, rest = entry[1:end], entry[end + 1:]
+            entry = addr_part
+            if rest.startswith(":") and rest[1:].isdigit():
+                entry_port = int(rest[1:])
+        elif entry.count(":") == 1:
+            name, _, tail = entry.partition(":")
+            if tail.isdigit():
+                entry, entry_port = name, int(tail)
+        if entry_port is not None and entry_port != port:
+            continue
+        if "/" in entry:
+            try:
+                network = ipaddress.ip_network(entry, strict=False)
+            except ValueError:
+                continue
+            if host_ip is not None and host_ip.version == network.version and host_ip in network:
+                return True
+            continue
+        if host_ip is not None:
+            try:
+                if host_ip == ipaddress.ip_address(entry):
+                    return True
+            except ValueError:
+                pass
+            continue
+        domain = entry.removeprefix("*").lstrip(".").rstrip(".")
+        if domain and (host == domain or host.endswith("." + domain)):
+            return True
+    return False
+
+
+def proxy_for_url(url: str, environ: Mapping[str, str]) -> str | None:
+    """The proxy URL the environment selects for ``url`` (``None`` when direct).
+
+    ``HTTP_PROXY`` for ``http`` and ``HTTPS_PROXY`` for ``https`` URLs, then ``ALL_PROXY``; a host matched
+    by ``NO_PROXY`` goes direct. The result may carry credentials: never log or echo it.
+    """
+    parts = urlsplit(str(url).strip())
+    scheme = (parts.scheme or "").lower()
+    if scheme not in {"http", "https"} or not parts.hostname:
+        return None
+    proxy = _env_value(environ, f"{scheme}_proxy") or _env_value(environ, "all_proxy")
+    if not proxy:
+        return None
+    try:
+        port = parts.port
+    except ValueError:
+        port = None
+    if no_proxy_matches(parts.hostname, port or (443 if scheme == "https" else 80), _env_value(environ, "no_proxy")):
+        return None
+    return proxy
+
+
+def _proxy_host(proxy: str) -> str:
+    """Host of a proxy URL (``host:port`` without a scheme is accepted); empty when malformed."""
+    try:
+        return urlsplit(proxy if "://" in proxy else f"http://{proxy}").hostname or ""
+    except ValueError:
+        return ""
+
+
 class BlockedURL(ContractError):
     """A URL (or redirect target) failed the network policy; nothing was fetched from it."""
 
@@ -88,6 +187,11 @@ class NetworkPolicy:
         connect_timeout / read_timeout: Per-request ``httpx`` timeouts (seconds).
         total_timeout: Wall-clock limit for one fetch including redirects.
         resolver: DNS resolver (injectable; tests never use the network).
+        trust_proxy: Opt-in (``F2W_SAFE_FETCH_TRUST_PROXY``): a request that really goes through the proxy
+            from ``HTTP_PROXY``/``HTTPS_PROXY`` (not excluded by ``NO_PROXY``) may be connected to that proxy's
+            address although it is private. The target host is still resolved and must be all public.
+        proxy_environ: Environment the proxy variables are read from (default: ``os.environ`` at fetch time).
+        proxy_resolver: Resolver for the proxy's own host name (injectable).
     """
 
     allowed_schemes: frozenset[str] = frozenset({"http", "https"})
@@ -98,6 +202,24 @@ class NetworkPolicy:
     read_timeout: float = 30.0
     total_timeout: float = 120.0
     resolver: Resolver = system_resolver
+    trust_proxy: bool = field(default_factory=trust_proxy_from_env)
+    proxy_environ: Mapping[str, str] | None = field(default=None, compare=False)
+    proxy_resolver: Resolver = system_resolver
+
+    def proxy_addresses(self, url: str) -> frozenset[str]:
+        """Addresses of the proxy used for ``url``; empty without the opt-in, a proxy or a resolvable proxy host."""
+        if not self.trust_proxy:
+            return frozenset()
+        proxy = proxy_for_url(url, os.environ if self.proxy_environ is None else self.proxy_environ)
+        host = _proxy_host(proxy) if proxy else ""
+        if not host:
+            return frozenset()
+        if _is_ip(host):
+            return frozenset({host})
+        try:
+            return frozenset(a.split("%", 1)[0] for a in self.proxy_resolver(host))
+        except OSError:  # proxy host does not resolve: no address is trusted, the peer check stays strict
+            return frozenset()
 
     def check_url(self, url: str) -> str:
         """Return the URL when it passes the policy, else raise :class:`BlockedURL`."""
@@ -129,6 +251,14 @@ class NetworkPolicy:
         if not all(is_public_address(a) for a in addresses):
             raise BlockedURL("private_address", url)
         return str(url).strip()
+
+
+def _is_ip(host: str) -> bool:
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return True
 
 
 def assert_public_http_url(url: str, policy: NetworkPolicy | None = None) -> None:
@@ -166,6 +296,16 @@ class FetchResult:
         return asdict(self)
 
 
+def _canonical(address: str) -> str:
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return address
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    return str(ip)
+
+
 class _Deadline(Exception):
     pass
 
@@ -185,7 +325,7 @@ class SafeFetcher:
         self.policy = policy or NetworkPolicy()
         self._clock = clock
 
-    def _peer_ok(self, response: httpx.Response) -> bool:
+    def _peer_ok(self, response: httpx.Response, url: str = "") -> bool:
         stream = response.extensions.get("network_stream")
         if stream is None or not hasattr(stream, "get_extra_info"):
             return True  # transport does not expose the peer (pre-connect check still applied)
@@ -195,7 +335,12 @@ class SafeFetcher:
             return True
         if not peer:
             return True
-        return is_public_address(str(peer[0]))
+        address = str(peer[0]).split("%", 1)[0]
+        if is_public_address(address):
+            return True
+        # Opt-in proxy hop: the peer may be the configured proxy and only it; any other private peer
+        # (a request that bypassed the proxy, or a rebound target) is still refused.
+        return _canonical(address) in {_canonical(a) for a in self.policy.proxy_addresses(url)}
 
     def fetch_pdf(self, ctx: RequestContext, url: str, store: FileDocumentStore, *,
                   metadata: Mapping[str, str] | None = None) -> FetchResult:
@@ -218,7 +363,7 @@ class SafeFetcher:
             try:
                 with self.http.stream("GET", current, follow_redirects=False, timeout=timeout,
                                       headers={"Accept": "application/pdf,*/*;q=0.1"}) as response:
-                    if not self._peer_ok(response):
+                    if not self._peer_ok(response, current):
                         result.status = "blocked:private_address"
                         return result
                     if response.status_code in (301, 302, 303, 307, 308):
@@ -368,5 +513,5 @@ def limited_stream(chunks: Iterable[bytes], max_bytes: int) -> Iterator[bytes]:
 __all__ = (
     "BlockedURL", "FetchResult", "LocalIntakePolicy", "NetworkPolicy", "PDF_MAGIC", "SafeFetcher",
     "UploadTooLarge", "assert_public_http_url", "check_declared_length", "is_public_address", "limited_stream",
-    "system_resolver",
+    "TRUST_PROXY_ENV", "no_proxy_matches", "proxy_for_url", "system_resolver", "trust_proxy_from_env",
 )
