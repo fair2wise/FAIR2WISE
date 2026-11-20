@@ -236,7 +236,7 @@ def _prepare_secrets(cfg: ManagedTiledConfig) -> None:
                 "users_to_passwords": {name: generate_api_key() for name in cfg.authn.users},
                 "secret_keys": [generate_api_key()],
             }
-            write_private_file(cfg.authn_secrets_file, json.dumps(data))
+            write_private_file(cfg.authn_secrets_file, json.dumps(data), exclusive=True)
         if cfg.authn.access_tags is not None:
             _compile_access_tags(cfg)
         return
@@ -245,7 +245,7 @@ def _prepare_secrets(cfg: ManagedTiledConfig) -> None:
         if cfg.writer_secret_file is not None:
             raise TiledConfigError(f"Writer secret file {key_file} does not exist")
         # First provisioning: generate the local writer key inside the data mount.
-        write_private_file(key_file, generate_api_key() + "\n")
+        write_private_file(key_file, generate_api_key() + "\n", exclusive=True)
     read_secret_file(key_file, alphanumeric=True)
 
 

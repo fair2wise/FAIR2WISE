@@ -186,3 +186,32 @@ def test_access_tags_render_tag_based_policy(tmp_path):
     plain = tc.ManagedTiledConfig(profile="test", data_dir=tmp_path, tiled_python=Path("/x"), port=0,
                                   owner=tc.OWNER_TEST, authn=tc.AuthnSpec())
     assert "access_control" not in tc.render_server_config(plain, port=1, init_catalog=True)
+
+
+def test_private_file_is_0600_independent_of_umask_and_setgid_parent(tmp_path, monkeypatch):
+    """First-start key creation (observed 0660 on a setgid hostPath): mode never depends on umask or directory."""
+    import os
+
+    parent = tmp_path / "secrets"
+    parent.mkdir()
+    parent.chmod(0o2777)
+    real_open = os.open
+    # A hostile environment: even the open() mode is wide; only the explicit fchmod/chmod can fix it.
+    monkeypatch.setattr(os, "open", lambda p, f, m=0o777, **kw: real_open(p, f, 0o660, **kw))
+    monkeypatch.setattr(type(parent), "chmod", lambda self, mode, **kw: None)  # by-path chmod disabled too
+    old = os.umask(0)
+    try:
+        path = parent / "writer.key"
+        tc.write_private_file(path, "abc123\n", exclusive=True)
+    finally:
+        os.umask(old)
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+
+
+def test_exclusive_private_file_never_truncates_an_existing_key(tmp_path):
+    path = tmp_path / "writer.key"
+    tc.write_private_file(path, "first\n", exclusive=True)
+    with pytest.raises(FileExistsError):
+        tc.write_private_file(path, "second\n", exclusive=True)
+    assert path.read_text(encoding="utf-8") == "first\n"
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600

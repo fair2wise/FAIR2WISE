@@ -493,12 +493,27 @@ def read_secret_file(path: Path, *, alphanumeric: bool = False) -> str:
     return value
 
 
-def write_private_file(path: Path, content: str) -> None:
-    """Create ``path`` with mode 0600 (refusing to follow an existing symlink)."""
+def write_private_file(path: Path, content: str, *, exclusive: bool = False) -> None:
+    """Create ``path`` with mode 0600, whatever the umask or a setgid parent directory.
+
+    The file is opened without following a symlink, ``fchmod``-ed to 0600 on the open
+    descriptor before any content is written, and chmod-ed again by path afterwards.
+
+    Args:
+        path: File to write.
+        content: Text to store.
+        exclusive: Create atomically (``O_EXCL``); an existing file raises ``FileExistsError``
+            instead of being truncated.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.parent.chmod(stat.S_IRWXU)
-    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+    flags = os.O_WRONLY | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    flags |= os.O_EXCL if exclusive else os.O_TRUNC
     fd = os.open(path, flags, 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+    except AttributeError:  # pragma: no cover - platforms without fchmod
+        pass
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         handle.write(content)
     path.chmod(0o600)
