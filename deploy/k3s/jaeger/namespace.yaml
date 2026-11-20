@@ -1,0 +1,14 @@
+# Namespace for Jaeger. Pod Security `restricted` is enforced, so the Deployment must (and does) satisfy it.
+#
+# The NetworkPolicy admits OTLP only from namespaces carrying the label below. Put it on the namespace that
+# runs FAIR2WISE (the label name is this example's choice; rename it here and in networkpolicy.yaml together):
+#   kubectl label namespace <f2w-namespace> f2w.observability/otlp-client=true
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

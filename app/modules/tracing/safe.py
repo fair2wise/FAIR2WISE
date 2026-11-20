@@ -17,6 +17,7 @@ from collections.abc import Mapping
 import logging
 import os
 import re
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -64,8 +65,26 @@ def key_allowed(key: str) -> bool:
     return not words & FORBIDDEN_FRAGMENTS
 
 
+_SECRET_CACHE: tuple[float, list[str]] = (0.0, [])
+#: Seconds the list of secret values is reused (scanning the environment on every attribute would dominate a span).
+SECRET_TTL_S = 5.0
+
+
+def reset_secret_cache() -> None:
+    """Forget the cached secret values (tests; a secret added to the environment is picked up within the TTL)."""
+    global _SECRET_CACHE
+    _SECRET_CACHE = (0.0, [])
+
+
 def _secret_values() -> list[str]:
-    return [v for k, v in os.environ.items() if v and len(v) >= _MIN_SECRET_CHARS and _SECRET_NAME.search(k)]
+    global _SECRET_CACHE
+    now = time.monotonic()
+    stamp, values = _SECRET_CACHE
+    if stamp and now - stamp < SECRET_TTL_S:
+        return values
+    values = [v for k, v in os.environ.items() if v and len(v) >= _MIN_SECRET_CHARS and _SECRET_NAME.search(k)]
+    _SECRET_CACHE = (now, values)
+    return values
 
 
 def value_allowed(value: object) -> bool:

@@ -8,6 +8,7 @@ import os
 import pytest
 
 from app.modules.tracing import runtime
+from app.modules.tracing.safe import reset_secret_cache
 
 SECRET = "sk-test-FAKEKEY-0123456789abcdef"
 SENTINEL = "SENTINEL-prompt-text-7f3a"
@@ -20,8 +21,10 @@ def _clean_tracing(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
         if name.startswith(("OTEL_", "F2W_OTEL_")):
             monkeypatch.delenv(name, raising=False)
     runtime.reset()
+    reset_secret_cache()
     yield
     runtime.reset()
+    reset_secret_cache()
 
 
 @pytest.fixture

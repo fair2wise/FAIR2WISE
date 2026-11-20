@@ -1,0 +1,17 @@
+# One in-cluster Service. FAIR2WISE exports to http://jaeger.observability.svc:4318 (OTLP/HTTP); other OTLP
+# clients may use gRPC on 4317. The UI port 16686 is for the ingress only (see networkpolicy.yaml).
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: jaeger
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: jaeger
+  ports:
+    - {name: otlp-grpc, port: 4317, targetPort: otlp-grpc, protocol: TCP}
+    - {name: otlp-http, port: 4318, targetPort: otlp-http, protocol: TCP}
+    - {name: ui, port: 16686, targetPort: ui, protocol: TCP}

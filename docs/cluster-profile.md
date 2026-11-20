@@ -235,3 +235,31 @@ spec:
 
 Stop: use `terminationGracePeriodSeconds: 120` (the supervisor stops the worker, API and Tiled in
 order; running jobs return to `queued`).
+
+## Tracing to Jaeger (optional)
+
+OpenTelemetry tracing is off unless `F2W_OTEL_ENABLED=1`; nothing in the table of writable paths changes (spans are
+exported from memory). Example manifests for the collector side are in `deploy/k3s/jaeger/` (namespace
+`observability`, Jaeger v2 pinned by digest, a NetworkPolicy, a Traefik IngressRoute that must sit behind the
+forward-auth middleware). The F2W side is an environment fragment on the Deployment above; the namespace that runs
+F2W must carry the label the Jaeger NetworkPolicy admits (`kubectl label namespace <ns>
+f2w.observability/otlp-client=true`):
+
+```yaml
+        env:
+          - {name: F2W_OTEL_ENABLED, value: "1"}
+          - {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://jaeger.observability.svc:4318"}
+          - {name: OTEL_SERVICE_NAME, value: "f2w"}
+          # Optional: OTEL_TRACES_SAMPLER=parentbased_traceidratio, OTEL_TRACES_SAMPLER_ARG=0.25,
+          #           F2W_OTEL_TRACE_FUNCTIONS / F2W_OTEL_TRACE_MODULES / F2W_OTEL_MIN_SPAN_MS
+          - {name: HTTPS_PROXY, valueFrom: {secretKeyRef: {name: f2w-proxy, key: url}}}   # unchanged: egress via Squid
+          - {name: NO_PROXY, value: ".svc,.cluster.local,10.0.0.0/8"}                      # your own entries
+```
+
+`NO_PROXY` and the Squid allowlist: spans are posted with `requests`, which obeys `HTTPS_PROXY`/`NO_PROXY`. When
+tracing is on and the endpoint host is not a public name (a `.svc`, `.local` or `.cluster.local` name, a
+single-label name, a private or loopback address) the supervisor adds that exact host to `NO_PROXY` and `no_proxy`
+next to the profile's own entries, so spans go straight to the Service and Squid never sees them. A public
+collector host is left to the proxy: add its domain to the Squid allowlist. Ports: OTLP/HTTP is 4318 (the endpoint
+above); gRPC (4317) is not used. Settings, span names and troubleshooting: `mkdocs/docs/observability.md`
+(published at `/fair2wise/docs/observability/`).

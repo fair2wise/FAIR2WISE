@@ -1,0 +1,81 @@
+# Jaeger v2, one replica (the in-memory store is not shared), under Pod Security `restricted`: non-root numeric
+# user, read-only root filesystem, no capabilities, RuntimeDefault seccomp, writable emptyDir only for /tmp.
+#
+# The image is pinned by the digest of the multi-arch index (linux/amd64, arm64, ...) resolved with
+#   docker buildx imagetools inspect jaegertracing/jaeger:2.22.0
+# Move it deliberately: re-run that command for the new tag and replace the digest.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: jaeger
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate                # one pod at a time; the in-memory store cannot be shared
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: jaeger
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: jaeger
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: jaeger
+          # jaegertracing/jaeger:2.22.0
+          image: jaegertracing/jaeger@sha256:836b967b5abcf1f7758066aa6b348619267a2f1459f72d472840570f9bd88a17
+          imagePullPolicy: IfNotPresent
+          args: ["--config=/etc/jaeger/config.yaml"]
+          ports:
+            - {name: otlp-grpc, containerPort: 4317}
+            - {name: otlp-http, containerPort: 4318}
+            - {name: ui, containerPort: 16686}
+            - {name: health, containerPort: 13133}
+            - {name: metrics, containerPort: 8888}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 1Gi}
+          readinessProbe:
+            httpGet: {path: /status, port: health}
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: {path: /status, port: health}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - {name: config, mountPath: /etc/jaeger, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+            # Badger variant (see configmap.yaml): uncomment this mount and the `badger` volume below.
+            # - {name: badger, mountPath: /badger}
+      volumes:
+        - name: config
+          configMap:
+            name: jaeger-config
+        - name: tmp
+          emptyDir: {sizeLimit: 64Mi}
+        # - name: badger
+        #   persistentVolumeClaim: {claimName: jaeger-badger}     # create a small PVC (for example 10Gi)

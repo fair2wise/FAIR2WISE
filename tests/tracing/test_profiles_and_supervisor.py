@@ -104,8 +104,25 @@ def test_other_profiles_gain_the_entry_only_when_tracing_is_on() -> None:
     assert "NO_PROXY" not in off and "otel-collector" in on["NO_PROXY"].split(",")
 
 
+def test_the_merged_no_proxy_makes_requests_skip_the_proxy_for_the_collector_only(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """The OTLP exporter posts with ``requests``; its proxy decision reads exactly the variables the supervisor sets."""
+    from requests.utils import get_environ_proxies
+
+    for name in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "NO_PROXY", "no_proxy"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("HTTP_PROXY", "http://squid:3128")
+    monkeypatch.setenv("HTTPS_PROXY", "http://squid:3128")
+    collector = "http://jaeger-collector.observability.svc:4318/v1/traces"
+    env = resolved({"F2W_OTEL_ENABLED": "1", "OTEL_EXPORTER_OTLP_ENDPOINT": "http://jaeger-collector.observability.svc:4318"})
+    assert get_environ_proxies(collector, no_proxy=env["NO_PROXY"]) == {}                      # direct
+    assert get_environ_proxies("https://api.cborg.lbl.gov/v1", no_proxy=env["NO_PROXY"]) != {}  # still proxied
+    assert get_environ_proxies(collector, no_proxy="127.0.0.1,localhost,::1") != {}           # without the entry: proxied
+
+
 def test_check_output_shows_no_proxy_when_the_collector_added_it(tmp_path: Path, capsys: pytest.CaptureFixture[str],
                                                                  monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("F2W_TILED_PYTHON", raising=False)  # the test recipe sets it; the :local profile locks its own
     monkeypatch.setenv("F2W_OTEL_ENABLED", "1")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4318")
     assert SUP.main(["--profile-file", str(PROFILES / "local.json"), "--check"]) == 0

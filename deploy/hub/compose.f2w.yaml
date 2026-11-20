@@ -1,0 +1,97 @@
+# FAIR2WISE (F2W) as a service of the ALS Computing Hub developer compose (example; nothing deploys it).
+#
+# For the hub maintainer: paste the `f2w` service, the two volumes and the `web`/`observability` network
+# entries into the hub's docker-compose.yml, or keep this file next to it and run
+#   podman-compose -f docker-compose.yml -f compose.f2w.yaml --profile f2w --profile observe up -d
+# (docker compose v2.20+ can also `include:` it). deploy/hub/README.md has the full walk-through.
+#
+# 1. Build the image once (from a checkout of the FAIR2WISE repository; the Mac Studio is arm64):
+#      docker build --platform linux/arm64 --target cluster \
+#        --build-arg GIT_COMMIT="$(git rev-parse HEAD)" -t f2w:cluster .
+#    `cluster` is the hardened image profile: numeric non-root user, read-only root filesystem, no
+#    capabilities, no nginx (F2W_GATEWAY=off: the API process serves the UI itself), probes at
+#    /fair2wise/api/livez and /readyz, bundled Tiled. Its own tracing is OFF unless F2W_OTEL_ENABLED is set.
+#    Or let compose build it: replace `image:` by the commented `build:` block below.
+# 2. Start it only when asked (profile `f2w`):
+#      F2W_OTEL_ENABLED=true podman-compose --profile f2w --profile observe up -d
+#    then open http://f2w.localhost:8088/ (Traefik redirects `/` to `/fair2wise/`) and look for the service
+#    `f2w` in Jaeger at http://127.0.0.1:16686.
+#
+# SECURITY: F2W has NO sign-in of its own in this image (the `local` trust model: every caller is the
+# operator and can read raw traces and publish to the bundled Tiled). It must stay reachable only through the
+# hub's Traefik on 127.0.0.1. Do not publish a port for this service (there is no `ports:` below, on purpose),
+# do not attach it to a network other than `web` and `observability`, and do not add a public router rule.
+#
+# CBORG_API_KEY is passed from the host environment (never written here). Export it in the shell that runs
+# compose, or add it to the hub's untracked .env file.
+
+services:
+  f2w:
+    image: f2w:cluster
+    # build:                               # alternative to `docker build` above; adjust the relative context
+    #   context: ../FAIR2WISE              # path from this file to the FAIR2WISE checkout
+    #   dockerfile: Dockerfile
+    #   target: cluster
+    #   args:
+    #     GIT_COMMIT: ${F2W_GIT_COMMIT:-unknown}   # the commit shown as f2w.code_commit in traces
+    container_name: f2w
+    profiles: [f2w]
+    restart: unless-stopped
+    stop_grace_period: 120s                # the supervisor stops worker, API and Tiled in order; running jobs requeue
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      F2W_GATEWAY: "off"
+      F2W_OTEL_ENABLED: ${F2W_OTEL_ENABLED:-false}
+      OTEL_SERVICE_NAME: f2w
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${F2W_OTEL_ENDPOINT:-http://otel-collector:4318}
+      # Optional tracing knobs (see mkdocs/docs/observability.md). Leave F2W_OTEL_TRACE_FUNCTIONS UNSET to keep the
+      # built-in function list: an empty value switches function tracing off.
+      # F2W_OTEL_TRACE_FUNCTIONS: app.modules.library.publish:*
+      # F2W_OTEL_TRACE_MODULES: app.modules.library
+      # F2W_OTEL_MIN_SPAN_MS: "5"
+      # OTEL_TRACES_SAMPLER: parentbased_traceidratio
+      # OTEL_TRACES_SAMPLER_ARG: "0.5"
+      CBORG_API_KEY:                        # no value: taken from the host environment
+    tmpfs:
+      - /tmp:rw,size=4g,mode=1777
+      - /run/fair2wise:rw,size=64m,uid=10001,gid=10001,mode=0755
+      - /var/lib/fair2wise/cache:rw,size=512m,uid=10001,gid=10001,mode=0700
+    volumes:
+      - f2w-state:/var/lib/fair2wise/state      # sessions, job stores, approvals, audit, JSON turn traces (single writer)
+      - f2w-tiled:/var/lib/fair2wise/tiled      # bundled Tiled catalog, storage and generated writer key
+    networks:
+      - observability                           # reaches otel-collector:4318
+      - web                                     # Traefik routes to port 8080 on this network
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/fair2wise/api/readyz"]
+      interval: 15s
+      timeout: 5s
+      start_period: 120s
+      retries: 6
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=web
+      # The UI and API live under /fair2wise/ (the UI is built with that prefix). `/` has nothing, so a
+      # redirectregex middleware sends the bare host to /fair2wise/; every other path passes through untouched.
+      - traefik.http.routers.f2w.rule=Host(`f2w.localhost`)
+      - traefik.http.routers.f2w.entrypoints=web
+      - traefik.http.routers.f2w.middlewares=f2w-root
+      - traefik.http.middlewares.f2w-root.redirectregex.regex=^(https?://[^/]+)/?$$
+      - traefik.http.middlewares.f2w-root.redirectregex.replacement=$${1}/fair2wise/
+      - traefik.http.services.f2w.loadbalancer.server.port=8080
+
+# Named volumes: the state and the Tiled data must persist across `down`/`up` (preflight requires them to be
+# real mounts, not tmpfs). A new volume takes the ownership of the image's directory (uid 10001).
+volumes:
+  f2w-state:
+  f2w-tiled:
+
+# Declared as in the hub compose; identical redeclarations merge. `web` is the network shared with Traefik.
+networks:
+  observability: {}
+  web:
+    name: web

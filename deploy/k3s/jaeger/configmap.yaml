@@ -1,0 +1,81 @@
+# Jaeger v2 configuration: an OpenTelemetry-collector style file. One OTLP receiver, one storage backend,
+# the query UI on 16686. Storage is IN MEMORY with a hard bound: restarting the pod forgets the traces, which
+# is fine for a pilot. To keep traces, switch to the commented Badger backend (single replica, a PVC) or to
+# OpenSearch/Elasticsearch (see the notes inside the file).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jaeger-config
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: jaeger
+data:
+  config.yaml: |
+    service:
+      extensions: [jaeger_storage, jaeger_query, healthcheckv2]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [jaeger_storage_exporter]
+      telemetry:
+        resource:
+          attributes:
+            - name: service.name
+              value: jaeger
+        metrics:
+          level: basic
+          readers:
+            - pull:
+                exporter:
+                  prometheus:
+                    host: 0.0.0.0
+                    port: 8888
+        logs:
+          level: info
+
+    extensions:
+      healthcheckv2:
+        use_v2: true
+        http:
+          endpoint: 0.0.0.0:13133
+      jaeger_query:
+        storage:
+          traces: main_store
+        http:
+          endpoint: 0.0.0.0:16686
+        grpc:
+          endpoint: 0.0.0.0:16685
+      jaeger_storage:
+        backends:
+          main_store:
+            memory:
+              max_traces: 20000            # oldest traces are evicted beyond this; the 1 GiB limit is ample
+            # Persistence upgrade 1: Badger on a PVC (single replica only; mount the volume at /badger, see the
+            # commented volume in deployment.yaml). Replace the `memory:` block above by:
+            # badger:
+            #   directories:
+            #     keys: /badger/keys
+            #     values: /badger/values
+            #   ephemeral: false
+            #   ttl:
+            #     spans: 168h                # keep a week
+            # Persistence upgrade 2: OpenSearch/Elasticsearch (several replicas, survives the pod):
+            # opensearch:
+            #   server_urls: ["https://opensearch.observability.svc:9200"]
+            #   (credentials from a Secret as env or a mounted file; see the Jaeger v2 storage documentation)
+
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+    processors:
+      batch:
+
+    exporters:
+      jaeger_storage_exporter:
+        trace_storage: main_store

@@ -1,0 +1,33 @@
+# Ingress policy for the Jaeger pod: everything not listed is denied. Two allowances:
+#   * OTLP (4317 gRPC, 4318 HTTP) only from namespaces labelled f2w.observability/otlp-client=true
+#     (label the FAIR2WISE namespace; rename the label here and in namespace.yaml together);
+#   * the query UI (16686) only from the ingress controller's namespace. K3s runs Traefik in `kube-system`;
+#     change the value below if yours runs elsewhere.
+# Kubelet probes come from the node and are not pod traffic, so they need no rule on K3s (kube-router). If your
+# CNI filters node traffic, add an ipBlock for the node CIDR on port 13133.
+# Egress is left open: Jaeger initiates no connections in this setup (neither does the Badger variant); add an
+# egress policy if you adopt OpenSearch.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jaeger-ingress
+  namespace: observability
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: jaeger
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              f2w.observability/otlp-client: "true"
+      ports:
+        - {protocol: TCP, port: 4317}
+        - {protocol: TCP, port: 4318}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system     # the ingress controller (Traefik on K3s)
+      ports:
+        - {protocol: TCP, port: 16686}
