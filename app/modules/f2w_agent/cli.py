@@ -26,6 +26,7 @@ if __name__ == "__main__":
 
     load_entrypoint_dotenv(__file__)
 
+from .. import tracing
 from ..cli_output import output
 from .coordinator import (
     Coordinator,
@@ -154,6 +155,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run status, ask, chat, or the HTTP API; return a process exit code."""
     args = build_parser().parse_args(argv)
+    tracing.init(process=args.command)  # no-op unless F2W_OTEL_ENABLED
     cfg = _cfg(args)
 
     if args.command == "status":

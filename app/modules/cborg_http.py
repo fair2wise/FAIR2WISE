@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextvars
+import functools
 import ipaddress
 import logging
 import os
@@ -11,6 +13,8 @@ import time
 from typing import TYPE_CHECKING, Any
 
 import httpx
+
+from . import tracing
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterable, Callable, Iterable
@@ -199,7 +203,11 @@ def call_with_deadline[T](call: Callable[[], T], seconds: float = LLM_TOTAL_DEAD
                 if state["abandoned"]:
                     _abandoned -= 1  # the hung call finally returned: its slot is free
 
-    threading.Thread(target=runner, name="llm-call", daemon=True).start()
+    # With tracing on, the call keeps the caller's span context so its HTTP spans nest under the caller's span;
+    # with tracing off the thread starts with an empty context, exactly as before.
+    context = contextvars.copy_context() if tracing.is_enabled() else None
+    target = runner if context is None else functools.partial(context.run, runner)
+    threading.Thread(target=target, name="llm-call", daemon=True).start()
     if not finished.wait(seconds):
         with _abandoned_lock:
             if not finished.is_set():  # decided under the lock, so the runner and this count cannot disagree

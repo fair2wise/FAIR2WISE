@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 import logging
 from typing import TYPE_CHECKING, Any
 
+from .. import tracing
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.jobs import JobState, StageOutcome
 from ..contracts.json_types import JsonValue
@@ -335,6 +336,22 @@ class PipelineRunner:
         self._on_denied = on_denied
 
     def run(self, lease: Lease, job: JobRecord) -> JobState:
+        """Drive ``job`` (see :meth:`_run_job`) inside a ``job.run`` span.
+
+        With tracing on, the span is a child of the request that submitted the job (its ``traceparent`` is
+        stored beside the job row), so one trace covers the API call and the worker's stages.
+        """
+        if not tracing.is_enabled():
+            return self._run_job(lease, job)
+        lookup = getattr(self.store, "trace_context", None)
+        parent = lookup(job.job_id) if callable(lookup) else None
+        attrs = {"f2w.job_id": job.job_id, "f2w.job_kind": job.kind}
+        with tracing.span_from_traceparent("job.run", parent, **attrs) as handle:
+            state = self._run_job(lease, job)
+            handle.set_attribute("f2w.status", state.value)
+            return state
+
+    def _run_job(self, lease: Lease, job: JobRecord) -> JobState:
         """Drive ``job`` until it succeeds, waits, fails or is stopped. Returns the resulting state.
 
         Only ``Exception`` subclasses are handled: a ``BaseException`` (a crash) propagates and
@@ -465,6 +482,18 @@ class PipelineRunner:
 
     def _run_stage(self, lease: Lease, job: JobRecord, spec: StageSpec, position: int, key: str,
                    authority: Callable[[JobRecord, Sequence[str]], Any] | None = None) -> None:
+        """Run one stage inside a ``job.stage`` span (pauses and stops are recorded, not errors)."""
+        attrs = {"f2w.job_id": job.job_id, "f2w.job_kind": job.kind, "f2w.stage": spec.name}
+        with tracing.start("job.stage", attrs, benign=(StagePause, JobStopped, JobInterrupted, RestartStages)) as span:
+            try:
+                self._run_stage_body(lease, job, spec, position, key, authority)
+            except _Ended as ended:  # the stage failed: record the real cause, not the internal wrapper
+                if ended.__cause__ is not None:
+                    span.set_error(ended.__cause__)
+                raise
+
+    def _run_stage_body(self, lease: Lease, job: JobRecord, spec: StageSpec, position: int, key: str,
+                        authority: Callable[[JobRecord, Sequence[str]], Any] | None = None) -> None:
         job_id = job.job_id
         ctx = StageContext(
             self.store,

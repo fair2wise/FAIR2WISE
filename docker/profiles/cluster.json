@@ -70,6 +70,18 @@
     "F2W_GATEWAY": "off",
     "F2W_SAFE_FETCH_TRUST_PROXY": "0"
   },
+  "optional_env": {
+    "F2W_OTEL_ENABLED": "set to 1 to export OpenTelemetry traces (OTLP/HTTP); off when unset",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "collector base URL, for example http://jaeger-collector.observability.svc:4318; a non-public host is added to NO_PROXY by the supervisor",
+    "OTEL_EXPORTER_OTLP_HEADERS": "k=v,k2=v2 request headers for the collector (never logged)",
+    "OTEL_SERVICE_NAME": "service name in Jaeger (default f2w)",
+    "OTEL_RESOURCE_ATTRIBUTES": "extra resource attributes, k=v,k2=v2",
+    "OTEL_TRACES_SAMPLER": "sampler name, for example parentbased_traceidratio",
+    "OTEL_TRACES_SAMPLER_ARG": "sampler argument, for example 0.25",
+    "F2W_OTEL_TRACE_FUNCTIONS": "comma list of module:qualname targets; unset uses the built-in list, empty disables it",
+    "F2W_OTEL_TRACE_MODULES": "comma list of module prefixes whose public functions are traced",
+    "F2W_OTEL_MIN_SPAN_MS": "drop spans of F2W_OTEL_TRACE_MODULES functions shorter than this many milliseconds"
+  },
   "required_mounts": [
     {
       "path": "/var/lib/fair2wise/state",
