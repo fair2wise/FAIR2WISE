@@ -92,8 +92,9 @@ def test_a_failing_chmod_keeps_the_refusal(tmp_path, monkeypatch):
         return real_chmod(self, mode, **kw)
 
     monkeypatch.setattr(Path, "chmod", deny)
-    with pytest.raises(tc.TiledConfigError, match="group- or world-accessible"):
+    with pytest.raises(tc.TiledConfigError, match="group- or world-accessible") as err:
         lc._prepare_secrets(_cfg(tmp_path))
+    assert "fsGroup" in str(err.value) and "abc123" not in str(err.value)
 
 
 def test_a_configured_secret_mount_is_never_touched(tmp_path):

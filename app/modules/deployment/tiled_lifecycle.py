@@ -274,7 +274,16 @@ def _prepare_secrets(cfg: ManagedTiledConfig) -> None:
             raise TiledConfigError(f"Writer secret file {key_file} does not exist")
         # First provisioning: generate the local writer key inside the data mount.
         write_private_file(key_file, generate_api_key() + "\n", exclusive=True)
-    read_secret_file(key_file, alphanumeric=True)
+    try:
+        read_secret_file(key_file, alphanumeric=True)
+    except TiledConfigError as exc:
+        if cfg.writer_secret_file is None and "group- or world-accessible" in str(exc):
+            raise TiledConfigError(
+                f"{exc}. F2W could not tighten it itself; on Kubernetes the kubelet applies the pod's fsGroup "
+                "to a local volume at every start (fsGroupChangePolicy: Always) and makes files group-writable. "
+                "Run the pod as the key's owner uid, or set fsGroupChangePolicy: OnRootMismatch, or chmod 0600 "
+                "the key by hand.") from None
+        raise
 
 
 def _compile_access_tags(cfg: ManagedTiledConfig) -> None:
