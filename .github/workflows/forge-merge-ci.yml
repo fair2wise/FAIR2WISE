@@ -30,7 +30,11 @@ env:
   # LibraryTab, ExtractionTab, library/, extraction/, harvest api and hooks, KeepAliveMainContent, App.tsx
   # routes, e2e library/extraction/harvester specs) plus the T18D UI files (317411b); previous a9c222b1.
   # PRs touching ui/ carry the ui-change-approved label. See docs/migration/ui_contracts/a8_library_tabs.md.
-  FROZEN_UI_TREE: 059b7a46a8111faa71588a0bbf94e4b0609a3a58
+  # Re-pinned 2026-11-20 (owner: "yes go fix"): UI work since 2026-11-03, each owner requested: Save edits the
+  # corpus on screen, Pending Approvals page, source pill and model-list fix, truncation notice, Publish to
+  # Tiled button and dialog, 300-node large-graph overview (T-save-corpus, T-approvals-ui, 93ab876, 93f5ab3,
+  # 4046edb); previous 059b7a46.
+  FROZEN_UI_TREE: e627b360f10eb7f404c27321c8de0584835b98b0
   KG_RAG_RETRIEVAL_BACKEND: lexical
   KG_RAG_FORCE_CPU: "1"
   F2W_SOURCE_RAG: "0"

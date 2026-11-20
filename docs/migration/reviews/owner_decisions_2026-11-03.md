@@ -204,3 +204,9 @@ not the other": confirmed (the plan's scope was e2e_demo only and bl1101's recor
 |---|---|
 | Which corpus(es) the demo QA chat uses (after the live probe showed chat answers only from the pointer's corpus) | "let's move from the e2e_demo KG to the most complete RSoXS kg, as well as the 580 paper OPV KG" (read as: the demo corpora become the most complete RSoXS KG, taken to be `matkg_rsoxs_v4.json` (22,012 things, 57,575 associations, 246 source papers; adopts as `rsoxs/v4`; to be confirmed by the owner) and the 580-paper OPV KG `matkg_qwen3_235b_580papers.json` (15,815 things, 20,096 associations; adopts as `qwen3_235b_580papers/v1`); both pass the dry-run adoption; chat must answer over both, i.e. over all live corpora, with the corpus named on each citation; e2e_demo stays the small live-extraction example) |
 | QA speed | "10 s is fine for now; revisit after the rehearsal (Recommended)" |
+
+## Twenty-third set (2026-11-20)
+
+| Question | Owner answer |
+|---|---|
+| Re-pin `FROZEN_UI_TREE` (stale since 2026-11-03; the guard and the release-manifest step failed on every push) | "yes go fix" (after "we should prioritize fixing these next"; read as approval to re-pin to the current `ui/` tree `e627b360`, covering the owner-requested UI changes since 059b7a46: Save edits the corpus on screen, Pending Approvals page, source pill and model-list fix, truncation notice, Publish to Tiled button and dialog, large-graph overview) |
