@@ -29,6 +29,7 @@ from pathlib import Path
 import shutil
 import signal
 import socket
+import stat
 import subprocess
 import tempfile
 import time
@@ -226,10 +227,35 @@ def _child_env(home: Path) -> dict[str, str]:
             "LC_ALL": "C.UTF-8"}
 
 
+def _retighten_own_secret(path: Path) -> None:
+    """Chmod a generated secret back to 0600 when a volume driver widened it (never loosens the check).
+
+    kubelet applies ``fsGroup`` ownership to an existing local volume on every pod start
+    (``fsGroupChangePolicy: Always``), which makes existing files group-writable. Only a regular
+    file (``lstat``, so not a symlink) owned by the running uid with group/other bits is touched;
+    a symlink, a foreign owner or a failing chmod is left for ``check_private_file`` to refuse.
+    """
+    try:
+        st = path.lstat()
+    except OSError:
+        return
+    getuid = getattr(os, "getuid", None)
+    mode = stat.S_IMODE(st.st_mode)
+    if not stat.S_ISREG(st.st_mode) or not mode & 0o077 or (getuid is not None and st.st_uid != getuid()):
+        return
+    try:
+        path.chmod(0o600)
+    except OSError as exc:
+        logger.warning("could not tighten %s from mode %04o: %s", path, mode, exc.strerror)
+        return
+    logger.warning("tightened %s from mode %04o to 0600 (a volume driver widened it)", path, mode)
+
+
 def _prepare_secrets(cfg: ManagedTiledConfig) -> None:
     cfg.secrets_dir.mkdir(parents=True, exist_ok=True)
     cfg.secrets_dir.chmod(0o700)
     if cfg.authn is not None:
+        _retighten_own_secret(cfg.authn_secrets_file)
         if not cfg.authn_secrets_file.exists():
             data = {
                 "provider": cfg.authn.provider,
@@ -241,6 +267,8 @@ def _prepare_secrets(cfg: ManagedTiledConfig) -> None:
             _compile_access_tags(cfg)
         return
     key_file = cfg.effective_writer_secret_file
+    if cfg.writer_secret_file is None:  # only the generated key; a configured secret mount is never touched
+        _retighten_own_secret(key_file)
     if not key_file.exists():
         if cfg.writer_secret_file is not None:
             raise TiledConfigError(f"Writer secret file {key_file} does not exist")
