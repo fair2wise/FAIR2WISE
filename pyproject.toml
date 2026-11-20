@@ -144,6 +144,7 @@ packages = [
   "f2w.modules.term_extractor",
   "f2w.modules.science",
   "f2w.modules.tools",
+  "f2w.modules.tracing",
   "f2w.modules.vision",
   "f2w.modules.vision.kernels",
   "f2w.modules.workers",

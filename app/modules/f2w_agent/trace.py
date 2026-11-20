@@ -26,6 +26,7 @@ import time
 from typing import Any, cast
 import uuid
 
+from .. import tracing
 from ..contracts.json_types import JsonValue
 
 logger = logging.getLogger(__name__)
@@ -661,7 +662,7 @@ def _summary_line(payload: Mapping[str, Any], elapsed_s: float) -> dict[str, Any
         if len(graph_ids) == 3:
             break
     ui_settings = cast(Mapping[str, Any], request.get("ui_settings") if isinstance(request.get("ui_settings"), Mapping) else {})
-    return {
+    summary = {
         "turn_id": payload.get("turn_id"),
         "session_id": payload.get("session_id"),
         "batch_id": request.get("batch_id"),
@@ -678,6 +679,9 @@ def _summary_line(payload: Mapping[str, Any], elapsed_s: float) -> dict[str, Any
         "latency_ms": int(elapsed_s * 1000),
         "error_count": len(payload.get("errors") or []),
     }
+    if payload.get("otel_trace_id"):  # additive: only when OpenTelemetry tracing was on for the turn
+        summary["otel_trace_id"] = payload["otel_trace_id"]
+    return summary
 
 
 def _final_sufficient(response: Mapping[str, Any], retrieval: Mapping[str, Any]) -> JsonValue:
@@ -763,6 +767,9 @@ def open_turn(
         collector.merge_env(env)
         collector.merge_request(request)
         collector.bind()
+        otel_trace_id = tracing.current_trace_id()
+        if otel_trace_id:
+            collector.data["otel_trace_id"] = otel_trace_id  # additive link to Jaeger; absent when tracing is off
         return collector
     except Exception as exc:
         logger.warning("Trace open failed: %s", exc)
@@ -827,7 +834,16 @@ def record_llm_call(
     timeout: float | None = None,
     error: BaseException | None = None,
 ) -> None:
-    """Record one model call on the active turn. No-op when no turn is open."""
+    """Record one model call on the active turn and, with tracing on, as an ``llm.call`` span.
+
+    The span carries the model name, the call-site label, latency, sizes and status; never the messages
+    or the response (``docs/adr/content-disclosure.md``). The turn record is a no-op when no turn is open.
+    """
+    if tracing.is_enabled():
+        tracing.record_model_call(
+            label=label, model=model, latency_ms=latency_ms, error=error,
+            prompt_chars=sum(len(str(item.get("content") or "")) for item in messages),
+            response_chars=None if response is None else len(response))
     collector = current_trace()
     if collector is None or collector.finished:
         return

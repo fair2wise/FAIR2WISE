@@ -27,6 +27,7 @@ import time
 from typing import Any, cast
 import uuid
 
+from .. import tracing
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.jobs import JOB_EVENT_VERSION, TERMINAL_STATES, JobEvent, JobHandle, JobState, StageOutcome
 from .keys import OperationInputs, canonical_json
@@ -54,6 +55,10 @@ SCHEMA = (
     "detail TEXT NOT NULL DEFAULT '{}', at REAL NOT NULL, PRIMARY KEY(job_id, sequence));\n",
     "CREATE TABLE IF NOT EXISTS job_logs (job_id TEXT NOT NULL, seq INTEGER NOT NULL, at REAL NOT NULL, "
     "level TEXT NOT NULL, stage TEXT NOT NULL DEFAULT '', message TEXT NOT NULL, PRIMARY KEY(job_id, seq));\n",
+    # Additive (OpenTelemetry): the W3C traceparent of the submitting request, so the worker's spans are its
+    # children. A side table, not a column: an existing database gets it from this script, no migration.
+    "CREATE TABLE IF NOT EXISTS job_trace_context (job_id TEXT PRIMARY KEY, traceparent TEXT NOT NULL, "
+    "created_at REAL NOT NULL);\n",
 )
 
 #: Longest stored log message (characters, after scrubbing).
@@ -318,7 +323,16 @@ class JobStore:
                     (job_id, kind, _json(inputs.as_dict()), created_by, settings_revision, now, now),
                 )
                 self._emit(con, job_id, "submit", StageOutcome.PENDING, JobState.QUEUED, detail={"by": created_by})
+                traceparent = tracing.current_traceparent()
+                if traceparent:
+                    con.execute("INSERT OR IGNORE INTO job_trace_context (job_id, traceparent, created_at) "
+                                "VALUES (?, ?, ?)", (job_id, traceparent, now))
         return self.get(job_id)
+
+    def trace_context(self, job_id: str) -> str | None:
+        """The ``traceparent`` stored when the job was submitted with tracing on, else ``None``."""
+        row = self.db.one("SELECT traceparent FROM job_trace_context WHERE job_id=?", (job_id,))
+        return None if row is None else str(row["traceparent"])
 
     def get(self, job_id: str) -> JobRecord:
         """The job, or ``NOT_FOUND``."""

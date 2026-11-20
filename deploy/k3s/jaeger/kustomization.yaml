@@ -1,0 +1,12 @@
+# For the owner's Flux repository: reference this directory as a Kustomization path.
+# ingressroute.yaml is listed last on purpose; do not adopt it until its forward-auth placeholders are replaced.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: observability
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
+  - networkpolicy.yaml
+  - ingressroute.yaml

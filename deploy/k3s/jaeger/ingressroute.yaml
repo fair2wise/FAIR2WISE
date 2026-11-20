@@ -1,0 +1,25 @@
+# Traefik IngressRoute for the Jaeger UI (K3s ships Traefik with the traefik.io CRDs).
+#
+# THE UI HAS NO SIGN-IN OF ITS OWN and shows every trace. It MUST sit behind the same forward-auth that
+# protects the other pilot apps (oauth2-proxy / Keycloak). `REPLACE_WITH_FORWARD_AUTH_MIDDLEWARE` is a
+# placeholder, not a real name: put the name (and namespace) of your forward-auth Middleware there. A
+# Middleware in another namespace needs Traefik's allowCrossNamespace provider option. Do not apply this file
+# with the placeholders in place: the route then references a middleware that does not exist, and Traefik
+# refuses to serve it (fail closed), which is the intended failure.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: jaeger-ui
+  namespace: observability
+spec:
+  entryPoints: [websecure]
+  routes:
+    - kind: Rule
+      match: Host(`jaeger.example.org`)                  # REPLACE with your hostname
+      middlewares:
+        - name: REPLACE_WITH_FORWARD_AUTH_MIDDLEWARE
+          namespace: REPLACE_WITH_ITS_NAMESPACE
+      services:
+        - name: jaeger
+          port: 16686
+  tls: {}                                                # or certResolver / secretName, as your other routes do

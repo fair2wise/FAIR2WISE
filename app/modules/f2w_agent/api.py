@@ -24,6 +24,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from .. import kg_rag_api as krag
+from .. import tracing
 from ...api.auth import undeclared_routes, warn_if_exposed
 from ...api.legacy_ui import build_guard, ui_context, ui_optional_context
 from ...api.origin_gate import OriginGateMiddleware
@@ -51,6 +52,7 @@ from ..literature.legacy_download import hardened_get_json, openalex_api_key, op
 from ..project_config import config_value, get_config
 from ..runtime_bridge.selection import attach_read_path, attach_summary_path
 from ..security.authorization import SETTINGS_DEPLOYMENT_FIELDS, StartupConfigError
+from ..tracing.asgi import install as install_tracing_middleware
 from .coordinator import Coordinator, CoordinatorConfig
 from .corpus_union import ChatCorpusUnion, ChatGraphSet
 from .debate_agent import EvidenceDebateAgent
@@ -8005,5 +8007,7 @@ def run_api(cfg: CoordinatorConfig, *, host: str, port: int, cors_origins: list[
 
     options = uvicorn_options(layout_from_env(os.environ))
     app = create_app(cfg, cors_origins=cors_origins)
+    tracing.init(process="api")  # no-op unless F2W_OTEL_ENABLED
+    install_tracing_middleware(app)  # request spans, only when tracing is on
     warn_if_exposed(app, host)  # AUD-16: :local beyond loopback serves raw traces to every caller
     uvicorn.run(app, host=host, port=port, **options)

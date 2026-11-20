@@ -51,6 +51,7 @@ nav:
       - "The :local image, end to end": local-image.md
       - "The :cluster image (Kubernetes)": cluster-image.md
       - Local and Docker operation: operations.md
+      - Observability (OpenTelemetry, Jaeger): observability.md
       - Release and maintenance: release.md
       - Performance guide: performance.md
       - Security model: security.md

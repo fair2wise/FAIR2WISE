@@ -43,6 +43,12 @@ image profile name), ``enum_env`` (names restricted to listed values, refused wi
 (it is skipped unless every named variable has one of the listed values), and
 ``no_proxy_append`` (entries added to ``NO_PROXY``/``no_proxy`` so internal traffic is never proxied).
 
+OpenTelemetry (any profile, only when tracing is on): with ``F2W_OTEL_ENABLED`` (or the alias ``OTEL_ENABLED``)
+truthy and an OTLP endpoint whose host is not a public name (a cluster Service such as
+``jaeger-collector.observability.svc``, a single-label hub name such as ``otel-collector``, a private or
+loopback address), that host is added to ``NO_PROXY`` so spans reach the collector directly and not through
+an egress proxy that would refuse it. Nothing changes while tracing is off.
+
 Exit codes: 0 clean stop; 1 stop needed SIGKILL or a child reported an unclean stop;
 70 a required child died; 71 a required child failed its startup health check;
 78 configuration or preflight refused (no service was started).
@@ -54,6 +60,7 @@ Importing this module has no side effects.
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import os
 import re
@@ -63,6 +70,7 @@ import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -314,8 +322,40 @@ def resolve_environment(
         env[name] = value
     if profile.no_proxy_append:
         notes.append(merge_no_proxy(env, profile.no_proxy_append))
+    collector = otel_no_proxy_host(env)
+    if collector:
+        notes.append("OTLP collector host is not public: " + merge_no_proxy(env, [collector]))
     env[DOTENV_VAR] = "off"
     return env, notes
+
+
+_OTEL_TRUE = frozenset({"1", "true", "yes", "on"})
+_INTERNAL_SUFFIXES = (".svc", ".local", ".localhost", ".internal", ".lan", ".home.arpa", ".cluster.local")
+
+
+def otel_no_proxy_host(env: Mapping[str, str]) -> Optional[str]:
+    """Collector host to add to ``NO_PROXY``: tracing is on and the OTLP endpoint host is not a public name.
+
+    Public means a dotted DNS name outside the internal suffixes (``.svc``, ``.local``, ``.internal``...) or a
+    global IP address; such a collector is reached through the egress proxy like any other host, and the
+    proxy's allowlist must name it. Returns ``None`` when tracing is off or the host is public.
+    """
+    flag = (env.get("F2W_OTEL_ENABLED") or "").strip() or (env.get("OTEL_ENABLED") or "")
+    if flag.strip().lower() not in _OTEL_TRUE:
+        return None
+    endpoint = ((env.get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") or env.get("OTEL_EXPORTER_OTLP_ENDPOINT") or "")
+                .strip() or "http://localhost:4318")
+    try:
+        host = (urllib.parse.urlsplit(endpoint).hostname or "").lower()
+    except ValueError:
+        return None
+    if not host:
+        return None
+    try:
+        return None if ipaddress.ip_address(host).is_global else host
+    except ValueError:
+        pass
+    return host if "." not in host or host.endswith(_INTERNAL_SUFFIXES) else None
 
 
 def merge_no_proxy(env: Dict[str, str], extra: Sequence[str]) -> str:
@@ -627,7 +667,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         log("note", detail=note)
     if args.check:
         shown = sorted(set(profile.locked_env) | set(profile.env) | {DOTENV_VAR}
-                       | ({"NO_PROXY"} if profile.no_proxy_append else set()))
+                       | ({"NO_PROXY"} if profile.no_proxy_append or otel_no_proxy_host(env) else set()))
         print(json.dumps({"profile": profile.profile, "tiled_mode": profile.tiled_mode,
                           "env": {k: env[k] for k in shown},
                           "preflight": [substitute(s, env) for s, w in zip(
