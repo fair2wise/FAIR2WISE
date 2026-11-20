@@ -28,7 +28,12 @@ PLAYBOOKS = sorted((DEPLOY / "playbooks").glob("*.yml"))
 TASK_FILES = sorted((ROLE / "tasks").glob("*.yml"))
 TEMPLATE = ROLE / "templates" / "edge-traefik.yml.j2"
 INVENTORY = DEPLOY / "inventory.example.yml"
-TEXT_FILES = sorted(p for p in DEPLOY.rglob("*") if p.is_file() and "__pycache__" not in p.parts)
+#: ``deploy/hub`` (a compose fragment for the ALS Computing Hub) and ``deploy/k3s`` (example manifests) are not part
+#: of the Ansible handoff this module checks: they legitimately pin a real image digest and name local hosts.
+#: ``tests/tracing/test_docs_and_deliverables.py`` checks their own rules.
+NOT_ANSIBLE = frozenset({"hub", "k3s"})
+TEXT_FILES = sorted(p for p in DEPLOY.rglob("*") if p.is_file() and "__pycache__" not in p.parts
+                    and p.relative_to(DEPLOY).parts[0] not in NOT_ANSIBLE)
 CONFIG_FILES = [p for p in TEXT_FILES if p.suffix in (".yml", ".j2", ".cfg")]
 PROFILES = ("als-dev", "als-prod", "local")
 DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")

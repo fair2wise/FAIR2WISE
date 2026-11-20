@@ -125,6 +125,7 @@ def test_service_version_matches_pyproject() -> None:
 
 def test_collector_down_never_raises_or_blocks_and_warns_once(monkeypatch: pytest.MonkeyPatch,
                                                               caplog: pytest.LogCaptureFixture) -> None:
+    pytest.importorskip("opentelemetry.exporter.otlp.proto.http.trace_exporter")  # in pixi.lock; older venvs lack it
     monkeypatch.setenv("F2W_OTEL_ENABLED", "1")
     monkeypatch.setenv("F2W_OTEL_TRACE_FUNCTIONS", "")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:9")  # discard port: connection refused

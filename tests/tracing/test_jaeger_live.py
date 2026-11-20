@@ -128,6 +128,7 @@ def services() -> list[str]:
 
 
 def test_real_jaeger_receives_nested_timed_spans_with_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("opentelemetry.exporter.otlp.proto.http.trace_exporter")
     monkeypatch.setenv("F2W_OTEL_ENABLED", "1")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", OTLP)  # the base URL: the exporter adds /v1/traces
     monkeypatch.setenv("OTEL_SERVICE_NAME", "f2w")
@@ -143,6 +144,7 @@ def test_real_jaeger_receives_nested_timed_spans_with_errors(monkeypatch: pytest
     with tracing.start("POST /chat", {"http.request.method": "POST", "f2w.job_id": marker}, kind="server") as request:
         trace_id = request.trace_id
         assert trace_id
+        time.sleep(0.03)  # the model call really takes this long, so the request span covers the 25 ms it reports
         turn_trace.record_llm_call(label="KG-RAG-judge", model="lbl/cborg-chat",
                                    messages=[{"role": "user", "content": "hi"}], response="ok", latency_ms=25.0)
         _off_domain("what is rsoxs", [], {})
