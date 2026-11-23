@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from . import bundles as B
+from ..cborg_errors import CborgIpNotAuthorized
 from ..contracts.errors import ContractError, ErrorCode
 from ..jobs.log_capture import CaptureBusy, capture_job_logs
 from ..jobs.pipeline import JobInterrupted, JobStopped, StageBusy, StageContext, StageResult
@@ -344,6 +345,9 @@ class LibraryExtractor:
                     for r in todo]
 
         def process(_sc: StageContext, unit: WorkUnit) -> Mapping[str, Any]:
+            refused = getattr(orch, "refusal", None)
+            if refused is not None:  # CBORG refused this network address: terminal, the next paper would be refused too
+                raise refused
             row = by_id[unit.payload]
             rel = str(row["relpath"])
             path = self.service.roots.policy("library").require_allowed(root / rel)
@@ -351,6 +355,9 @@ class LibraryExtractor:
             before = dict(orch.store.metadata)
             logger.info("extracting %s", rel)  # a log line (captured); ctx.log here would turn a cancel into a failure
             with_terms = int(orch.process_pdf(str(path)) or 0)
+            refused = getattr(orch, "refusal", None)
+            if refused is not None:  # the pages were not read by the model: say why, do not call the PDF unreadable
+                raise refused
             pages = int(orch.store.metadata.get("processed_pages_total", 0)) - int(before.get("processed_pages_total", 0))
             _sc.store.check_lease(_sc.lease)  # a run that lost its lease while the PDF was in flight must not record it as done
             if pages <= 0:
@@ -380,8 +387,8 @@ class LibraryExtractor:
         with capture_job_logs(ctx, CAPTURED_LOGGERS):  # CaptureBusy: surfaced by run() as a retryable conflict
             try:
                 result = chunked_stage(units, process)(ctx)
-            except (JobStopped, JobInterrupted):
-                finalize()
+            except (JobStopped, JobInterrupted, CborgIpNotAuthorized):
+                finalize()  # what finished before the stop is kept
                 raise
             finalized = finalize()
         ctx.log(f"extraction finished: {len(rows) - len(result.incomplete)} of {len(rows)} papers in bundle "

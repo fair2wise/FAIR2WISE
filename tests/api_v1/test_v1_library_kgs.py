@@ -55,7 +55,8 @@ def test_models_schemas_and_unavailable_backend(local, kgs):
     body = c.get("/v1/library/models").json()
     policy = body.pop("model_policy")  # additive (free-model policy, 2026-11-09)
     assert policy["default_model"] == "lbl/cborg-chat" and policy["as_of"]
-    assert body == {"available": True, "models": ["m1", "m2"], "source": "live", "error": None, "backend": "cborg"}
+    assert body == {"available": True, "models": ["m1", "m2"], "source": "live", "error": None, "error_code": None,
+                    "backend": "cborg"}
     svc.catalog = CachedModelCatalog(lambda: ModelListing("cborg", "unavailable", error="no key"))
     out = c.get("/v1/library/models").json()
     assert out["available"] is False and out["models"] == [] and out["error"] == "no key"

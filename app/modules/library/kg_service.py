@@ -74,7 +74,7 @@ class KgLibrary:
         # Free-model policy (owner decision 2026-11-09): the picker offers only the free ids of the live list.
         models = policy.filter(listing.models, listing) if listing.available else []
         return {"available": bool(listing.available), "models": models, "source": listing.source,
-                "error": listing.error, "backend": listing.backend, "model_policy": policy.describe()}
+                "error": listing.error, "error_code": listing.error_code, "backend": listing.backend, "model_policy": policy.describe()}
 
     # -------------------------------------------------------------- estimate
     def _facts(self, paper_ids: list[str]) -> list[PaperFacts]:

@@ -39,7 +39,8 @@ env:
   # Re-pinned 2026-11-23 (owner bug list, task 5): KG viewer defaults to a JSON source (GraphSourceSelect, graphSourceStore, graphSourcesApi, agentSettings fallback); previous fe160a2d.
   # Re-pinned 2026-11-23 (owner bug list, task 6): KG viewer defaults to force-directed where force is allowed (GraphMockup, largeGraphPolicy, test setup, e2e spec); previous f6449d9a.
   # Re-pinned 2026-11-23 (owner bug list, task 9): shared category list: Enter/Add category creates and selects it in Papers and Harvester; previous 2607239b.
-  FROZEN_UI_TREE: fe17f58dffa590cc68b67f664e25b39d71141862
+  # Re-pinned 2026-11-23 (owner bug list, task 2): provider refusal wording (providerErrors; judge model setting and extraction toasts show the CBORG address refusal); previous fe17f58d.
+  FROZEN_UI_TREE: bdf888d37ed4fc8679e939969ff88d59e91897d2
   KG_RAG_RETRIEVAL_BACKEND: lexical
   KG_RAG_FORCE_CPU: "1"
   F2W_SOURCE_RAG: "0"

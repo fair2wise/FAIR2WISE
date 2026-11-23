@@ -21,6 +21,7 @@ from typing import Any, cast
 from academy.agent import Agent, action
 
 from .. import kg_rag_api as krag
+from ..cborg_errors import IP_NOT_AUTHORIZED_MESSAGE, is_ip_not_authorized
 from ..graph.backends.tiled_lookup import (
     TILED_GRAPH_ID,
     is_experiment_identity_question,
@@ -334,6 +335,8 @@ def _off_domain(question: str, hits: Sequence[ScoredHit], graphs: dict[str, Any]
 
 def describe_llm_failure(exc: BaseException) -> str:
     """One user-presentable sentence for a failed model call (HTTP status errors are not shown raw)."""
+    if is_ip_not_authorized(exc):
+        return IP_NOT_AUTHORIZED_MESSAGE + "."
     status = getattr(exc, "status_code", None)
     if status == 403:
         return (

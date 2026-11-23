@@ -16,6 +16,7 @@ from dataclasses import dataclass
 import logging
 from typing import Any
 
+from ..cborg_errors import IP_NOT_AUTHORIZED_REASON
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
 from .pipeline import PauseBudget, PauseProvider, QuarantineStage, StageContext, StageResult, StageRun
@@ -102,8 +103,8 @@ def chunked_stage(
             except ContractError as exc:
                 if exc.code is ErrorCode.BUDGET_EXHAUSTED:
                     raise PauseBudget(str(exc)) from exc
-                if exc.code is ErrorCode.DENIED:
-                    raise
+                if exc.code is ErrorCode.DENIED or exc.reason == IP_NOT_AUTHORIZED_REASON:
+                    raise  # an address refusal is terminal for the job: it ends failed with the refusal text
                 sc.fail_unit(unit.unit_id, unit.unit_key, f"{exc.code.value}: {exc}")
                 missing.append(unit.unit_id)
                 continue

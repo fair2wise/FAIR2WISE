@@ -9,6 +9,7 @@ from typing import Any
 import openai
 import requests
 
+from ..cborg_errors import as_ip_not_authorized
 from ..cborg_http import (
     LLM_MAX_RETRIES,
     collect_stream_text,
@@ -30,6 +31,9 @@ def _traced_chat(model: str, prompt: str, trace_label: str | None, timeout: int,
     try:
         result = call()
     except Exception as exc:
+        refusal = as_ip_not_authorized(exc)
+        if refusal is not None:  # terminal; traced and raised with the fixed text (the cause may name this host's address)
+            exc = refusal
         record_llm_call(
             label=label,
             model=model,
@@ -39,6 +43,8 @@ def _traced_chat(model: str, prompt: str, trace_label: str | None, timeout: int,
             timeout=timeout,
             error=exc,
         )
+        if refusal is not None:
+            raise refusal from None
         raise
     record_llm_call(
         label=label,

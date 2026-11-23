@@ -102,6 +102,8 @@ export interface ModelsResponse {
   models: string[];
   source: 'live' | 'unavailable' | string;
   error: string | null;
+  /** Stable code of a known refusal (`cborg_ip_not_authorized`), else null/absent. */
+  error_code?: string | null;
   /** Provider backend name (e.g. `openai`), or null. */
   backend?: string | null;
 }

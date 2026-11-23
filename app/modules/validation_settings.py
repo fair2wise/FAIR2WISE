@@ -131,6 +131,7 @@ class JudgeModelService:
             "models_source": listing.source,
             "models_listed_at": listing.listed_at,
             "models_error": listing.error,
+            "models_error_code": listing.error_code,
             "backend": listing.backend,
             "model_policy": policy.describe(),
         }

@@ -11,6 +11,7 @@ const LIVE = {
   models_source: 'live',
   models_listed_at: '2026-10-16T00:00:00Z',
   models_error: null,
+  models_error_code: null,
   backend: 'cborg',
 };
 

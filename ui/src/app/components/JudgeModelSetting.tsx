@@ -9,6 +9,7 @@ import {
   saveJudgeModel,
   type JudgeModelState,
 } from './judgeModel';
+import { modelListReason } from './providerErrors';
 import { Label } from './ui/label';
 
 /**
@@ -67,6 +68,7 @@ export function JudgeModelSetting({ open, disabled = false }: { open: boolean; d
   const options = state ? judgeOptions(state) : [];
   const listUnavailable = state?.models_source !== 'live';
   const busy = disabled || loading || saving;
+  const listReason = state ? modelListReason({ error: state.models_error, error_code: state.models_error_code }) : '';
   const changed = (state?.judge_model ?? '') !== draft;
 
   return (
@@ -116,7 +118,7 @@ export function JudgeModelSetting({ open, disabled = false }: { open: boolean; d
       {state && (
         <p className="text-xs text-slate-500" data-testid="judge-model-source">
           {listUnavailable
-            ? `Model list unavailable${state.models_error ? `: ${state.models_error}` : ''}.`
+            ? `Model list unavailable${listReason ? `: ${listReason}` : ''}.`
             : `${state.available_models.length} models currently offered by ${state.backend.toUpperCase()}`
               + (state.models_listed_at ? ` (listed ${state.models_listed_at})` : '')
               + '.'}

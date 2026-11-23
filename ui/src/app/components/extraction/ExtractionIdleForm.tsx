@@ -16,6 +16,7 @@ import {
   useStartExtraction,
 } from '../extractionHooks';
 import { useLibraryPapers } from '../libraryHooks';
+import { errorWithReason } from '../providerErrors';
 import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
 import { Input } from '../ui/input';
@@ -113,7 +114,7 @@ export function ExtractionIdleForm({ onStarted }: ExtractionIdleFormProps) {
       setEstimated({ key: estimateKey, result });
       setConfirmed(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'The estimate failed.');
+      toast.error(errorWithReason(error, 'The estimate failed.'));
     }
   }
 
@@ -139,7 +140,7 @@ export function ExtractionIdleForm({ onStarted }: ExtractionIdleFormProps) {
       });
       onStarted(job.id, name);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not start the extraction.');
+      toast.error(errorWithReason(error, 'Could not start the extraction.'));
     }
   }
 

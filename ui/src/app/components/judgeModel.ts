@@ -24,6 +24,8 @@ export interface JudgeModelState {
   models_source: 'live' | 'unavailable' | string;
   models_listed_at: string | null;
   models_error: string | null;
+  /** Stable code of a known refusal (`cborg_ip_not_authorized`) when the list is unavailable for that reason. */
+  models_error_code: string | null;
   backend: string;
   /** Where the allowlist came from and the free id a refused setting falls back to. */
   model_policy: { source: string | null; as_of: string | null; default_model: string };
@@ -60,6 +62,7 @@ export function normalizeJudgeState(raw: unknown): JudgeModelState {
     models_source: str(data.models_source) || 'unavailable',
     models_listed_at: str(data.models_listed_at),
     models_error: str(data.models_error),
+    models_error_code: str(data.models_error_code),
     backend: str(data.backend) || 'cborg',
     model_policy: normalizePolicy(data.model_policy),
   };

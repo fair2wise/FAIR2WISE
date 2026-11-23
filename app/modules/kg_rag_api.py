@@ -82,6 +82,9 @@ else:
     SentenceTransformer = None  # type: ignore[assignment,misc]
     torch = None  # type: ignore[assignment]
 
+from .cborg_errors import (  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+    as_ip_not_authorized,
+)
 from .cborg_http import (  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
     openai_http_kwargs,
     require_cborg_api_key,
@@ -1757,6 +1760,11 @@ class CBorgClient:
             ) from exc
         except openai.AuthenticationError as exc:
             raise RuntimeError("CBORG authentication failed. Check CBORG_API_KEY.") from exc
+        except openai.PermissionDeniedError as exc:
+            refusal = as_ip_not_authorized(exc)
+            if refusal is None:
+                raise
+            raise refusal from None  # the cause may carry this host's public address
 
 
 def make_chat_client(backend: str = LLM_BACKEND, model: str | None = None) -> ChatClient:

@@ -16,6 +16,7 @@ from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
 
 from . import provenance, source_repos
+from ..cborg_errors import CborgIpNotAuthorized, as_ip_not_authorized
 from ..cborg_http import (
     LLM_MAX_RETRIES,
     call_with_deadline,
@@ -170,6 +171,9 @@ class Orchestrator:
 
     #: Polled before each page; ``True`` ends the work (the owning job stopped or lost its lease).
     cancel_check: Callable[[], bool] | None = None
+    #: Set by the first CBORG ``ip_not_authorized`` refusal; once set no further LLM call is made (it is terminal
+    #: for this orchestrator: another page, retry or fallback call would be refused the same way).
+    refusal: CborgIpNotAuthorized | None = None
 
     def __init__(
         self,
@@ -287,10 +291,22 @@ class Orchestrator:
     # Processing pipeline
     # ------------------------------------------------------------------
 
+    def _note_refusal(self, exc: BaseException) -> bool:
+        """Record CBORG's address refusal (once, with the fixed text only); True when ``exc`` is that refusal."""
+        refusal = as_ip_not_authorized(exc)
+        if refusal is None:
+            return False
+        if self.refusal is None:
+            self.refusal = refusal
+            logger.error("Extraction stopped: %s", refusal)
+        return True
+
     def process_page(self, text: str, filename: str, page_num: int) -> bool:
         """Invoke the agent graph on one page of text. Returns True if any terms were added/updated."""
         if self.cancel_check is not None and self.cancel_check():
             return False  # the owning job stopped or lost its lease: no more LLM calls for it
+        if self.refusal is not None:
+            return False  # CBORG refused this network address: terminal, no further call
         if not text or len(text.split()) < 20:
             logger.info("Skipping page %d of %s (insufficient text).", page_num + 1, filename)
             return False
@@ -306,6 +322,8 @@ class Orchestrator:
                 with sync_slot(enabled=self._uses_cborg_admission()):
                     result = self.graph.invoke({"messages": [HumanMessage(content=prompt)]})
             except Exception as e:
+                if self._note_refusal(e):
+                    return False  # terminal: no fallback call, nothing that could echo the refused address
                 logger.error("Agent failed on %s page %d: %s", filename, page_num + 1, _short_error(e))
                 added = self._fallback_json_extract(text, filename, page_num, schema_ctx)
                 if added:
@@ -431,6 +449,8 @@ class Orchestrator:
         def _process(page_num: int) -> bool:
             text = page_texts[page_num]
             added = self.process_page(text, filename, page_num)
+            if self.refusal is not None:
+                return bool(added)
             try:
                 snips = provenance.extract_code_snippets(
                     text,
@@ -442,7 +462,8 @@ class Orchestrator:
                 )
                 snips_added = self.store.add_code_snippets(snips, pub_meta=pub_meta)
             except Exception as e:
-                logger.warning("Code-snippet pass failed on %s page %d: %s", filename, page_num + 1, e)
+                if not self._note_refusal(e):
+                    logger.warning("Code-snippet pass failed on %s page %d: %s", filename, page_num + 1, e)
                 snips_added = False
             return bool(added or snips_added)
 
@@ -566,7 +587,7 @@ class Orchestrator:
             text = page_texts[page_num]
             added = self.process_page(text, filename, page_num)
             snips_added = False
-            if _looks_code_like(text):
+            if _looks_code_like(text) and self.refusal is None:
                 try:
                     snips = provenance.extract_code_snippets(
                         text,
@@ -578,7 +599,8 @@ class Orchestrator:
                     )
                     snips_added = self.store.add_code_snippets(snips, pub_meta=pub_meta)
                 except Exception as e:
-                    logger.warning("Code-snippet pass failed on %s page %d: %s", filename, page_num + 1, e)
+                    if not self._note_refusal(e):
+                        logger.warning("Code-snippet pass failed on %s page %d: %s", filename, page_num + 1, e)
             return bool(added or snips_added)
 
         if selected_pages:

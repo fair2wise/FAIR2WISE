@@ -62,6 +62,8 @@ class ModelListing:
         models: Model ids the endpoint returned, sorted and de-duplicated (empty when unavailable).
         listed_at: UTC time of the request (ISO 8601, ``Z``).
         error: Short reason when ``unavailable`` (exception type and a scrubbed message, never a key).
+        error_code: Stable code for a known refusal (``cborg_ip_not_authorized``: CBORG answered 403 for this network
+            address); ``None`` otherwise. ``error`` then holds the fixed, address-free message.
         prices: Price per model id when the payload carried one (see :func:`_item_price`); empty otherwise.
             The free-model policy (:mod:`app.modules.model_policy`) refines its allowlist with it: an
             allowlisted model priced above 0 here is refused.
@@ -72,6 +74,7 @@ class ModelListing:
     models: tuple[str, ...] = ()
     listed_at: str = field(default_factory=_utc_now)
     error: str | None = None
+    error_code: str | None = None
     prices: Mapping[str, float] = field(default_factory=dict)
 
     def price_of(self, model: str) -> float | None:
@@ -92,7 +95,7 @@ class ModelListing:
     def to_dict(self) -> dict[str, Any]:
         """JSON-ready form."""
         return {"backend": self.backend, "source": self.source, "models": list(self.models),
-                "listed_at": self.listed_at, "error": self.error}
+                "listed_at": self.listed_at, "error": self.error, "error_code": self.error_code}
 
 
 def _scrub(text: str, secret: str | None = None, limit: int = 200) -> str:
@@ -202,6 +205,12 @@ def list_cborg_models_live(
     Returns:
         A ``live`` listing, or ``unavailable`` with the reason. Never raises for a provider fault.
     """
+    from .cborg_errors import (
+        IP_NOT_AUTHORIZED,
+        IP_NOT_AUTHORIZED_MESSAGE,
+        IP_NOT_AUTHORIZED_REASON,
+        is_ip_not_authorized,
+    )
     from .cborg_http import openai_http_kwargs, require_cborg_api_key
     from .cborg_limiter import sync_slot
 
@@ -229,6 +238,10 @@ def list_cborg_models_live(
             models = tuple(sorted(set(_model_ids(page))))
             prices = _model_prices(page)
     except Exception as exc:  # noqa: BLE001 - provider/network fault is "unavailable", never a list
+        if is_ip_not_authorized(exc):  # fixed text only: the refusal body may name this host's public address
+            logger.warning("model listing unavailable: %s", IP_NOT_AUTHORIZED)
+            return ModelListing("cborg", "unavailable", error=IP_NOT_AUTHORIZED_MESSAGE,
+                                error_code=IP_NOT_AUTHORIZED_REASON)
         logger.warning("model listing unavailable: %s", type(exc).__name__)
         return ModelListing("cborg", "unavailable", error=_scrub(f"{type(exc).__name__}: {exc}", key))
     return ModelListing("cborg", "live", models, prices=prices)
