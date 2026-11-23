@@ -54,6 +54,7 @@ from datetime import UTC
 import logging
 import os
 from pathlib import Path
+import re
 import threading
 import time
 from typing import TYPE_CHECKING, Any, cast
@@ -383,12 +384,37 @@ def resolve_tiled_settings(settings: DeploymentSettings, environ: Any = None) ->
     return tiled, None
 
 
+_VERSIONED_NAME = re.compile(r"^(matkg_.+)_v(\d+)\.json$")
+
+
 def storage_graph_files(root: str | Path) -> list[str]:
-    """``<root>/storage/kg/*.json``, sorted by name (the legacy ``list_storage_kg_json_files`` rule)."""
+    """``<root>/storage/kg/*.json``, sorted by name, one file per graph id.
+
+    The legacy ``list_storage_kg_json_files`` rule, with one addition: successive versions of
+    one graph (``matkg_bl1101_v1.json`` ... ``matkg_bl1101_v9.json`` all carry the id
+    ``bl1101``) are the *same* graph, so only the highest ``vN`` is listed; handing every version
+    to the JSON backend made it refuse the whole listing ("claimed by two files"). Files that
+    share an id but are not all numbered versions of one stem are all kept, so the backend still
+    refuses two genuinely different graphs.
+    """
+    from ..graph.snapshots import graph_id_for_snapshot
+
     kg_dir = Path(root) / "storage" / "kg"
     if not kg_dir.is_dir():
         return []
-    return [str(p) for p in sorted(kg_dir.glob("*.json"), key=lambda p: p.name.lower())]
+    paths = sorted(kg_dir.glob("*.json"), key=lambda p: p.name.lower())
+    by_id: dict[str, list[Path]] = {}
+    for path in paths:
+        by_id.setdefault(graph_id_for_snapshot(path), []).append(path)
+    drop: set[Path] = set()
+    for group in by_id.values():
+        matches = [_VERSIONED_NAME.match(p.name) for p in group]
+        if len(group) > 1 and all(matches):
+            stems = {m.group(1) for m in matches if m}
+            if len(stems) == 1:
+                newest = max(group, key=lambda p: int(_VERSIONED_NAME.match(p.name).group(2)))  # type: ignore[union-attr]
+                drop.update(p for p in group if p is not newest)
+    return [str(p) for p in paths if p not in drop]
 
 
 def directory_corpus_names(directory: str | Path) -> CorpusLister:
