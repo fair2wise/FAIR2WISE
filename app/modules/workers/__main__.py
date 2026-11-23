@@ -41,6 +41,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     tracing.init(process="worker")  # no-op unless F2W_OTEL_ENABLED; flushed at exit
     metrics.init(process="worker")  # no-op unless F2W_METRICS_ENABLED and an OTLP endpoint; flushed at exit
     service = load_factory(args.factory)(args.db)
+    metrics.set_queue_depth_source(service.queue_depth)  # the worker owns the queue, so it reports its depth
     executor = WorkerExecutor(service, max_concurrency=args.concurrency).start()
     stop = threading.Event()
     if threading.current_thread() is threading.main_thread():

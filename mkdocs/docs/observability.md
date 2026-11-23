@@ -304,6 +304,9 @@ The commit is exposed by one metric, `f2w.build.info`, instead.
 | OTel name | Type, unit | Labels | Prometheus name |
 | --- | --- | --- | --- |
 | `f2w.build.info` | observable gauge, `{info}` | `commit`, `profile` | `f2w_build_info` (value 1; emitted by the API process only, not the worker) |
+| `f2w.jobs` | counter, `{job}` | `kind`, `outcome` | `f2w_jobs_total` |
+| `f2w.job.duration` | histogram, `s` | `kind`, `outcome` | `f2w_job_duration_seconds_bucket`, `_sum`, `_count` |
+| `f2w.jobs.queue.depth` | observable gauge, `{job}` | `kind`, `state` | `f2w_jobs_queue_depth` (worker process only) |
 | `f2w.http.requests` | counter, `{request}` | `http_route`, `http_method`, `status_class` | `f2w_http_requests_total` |
 | `f2w.http.request.duration` | histogram, `s` | `http_route`, `http_method`, `status_class` | `f2w_http_request_duration_seconds_bucket`, `_sum`, `_count` |
 
@@ -311,6 +314,12 @@ The commit is exposed by one metric, `f2w.build.info`, instead.
 no route is `unmatched`. `status_class` is `2xx`..`5xx`. Health probes (`/livez`, `/readyz`, `/health`,
 `/healthz`) are not counted. Histogram boundaries (seconds, set with OpenTelemetry Views):
 `0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30`. Long streams (job events) fall in the top bucket.
+
+Jobs: `kind` is a registered job kind (`ingest`, `build_snapshot`, `publish`, ...; anything else is `other`) and
+`outcome` is `succeeded`, `failed`, `cancelled` or `paused` (budget, provider or review pause). A run that ends
+requeued (interrupted) or loses its lease is not a finish and is not counted. Job duration boundaries (seconds):
+`1, 5, 10, 30, 60, 120, 300, 600, 1200, 1800, 3600`. The queue depth gauge (`state` is `queued` or `running`) is
+reported by the worker only, from one small SQLite query per export interval; the API reports no queue depth.
 
 **Label safety.** Every label value comes from a closed set (or a route template the application declared);
 anything else becomes `other`. DOIs, URLs, query strings, uuids, file names, node ids, paper titles, user ids

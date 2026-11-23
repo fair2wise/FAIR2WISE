@@ -15,10 +15,12 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any
 
+from .. import metrics
 from ..contracts.context import LOCAL_OPERATOR, RequestContext
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.jobs import JobEvent, JobHandle, JobState
 from ..llm_admission import ProviderAdmission
+from ..metrics import labels
 from ..security.authorization import DeploymentSettings, JobAuthority, StartupConfigError
 from .keys import OperationInputs
 from .pipeline import Pipeline, PipelineRunner
@@ -329,7 +331,16 @@ class JobService:
         try:
             entry = self.kind(job.kind)
             beat = self._start_heartbeat(lease)
-            state: JobState | None = entry.runner.run(lease, job)
+            started = time.monotonic()
+            try:
+                state: JobState | None = entry.runner.run(lease, job)
+            except LeaseLost:
+                raise
+            except Exception:
+                metrics.record_job(kind=job.kind, state=JobState.FAILED, seconds=time.monotonic() - started,
+                                   kinds=self._kinds)
+                raise
+            metrics.record_job(kind=job.kind, state=state, seconds=time.monotonic() - started, kinds=self._kinds)
         except LeaseLost:
             beat.set()
             self.store.release_lease(lease)
@@ -350,6 +361,12 @@ class JobService:
             with self._claim_lock:
                 self._backoff_until[job.job_id] = time.monotonic() + delay
         return job.job_id, state
+
+    def queue_depth(self) -> list[tuple[str, str, int]]:
+        """``(kind, state, count)`` for queued and running jobs of the registered kinds (metrics gauge source)."""
+        rows = self.store.db.query(
+            "SELECT kind, state, COUNT(*) FROM jobs WHERE state IN ('queued', 'running') GROUP BY kind, state")
+        return [(labels.enum(r[0], self._kinds), str(r[1]), int(r[2])) for r in rows]
 
     def _finish_job(self, job_id: str) -> None:
         with self._claim_lock:

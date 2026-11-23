@@ -12,7 +12,7 @@ and never raises into the application.
 from __future__ import annotations
 
 import atexit
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 import logging
 import os
@@ -42,6 +42,7 @@ class _State:
     instruments: dict[str, Any] = field(default_factory=dict)
     exit_hook: bool = False
     process: str = ""
+    queue_source: Callable[[], Iterable[tuple[str, str, int]]] | None = None
 
 
 _STATE = _State()
@@ -97,11 +98,12 @@ def _start(config: cfg.MetricsConfig, environ: Mapping[str, str], process: str |
     instruments: dict[str, Any] = {}
     for spec in SPECS:
         if spec.kind == "gauge":
-            continue
+            continue  # observable gauges are registered below
         if spec.kind == "counter":
             instruments[spec.key] = meter.create_counter(spec.name, unit=spec.unit, description=spec.description)
         else:
             instruments[spec.key] = meter.create_histogram(spec.name, unit=spec.unit, description=spec.description)
+    _register_queue_depth(meter)
     if process == "api":  # one build-info series per release; the worker would only duplicate it
         _register_build_info(meter, labels.build_commit(tracing_runtime.code_commit()), labels.build_profile(profile))
     _STATE.config, _STATE.process = config, process or ""
@@ -126,6 +128,34 @@ def _register_build_info(meter: Any, commit: str, profile: str) -> None:  # noqa
     meter.create_observable_gauge(spec.name, callbacks=[callback], unit=spec.unit, description=spec.description)
 
 
+def _register_queue_depth(meter: Any) -> None:  # noqa: ANN401  # Any: an SDK Meter (imported lazily)
+    from opentelemetry.metrics import Observation
+
+    spec = next(s for s in SPECS if s.key == "queue_depth")
+
+    def callback(_options: object) -> list[Any]:
+        source = _STATE.queue_source
+        if source is None:  # the API process owns no queue: it reports nothing
+            return []
+        try:
+            return [Observation(int(count), {"kind": str(kind), "state": labels.enum(state, labels.QUEUE_STATES)})
+                    for kind, state, count in source()]
+        except Exception as exc:  # a locked or closed database must not break the export
+            logger.debug("queue depth not observed: %s", type(exc).__name__)
+            return []
+
+    meter.create_observable_gauge(spec.name, callbacks=[callback], unit=spec.unit, description=spec.description)
+
+
+def set_queue_depth_source(source: Callable[[], Iterable[tuple[str, str, int]]] | None) -> None:
+    """Report job queue depth from ``source``: ``(kind, state, count)`` triples, ``kind`` already a closed-set value.
+
+    Called by the worker process, which owns the queue. The source runs on the export thread once per interval and
+    must be cheap; any exception is swallowed.
+    """
+    _STATE.queue_source = source
+
+
 def shutdown() -> None:
     """Export what is pending and stop the provider (registered with ``atexit``); never raises."""
     provider = _STATE.provider
@@ -146,6 +176,7 @@ def reset() -> None:
         _STATE.instruments = {}
         _STATE.config = cfg.MetricsConfig()
         _STATE.process = ""
+        _STATE.queue_source = None
 
 
 def _add(key: str, attrs: Mapping[str, str], amount: int = 1) -> None:
@@ -183,3 +214,27 @@ def record_http_request(*, route: object, method: object, status: object, second
              "status_class": labels.status_class(status)}
     _add("http_requests", attrs)
     _observe("http_duration", attrs, seconds)
+
+
+#: Job states that end a run for metrics purposes (a ``queued`` result is a requeue, not a finish).
+_JOB_OUTCOME = {"succeeded": "succeeded", "failed": "failed", "cancelled": "cancelled", "paused_budget": "paused",
+                "paused_provider": "paused", "awaiting_review": "paused"}
+
+
+def record_job(*, kind: object, state: object, seconds: float, kinds: Iterable[str]) -> None:
+    """Count one finished job run and record its duration.
+
+    Args:
+        kind: The job kind; one of ``kinds`` (the kinds the job service registered) or it is ``other``.
+        state: The state the run ended in (``JobState`` or its value; ``failed`` for a run that raised).
+        seconds: Wall-clock duration of the run.
+        kinds: The registered job kinds (code-defined, a closed set).
+    """
+    if not _STATE.enabled:
+        return
+    outcome = _JOB_OUTCOME.get(str(getattr(state, "value", state)))
+    if outcome is None:  # requeued or lease lost: the job did not finish here
+        return
+    attrs = {"kind": labels.enum(kind, kinds), "outcome": outcome}
+    _add("jobs", attrs)
+    _observe("job_duration", attrs, seconds)
