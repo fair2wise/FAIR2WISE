@@ -14,13 +14,12 @@ test.describe('KG viewer', () => {
     await page.goto('/');
   });
 
-  test('Fixed Layout is default and Force-directed stays in F2W chrome', async ({ page }) => {
+  test('Force-directed is the KG viewer default (chat graph stays fixed) and the layout switch stays in F2W chrome', async ({ page }) => {
     await expect(page.getByRole('button', { name: 'Fixed Layout' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('[data-kg-layout="existing"]')).toBeVisible();
 
     await page.getByRole('button', { name: 'KG Viewer' }).click();
     await expect(page.locator('[data-kg-empty="false"]')).toBeVisible();
-    await page.getByRole('button', { name: 'Force-directed' }).click();
     await expect(page.getByRole('button', { name: 'Force-directed' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('[data-kg-layout="force"]')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Toggle weakly connected nodes' })).toBeVisible();

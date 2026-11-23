@@ -13,6 +13,12 @@ if (typeof window !== 'undefined' && typeof window.URL.createObjectURL !== 'func
   window.URL.revokeObjectURL = () => undefined;
 }
 
+// jsdom has no canvas: the force-directed view (the KG viewer default) draws nothing in tests and, with this stub,
+// logs nothing either; tests assert the layout mode through `data-kg-layout`.
+if (typeof HTMLCanvasElement !== 'undefined') {
+  HTMLCanvasElement.prototype.getContext = (() => null) as unknown as HTMLCanvasElement['getContext'];
+}
+
 // jsdom has no matchMedia or ResizeObserver; components read them on mount.
 if (typeof window !== 'undefined') {
   if (typeof window.matchMedia !== 'function') {

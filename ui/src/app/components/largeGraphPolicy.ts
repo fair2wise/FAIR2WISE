@@ -11,6 +11,7 @@
  * overview path, so the existing small demo graphs behave exactly as before.
  */
 import type { GraphPayload, LiveGraphNode } from './data/liveAgent';
+import type { KgLayoutMode } from './kgCatalog';
 import { isUnknownNodeCategory } from './kgNodeColors';
 
 /** Above this many nodes in the loaded graph the default view is an overview, not "All". */
@@ -37,6 +38,21 @@ export function isLargeGraph(nodeCount: number): boolean {
 /** Force-directed layout is offered only up to `SLOW_LAYOUT_NODE_LIMIT` displayed nodes. */
 export function forceLayoutAllowed(displayedNodeCount: number): boolean {
   return displayedNodeCount <= SLOW_LAYOUT_NODE_LIMIT;
+}
+
+/**
+ * The layout the viewer draws (owner bug list 2026-11, task 6). A layout the user picked wins, except that force
+ * stays off above `SLOW_LAYOUT_NODE_LIMIT` displayed nodes. With no choice the KG viewer is force-directed wherever
+ * force is allowed (so a 300-node overview of a huge graph is force-directed too) and uses the fixed layout above the
+ * limit; the chat sidebar graph keeps the fixed layout.
+ */
+export function effectiveLayoutMode(
+  userChoice: KgLayoutMode | null,
+  isKgViewer: boolean,
+  displayedNodeCount: number,
+): KgLayoutMode {
+  const wanted: KgLayoutMode = userChoice ?? (isKgViewer ? 'force' : 'existing');
+  return wanted === 'force' && !forceLayoutAllowed(displayedNodeCount) ? 'existing' : wanted;
 }
 
 export function overviewIsSlow(displayedNodeCount: number): boolean {

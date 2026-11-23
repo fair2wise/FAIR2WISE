@@ -41,6 +41,7 @@ import { getNodeColor, isUnknownNodeCategory, SCHEMA_NODE_CLASSES } from './kgNo
 import {
   capNeighborhood,
   clampOverviewStep,
+  effectiveLayoutMode,
   forceLayoutAllowed,
   isLargeGraph,
   nextOverviewStep,
@@ -1704,7 +1705,8 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
   // The source whose catalog the KG viewer shows; chat mode always reads the default graph.
   const viewerSource = isKgViewer ? graphSourceFromPath(graph.source_path) : null;
   const [drag, setDrag] = useState<DragState | null>(null);
-  const [requestedLayout, setLayoutMode] = useState<KgLayoutMode>('existing');
+  // `null` until the user picks a layout: the KG viewer then defaults to force-directed (effectiveLayoutMode).
+  const [requestedLayout, setLayoutMode] = useState<KgLayoutMode | null>(null);
   // Large-graph overview (largeGraphPolicy.ts): the step the viewer shows and whether Unknown placeholders are in it.
   const [overviewStep, setOverviewStep] = useState<number>(OVERVIEW_DEFAULT_NODES);
   const [includeUnknown, setIncludeUnknown] = useState(false);
@@ -1832,7 +1834,7 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
   const displayGraph = display.graph;
   // Force-directed layout is offered only up to SLOW_LAYOUT_NODE_LIMIT displayed nodes; above it the fixed layout is used.
   const forceAllowed = forceLayoutAllowed(displayGraph.nodes.length);
-  const layoutMode: KgLayoutMode = requestedLayout === 'force' && !forceAllowed ? 'existing' : requestedLayout;
+  const layoutMode: KgLayoutMode = effectiveLayoutMode(requestedLayout, isKgViewer, displayGraph.nodes.length);
   const layout = useMemo(
     () => (layoutMode === 'force' ? { nodes: [] as LayoutNode[], width: W, height: H } : layoutGraph(displayGraph)),
     [displayGraph, layoutMode],

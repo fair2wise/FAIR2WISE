@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   capNeighborhood,
   clampOverviewStep,
+  effectiveLayoutMode,
   FOCUS_NEIGHBORHOOD_MAX_NODES,
   forceLayoutAllowed,
   isLargeGraph,
@@ -176,5 +177,25 @@ describe('capNeighborhood', () => {
     expect(result.graph.nodes.some(node => node.id === 'n0')).toBe(true);
     const ids = new Set(result.graph.nodes.map(node => node.id));
     expect(result.graph.edges.every(edge => ids.has(edge.source) && ids.has(edge.target))).toBe(true);
+  });
+});
+
+describe('effectiveLayoutMode (default view)', () => {
+  it('defaults the KG viewer to force-directed up to the 2,000-node limit and to fixed above it', () => {
+    expect(effectiveLayoutMode(null, true, 0)).toBe('force');
+    expect(effectiveLayoutMode(null, true, OVERVIEW_DEFAULT_NODES)).toBe('force');
+    expect(effectiveLayoutMode(null, true, SLOW_LAYOUT_NODE_LIMIT)).toBe('force');
+    expect(effectiveLayoutMode(null, true, SLOW_LAYOUT_NODE_LIMIT + 1)).toBe('existing');
+  });
+
+  it('respects the user choice, but never lets force past the limit', () => {
+    expect(effectiveLayoutMode('existing', true, 50)).toBe('existing');
+    expect(effectiveLayoutMode('force', true, 50)).toBe('force');
+    expect(effectiveLayoutMode('force', true, 5_000)).toBe('existing');
+  });
+
+  it('keeps the chat sidebar graph on the fixed layout by default', () => {
+    expect(effectiveLayoutMode(null, false, 50)).toBe('existing');
+    expect(effectiveLayoutMode('force', false, 50)).toBe('force');
   });
 });

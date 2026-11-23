@@ -112,3 +112,34 @@ describe('GraphMockup on a large graph', () => {
     expect(screen.queryByTestId('kg-overview-banner')).toBeNull();
   });
 });
+
+describe('default layout of the KG viewer', () => {
+  const layout = () => document.querySelector('[data-kg-layout]')?.getAttribute('data-kg-layout');
+
+  it('is force-directed for a small graph and for the 300-node overview of a large one', () => {
+    const small = renderViewer(graphOf(400));
+    expect(layout()).toBe('force');
+    expect(screen.getByRole('button', { name: 'Force-directed' })).toHaveAttribute('aria-pressed', 'true');
+    small.unmount();
+    renderViewer(graphOf(3_000));
+    expect(document.querySelector('[data-kg-node-count]')?.getAttribute('data-kg-node-count')).toBe('300');
+    expect(layout()).toBe('force');
+  });
+
+  it('falls back to the fixed layout above 2,000 shown nodes, and force stays disabled there', () => {
+    renderViewer(graphOf(3_000));
+    fireEvent.change(screen.getByLabelText('Nodes to render'), { target: { value: '2408' } });
+    expect(layout()).toBe('existing');
+    expect(screen.getByRole('button', { name: 'Force-directed' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Nodes to render'), { target: { value: '2000' } });
+    expect(layout()).toBe('force');
+  });
+
+  it('keeps a layout the user picked', () => {
+    renderViewer(graphOf(400));
+    fireEvent.click(screen.getByRole('button', { name: 'Fixed Layout' }));
+    expect(layout()).toBe('existing');
+    expect(screen.getByRole('button', { name: 'Fixed Layout' })).toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
