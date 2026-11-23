@@ -36,6 +36,8 @@ frozen-UI guard always runs.
 | Playwright mocked-backend suite (`playwright-mocked`) | same | `cd ui && npx playwright test` |
 | Coverage (was serial inside `python-quality`, 28 min) | `python-nightly-full`, same triggers | `pytest -n auto --cov` |
 | Docling model download and the tests that need the weights (about 7 tests) | `python-nightly-full` | `python scripts/fetch_docling_models.py --dest <dir>`, then `F2W_DOCLING_ARTIFACTS_PATH=<dir> pytest` |
+| Image builds, all three variants, amd64 and arm64 (`build-app.yml`: `build-candidates`, about 8 min, plus `image-static-tests`) on every `forge_merge` push and PR | `workflow_dispatch` of `build-app.yml` with ref `forge_merge`; push to `main` and `v*` tags (inside `publish-image.yml`, unchanged) | local build per `docker/profiles/README.md` |
+| `image-static-tests` (`tests/images`, `tests/ci`) on `forge_merge` | inside the sharded unit suite on every push | `pytest tests/images tests/ci` |
 | Full-size scale tests (`python-slow-suite`, unchanged) | nightly, dispatch | `pixi run -e dev test-slow` |
 
 !!! warning "The nightly cron only fires from the default branch"
@@ -46,3 +48,15 @@ frozen-UI guard always runs.
 
 Pixi installs measured 8 to 15 s per job, so no pixi environment cache is used (restoring a multi-GB
 cache would cost more than the install). npm is cached by `actions/setup-node`.
+
+`publish-image.yml` is unchanged: its gate (`O06_APPROVED`, protected ref, the `ghcr-publish` and
+`ghcr-als-prod` environments) still decides every publication.
+
+## Residual risk
+
+A push to `forge_merge` is not proven against a real Tiled server, a real browser, the Docling weights or a
+Docker build until the nightly, a dispatch or a `[ci full]` commit runs them (the nightly cron does not fire
+until the workflow is on `main`). The common regressions are caught on the push path: Python tests that do not
+need a Tiled server (the Tiled-backed tests skip), lint and types, and Vitest. Docs-only commits skip the Python
+tests, so a Markdown file that a test pins is only caught by the next code push. Dockerfile and `docker/` changes are
+covered on the push path by the static tests only; dispatch `build-app.yml` before a release.

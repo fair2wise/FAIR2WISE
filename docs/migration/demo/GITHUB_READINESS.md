@@ -54,10 +54,10 @@ exists and runs in `image-static-tests`. Every third-party action is pinned to a
 | File | Triggers | What it does | Secrets / variables / environments |
 |---|---|---|---|
 | `forge-merge-ci.yml` | push and PR on `forge_merge`; dispatch; nightly cron `17 6 * * *` (fires only once the file is on the default branch) | push path (target under 5 min, cancelled by a newer push, path-filtered): `guard` (no `.env`, frozen UI tree `a21f0906...`, changed paths), contracts, unit suite in 3 shards vs known-failure set, quality gate (ruff, isort, mypy --strict), import closure, frontend build (2 base paths), MkDocs strict. Dispatch, nightly or `[ci full]` only: Tiled-backed suites, Playwright mocked, `python-nightly-full` (Docling weights, coverage), `python-slow-suite`. See `mkdocs/docs/ci.md` | none; `permissions: contents: read` |
-| `build-app.yml` | push to `main` and `forge_merge`, PR to either, dispatch, `workflow_call` | `image-static-tests` (tests/images, tests/ci) then `build-candidates`: builds `local`, `als-dev`, `als-prod` (amd64) from one commit, runs post-build checks with `--network none`, writes `release-manifest.json`, uploads artifacts `release-manifest` and (non-PR) `release-images` (`docker save`, 90 days). The legacy `test` job and `docs-deploy` (the only write job, `contents: write`) run only for main | none; `contents: read`; no registry login |
+| `build-app.yml` | push to `main`, PR to `main`, dispatch (use it for `forge_merge`), `workflow_call`; no longer on `forge_merge` pushes (CI split, `mkdocs/docs/ci.md`) | `image-static-tests` (tests/images, tests/ci) then `build-candidates`: builds `local`, `als-dev`, `als-prod` (amd64) from one commit, runs post-build checks with `--network none`, writes `release-manifest.json`, uploads artifacts `release-manifest` and (non-PR) `release-images` (`docker save`, 90 days). The legacy `test` job and `docs-deploy` (the only write job, `contents: write`) run only for main | none; `contents: read`; no registry login |
 | `publish-image.yml` | push to **main**, push of a `v*` **tag**, dispatch (promote/rollback) | `gate` (needs variable `O06_APPROVED == "true"`, a **protected** ref, default branch or `vMAJOR.MINOR.PATCH[-suffix]` tag) -> `candidate` (calls build-app) -> `publish` (environment `ghcr-publish`) -> `publish-als-prod` (environment `ghcr-als-prod`) | variable `O06_APPROVED`; environments `ghcr-publish`, `ghcr-als-prod`; `GITHUB_TOKEN` with `packages: write` for ghcr login; no repository secret is referenced |
 
-Key consequence: **a push to `forge_merge` runs tests and builds candidate images but publishes nothing to ghcr.**
+Key consequence: **a push to `forge_merge` runs lint, types and unit tests only; candidate images are built by dispatching `build-app.yml`; nothing is published to ghcr from `forge_merge`.**
 The images only exist as workflow artifacts (`release-images`, a gzip `docker save` tar of the three variants,
 90 days). Publishing needs a push of the default branch (`main`) or a `v*` tag, with the gate satisfied.
 
@@ -220,7 +220,7 @@ Owner configuration needed before the first publish (repository admin, not YAML)
    origin` to see what is already there. Do not `git push --tags` (tag `v0.0.1` is old).
 3. Run the pre-push checklist below.
 4. Push only the branch: `git push origin forge_merge` (about 240 MB; expect two 50 MB warnings, a few minutes).
-   Triggers `forge_merge validation` and `Build and check image candidates`; no publish.
+   Triggers `forge_merge validation` only (image candidates: dispatch `Build and check image candidates` on `forge_merge`); no publish.
 5. Watch the runs. First-run failure modes: the known-failure comparison (`docs/migration/reviews/H0/known_failures.json`
    was recorded on the Mac; Linux runners may differ), modelscope.cn or Hugging Face timeouts during the Docling fetch
    (rerun), pinned-action or pixi download failures, the frozen UI tree guard, `test ! -e .env`, disk space during the

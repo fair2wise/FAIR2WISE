@@ -187,8 +187,9 @@ def test_checkouts_do_not_persist_credentials_where_not_needed(path: Path) -> No
 def test_build_runs_for_prs_with_read_only_permissions(build: Dict[str, Any]) -> None:
     on = triggers(build)
     assert set(on) == {"push", "pull_request", "workflow_dispatch", "workflow_call"}
-    assert set(on["pull_request"]["branches"]) == {"main", "forge_merge"}
-    assert set(on["push"]["branches"]) == {"main", "forge_merge"}
+    # forge_merge pushes are validated by forge-merge-ci.yml; images are built there only by dispatch.
+    assert set(on["pull_request"]["branches"]) == {"main"}
+    assert set(on["push"]["branches"]) == {"main"}
     assert "tags" not in on["push"], "v* tags are built inside publish-image.yml's call"
     assert on["workflow_call"]["inputs"]["publish_candidate"]["type"] == "boolean"
     assert on["workflow_call"].get("secrets") is None
@@ -634,3 +635,9 @@ def test_unit_suite_is_sharded_so_every_test_runs_once(forge_ci: Dict[str, Any])
     run = next(s for s in job["steps"] if s.get("name", "").startswith("Unit tests, shard"))
     assert run["env"] == {"SHARD": "${{ matrix.shard }}/3"} and 'F2W_SHARD="$SHARD"' in run["run"]
 
+
+
+def test_build_app_does_not_build_images_for_forge_merge_pushes(build: Dict[str, Any]) -> None:
+    on = triggers(build)
+    assert "forge_merge" not in str(on["push"]) + str(on["pull_request"])
+    assert "workflow_dispatch" in on, "forge_merge candidates are built by dispatching this workflow"

@@ -14,8 +14,10 @@
 # to main or a v* tag, publish-image.yml calls this workflow (workflow_call, input
 # publish_candidate=true) and publishes the artifacts of that same run inside its GitHub
 # environments; the standalone run for a push to main therefore only runs the legacy test
-# and docs jobs, so each main commit is built once. forge_merge pushes and pull requests build
-# and check candidates without publishing anything.
+# and docs jobs, so each main commit is built once. forge_merge pushes no longer build images (CI split,
+# owner pilot task 11: a push to forge_merge runs lint, types and unit tests in forge-merge-ci.yml only; the
+# image static tests tests/images and tests/ci are part of that unit suite). To build and check candidates for
+# forge_merge run this workflow by hand (workflow_dispatch, ref forge_merge); nothing is published either way.
 # No secret is referenced: candidates never receive CBORG, Tiled or any runtime credential, and
 # every check container runs with --network none.
 #
@@ -26,9 +28,9 @@ name: Build and check image candidates
 
 on:
   push:
-    branches: [ main, forge_merge ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, forge_merge ]
+    branches: [ main ]
   workflow_dispatch: {}
   workflow_call:
     inputs:
