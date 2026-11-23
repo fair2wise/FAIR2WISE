@@ -1,7 +1,10 @@
+import { Loader2 } from 'lucide-react';
 import { Badge } from '../../ui/badge';
 import type { HarvestStatus } from '../../harvestApi';
 
 const LABELS: Record<HarvestStatus, string> = {
+  found: 'Found',
+  downloading: 'Downloading',
   downloaded: 'Downloaded',
   in_library: 'In library',
   paywalled: 'Paywalled',
@@ -19,6 +22,7 @@ export function HarvestStatusBadge({ status, detail }: { status: HarvestStatus; 
     : 'secondary';
   return (
     <Badge variant={variant} title={detail ?? undefined}>
+      {status === 'downloading' ? <Loader2 aria-hidden="true" className="animate-spin" /> : null}
       {LABELS[status] ?? status}
     </Badge>
   );

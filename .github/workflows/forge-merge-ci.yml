@@ -34,7 +34,9 @@ env:
   # corpus on screen, Pending Approvals page, source pill and model-list fix, truncation notice, Publish to
   # Tiled button and dialog, 300-node large-graph overview (T-save-corpus, T-approvals-ui, 93ab876, 93f5ab3,
   # 4046edb); previous 059b7a46.
-  FROZEN_UI_TREE: e627b360f10eb7f404c27321c8de0584835b98b0
+  # Re-pinned 2026-11-23 (owner bug list, task 8): Harvester shows papers as found/downloading/settled with a
+  # failure reason while the run goes; previous e627b360.
+  FROZEN_UI_TREE: fe160a2df2a6e70b1d13baed5fe56da9c01906c5
   KG_RAG_RETRIEVAL_BACKEND: lexical
   KG_RAG_FORCE_CPU: "1"
   F2W_SOURCE_RAG: "0"

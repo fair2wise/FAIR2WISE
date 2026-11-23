@@ -5,7 +5,7 @@ import { HarvestStatusBadge } from './HarvestStatusBadge';
 
 describe('HarvestStatusBadge', () => {
   it.each<[HarvestStatus, string]>([
-    ['downloaded', 'Downloaded'], ['in_library', 'In library'], ['paywalled', 'Paywalled'], ['filed', 'Filed'],
+    ['found', 'Found'], ['downloading', 'Downloading'], ['downloaded', 'Downloaded'], ['in_library', 'In library'], ['paywalled', 'Paywalled'], ['filed', 'Filed'],
     ['failed', 'Failed'], ['skipped', 'Skipped'], ['dismissed', 'Dismissed'],
   ])('labels %s', (status, label) => {
     render(<HarvestStatusBadge status={status} />);

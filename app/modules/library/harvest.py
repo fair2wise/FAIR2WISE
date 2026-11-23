@@ -56,7 +56,9 @@ SOURCES = ("arxiv", "openalex")
 MAX_TOPIC_CHARS = 200
 MAX_DOWNLOADS = 200
 MAX_PER_QUERY = 100
-STATUSES = ("downloaded", "in_library", "paywalled", "filed", "failed", "skipped", "dismissed")
+STATUSES = ("found", "downloading", "downloaded", "in_library", "paywalled", "filed", "failed", "skipped", "dismissed")
+#: Statuses of a paper still in flight: a resumed job redoes these, it never redoes a settled one.
+PENDING_STATUSES = ("found", "downloading")
 #: Fetch results meaning "this open-access link is not really open" (the paper becomes ``paywalled``).
 PAYWALL_STATUSES = ("refused:not_pdf", "failed:http_401", "failed:http_402", "failed:http_403", "failed:http_451")
 PDF_MAGIC = b"%PDF-"
@@ -403,9 +405,10 @@ class HarvestStore:
                               (status, relpath, detail, cid))
 
     def finished_keys(self, run_id: str) -> set[str]:
-        """Keys of the candidates a resumed job must not redo (any settled outcome)."""
+        """Keys of the candidates a resumed job must not redo (any settled outcome; ``found`` and ``downloading`` are not)."""
         with self._lock:
-            rows = self._con.execute("SELECT key FROM candidates WHERE run_id=?", (run_id,)).fetchall()
+            rows = self._con.execute("SELECT key FROM candidates WHERE run_id=? AND status NOT IN (?,?)",
+                                     (run_id, *PENDING_STATUSES)).fetchall()
         return {r["key"] for r in rows}
 
     def candidate(self, cid: str) -> dict[str, Any] | None:
@@ -525,6 +528,11 @@ class Harvester:
         for cand in candidates:
             cand.score, cand.tier = score_candidate(args["topic"], cand.title, cand.abstract)
         candidates.sort(key=lambda c: (c.tier, -c.score, c.title))
+        settled = self.store.finished_keys(run_id)
+        for cand in candidates:  # list every paper at once so the tab shows them while the downloads run
+            if cand.key not in settled:
+                self.store.save_candidate(run_id, cand, status="found")
+        ctx.progress(done=0, total=len(candidates))
         ctx.log(f"{len(candidates)} distinct papers; tier A {sum(c.tier == 'A' for c in candidates)}, "
                 f"B {sum(c.tier == 'B' for c in candidates)}, C {sum(c.tier == 'C' for c in candidates)}")
         counts = self._process(ctx, run_id, args, candidates)
@@ -546,14 +554,19 @@ class Harvester:
             ctx.guard()
             if cand.key in settled:
                 continue
-            status, detail, relpath, used = self._outcome(ctx, cand, args, counts, known_dois, downloader, max_bytes)
+            def downloading(cand: Candidate = cand) -> None:
+                self.store.save_candidate(run_id, cand, status="downloading")
+
+            status, detail, relpath, used = self._outcome(ctx, cand, args, counts, known_dois, downloader, max_bytes,
+                                                          downloading)
             self.store.save_candidate(run_id, cand, status=status, pdf_url=used, relpath=relpath, detail=detail)
             counts[status] = counts.get(status, 0) + 1
             ctx.progress(done=index + 1, total=len(candidates), **counts)
         return counts
 
     def _outcome(self, ctx: StageContext, cand: Candidate, args: Mapping[str, Any], counts: Mapping[str, int],
-                 known_dois: set[str], downloader: Downloader, max_bytes: int) -> tuple[str, str, str | None, str | None]:
+                 known_dois: set[str], downloader: Downloader, max_bytes: int,
+                 downloading: Callable[[], None] = lambda: None) -> tuple[str, str, str | None, str | None]:
         """``(status, detail, relpath, pdf_url)`` of one candidate."""
         if cand.doi and cand.doi in known_dois:
             return "in_library", "a paper with this DOI is already in the library", None, None
@@ -564,9 +577,13 @@ class Harvester:
         if not cand.pdf_urls:
             return "paywalled", "no open-access PDF found", None, None
         last = ""
+        downloading()
         for url in cand.pdf_urls:
             ctx.guard()
-            data, status = downloader(url, max_bytes)
+            try:
+                data, status = downloader(url, max_bytes)
+            except Exception as exc:  # noqa: BLE001 - one paper's failure must not abort the rest of the run
+                data, status = None, f"failed:{type(exc).__name__}"
             self._sleep(self.delay)
             if data is None:
                 last = status
@@ -574,7 +591,14 @@ class Harvester:
                 continue
             known = {"year": cand.year, "title": cand.title, "doi": cand.doi, "arxiv_id": cand.arxiv_id,
                      "source": cand.source}
-            result = self.service.upload(f"{file_stem(cand)}.pdf", data, args["category"], known=known)
+            try:
+                result = self.service.upload(f"{file_stem(cand)}.pdf", data, args["category"], known=known)
+            except ContractError as exc:
+                ctx.log(f"{cand.title[:70]}: not filed ({exc.code.value})", level="warning")
+                return "failed", f"not filed: {exc.code.value}", None, None
+            except Exception as exc:  # noqa: BLE001 - reported as a short reason, never the message (it may hold paths)
+                ctx.log(f"{cand.title[:70]}: not filed ({type(exc).__name__})", level="warning")
+                return "failed", f"not filed: {type(exc).__name__}", None, None
             relpath = result["paper"]["relpath"]
             if result["duplicate"]:
                 return "in_library", f"identical to {relpath}", relpath, url

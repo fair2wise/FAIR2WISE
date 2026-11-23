@@ -325,6 +325,7 @@ export function HarvesterPanel() {
         <section aria-labelledby="harvest-candidates-title" className="space-y-2">
           <h3 id="harvest-candidates-title" className="text-sm font-semibold">
             Papers found{runTopic(openRunId) ? ` for “${runTopic(openRunId)}”` : ''}
+            {candidates.data ? ` (${candidates.data.candidates.length})` : ''}
           </h3>
           {candidates.isError ? (
             <p role="alert" className="text-sm text-destructive">{candidates.error.message}</p>

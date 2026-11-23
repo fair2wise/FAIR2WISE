@@ -31,6 +31,8 @@ export const TOPIC_MAX_CHARS = 200;
 
 /** Outcome of one candidate: see the V77 row of the API README. */
 export type HarvestStatus =
+  | 'found'
+  | 'downloading'
   | 'downloaded'
   | 'in_library'
   | 'paywalled'
@@ -45,6 +47,9 @@ export type HarvestTier = 'A' | 'B' | 'C';
 /** Per-status candidate counts of a run (`total` is their sum). */
 export interface HarvestCounts {
   total: number;
+  /** Absent on a server that lists papers only once they are settled. */
+  found?: number;
+  downloading?: number;
   downloaded: number;
   in_library: number;
   paywalled: number;

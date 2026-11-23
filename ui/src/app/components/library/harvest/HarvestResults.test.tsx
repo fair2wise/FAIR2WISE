@@ -42,6 +42,20 @@ describe('HarvestResults', () => {
     expect(screen.getByRole('heading', { name: 'Results (2)' })).toBeInTheDocument();
   });
 
+  it('lists found and downloading papers as they arrive, and a failed one with its short reason', () => {
+    setup([
+      cand('a', { status: 'found' }),
+      cand('b', { status: 'downloading' }),
+      cand('c', { status: 'failed', detail: 'failed:http_403' }),
+    ]);
+    const table = screen.getByRole('table', { name: 'Harvest results' });
+    expect(within(table).getByText('Found')).toBeInTheDocument();
+    expect(within(table).getByText('Downloading')).toBeInTheDocument();
+    expect(within(table).getByText('Failed')).toBeInTheDocument();
+    expect(within(table).getByText('failed:http_403')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Results (3)' })).toBeInTheDocument();
+  });
+
   it('says so when the queue or the table is empty', () => {
     setup([cand('d')]);
     expect(screen.getByText('Nothing is waiting for a PDF.')).toBeInTheDocument();
