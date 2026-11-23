@@ -6,7 +6,7 @@ Status: candidate for H4. Built and run only by the owner; nothing here has been
 
 | Stage | From | Content |
 | --- | --- | --- |
-| `pixi-app`, `frontend-build`, `docs-build`, `frontend` | pixi / node / nginx | T24C: `pixi-app` is pixi 0.66.0 (the version that wrote `pixi.lock`; build stages only); Vite bundle for `/fair2wise`, MkDocs site (pixi `docs` environment), standalone gateway image (compose) |
+| `pixi-app`, `frontend-build`, `docs-build`, `frontend` | pixi / node / nginx | T24C: `pixi-app` is pixi 0.84.2 (the version that wrote `pixi.lock`; build stages only); Vite bundle for `/fair2wise`, MkDocs site (pixi `docs` environment), standalone gateway image (compose) |
 | `app-env-build` | `pixi-app` | pixi `default` environment at `/opt/fair2wise/pixi/.pixi/envs/default`, installed `--locked` from `pixi.lock`; fails if torch is a CUDA build |
 | `tiled-server-build` | `pixi-app` | pixi `tiled-server` environment at `/opt/tiled/ws/.pixi/envs/tiled-server`: Tiled 0.2.18 (owner pin O-T1; wheel hash `PINNED_TILED_WHEEL_SHA256` recorded in `pixi.lock`), installed `--locked`, version assert |
 | `runtime-base` | `${PYTHON_IMAGE}` | the `app-env-build` environment copied in (PATH puts it first), allowlisted code/schemas/tracked KG JSON, UI + docs, gateway template, `docker/entrypoint/`, tini, nginx, uid 10001; no profile |
@@ -196,7 +196,7 @@ image except the legacy `agent` target (`splash_links`, separate pixi 0.70.2). C
 with `scripts/ci/install_pixi.sh` (pinned release, sha256-verified). The semantic stack
 (faiss-cpu, sentence-transformers, CPU torch) is unpinned in `pixi.toml` by design and fixed by
 the lock. `tests/packaging/test_pixi_lock.py` checks the lock. To change a dependency, edit
-`pixi.toml`, run `pixi lock` with pixi 0.66.0, and commit `pixi.lock`; never hand-edit it.
+`pixi.toml`, run `pixi lock` with pixi 0.84.2, and commit `pixi.lock`; never hand-edit it.
 
 Baked Hugging Face models: the image writes `refs/main` in the model cache so offline lookup by
 bare model name resolves.
