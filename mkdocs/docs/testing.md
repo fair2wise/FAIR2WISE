@@ -33,7 +33,7 @@ pixi run -e dev test-slow    # only the tests marked slow
 
 | Run | What it runs | Where |
 |---|---|---|
-| fast (default) | everything except `@pytest.mark.slow`: `-m "not slow"` | `pixi run -e dev test`; the `python-baseline-suite` and `python-tiled-suites` CI jobs |
+| fast (default) | everything except `@pytest.mark.slow`: `-m "not slow"` | `pixi run -e dev test`; the sharded `python-baseline-suite` CI job on every push, `python-tiled-suites` nightly (see [CI](ci.md)) |
 | slow | only the full-size scale tests (`tests/operations`, parameter id `full`: 60k-entity populations, a 15k-entity disposable Tiled server) | `pixi run -e dev test-slow` |
 | full | fast and slow | `pixi run -e dev test-full` |
 | nightly | the slow tests with a Tiled server, at 06:17 UTC and on manual dispatch | job `python-slow-suite` of `.github/workflows/forge-merge-ci.yml` |

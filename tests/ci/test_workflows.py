@@ -580,10 +580,11 @@ def test_full_suite_is_gated_by_compare_known_failures_not_hidden(forge_ci: Dict
     assert "|| true" not in _job_script(job)
     assert "continue-on-error" not in job and not [s for s in job["steps"] if "continue-on-error" in s]
     names = [s.get("name", "") for s in job["steps"]]
-    full = next(s for s in job["steps"] if s.get("name", "").startswith("Full suite"))
+    full = next(s for s in job["steps"] if s.get("name", "").startswith("Unit tests, shard"))
     gate = next(s for s in job["steps"] if s.get("name", "").startswith("Compare with the known-failure set"))
     assert names.index(full["name"]) < names.index(gate["name"])
     assert "--junitxml=full.xml" in full["run"]
+    assert '-m "not slow"' in full["run"] and "-p scripts.ci.pytest_shard" in full["run"] and "PYTHONPATH" not in full["run"]
     assert 'test -s full.xml || exit "$status"' in full["run"], "a run that produced no report fails outright"
     assert gate["run"] == (
         "python scripts/ci/compare_known_failures.py full.xml docs/migration/reviews/H0/known_failures.json"
@@ -596,3 +597,40 @@ def test_known_failure_set_is_empty_since_the_splash_wipe_path_was_retired() -> 
     known = yaml.safe_load((REPO / "docs/migration/reviews/H0/known_failures.json").read_text(encoding="utf-8"))
     assert known["known_failures"] == []
     assert not hasattr(importlib.import_module("app.modules.f2w_agent.kg_update"), "splash_reimport")
+
+
+# ---------------------------------------------------------------- the push / nightly split ----
+HEAVY_JOBS = ("python-tiled-suites", "python-nightly-full", "playwright-mocked")
+PUSH_JOBS = ("guard", "python-contracts", "python-baseline-suite", "python-quality", "import-closure",
+             "frontend", "docs-build")
+
+
+def test_push_path_is_concurrency_cancelled_and_every_job_is_bounded(forge_ci: Dict[str, Any]) -> None:
+    assert forge_ci["concurrency"] == {
+        "group": "${{ github.workflow }}-${{ github.ref }}", "cancel-in-progress": True}
+    for job_id in PUSH_JOBS:
+        assert forge_ci["jobs"][job_id].get("timeout-minutes", 99) <= 15, job_id
+
+
+def test_heavy_jobs_do_not_run_on_a_plain_push(forge_ci: Dict[str, Any]) -> None:
+    for job_id in HEAVY_JOBS:
+        cond = forge_ci["jobs"][job_id]["if"]
+        assert "github.event_name == 'schedule'" in cond and "github.event_name == 'workflow_dispatch'" in cond, job_id
+        assert "[ci full]" in cond, job_id
+    for job_id in PUSH_JOBS:
+        assert "schedule" not in forge_ci["jobs"][job_id].get("if", ""), job_id
+
+
+def test_push_path_has_no_image_build_model_download_or_coverage(forge_ci: Dict[str, Any]) -> None:
+    for job_id in PUSH_JOBS:
+        script = _job_script(forge_ci["jobs"][job_id])
+        for word in ("docker ", "buildx", "fetch_docling_models", "--cov", "playwright install"):
+            assert word not in script, f"{job_id} runs {word!r} on the push path"
+
+
+def test_unit_suite_is_sharded_so_every_test_runs_once(forge_ci: Dict[str, Any]) -> None:
+    job = forge_ci["jobs"]["python-baseline-suite"]
+    assert job["strategy"]["matrix"]["shard"] == [1, 2, 3] and job["strategy"]["fail-fast"] is False
+    run = next(s for s in job["steps"] if s.get("name", "").startswith("Unit tests, shard"))
+    assert run["env"] == {"SHARD": "${{ matrix.shard }}/3"} and 'F2W_SHARD="$SHARD"' in run["run"]
+

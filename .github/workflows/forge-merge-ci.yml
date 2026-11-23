@@ -1,6 +1,9 @@
 # Validation for the FORGE-to-F2W migration branch (T01/T18A).
 # Tests only: no deployment, publishing, registry, Pages or secrets.
-# build-app.yml and publish-image.yml keep their main-only triggers unchanged.
+# CI split (owner pilot task 11): a push runs only lint, type checks and unit tests (target under 5 minutes,
+# the unit suite is sharded three ways); the Tiled-backed suites, Playwright, coverage and the Docling
+# model download run nightly, on workflow_dispatch, or when the head commit message contains "[ci full]".
+# Image builds left this branch entirely (build-app.yml). docs/ci.md lists every moved job.
 # Plan: docs/migration/ui_contracts/ci_plan.md
 name: forge_merge validation
 
@@ -17,7 +20,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: forge-merge-ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -51,8 +54,13 @@ env:
 
 jobs:
   guard:
-    name: Isolation and frozen-UI guard
+    name: Isolation, frozen-UI guard and changed paths
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      python: ${{ steps.paths.outputs.python }}
+      frontend: ${{ steps.paths.outputs.frontend }}
+      docs: ${{ steps.paths.outputs.docs }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
         with: { fetch-depth: 0 }
@@ -64,10 +72,25 @@ jobs:
           actual="$(git rev-parse HEAD:ui)"
           echo "ui tree: $actual"
           test "$actual" = "$FROZEN_UI_TREE"
+      # Path filter: docs-only changes skip the Python and frontend jobs, UI-only changes skip the Python jobs,
+      # Python-only changes skip the frontend jobs. Unknown base, dispatch and schedule run everything.
+      - name: Which job groups does this change need? (scripts/ci/changed_paths.py)
+        id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ "$EVENT" = push ] || [ "$EVENT" = pull_request ]; then
+            python3 scripts/ci/changed_paths.py --base "$BASE_SHA" --head "$GITHUB_SHA"
+          else
+            python3 scripts/ci/changed_paths.py --force-all
+          fi
 
   python-contracts:
     name: Python contract tests
     needs: guard
+    if: ${{ needs.guard.outputs.python == 'true' }}
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
@@ -87,9 +110,18 @@ jobs:
         with: { name: contracts-junit, path: contracts.xml }
 
   python-baseline-suite:
-    name: Full pytest suite vs known failures
+    name: Unit tests, shard ${{ matrix.shard }} of 3 (known failures gate)
     needs: guard
+    if: ${{ needs.guard.outputs.python == 'true' }}
+    timeout-minutes: 15
     runs-on: ubuntu-latest
+    # Three shards (scripts/ci/pytest_shard.py: crc32 of the test id) run in parallel; measured serially-equivalent
+    # cost of the not-slow suite without Tiled and Docling weights is ~340 s on 4 workers, so one job would
+    # miss the 5 minute target. Every test is in exactly one shard.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
       - name: Install pixi (pinned release, sha256-verified)
@@ -102,30 +134,33 @@ jobs:
       # known-failure set is tolerated, any other failure (or a known one now passing)
       # fails the next step. The JUnit file must exist, so a crash before any test ran
       # fails here instead of being compared against nothing (T28B, audit AUD-09).
-      - name: Docling model weights (pinned commits, scripts/fetch_docling_models.py)
-        # Not in the repo or the lock: the parser tests that run real Docling conversions read them from here.
-        run: python scripts/fetch_docling_models.py --dest "$RUNNER_TEMP/docling"
-      - name: Full suite, parallel, without the slow full-size scale tests (failures recorded, not hidden)
+      # The tests that need Docling model weights skip here (no model download on a push); the
+      # nightly job python-nightly-full fetches the weights and runs them.
+      - name: Unit tests, shard ${{ matrix.shard }} of 3, parallel, without the slow full-size scale tests (failures recorded, not hidden)
+        env:
+          SHARD: ${{ matrix.shard }}/3
         run: |
           mkdir -p "$RUNNER_TEMP/home"
           env -i PATH="$PATH" HOME="$RUNNER_TEMP/home" TMPDIR="$RUNNER_TEMP" LANG=C.UTF-8 \
-            HF_HUB_OFFLINE=1 F2W_DOCLING_ARTIFACTS_PATH="$RUNNER_TEMP/docling" \
-            python -m pytest -n auto -m "not slow" -q -p no:cacheprovider --junitxml=full.xml; status=$?
+            HF_HUB_OFFLINE=1 F2W_SHARD="$SHARD" \
+            python -m pytest -p scripts.ci.pytest_shard -n auto -m "not slow" -q -p no:cacheprovider --junitxml=full.xml; status=$?
           test -s full.xml || exit "$status"
       - name: Compare with the known-failure set (the gate)
         run: python scripts/ci/compare_known_failures.py full.xml docs/migration/reviews/H0/known_failures.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         if: always()
-        with: { name: full-junit, path: full.xml }
+        with: { name: "full-junit-${{ matrix.shard }}", path: full.xml }
 
   python-quality:
     # T27 (docs/migration/reviews/H7/sniff_findings.md): measures typing, docstring, pathlib,
     # print, import-order and coverage findings. The report steps tolerate their own failure so the
     # numbers are always produced; ruff, isort and mypy are at 0 and the gate step below keeps them there
-    # (it runs after the reports and the artifact is uploaded either way). Coverage stays report only.
+    # (it runs after the reports and the artifact is uploaded either way). Coverage moved to the nightly job python-nightly-full.
     # Configuration lives in pyproject.toml; tool versions are locked in pixi.lock (feature `quality`).
-    name: Code quality (T27, ruff isort mypy gate, coverage reported)
+    name: Code quality (T27, ruff isort mypy gate; coverage is nightly)
     needs: guard
+    if: ${{ needs.guard.outputs.python == 'true' }}
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
@@ -150,17 +185,6 @@ jobs:
           isort --check-only app
           mypy
           python scripts/ci/docstring_style.py --check
-      - name: Docling model weights (pinned commits, scripts/fetch_docling_models.py)
-        # Not in the repo or the lock: the parser tests that run real Docling conversions read them from here.
-        run: python scripts/fetch_docling_models.py --dest "$RUNNER_TEMP/docling"
-      - name: Coverage (full suite, T27 80% target per module)
-        run: |
-          mkdir -p "$RUNNER_TEMP/home"
-          env -i PATH="$PATH" HOME="$RUNNER_TEMP/home" TMPDIR="$RUNNER_TEMP" LANG=C.UTF-8 \
-            HF_HUB_OFFLINE=1 F2W_DOCLING_ARTIFACTS_PATH="$RUNNER_TEMP/docling" \
-            python -m pytest -q -p no:cacheprovider --cov --cov-report= || true
-          coverage report --skip-empty > quality/coverage.txt || true
-          tail -n 3 quality/coverage.txt
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         if: always()
         with: { name: quality-report, path: quality }
@@ -175,6 +199,7 @@ jobs:
     # Tiled, no credentials (T28B, AUD-09).
     name: Tiled-backed suites (disposable 0.2.18 servers)
     needs: guard
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[ci full]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -235,9 +260,43 @@ jobs:
         if: always()
         with: { name: slow-junit, path: slow.xml }
 
+  python-nightly-full:
+    # Moved off the push path: the real Docling conversions (model weights downloaded from pinned commits)
+    # and the coverage run (report only; serial before, now xdist). Nightly, dispatch or "[ci full]".
+    name: Docling-backed tests and coverage (nightly)
+    needs: guard
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[ci full]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - name: Install pixi (pinned release, sha256-verified)
+        run: scripts/ci/install_pixi.sh
+      - name: Install the locked dev environment (pixi.lock, --locked)
+        run: |
+          pixi install --locked -e dev
+          echo "$PWD/.pixi/envs/dev/bin" >> "$GITHUB_PATH"
+      - name: Docling model weights (pinned commits, scripts/fetch_docling_models.py)
+        # Not in the repo or the lock: the parser tests that run real Docling conversions read them from here.
+        run: python scripts/fetch_docling_models.py --dest "$RUNNER_TEMP/docling"
+      - name: Coverage (full not-slow suite with the Docling weights, T27 80% target per module, report only)
+        run: |
+          mkdir -p quality "$RUNNER_TEMP/home"
+          env -i PATH="$PATH" HOME="$RUNNER_TEMP/home" TMPDIR="$RUNNER_TEMP" LANG=C.UTF-8 \
+            HF_HUB_OFFLINE=1 F2W_DOCLING_ARTIFACTS_PATH="$RUNNER_TEMP/docling" \
+            python -m pytest -n auto -m "not slow" -q -p no:cacheprovider --cov --cov-report= || true
+          coverage combine 2>/dev/null || true
+          coverage report --skip-empty > quality/coverage.txt || true
+          tail -n 3 quality/coverage.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        if: always()
+        with: { name: coverage-report, path: quality }
+
   import-closure:
     name: Syntax check and legacy entrypoints
     needs: guard
+    if: ${{ needs.guard.outputs.python == 'true' }}
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
@@ -287,9 +346,12 @@ jobs:
   frontend:
     name: Frontend unit tests and build (frozen UI)
     needs: guard
+    if: ${{ needs.guard.outputs.frontend == 'true' }}
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: ui } }
     strategy:
+      fail-fast: false
       matrix:
         include:
           - name: standalone-dev
@@ -311,7 +373,9 @@ jobs:
 
   playwright-mocked:
     name: Existing Playwright suite (mocked backend)
-    needs: frontend
+    needs: guard
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[ci full]') }}
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: ui } }
     steps:
@@ -329,6 +393,8 @@ jobs:
   docs-build:
     name: MkDocs strict build (no publish)
     needs: guard
+    if: ${{ needs.guard.outputs.docs == 'true' }}
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
