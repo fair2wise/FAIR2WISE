@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Play } from 'lucide-react';
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   harvestFormProblem,
@@ -24,12 +24,13 @@ import {
 import { TERMINAL_JOB_STATES } from '../../extractionApi';
 import { useCancelJob, useJob, useSchemas } from '../../extractionHooks';
 import { useJobLogStream } from '../../extraction/useJobLogStream';
-import { isValidFolderName, paperFolders } from '../../libraryApi';
-import { libraryKeys, useLibraryPapers } from '../../libraryHooks';
+import { isValidFolderName } from '../../libraryApi';
+import { libraryKeys, useCreateCategory, useLibraryCategories } from '../../libraryHooks';
 import { Button } from '../../ui/button';
 import { Checkbox } from '../../ui/checkbox';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
+import { NewCategoryField } from '../NewCategoryField';
 import { HarvestResults } from './HarvestResults';
 import { HarvestRunsList } from './HarvestRunsList';
 import { HarvestRunView } from './HarvestRunView';
@@ -57,8 +58,8 @@ const newNonce = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Mat
 export function HarvesterPanel() {
   const queryClient = useQueryClient();
   const schemas = useSchemas();
-  const papers = useLibraryPapers(true);
-  const folders = useMemo(() => paperFolders(papers.data?.papers ?? []).filter(f => f.name !== ''), [papers.data]);
+  const { categories: folders } = useLibraryCategories(true);
+  const createCategory = useCreateCategory();
 
   const [topic, setTopic] = useState('');
   const [choice, setChoice] = useState('');
@@ -192,19 +193,16 @@ export function HarvesterPanel() {
           <p className="text-xs text-muted-foreground">Papers are filed under the category by publication year.</p>
         </div>
         {creating ? (
-          <div className="space-y-1">
-            <Label htmlFor={id('new-category')}>New category name</Label>
-            <Input
-              id={id('new-category')}
-              value={newName}
-              maxLength={64}
-              aria-invalid={newNameInvalid}
-              onChange={event => setNewName(event.target.value)}
-            />
-            <p className={newNameInvalid ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'}>
-              Letters, digits, &quot;_&quot; and &quot;-&quot;; start with a letter or digit; up to 64 characters.
-            </p>
-          </div>
+          <NewCategoryField
+            value={newName}
+            onChange={setNewName}
+            existing={folders.map(folder => folder.name)}
+            onCreate={createCategory.mutateAsync}
+            onCreated={name => {
+              setChoice(name);
+              setNewName('');
+            }}
+          />
         ) : null}
         <div className="space-y-1">
           <Label htmlFor={id('schema')}>Schema (label only)</Label>

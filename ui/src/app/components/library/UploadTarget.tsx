@@ -1,7 +1,7 @@
 import { useId } from 'react';
-import { folderLabel, isValidFolderName, type LibraryFolder } from '../libraryApi';
-import { Input } from '../ui/input';
+import { folderLabel, isValidFolderName, type CreatedCategory, type LibraryFolder } from '../libraryApi';
 import { Label } from '../ui/label';
+import { NewCategoryField } from './NewCategoryField';
 
 /** `value` of the "new category" option of the select. */
 export const NEW_CATEGORY = '\u0000new';
@@ -27,6 +27,8 @@ export interface UploadTargetProps {
   folders: LibraryFolder[];
   value: UploadTargetValue;
   onChange: (next: UploadTargetValue) => void;
+  /** Creates a category on the server (the shared list). */
+  onCreateCategory: (name: string) => Promise<CreatedCategory>;
   disabled?: boolean;
 }
 
@@ -38,9 +40,8 @@ const SELECT_CLASS =
  * "Upload to" control: the library root, an existing category, or a new category by name. Inside a category the
  * server files each paper under its publication year and records it in the category's manifest.
  */
-export function UploadTarget({ folders, value, onChange, disabled = false }: UploadTargetProps) {
+export function UploadTarget({ folders, value, onChange, onCreateCategory, disabled = false }: UploadTargetProps) {
   const selectId = useId();
-  const nameId = useId();
   const helpId = useId();
   const creating = value.choice === NEW_CATEGORY;
   const invalid = creating && value.newName.trim() !== '' && !isValidFolderName(value.newName.trim());
@@ -64,19 +65,14 @@ export function UploadTarget({ folders, value, onChange, disabled = false }: Upl
         </select>
       </div>
       {creating && (
-        <div className="space-y-1">
-          <Label htmlFor={nameId}>New category name</Label>
-          <Input
-            id={nameId}
-            value={value.newName}
-            maxLength={64}
-            disabled={disabled}
-            aria-invalid={invalid}
-            aria-describedby={helpId}
-            onChange={event => onChange({ ...value, newName: event.target.value })}
-            className="w-48 disabled:cursor-not-allowed disabled:opacity-50"
-          />
-        </div>
+        <NewCategoryField
+          value={value.newName}
+          onChange={newName => onChange({ ...value, newName })}
+          existing={named.map(folder => folder.name)}
+          onCreate={onCreateCategory}
+          onCreated={name => onChange({ choice: name, newName: '' })}
+          disabled={disabled}
+        />
       )}
       <p id={helpId} className={invalid ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'}>
         {invalid

@@ -147,7 +147,8 @@ def test_routes_are_absent_on_als(monkeypatch, tmp_path):
     for who in ("anon", "user", "admin"):
         c = als.client(who)
         for method, path in (("GET", "/v1/library"), ("GET", "/v1/library/papers"), ("POST", "/v1/library/papers"),
-                             ("POST", "/v1/library/papers/" + "0" * 16 + "/verify")):
+                             ("POST", "/v1/library/papers/" + "0" * 16 + "/verify"),
+                             ("GET", "/v1/library/categories"), ("POST", "/v1/library/categories")):
             resp = c.request(method, path)
             assert resp.status_code == 404 and resp.json() == {"detail": "Not Found"}, (who, method, path, resp.text)
     assert not hasattr(als.app.state, "f2w_library")
@@ -162,3 +163,74 @@ def test_job_submission_shape_used_by_the_ui_client(lib):
     assert plain.status_code == 200, plain.text
     nonced = c.post("/v1/jobs", json={"kind": "library_verify", "inputs": {"params": {"nonce": "n1"}}})
     assert nonced.status_code == 200 and nonced.json()["job_id"] != plain.json()["job_id"]
+
+
+# -- shared category list (owner bug list, task 9) -------------------------------------------------------------
+
+
+def test_category_policy_rows_and_declared_routes(lib):
+    from app.api.auth import undeclared_routes
+
+    rows = {p.route_id: p for p in API_ROUTE_POLICIES if p.route_id in ("V84", "V85")}
+    assert (rows["V84"].method, rows["V84"].path, rows["V84"].capabilities, rows["V84"].on_als) == (
+        "GET", "/v1/library/categories", frozenset({"library.read"}), False)
+    assert (rows["V85"].method, rows["V85"].path, rows["V85"].capabilities, rows["V85"].on_als) == (
+        "POST", "/v1/library/categories", frozenset({"library.upload"}), False)
+    assert undeclared_routes(lib[0].app) == []
+
+
+def test_a_created_category_is_listed_at_once_even_when_empty_and_counts_follow_uploads(lib):
+    app, service, folder = lib
+    c = app.client()
+    assert c.get("/v1/library/categories").json() == {"categories": []}
+    made = c.post("/v1/library/categories", json={"name": "  rsoxs "})
+    assert made.status_code == 200 and made.json() == {"name": "rsoxs", "created": True, "count": 0}
+    assert (folder / "rsoxs").is_dir()
+    assert c.get("/v1/library/categories").json()["categories"] == [{"name": "rsoxs", "count": 0}]
+    assert c.post("/v1/library/papers", params={"folder": "rsoxs"},
+                  files={"file": ("a.pdf", io.BytesIO(pdf("a")), "application/pdf")}).status_code == 200
+    assert c.get("/v1/library/categories").json()["categories"] == [{"name": "rsoxs", "count": 1}]
+
+
+def test_an_existing_name_in_any_case_selects_the_existing_folder(lib):
+    app, _, folder = lib
+    c = app.client()
+    c.post("/v1/library/categories", json={"name": "Tomo"})
+    again = c.post("/v1/library/categories", json={"name": "tomo"})
+    assert again.status_code == 200 and again.json()["name"] == "Tomo" and again.json()["created"] is False
+    assert sorted(p.name for p in folder.iterdir()) == ["Tomo"]
+
+
+@pytest.mark.parametrize("name", ["", "   ", "..", ".", "../x", "a/b", "a\\b", "/abs", ".hidden", "-x", "_x", "with space",
+                                  "x" * 65, "caf\u00e9", "a\x00b", "C:x"])
+def test_bad_category_names_are_refused_and_nothing_is_created(lib, name, tmp_path):
+    app, _, folder = lib
+    resp = app.client().post("/v1/library/categories", json={"name": name})
+    assert resp.status_code == 422, (name, resp.text)
+    assert list(folder.iterdir()) == [] and not (tmp_path / "x").exists()
+
+
+def test_category_body_must_be_exactly_a_name(lib):
+    c = lib[0].client()
+    assert c.post("/v1/library/categories", json={}).status_code == 422
+    assert c.post("/v1/library/categories", json={"name": "ok", "path": "/x"}).status_code == 422
+    assert c.post("/v1/library/categories", json={"name": 5}).status_code == 422
+
+
+def test_a_file_or_link_with_the_name_is_refused_and_links_are_not_listed(lib, tmp_path):
+    app, _, folder = lib
+    c = app.client()
+    (folder / "taken").write_bytes(b"x")
+    assert c.post("/v1/library/categories", json={"name": "taken"}).status_code == 422
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (folder / "link").symlink_to(outside)
+    assert c.post("/v1/library/categories", json={"name": "link"}).status_code == 422
+    assert c.get("/v1/library/categories").json() == {"categories": []}
+
+
+def test_categories_when_nothing_is_mounted(monkeypatch, tmp_path):
+    service = LibraryService(None, tmp_path / "state" / "catalog.sqlite", settings=local_settings(), breaker=QuotaBreaker())
+    c = build_local(monkeypatch, tmp_path, library=service).client()
+    assert c.get("/v1/library/categories").json() == {"categories": []}
+    assert c.post("/v1/library/categories", json={"name": "x"}).status_code == 501

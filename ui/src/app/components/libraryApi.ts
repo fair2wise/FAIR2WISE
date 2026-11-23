@@ -108,6 +108,34 @@ export function fetchLibraryPapers(fetcher: typeof fetch = fetch): Promise<Libra
   return v1Json<LibraryPapersResponse>(v1Url(`${LIBRARY_PATH}/papers`), {}, fetcher);
 }
 
+/** One entry of the shared category list. */
+export interface LibraryFolderEntry {
+  name: string;
+  count: number;
+}
+
+/** `GET /v1/library/categories`: the shared category list (folders, empty ones included). */
+export interface LibraryCategoriesResponse {
+  categories: LibraryFolderEntry[];
+}
+
+/** `POST /v1/library/categories`. `created` is false when the name already existed (any case): `name` is then the stored spelling. */
+export interface CreatedCategory {
+  name: string;
+  created: boolean;
+  count: number;
+}
+
+/** The shared category list (V84). */
+export function fetchLibraryCategories(fetcher: typeof fetch = fetch): Promise<LibraryCategoriesResponse> {
+  return v1Json<LibraryCategoriesResponse>(v1Url(`${LIBRARY_PATH}/categories`), {}, fetcher);
+}
+
+/** Create a category (V85); the server trims, validates and matches an existing name case-insensitively. */
+export function createLibraryCategory(name: string, fetcher: typeof fetch = fetch): Promise<CreatedCategory> {
+  return v1Json<CreatedCategory>(v1Url(`${LIBRARY_PATH}/categories`), jsonBody('POST', { name }), fetcher);
+}
+
 /** Options of {@link uploadLibraryPaper}. */
 export interface UploadOptions {
   /**
@@ -124,6 +152,20 @@ export const FOLDER_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 /** True when `name` is an acceptable category folder name (the server validates again). */
 export function isValidFolderName(name: string): boolean {
   return FOLDER_NAME_PATTERN.test(name);
+}
+
+/**
+ * Why `raw` (trimmed) cannot be a new category name, or `null` when it can. Mirrors the server's rule; the
+ * server checks again (the name becomes a library folder, so separators, dots and spaces are refused).
+ */
+export function categoryNameProblem(raw: string): string | null {
+  const name = raw.trim();
+  if (name === '') return 'Enter a category name.';
+  if (name.length > 64) return 'A category name is at most 64 characters.';
+  if (!FOLDER_NAME_PATTERN.test(name)) {
+    return 'Use letters, digits, "_" and "-" only; start with a letter or digit.';
+  }
+  return null;
 }
 
 /**

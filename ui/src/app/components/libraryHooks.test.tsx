@@ -3,7 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useRunningExtraction } from './extractionHooks';
-import { useLibraryProbe, useUploadPaper } from './libraryHooks';
+import { libraryKeys, useCreateCategory, useLibraryCategories, useLibraryProbe, useUploadPaper } from './libraryHooks';
 
 function wrapper() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -76,5 +76,50 @@ describe('useRunningExtraction', () => {
     const { Wrapper } = wrapper();
     const { result } = renderHook(() => useRunningExtraction(true, 60_000), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.data).toBeNull());
+  });
+});
+
+describe('shared category list', () => {
+  const paper = (id: string, folder: string) => ({ id, folder, relpath: `${folder}/${id}.pdf` });
+
+  it('merges the served folders (empty ones too) with the papers folders, deduped case-insensitively, root excluded', async () => {
+    stubFetch({
+      '/v1/library/categories': { status: 200, body: { categories: [{ name: 'empty', count: 0 }, { name: 'Tomo', count: 1 }] } },
+      '/v1/library/papers': { status: 200, body: { papers: [paper('a', 'tomo'), paper('b', 'tomo'), paper('c', ''), paper('d', 'rsoxs')], total: 4 } },
+    });
+    const { Wrapper } = wrapper();
+    const { result } = renderHook(() => useLibraryCategories(true), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.categories.map(c => c.name)).toEqual(['empty', 'rsoxs', 'Tomo']));
+    expect(result.current.categories.find(c => c.name === 'Tomo')?.count).toBe(2);
+  });
+
+  it('falls back to the papers folders when the server has no categories route', async () => {
+    stubFetch({ '/v1/library/papers': { status: 200, body: { papers: [paper('a', 'tomo')], total: 1 } } });
+    const { Wrapper } = wrapper();
+    const { result } = renderHook(() => useLibraryCategories(true), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.categories.map(c => c.name)).toEqual(['tomo']));
+  });
+
+  it('a created category is in the list for every consumer straight after the create answers', async () => {
+    let made = false;
+    const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), 'http://x');
+      if (url.pathname === '/v1/library/categories' && init?.method === 'POST') {
+        made = true;
+        return new Response(JSON.stringify({ name: 'xray', created: true, count: 0 }), { status: 200 });
+      }
+      if (url.pathname === '/v1/library/categories') {
+        return new Response(JSON.stringify({ categories: made ? [{ name: 'xray', count: 0 }] : [] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ papers: [], total: 0 }), { status: 200 });
+    });
+    vi.stubGlobal('fetch', mock);
+    const { Wrapper, client } = wrapper();
+    const { result } = renderHook(() => ({ first: useLibraryCategories(true), second: useLibraryCategories(true), make: useCreateCategory() }), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.first.isPending).toBe(false));
+    await result.current.make.mutateAsync('xray');
+    await waitFor(() => expect(result.current.first.categories.map(c => c.name)).toContain('xray'));
+    expect(result.current.second.categories.map(c => c.name)).toContain('xray');
+    expect(client.getQueryData(libraryKeys.categories)).toBeDefined();
   });
 });

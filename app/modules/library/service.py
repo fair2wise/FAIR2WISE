@@ -51,7 +51,7 @@ from ..literature.openalex import (
     default_http_client,
 )
 from ..security.authorization import StartupConfigError, local_operator_context
-from .arrange import guess_year, is_valid_folder_name, year_folder
+from .arrange import category_problem, guess_year, is_valid_folder_name, year_folder
 from .catalog import LibraryCatalog, sha256_file
 from .manifest import record_upload
 from .probe import DEFAULT_TIMEOUT_SECONDS, Probe, ProbeResult, isolated_probe
@@ -349,6 +349,55 @@ class LibraryService:
         papers = [self._dto(r) for r in self.catalog.rows()] if info["mounted"] else []
         return {"papers": papers, "total": len(papers), "pending_metadata": info["pending"],
                 "truncated": info["truncated"]}
+
+    # -- categories ----------------------------------------------------------------------------------
+
+    def list_categories(self) -> dict[str, Any]:
+        """The categories (top-level folders of the library, empty ones included) with their paper counts.
+
+        Returns:
+            ``{"categories": [{"name", "count"}]}`` sorted by name, case-insensitively; ``[]`` when nothing is mounted.
+        """
+        root = self._root()
+        if root is None:
+            return {"categories": []}
+        counts: dict[str, int] = {}
+        for row in self.catalog.rows():
+            name = folder_of(row["relpath"])
+            if name:
+                counts[name] = counts.get(name, 0) + 1
+        names = {n for n in counts if is_valid_folder_name(n)}
+        try:
+            names |= {c.name for c in root.iterdir()
+                      if is_valid_folder_name(c.name) and c.is_dir() and not c.is_symlink()}
+        except OSError as exc:
+            logger.warning("category listing could not read the library folder: %s", exc)
+        return {"categories": [{"name": n, "count": counts.get(n, 0)} for n in sorted(names, key=str.lower)]}
+
+    def create_category(self, raw: object) -> dict[str, Any]:
+        """Create the category ``raw`` (an empty top-level folder); an existing one (any case) is returned as is.
+
+        Returns:
+            ``{"name", "created", "count"}``: the stored spelling, whether this call created it, its paper count.
+
+        Raises:
+            ContractError: ``INVALID_INPUT`` for a bad name or a name taken by something that is not a real folder;
+                ``UNSUPPORTED_CAPABILITY`` when nothing is mounted.
+        """
+        problem = category_problem(raw)
+        if problem is not None:
+            raise ContractError(ErrorCode.INVALID_INPUT, problem)
+        name = str(raw).strip()
+        root = self._require_root()
+        with self._upload_lock:
+            for child in root.iterdir():
+                if child.name.lower() == name.lower():
+                    if child.is_dir() and not child.is_symlink():
+                        existing = next((c for c in self.list_categories()["categories"] if c["name"] == child.name), None)
+                        return {"name": child.name, "created": False, "count": existing["count"] if existing else 0}
+                    raise ContractError(ErrorCode.INVALID_INPUT, "that name is taken by something that is not a folder")
+            (root / name).mkdir()
+        return {"name": name, "created": True, "count": 0}
 
     # -- upload ------------------------------------------------------------------------------------
 

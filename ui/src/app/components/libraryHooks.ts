@@ -3,13 +3,20 @@
  * whether the Library and Extract tabs exist at all.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import {
+  createLibraryCategory,
+  fetchLibraryCategories,
   fetchLibraryPapers,
+  paperFolders,
   fetchLibraryStatus,
   indexLibraryPapers,
   uploadLibraryPaper,
   verifyAllLibraryPapers,
   verifyLibraryPaper,
+  type CreatedCategory,
+  type LibraryCategoriesResponse,
+  type LibraryFolder,
   type LibraryStatus,
 } from './libraryApi';
 
@@ -18,6 +25,7 @@ export const libraryKeys = {
   all: ['library'] as const,
   status: ['library', 'status'] as const,
   papers: ['library', 'papers'] as const,
+  categories: ['library', 'categories'] as const,
 };
 
 /** Result of `useLibraryProbe`. */
@@ -95,5 +103,51 @@ export function useIndexLibrary() {
   return useMutation({
     mutationFn: (nonce?: string) => indexLibraryPapers(nonce),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: libraryKeys.all }),
+  });
+}
+
+/**
+ * The one category list the Papers and Harvester tabs share: the server's folders (empty ones included) merged
+ * with the folders of the listed papers (so an older server without the categories route still works), named
+ * categories only, sorted case-insensitively.
+ *
+ * @param enabled - Fetch only when true (the library is mounted).
+ */
+export function useLibraryCategories(enabled = true): { categories: LibraryFolder[]; isPending: boolean } {
+  const list = useQuery({
+    queryKey: libraryKeys.categories,
+    queryFn: () => fetchLibraryCategories(),
+    enabled,
+    retry: false,
+  });
+  const papers = useLibraryPapers(enabled);
+  const paperList = papers.data?.papers;
+  const served = list.data?.categories;
+  const categories = useMemo(() => {
+    const merged = new Map<string, LibraryFolder>();
+    for (const entry of [...(served ?? []), ...paperFolders(paperList ?? [])]) {
+      if (entry.name === '') continue;
+      const key = entry.name.toLowerCase();
+      const have = merged.get(key);
+      merged.set(key, have ? { name: have.name, count: Math.max(have.count, entry.count) } : { ...entry });
+    }
+    return [...merged.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  }, [served, paperList]);
+  return { categories, isPending: enabled && list.isPending && papers.isPending };
+}
+
+/** Create a category; the new name joins the shared list at once (both tabs), then the list is refetched. */
+export function useCreateCategory() {
+  const queryClient = useQueryClient();
+  return useMutation<CreatedCategory, Error, string>({
+    mutationFn: name => createLibraryCategory(name),
+    onSuccess: created => {
+      queryClient.setQueryData<LibraryCategoriesResponse>(libraryKeys.categories, current => {
+        const have = current?.categories ?? [];
+        if (have.some(entry => entry.name === created.name)) return { categories: have };
+        return { categories: [...have, { name: created.name, count: created.count }] };
+      });
+      void queryClient.invalidateQueries({ queryKey: libraryKeys.categories });
+    },
   });
 }

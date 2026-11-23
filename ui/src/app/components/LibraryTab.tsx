@@ -6,7 +6,9 @@ import { useJob } from './extractionHooks';
 import { paperFolders, uploadErrorMessage } from './libraryApi';
 import {
   libraryKeys,
+  useCreateCategory,
   useIndexLibrary,
+  useLibraryCategories,
   useLibraryPapers,
   useLibraryProbe,
   useUploadPaper,
@@ -57,6 +59,8 @@ export function LibraryTab() {
   const jobRunning = tracked !== null && !(job.data && TERMINAL_JOB_STATES.has(job.data.state));
   const papersQuery = useLibraryPapers(mounted, jobRunning ? LIST_POLL_MS : false);
 
+  const categoryList = useLibraryCategories(mounted);
+  const createCategory = useCreateCategory();
   const upload = useUploadPaper();
   const verifyOne = useVerifyPaper();
   const verifyAll = useVerifyAllPapers();
@@ -175,7 +179,13 @@ export function LibraryTab() {
         </p>
       ) : null}
 
-      <UploadTarget folders={folders} value={target} onChange={setTarget} disabled={!mounted} />
+      <UploadTarget
+        folders={categoryList.categories}
+        value={target}
+        onChange={setTarget}
+        onCreateCategory={createCategory.mutateAsync}
+        disabled={!mounted}
+      />
       <LibraryDropzone
         disabled={!mounted || uploadFolder === null}
         busy={uploading}

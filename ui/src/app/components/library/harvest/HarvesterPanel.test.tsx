@@ -239,4 +239,33 @@ describe('HarvesterPanel results', () => {
     await user.click(await screen.findByRole('button', { name: 'Dismiss Paper p' }));
     await waitFor(() => expect(calls.some(c => c.method === 'POST' && c.path === '/v1/library/harvest/candidates/p/dismiss')).toBe(true));
   });
+
+  it('Enter in the new-category field creates and selects it without starting the harvest', async () => {
+    const user = userEvent.setup();
+    routes['GET /v1/library/categories'] = { status: 200, body: { categories: [{ name: 'empty', count: 0 }] } };
+    routes['POST /v1/library/categories'] = { status: 200, body: { name: 'xray', created: true, count: 0 } };
+    renderPanel();
+    await screen.findByRole('form', { name: 'Start a harvest' });
+    await user.type(screen.getByLabelText('Topic'), 'polymer blends');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'empty' })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText('Category'), 'New category…');
+    routes['GET /v1/library/categories'].body = { categories: [{ name: 'empty', count: 0 }, { name: 'xray', count: 0 }] };
+    await user.type(screen.getByLabelText('New category name'), 'xray{Enter}');
+    await waitFor(() => expect(screen.getByLabelText('Category')).toHaveValue('xray'));
+    expect(calls.some(c => c.method === 'POST' && c.path === '/v1/jobs')).toBe(false);
+    expect(calls.find(c => c.method === 'POST' && c.path === '/v1/library/categories')?.body).toEqual({ name: 'xray' });
+    expect(startButton()).toBeEnabled();
+  });
+
+  it('shows the server error for a category that cannot be created', async () => {
+    const user = userEvent.setup();
+    routes['POST /v1/library/categories'] = { status: 422, body: { detail: 'that name is taken by something that is not a folder' } };
+    renderPanel();
+    await screen.findByRole('form', { name: 'Start a harvest' });
+    await user.selectOptions(screen.getByLabelText('Category'), 'New category…');
+    await user.type(screen.getByLabelText('New category name'), 'taken');
+    await user.click(screen.getByRole('button', { name: 'Add category' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('not a folder');
+    expect(screen.getByLabelText('Category')).toHaveValue('\u0000new');
+  });
 });

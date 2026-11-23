@@ -31,6 +31,22 @@ def is_valid_folder_name(name: str) -> bool:
     return bool(FOLDER_NAME_PATTERN.match(name))
 
 
+def category_problem(raw: object) -> str | None:
+    """Why ``raw`` cannot be a category name (after trimming), or ``None`` when it can.
+
+    The name becomes a top-level folder of the library, so only the :data:`FOLDER_NAME_PATTERN` characters are
+    allowed: no separators, dots, spaces or leading ``-``/``_`` (hence no ``..``, absolute path or hidden folder).
+    """
+    name = raw.strip() if isinstance(raw, str) else ""
+    if not name:
+        return "enter a category name"
+    if len(name) > 64:
+        return "a category name is at most 64 characters"
+    if not FOLDER_NAME_PATTERN.match(name):
+        return "use letters, digits, '_' and '-' only, starting with a letter or digit"
+    return None
+
+
 def _plausible(year: int, *, now: datetime | None = None) -> bool:
     return 1900 <= year <= (now or datetime.now(UTC)).year + 1
 
@@ -64,4 +80,4 @@ def year_folder(year: int | None) -> str:
     return str(year) if year is not None else UNKNOWN_YEAR
 
 
-__all__ = ("FOLDER_NAME_PATTERN", "UNKNOWN_YEAR", "guess_year", "is_valid_folder_name", "year_folder")
+__all__ = ("FOLDER_NAME_PATTERN", "category_problem", "UNKNOWN_YEAR", "guess_year", "is_valid_folder_name", "year_folder")

@@ -253,4 +253,26 @@ describe('LibraryTab', () => {
     expect(screen.getByRole('region', { name: 'Library' })).toBeInTheDocument();
     await screen.findByText('a.pdf');
   });
+
+  it('a category created in Papers (Enter) is selected there and offered by the Harvester tab: one shared list', async () => {
+    routes['GET /v1/library/categories'] = { status: 200, body: { categories: [{ name: 'empty', count: 0 }] } };
+    routes['POST /v1/library/categories'] = { status: 200, body: { name: 'xray', created: true, count: 0 } };
+    routes['GET /v1/library/schemas'] = { status: 200, body: { schemas: [] } };
+    routes['GET /v1/jobs'] = { status: 200, body: { jobs: [] } };
+    routes['GET /v1/library/harvest/runs'] = { status: 200, body: { runs: [] } };
+    renderTab();
+    await screen.findByText('a.pdf');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'empty' })).toBeInTheDocument());
+    await userEvent.selectOptions(screen.getByLabelText('Upload to'), 'New category…');
+    routes['GET /v1/library/categories'].body = { categories: [{ name: 'empty', count: 0 }, { name: 'xray', count: 0 }] };
+    await userEvent.type(screen.getByLabelText('New category name'), ' xray{Enter}');
+    await waitFor(() => expect(screen.getByLabelText('Upload to')).toHaveValue('xray'));
+    expect(calls.find(c => c.method === 'POST' && c.path === '/v1/library/categories')?.body).toEqual({ name: 'xray' });
+    expect(screen.getAllByRole('option').map(o => o.textContent)).toContain('xray');
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Harvester' }));
+    const category = await screen.findByLabelText('Category');
+    expect(Array.from(category.querySelectorAll('option')).map(o => o.textContent)).toEqual(
+      ['Choose a category…', 'empty', 'xray', 'New category…']);
+  });
 });

@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from './apiHttp';
 import {
+  categoryNameProblem,
+  createLibraryCategory,
+  fetchLibraryCategories,
   fetchLibraryPapers,
   fetchLibraryStatus,
   indexLibraryPapers,
@@ -106,5 +109,27 @@ describe('libraryApi', () => {
     expect(uploadErrorMessage(new ApiError('big', 413))).toContain('too large');
     expect(uploadErrorMessage(new ApiError('x', 501))).toContain('not mounted');
     expect(uploadErrorMessage(new ApiError('odd', 422))).toBe('odd');
+  });
+
+  it('reads the shared category list and creates a category with a JSON body', async () => {
+    const list = respond(200, { categories: [{ name: 'rsoxs', count: 2 }] });
+    expect((await fetchLibraryCategories(asFetch(list))).categories).toEqual([{ name: 'rsoxs', count: 2 }]);
+    expect(String(list.mock.calls[0][0])).toContain('/v1/library/categories');
+    const make = respond(200, { name: 'xray', created: true, count: 0 });
+    expect(await createLibraryCategory('xray', asFetch(make))).toEqual({ name: 'xray', created: true, count: 0 });
+    const init = make.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({ name: 'xray' });
+  });
+
+  it('judges a new category name like the server (trim, length, characters, no traversal)', () => {
+    expect(categoryNameProblem('  xray ')).toBeNull();
+    expect(categoryNameProblem('a-b_c9')).toBeNull();
+    expect(categoryNameProblem('')).toMatch(/Enter/);
+    expect(categoryNameProblem('   ')).toMatch(/Enter/);
+    expect(categoryNameProblem('x'.repeat(65))).toMatch(/64/);
+    for (const bad of ['..', '../x', 'a/b', 'a\\b', '.hidden', '-x', '_x', 'with space', 'caf\u00e9']) {
+      expect(categoryNameProblem(bad), bad).not.toBeNull();
+    }
   });
 });

@@ -13,6 +13,7 @@ import re
 from typing import Any, cast
 
 from fastapi import Depends, FastAPI, Request
+from pydantic import BaseModel, ConfigDict
 from starlette.concurrency import run_in_threadpool
 
 from ..modules.contracts.context import RequestContext
@@ -23,6 +24,14 @@ from .routes_common import Prefixed, context, project
 from .upload_limits import read_upload_limited
 
 _ID_RE = re.compile(r"^[0-9a-f]{16}$")
+
+
+class CategoryBody(BaseModel):
+    """Body of ``POST /v1/library/categories``: the new category's name (trimmed and checked by the service)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
 
 
 def library_service(request: Request) -> LibraryService:
@@ -46,6 +55,16 @@ def install(app: FastAPI) -> FastAPI:
     def papers(request: Request, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """The papers of the mounted folder: name, title, DOI, verification and index status."""
         return cast(dict[str, Any], project(request, library_service(request).list_papers()))
+
+    @router.get("/categories")
+    def categories(request: Request, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
+        """The categories (top-level folders, empty ones too) with paper counts: the one list every tab uses."""
+        return cast(dict[str, Any], project(request, library_service(request).list_categories()))
+
+    @router.post("/categories")
+    def create_category(body: CategoryBody, request: Request, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
+        """Create a category folder (letters, digits, ``_``, ``-``); an existing name answers ``created: false``."""
+        return cast(dict[str, Any], project(request, library_service(request).create_category(body.name)))
 
     @router.post("/papers")
     async def upload(request: Request, folder: str | None = None,

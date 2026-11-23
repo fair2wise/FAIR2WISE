@@ -162,6 +162,12 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
        note="file a PDF a person saved for a paywalled candidate into the run's category (multipart)"),
     _v("V79", "POST", "/library/harvest/candidates/{candidate_id}/dismiss", "library.upload", on_als=False,
        note="dismiss a paywalled candidate"),
+    # Shared category list (owner bug list 2026-11-23, task 9): the Papers and Harvester tabs read and extend one list.
+    _v("V84", "GET", "/library/categories", "library.read", on_als=False,
+       note="categories = top-level folders of the library (empty ones too) with paper counts; no paths"),
+    _v("V85", "POST", "/library/categories", "library.upload", on_als=False,
+       note="create a category folder from a name (letters, digits, _ and -; 64 max); an existing name (any case) "
+            "answers created=false; never a path"),
     # UI graph sources (owner instruction 2026-11-06): the selectable JSON/Tiled graphs of the graph view. Read-only;
     # same entry capability as GET /graph (R06). The `source` query parameter on R06-R09 needs no extra capability.
     _v("V80", "GET", "/graph/sources", "chat.read_support",
