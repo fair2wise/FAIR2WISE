@@ -40,7 +40,8 @@ env:
   # Re-pinned 2026-11-23 (owner bug list, task 6): KG viewer defaults to force-directed where force is allowed (GraphMockup, largeGraphPolicy, test setup, e2e spec); previous f6449d9a.
   # Re-pinned 2026-11-23 (owner bug list, task 9): shared category list: Enter/Add category creates and selects it in Papers and Harvester; previous 2607239b.
   # Re-pinned 2026-11-23 (owner bug list, task 2): provider refusal wording (providerErrors; judge model setting and extraction toasts show the CBORG address refusal); previous fe17f58d.
-  FROZEN_UI_TREE: bdf888d37ed4fc8679e939969ff88d59e91897d2
+  # Re-pinned 2026-11-23 (owner bug list, task 10): Library list shows stored year, authors and abstract with a not-stored marker; previous bdf888d3.
+  FROZEN_UI_TREE: f780e527ec24ad86a2d7701c105eb093cab2cd2c
   KG_RAG_RETRIEVAL_BACKEND: lexical
   KG_RAG_FORCE_CPU: "1"
   F2W_SOURCE_RAG: "0"

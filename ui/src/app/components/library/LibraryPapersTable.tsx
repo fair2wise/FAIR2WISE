@@ -3,6 +3,7 @@ import { folderLabel, type LibraryPaper } from '../libraryApi';
 import { Button } from '../ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { IndexStatusBadge, VerifyStatusBadge } from './LibraryStatusBadges';
+import { PaperAbstract, PaperAuthors, PaperYear } from './PaperMetadata';
 
 /** Props of {@link LibraryPapersTable}. */
 export interface LibraryPapersTableProps {
@@ -14,7 +15,10 @@ export interface LibraryPapersTableProps {
   onVerify: (paperId: string) => void;
 }
 
-/** Table of library papers: file name, title, DOI, verify and index status, per-row Verify. */
+/**
+ * Table of library papers: file name, title with its abstract (collapsed), authors, year, DOI, verify and index
+ * status, per-row Verify. Year, authors and abstract are shown as stored; a missing one reads "not stored".
+ */
 export function LibraryPapersTable({ papers, verifyingId, verifyDisabled = false, onVerify }: LibraryPapersTableProps) {
   if (papers.length === 0) {
     return (
@@ -29,7 +33,9 @@ export function LibraryPapersTable({ papers, verifyingId, verifyDisabled = false
         <TableRow>
           <TableHead>Folder</TableHead>
           <TableHead>File</TableHead>
-          <TableHead>Title</TableHead>
+          <TableHead>Title and abstract</TableHead>
+          <TableHead>Authors</TableHead>
+          <TableHead>Year</TableHead>
           <TableHead>DOI</TableHead>
           <TableHead>Verify</TableHead>
           <TableHead>Index</TableHead>
@@ -47,8 +53,17 @@ export function LibraryPapersTable({ papers, verifyingId, verifyDisabled = false
             <TableCell className="max-w-48 truncate" title={paper.file_name}>
               {paper.file_name}
             </TableCell>
-            <TableCell className="max-w-72 truncate" title={paper.title ?? undefined}>
-              {paper.title ?? <span className="text-muted-foreground">Untitled</span>}
+            <TableCell className="max-w-96 align-top">
+              <p className="truncate" title={paper.title ?? undefined}>
+                {paper.title ?? <span className="text-muted-foreground">Untitled</span>}
+              </p>
+              <PaperAbstract paper={paper} />
+            </TableCell>
+            <TableCell className="max-w-48 truncate align-top">
+              <PaperAuthors paper={paper} />
+            </TableCell>
+            <TableCell className="align-top">
+              <PaperYear paper={paper} />
             </TableCell>
             <TableCell className="max-w-48 truncate" title={paper.doi ?? undefined}>
               {paper.doi ?? <span className="text-muted-foreground">No DOI</span>}

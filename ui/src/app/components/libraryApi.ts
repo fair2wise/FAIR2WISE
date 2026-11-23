@@ -44,6 +44,19 @@ export interface LibraryPaper {
   /** State of the title/DOI extraction from the PDF (server-defined string); may be absent. */
   metadata_status?: string | null;
   index_status: LibraryIndexStatus;
+  /** Publication year as stored (category manifest, else the year folder); `null`/absent: not stored. */
+  year?: number | null;
+  /** Where `year` came from: `manifest` or `folder`. */
+  year_source?: 'manifest' | 'folder' | null;
+  /** Author names as stored (capped; see `authors_total`); `null`/absent: not stored. */
+  authors?: string[] | null;
+  /** How many authors are stored (may exceed `authors.length`). */
+  authors_total?: number;
+  /** Abstract as stored (cut at 2000 characters, see `abstract_truncated`); `null`/absent: not stored. */
+  abstract?: string | null;
+  abstract_truncated?: boolean;
+  /** Which of `year`, `authors`, `abstract` no source holds for this paper. */
+  metadata_missing?: Array<'year' | 'authors' | 'abstract'>;
 }
 
 /** `GET /v1/library/papers`. */

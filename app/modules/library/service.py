@@ -54,6 +54,7 @@ from ..security.authorization import StartupConfigError, local_operator_context
 from .arrange import category_problem, guess_year, is_valid_folder_name, year_folder
 from .catalog import LibraryCatalog, sha256_file
 from .manifest import record_upload
+from .metadata import ManifestMetadata
 from .probe import DEFAULT_TIMEOUT_SECONDS, Probe, ProbeResult, isolated_probe
 
 if TYPE_CHECKING:
@@ -161,6 +162,7 @@ class LibraryService:
         self._clock = clock
         self._refresh_lock = threading.RLock()
         self._upload_lock = threading.Lock()
+        self._stored_metadata = ManifestMetadata()
         self.index_dir = Path(index_dir) if index_dir else None
         self._chunker = chunker
         self._indexer: Any = None
@@ -344,9 +346,18 @@ class LibraryService:
                 "indexed_count": self.catalog.indexed_count(), "quota_open": quota_open}
 
     def list_papers(self) -> dict[str, Any]:
-        """Every paper of the folder with its local or verified title and DOI."""
+        """Every paper of the folder with its local or verified title and DOI, plus the stored year, authors and abstract.
+
+        The last three come from the category manifests (``year`` also from the year folder); a field no source holds
+        is ``None`` and listed in the paper's ``metadata_missing`` (see :mod:`.metadata`).
+        """
         info = self.refresh()
+        root = self._root()
         papers = [self._dto(r) for r in self.catalog.rows()] if info["mounted"] else []
+        if papers and root is not None:  # year, authors and abstract as stored in the category manifests
+            stored = self._stored_metadata.index(root)
+            for dto in papers:
+                dto.update(stored.describe(dto["relpath"], dto["sha256"], dto["doi"]))
         return {"papers": papers, "total": len(papers), "pending_metadata": info["pending"],
                 "truncated": info["truncated"]}
 

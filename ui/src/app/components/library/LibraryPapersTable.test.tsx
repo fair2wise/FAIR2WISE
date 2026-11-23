@@ -84,3 +84,50 @@ describe('LibraryPapersTable', () => {
     expect(screen.getByText('Uncategorized')).toBeInTheDocument();
   });
 });
+
+describe('LibraryPapersTable stored metadata', () => {
+  it('shows year, the first authors with +N, and an abstract collapsed behind a toggle', async () => {
+    render(
+      <LibraryPapersTable
+        papers={[paper({
+          year: 2014, year_source: 'manifest', authors: ['A One', 'B Two', 'C Three', 'D Four', 'E Five'], authors_total: 7,
+          abstract: 'We study polymer blends.', metadata_missing: [],
+        })]}
+        verifyingId={null}
+        onVerify={() => undefined}
+      />,
+    );
+    expect(screen.getByText('2014')).toBeInTheDocument();
+    expect(screen.getByText(/A One, B Two, C Three/)).toBeInTheDocument();
+    expect(screen.getByText('+4')).toBeInTheDocument();
+    expect(screen.getByText('+4').closest('span[title]')).toHaveAttribute('title', expect.stringContaining('and 2 more'));
+    const toggle = screen.getByRole('button', { name: 'Show abstract of a.pdf' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByText('We study polymer blends.')).toHaveClass('line-clamp-2');
+    await userEvent.click(toggle);
+    expect(screen.getByRole('button', { name: 'Hide abstract of a.pdf' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('We study polymer blends.')).not.toHaveClass('line-clamp-2');
+  });
+
+  it('marks every field the server does not hold as "not stored" rather than leaving it blank', () => {
+    render(
+      <LibraryPapersTable
+        papers={[paper({ year: null, authors: null, abstract: null, metadata_missing: ['year', 'authors', 'abstract'] })]}
+        verifyingId={null}
+        onVerify={() => undefined}
+      />,
+    );
+    expect(screen.getAllByText('not stored')).toHaveLength(3);
+    expect(screen.queryByRole('button', { name: /abstract/ })).not.toBeInTheDocument();
+  });
+
+  it('treats an older server that sends none of the fields as not stored', () => {
+    render(<LibraryPapersTable papers={[paper()]} verifyingId={null} onVerify={() => undefined} />);
+    expect(screen.getAllByText('not stored')).toHaveLength(3);
+  });
+
+  it('says when the year was taken from the folder name', () => {
+    render(<LibraryPapersTable papers={[paper({ year: 2021, year_source: 'folder' })]} verifyingId={null} onVerify={() => undefined} />);
+    expect(screen.getByText('2021')).toHaveAttribute('title', 'Year taken from the year folder');
+  });
+});
