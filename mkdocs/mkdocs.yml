@@ -50,6 +50,7 @@ nav:
   - Operations:
       - Fresh-machine deployment: deployment.md
       - "The :local image, end to end": local-image.md
+      - "Standalone install (scoping plan)": standalone-install.md
       - "The :cluster image (Kubernetes)": cluster-image.md
       - Local and Docker operation: operations.md
       - Observability (OpenTelemetry, Jaeger): observability.md
