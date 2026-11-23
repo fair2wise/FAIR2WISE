@@ -7,5 +7,7 @@ exclude =
     versioneer.py,
     /_version.py,
     docs/source/conf.py,
-    env
+    env,
+    .pixi,
+    node_modules
 max-line-length = 115
