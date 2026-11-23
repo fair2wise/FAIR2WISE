@@ -220,7 +220,7 @@ def test_public_defaults_are_json_not_splash():
 def test_ui_settings_text_describes_tiled_and_json_modes_without_a_splash_server():
     """Owner decision 2026-11-09 (Q6): description text only; the ``splash_links``/``json`` ids and labels stay."""
     tsx = (REPO_ROOT / "ui/src/app/components/AppSettingsButton.tsx").read_text(encoding="utf-8")
-    assert 'id="splash_links"' in tsx and 'label="splash_links"' in tsx
+    assert 'id="splash_links"' in tsx and 'label="Tiled Graph"' in tsx
     assert 'id="json"' in tsx and 'label="JSON"' in tsx
     assert "requires a running splash server" not in tsx
     assert "Editable knowledge graph backed by Tiled Graph" in tsx

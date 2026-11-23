@@ -34,7 +34,7 @@
         "fields": {
           "backend": "'cborg' | 'ollama'; anything else loads as 'cborg' (agentSettings.ts:178)",
           "model": "string; cborg aliases normalized (agentSettings.ts:93-105,158-164); empty -> backend default",
-          "graphSource": "'splash_links' | 'json' (agentSettings.ts:2); ANY stored value other than 'json', including a missing field, loads as 'splash_links' (agentSettings.ts:190)",
+          "graphSource": "'splash_links' | 'json' (agentSettings.ts:2); settingsVersion 2 (2026-11 follow-up): 'splash_links' loads only with a recorded explicit pick (graphSourceChosen); a pre-v2 stored 'splash_links' with no recorded pick is reset once to 'json' with a notice (migrateGraphSource, agentSettings.ts:190)",
           "workflowMode": "'deterministic' | 'agentic'; else 'agentic' (agentSettings.ts:191)",
           "extractionMode": "'full' | 'targeted'; else 'targeted' (agentSettings.ts:166-170)",
           "targetedMaxPages": "number > 0; else 6 (agentSettings.ts:193-195)",
@@ -68,7 +68,7 @@
           "useLiveTiled": false,
           "tiledUri": ""
         },
-        "note": "Defaults apply when the key is absent or JSON.parse fails (agentSettings.ts:176,210-212). Absent key -> graphSource 'json'; present key without 'json' -> 'splash_links'. These two defaults differ."
+        "note": "Defaults apply when the key is absent or JSON.parse fails (agentSettings.ts:176,210-212). Absent key -> graphSource 'json'; present v2 key -> 'splash_links' only after an explicit pick, else 'json'; present pre-v2 key with 'splash_links' -> reset to 'json' once with a notice. The default is JSON everywhere."
       },
       "wire_mapping": {
         "to_api": "graphSourceToApi: 'json' -> 'json', everything else -> 'splash' (agentSettings.ts:220-222); used in settingsToApiPayload (agentSettings.ts:228-249) for PUT /settings",
