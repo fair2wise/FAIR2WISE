@@ -238,3 +238,12 @@ def record_job(*, kind: object, state: object, seconds: float, kinds: Iterable[s
     attrs = {"kind": labels.enum(kind, kinds), "outcome": outcome}
     _add("jobs", attrs)
     _observe("job_duration", attrs, seconds)
+
+
+def record_llm(*, provider: object, outcome: object, seconds: float) -> None:
+    """Count one model call and record its duration (both labels are mapped into their closed sets)."""
+    if not _STATE.enabled:
+        return
+    attrs = {"provider": labels.enum(provider, labels.LLM_PROVIDERS), "outcome": labels.enum(outcome, labels.LLM_OUTCOMES)}
+    _add("llm_calls", attrs)
+    _observe("llm_duration", attrs, seconds)

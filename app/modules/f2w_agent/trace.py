@@ -26,7 +26,7 @@ import time
 from typing import Any, cast
 import uuid
 
-from .. import tracing
+from .. import metrics, tracing
 from ..contracts.json_types import JsonValue
 
 logger = logging.getLogger(__name__)
@@ -833,12 +833,17 @@ def record_llm_call(
     latency_ms: float,
     timeout: float | None = None,
     error: BaseException | None = None,
+    provider: str | None = None,
 ) -> None:
     """Record one model call on the active turn and, with tracing on, as an ``llm.call`` span.
+
+    This is the one place every model call passes, so it also feeds the metrics (``provider``: ``cborg`` or
+    ``ollama``; no model name, no text).
 
     The span carries the model name, the call-site label, latency, sizes and status; never the messages
     or the response (``docs/adr/content-disclosure.md``). The turn record is a no-op when no turn is open.
     """
+    metrics.record_llm_call(provider=provider, error=error, seconds=latency_ms / 1000.0)
     if tracing.is_enabled():
         tracing.record_model_call(
             label=label, model=model, latency_ms=latency_ms, error=error,

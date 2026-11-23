@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 METER_NAME = "app.modules.metrics"
 
+LLM_BOUNDS_S = (0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0, 30.0, 60.0, 120.0, 180.0, 300.0)
 JOB_BOUNDS_S = (1.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0, 1200.0, 1800.0, 3600.0)
 HTTP_BOUNDS_S = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0)
 
@@ -33,4 +34,6 @@ SPECS = (
     Spec("jobs", "f2w.jobs", "counter", "{job}", "Jobs that finished a run"),
     Spec("job_duration", "f2w.job.duration", "histogram", "s", "Duration of one job run", JOB_BOUNDS_S),
     Spec("queue_depth", "f2w.jobs.queue.depth", "gauge", "{job}", "Jobs queued or running (worker only)"),
+    Spec("llm_calls", "f2w.llm.calls", "counter", "{call}", "Model calls"),
+    Spec("llm_duration", "f2w.llm.call.duration", "histogram", "s", "Model call duration", LLM_BOUNDS_S),
 )

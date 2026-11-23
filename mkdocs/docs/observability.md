@@ -307,6 +307,8 @@ The commit is exposed by one metric, `f2w.build.info`, instead.
 | `f2w.jobs` | counter, `{job}` | `kind`, `outcome` | `f2w_jobs_total` |
 | `f2w.job.duration` | histogram, `s` | `kind`, `outcome` | `f2w_job_duration_seconds_bucket`, `_sum`, `_count` |
 | `f2w.jobs.queue.depth` | observable gauge, `{job}` | `kind`, `state` | `f2w_jobs_queue_depth` (worker process only) |
+| `f2w.llm.calls` | counter, `{call}` | `provider`, `outcome` | `f2w_llm_calls_total` |
+| `f2w.llm.call.duration` | histogram, `s` | `provider`, `outcome` | `f2w_llm_call_duration_seconds_bucket`, `_sum`, `_count` |
 | `f2w.http.requests` | counter, `{request}` | `http_route`, `http_method`, `status_class` | `f2w_http_requests_total` |
 | `f2w.http.request.duration` | histogram, `s` | `http_route`, `http_method`, `status_class` | `f2w_http_request_duration_seconds_bucket`, `_sum`, `_count` |
 
@@ -320,6 +322,12 @@ Jobs: `kind` is a registered job kind (`ingest`, `build_snapshot`, `publish`, ..
 requeued (interrupted) or loses its lease is not a finish and is not counted. Job duration boundaries (seconds):
 `1, 5, 10, 30, 60, 120, 300, 600, 1200, 1800, 3600`. The queue depth gauge (`state` is `queued` or `running`) is
 reported by the worker only, from one small SQLite query per export interval; the API reports no queue depth.
+
+Model calls are counted where every call already passes (`record_llm_call` in `f2w_agent/trace.py`, fed by
+the CBORG and Ollama chat clients, the Q&A loop and the planning model). `provider` is `cborg` or `ollama`
+(`other` if a call site cannot say); `outcome` is `ok`, `ip_not_authorized` (CBORG's HTTP 403 network refusal, as
+classified by `cborg_errors.py`), `auth` (other 401/403), `rate_limited` (429), `timeout` or `error`. LLM duration
+boundaries (seconds): `0.1, 0.25, 0.5, 1, 2.5, 5, 10, 20, 30, 60, 120, 180, 300`. There is no model-name label.
 
 **Label safety.** Every label value comes from a closed set (or a route template the application declared);
 anything else becomes `other`. DOIs, URLs, query strings, uuids, file names, node ids, paper titles, user ids

@@ -136,6 +136,7 @@ def _content(message: object) -> str:
 def _record(model: object, messages: Sequence[Any], reply: object, started: float,
             error: BaseException | None) -> None:
     from ..f2w_agent.trace import record_llm_call
+    from ..metrics import provider_of
 
     record_llm_call(
         label=PLANNING_LABEL,
@@ -144,6 +145,7 @@ def _record(model: object, messages: Sequence[Any], reply: object, started: floa
         response=None if reply is None else _content(reply),
         latency_ms=round((time.perf_counter() - started) * 1000.0, 3),
         error=error,
+        provider=provider_of(model),
     )
 
 

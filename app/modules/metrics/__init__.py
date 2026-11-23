@@ -13,6 +13,7 @@ Labels are closed vocabularies (:mod:`app.modules.metrics.labels`); nothing a pe
 from __future__ import annotations
 
 from .config import ENV_VARS, MetricsConfig, from_env
+from .llm import provider_of, record_llm_call
 from .runtime import (
     init,
     is_enabled,
@@ -23,5 +24,5 @@ from .runtime import (
     shutdown,
 )
 
-__all__ = ("ENV_VARS", "MetricsConfig", "from_env", "init", "is_enabled", "record_http_request", "record_job", "reset",
+__all__ = ("ENV_VARS", "MetricsConfig", "from_env", "init", "is_enabled", "provider_of", "record_http_request", "record_job", "record_llm_call", "reset",
     "set_queue_depth_source", "shutdown")

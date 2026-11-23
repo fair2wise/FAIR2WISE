@@ -23,7 +23,8 @@ from ..model_policy import require_free_cborg_model
 logger = logging.getLogger(__name__)
 
 
-def _traced_chat(model: str, prompt: str, trace_label: str | None, timeout: int, call: Callable[[], str]) -> str:
+def _traced_chat(model: str, prompt: str, trace_label: str | None, timeout: int, call: Callable[[], str],
+                 provider: str | None = None) -> str:
     """Run ``call`` and record the rendered prompt when a turn trace is active."""
     label = trace_label or "chat"
     started = time.perf_counter()
@@ -42,6 +43,7 @@ def _traced_chat(model: str, prompt: str, trace_label: str | None, timeout: int,
             latency_ms=(time.perf_counter() - started) * 1000,
             timeout=timeout,
             error=exc,
+            provider=provider,
         )
         if refusal is not None:
             raise refusal from None
@@ -54,6 +56,7 @@ def _traced_chat(model: str, prompt: str, trace_label: str | None, timeout: int,
         latency_ms=(time.perf_counter() - started) * 1000,
         timeout=timeout,
         error=None,
+        provider=provider,
     )
     return result
 
@@ -115,7 +118,7 @@ class OllamaChatClient(ChatClient):
             logger.debug("OllamaClient.chat: response_len=%d", len(result))
             return result
 
-        return _traced_chat(self.model, prompt, trace_label, timeout, call)
+        return _traced_chat(self.model, prompt, trace_label, timeout, call, provider="ollama")
 
 
 class CBorgChatClient(ChatClient):
@@ -169,7 +172,7 @@ class CBorgChatClient(ChatClient):
             logger.debug("CBorgClient.chat: response_len=%d", len(result))
             return result
 
-        return _traced_chat(self.model, prompt, trace_label, timeout, call)
+        return _traced_chat(self.model, prompt, trace_label, timeout, call, provider="cborg")
 
 
 def make_chat_client(

@@ -16,6 +16,8 @@ UNMATCHED = "unmatched"
 HTTP_METHODS = frozenset({"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"})
 JOB_OUTCOMES = ("succeeded", "failed", "cancelled", "paused")
 QUEUE_STATES = ("queued", "running")
+LLM_PROVIDERS = ("cborg", "ollama")
+LLM_OUTCOMES = ("ok", "ip_not_authorized", "auth", "rate_limited", "timeout", "error")
 STATUS_CLASSES = ("1xx", "2xx", "3xx", "4xx", "5xx")
 
 

@@ -1890,6 +1890,7 @@ async def call_llm(cli: ChatClient, messages: Sequence[dict[str, str]], label: s
     ``LLM_TIMEOUT_GRACE_S``) is re-raised as ``RuntimeError``; other client errors propagate.
     """
     from .f2w_agent.trace import record_llm_call
+    from .metrics import provider_of
 
     output.info(
         Fore.YELLOW
@@ -1897,12 +1898,14 @@ async def call_llm(cli: ChatClient, messages: Sequence[dict[str, str]], label: s
         + Style.RESET_ALL,
     )
     started = time.perf_counter()
+    provider = provider_of(cli)
     try:
         result = await asyncio.wait_for(cli.chat(messages), timeout=LLM_TIMEOUT + LLM_TIMEOUT_GRACE_S)
     except TimeoutError as exc:
         wrapped = RuntimeError(
             f"{label} call exceeded {LLM_TIMEOUT}s. Try --timeout 30, another model, or check CBORG."
         )
+        wrapped.__cause__ = exc  # so the metrics classify the timeout; ``raise ... from exc`` below sets the same
         record_llm_call(
             label=label,
             model=getattr(cli, "model", None),
@@ -1911,6 +1914,7 @@ async def call_llm(cli: ChatClient, messages: Sequence[dict[str, str]], label: s
             latency_ms=(time.perf_counter() - started) * 1000,
             timeout=LLM_TIMEOUT,
             error=wrapped,
+            provider=provider,
         )
         raise wrapped from exc
     except Exception as exc:
@@ -1922,6 +1926,7 @@ async def call_llm(cli: ChatClient, messages: Sequence[dict[str, str]], label: s
             latency_ms=(time.perf_counter() - started) * 1000,
             timeout=LLM_TIMEOUT,
             error=exc,
+            provider=provider,
         )
         raise
     record_llm_call(
@@ -1932,6 +1937,7 @@ async def call_llm(cli: ChatClient, messages: Sequence[dict[str, str]], label: s
         latency_ms=(time.perf_counter() - started) * 1000,
         timeout=LLM_TIMEOUT,
         error=None,
+        provider=provider,
     )
     return result
 
