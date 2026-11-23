@@ -34,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
+import { OllamaModelSetting } from './OllamaModelSetting';
 import { Label } from './ui/label';
 import { RadioGroup } from './ui/radio-group';
 import {
@@ -610,20 +611,13 @@ export function AppSettingsButton({
                 )}
               </div>
             ) : (
-              <div className="space-y-2 px-3">
-                <Label htmlFor="ollama-model-input" className="text-xs font-medium text-slate-500">
-                  Ollama model
-                </Label>
-                <input
-                  id="ollama-model-input"
-                  type="text"
-                  value={draftSettings.model}
-                  disabled={loading || saving}
-                  onChange={event => updateModel(event.target.value)}
-                  placeholder={defaultOllamaModel}
-                  className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm outline-none focus:border-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
-                />
-              </div>
+              <OllamaModelSetting
+                open={open}
+                value={draftSettings.model}
+                disabled={loading || saving}
+                onChange={updateModel}
+                placeholder={defaultOllamaModel}
+              />
             )}
 
             <div className="space-y-3">

@@ -168,6 +168,12 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
     _v("V85", "POST", "/library/categories", "library.upload", on_als=False,
        note="create a category folder from a name (letters, digits, _ and -; 64 max); an existing name (any case) "
             "answers created=false; never a path"),
+    # Ollama model dropdown (owner bug list 2026-11-23, task 4): the settings panel lists the models of the deployment's
+    # Ollama server through the API (the browser never calls Ollama). Read-only, bounded, no URL in the answer; the
+    # entry capability is the one the settings panel itself needs.
+    _v("V86", "GET", "/ollama/models", "settings.personal",
+       note="models of {OLLAMA_URL}/api/tags: state ok|empty|unset|unreachable|error, models, short fixed error; "
+            "read-only, 3 s timeout, 1 MB cap, no redirect; never the URL or host"),
     # UI graph sources (owner instruction 2026-11-06): the selectable JSON/Tiled graphs of the graph view. Read-only;
     # same entry capability as GET /graph (R06). The `source` query parameter on R06-R09 needs no extra capability.
     _v("V80", "GET", "/graph/sources", "chat.read_support",

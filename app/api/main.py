@@ -239,6 +239,7 @@ def create_api_app(
     from . import routes_jobs as jobs
     from . import routes_library as library_routes
     from . import routes_library_harvest
+    from . import routes_ollama as ollama_routes
     from . import routes_operations as knowledge_routes
     from . import routes_publications as publications
     from . import routes_records as records
@@ -363,6 +364,7 @@ def create_api_app(
         judge_settings = JudgeModelService(JudgeModelStore(judge_settings_path(Path(cfg.workdir))))
     app.state.f2w_judge_settings = judge_settings
     validation.install(app)
+    ollama_routes.install(app)
     knowledge_routes.install(app)
     records.install(app)
 

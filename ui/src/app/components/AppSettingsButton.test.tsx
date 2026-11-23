@@ -39,3 +39,27 @@ describe('AppSettingsButton knowledge graph source', () => {
     expect(screen.queryByText(/requires a running splash server/)).not.toBeInTheDocument();
   });
 });
+
+describe('AppSettingsButton Ollama model dropdown', () => {
+  it('lists the models the API reports for the Ollama backend and never calls Ollama itself', async () => {
+    const paths: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const path = new URL(String(input), 'http://x').pathname;
+      paths.push(path);
+      if (path.endsWith('/v1/ollama/models')) {
+        return new Response(JSON.stringify({ state: 'ok', models: ['llama3:8b', 'qwen2.5:7b'], error: null }), { status: 200 });
+      }
+      return new Response(JSON.stringify({
+        backend: 'cborg', model: 'lbl/cborg-chat', workflow_mode: 'agentic', extraction_mode: 'targeted',
+        graph_source: 'json', available_json_graphs: [], available_cborg_models: ['lbl/cborg-chat'],
+      }), { status: 200 });
+    }));
+    render(<AppSettingsButton />);
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    fireEvent.click(await screen.findByRole('radio', { name: /^Ollama/ }));
+    expect(await screen.findByRole('option', { name: 'qwen2.5:7b' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Ollama model')).toBeEnabled();
+    expect(paths.filter(p => p.endsWith('/v1/ollama/models'))).toHaveLength(1);
+    expect(paths.every(p => !p.includes('11434') && !p.includes('/api/tags'))).toBe(true);
+  });
+});
