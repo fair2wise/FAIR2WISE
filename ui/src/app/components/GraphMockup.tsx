@@ -24,6 +24,7 @@ import { canEditNode } from './capabilitiesApi';
 import { GraphSourceSelect } from './GraphSourceSelect';
 import { graphSourceFromPath, useGraphSourceState } from './graphSourceStore';
 import { useGraphSources } from './graphSourcesHooks';
+import { sourceForChatNode } from './nodeDetailSource';
 import { useCapabilities } from './capabilitiesHooks';
 import {
   fetchGraphNeighborhoodResult,
@@ -655,16 +656,21 @@ function NodeDetailPanel({
   node,
   graph,
   graphSourcePath,
+  fromChat = false,
   onClose,
   onNodeUpdated,
 }: {
   node: LayoutNode;
   graph: GraphPayload;
   graphSourcePath: string;
+  /** The node was opened from a chat citation: its record is read from the corpus the answer took it from. */
+  fromChat?: boolean;
   onClose: () => void;
   onNodeUpdated?: (node: LiveGraphNode, graph?: GraphPayload) => void;
 }) {
   const [detail, setDetail] = useState<LiveGraphNode | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -688,25 +694,52 @@ function NodeDetailPanel({
   // Node reads and edits carry the source the viewer shows. A source is editable only when the server lists it
   // `read_only: false` (a Tiled graph whose corpus is live on the Save target); Save then edits that corpus.
   const viewerSource = graphSourceFromPath(graphSourcePath);
-  const sourceListing = useGraphSources({ enabled: viewerSource !== null });
+  const sourceListing = useGraphSources({ enabled: viewerSource !== null || fromChat });
   const sourceEditable = viewerSource !== null
     && sourceListing.data?.sources.some(source => source.id === viewerSource && !source.read_only) === true;
+  // A chat node is read from its own corpus' source (task 7); the viewer's source is the fallback.
+  const chatSource = fromChat ? sourceForChatNode(node, viewerSource, sourceListing.data) : null;
+  const waitingForSources = fromChat && sourceListing.isLoading;
   const canEdit = canEditNode(loadAgentSettings().graphSource, capabilities);
-  const canEditShown = canEdit && (viewerSource === null || sourceEditable);
+  // Edits and their refresh address the viewer's source, so a node read from another corpus is not editable here.
+  const canEditShown = canEdit && (viewerSource === null || sourceEditable)
+    && (chatSource === null || chatSource === viewerSource);
 
   useEffect(() => {
     let cancelled = false;
     setDetail(node);
     setEditing(false);
     setSaveError(null);
+    setDetailError(null);
 
     if (looksLikeTiledIdentityRef(node.id, node)) {
+      setDetailLoading(false);
+      return;
+    }
+    if (waitingForSources) {
+      setDetailLoading(true);
       return;
     }
 
-    fetchGraphNodeDetail(node.id, uploadedGraphQueryParam(graphSourcePath), viewerSource)
+    // The same read as a click in the viewer (`GET /graph/node/{id}`); a chat node names its corpus' source first
+    // and falls back to the viewer's source or the default graph.
+    const attempts = chatSource !== null && chatSource !== viewerSource ? [chatSource, viewerSource] : [viewerSource];
+    const readRecord = async (): Promise<LiveGraphNode> => {
+      let firstError: unknown = null;
+      for (const source of attempts) {
+        try {
+          return await fetchGraphNodeDetail(node.id, uploadedGraphQueryParam(graphSourcePath), source);
+        } catch (error) {
+          firstError ??= error;
+        }
+      }
+      throw firstError;
+    };
+    setDetailLoading(true);
+    readRecord()
       .then(nextDetail => {
         if (cancelled) return;
+        setDetailLoading(false);
         const fetchedUnknown = !nextDetail.type || nextDetail.type.toLowerCase() === 'unknown';
         const overlayTyped = Boolean(node.type) && node.type.toLowerCase() !== 'unknown';
         if (fetchedUnknown && overlayTyped) {
@@ -731,14 +764,18 @@ function NodeDetailPanel({
           extra_fields: { ...(node.extra_fields || {}), ...(nextDetail.extra_fields || {}) },
         });
       })
-      .catch(() => {
-        // Keep inline node data on failure.
+      .catch(error => {
+        if (cancelled) return;
+        // Keep the inline node data, but say that the full record is missing instead of showing a bare panel.
+        setDetailLoading(false);
+        const reason = error instanceof Error && error.message ? `: ${error.message.slice(0, 200)}` : '';
+        setDetailError(`The full record (description and papers) could not be loaded${reason}`);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [node.id, graphSourcePath]);
+  }, [node.id, graphSourcePath, chatSource, waitingForSources]);
 
   const display = detail ?? node;
   const publications = display.publications ?? [];
@@ -991,6 +1028,17 @@ function NodeDetailPanel({
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        {detailError ? (
+          <div
+            role="alert"
+            data-testid="node-detail-error"
+            className="mb-3 rounded border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+          >
+            {detailError}. Showing only what the answer carried.
+          </div>
+        ) : detailLoading ? (
+          <div data-testid="node-detail-loading" className="mb-3 text-xs text-slate-400">Loading the full record…</div>
+        ) : null}
         {editing ? (
           <div className="space-y-4">
             <div>
@@ -2744,6 +2792,7 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
                   node={selectedNode}
                   graph={displayGraph.nodes.length ? displayGraph : graph}
                   graphSourcePath={graph.source_path}
+                  fromChat={!isKgViewer}
                   onClose={() => {
                     if (searchedNodeId && selectedNode.id === searchedNodeId) {
                       setSearchedNodeId(null);

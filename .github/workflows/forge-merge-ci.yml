@@ -41,7 +41,8 @@ env:
   # Re-pinned 2026-11-23 (owner bug list, task 9): shared category list: Enter/Add category creates and selects it in Papers and Harvester; previous 2607239b.
   # Re-pinned 2026-11-23 (owner bug list, task 2): provider refusal wording (providerErrors; judge model setting and extraction toasts show the CBORG address refusal); previous fe17f58d.
   # Re-pinned 2026-11-23 (owner bug list, task 10): Library list shows stored year, authors and abstract with a not-stored marker; previous bdf888d3.
-  FROZEN_UI_TREE: f780e527ec24ad86a2d7701c105eb093cab2cd2c
+  # Re-pinned 2026-11-23 (owner bug list, task 7): chat citation click loads the full entity record (GraphMockup NodeDetailPanel, nodeDetailSource, liveAgent type); previous f780e527.
+  FROZEN_UI_TREE: e1a6fec0714c829da8df660a8ed07cd74a39817f
   KG_RAG_RETRIEVAL_BACKEND: lexical
   KG_RAG_FORCE_CPU: "1"
   F2W_SOURCE_RAG: "0"

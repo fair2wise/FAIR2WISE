@@ -28,6 +28,8 @@ export interface LiveGraphNode {
   linked_code_snippets?: LinkedCodeSnippet[];
   graph_id?: string | null;
   graph_label?: string | null;
+  /** The corpus a multi-corpus chat answer took this node from (additive; `graph_id` is the corpus name there). */
+  corpus?: string | null;
   formula?: string | null;
   source_papers?: string[];
   properties?: Array<Record<string, unknown>>;
