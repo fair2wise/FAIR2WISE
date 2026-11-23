@@ -304,3 +304,35 @@ def find_scattering_peaks(q, intensity):
     expect(citationBibliographyLabel(citations[0])).toBe('ESAF 2026-00043');
   });
 });
+
+describe('graph_id-prefixed citations for an arbitrary corpus (a session graph file kg.json cites as "kg: <name>")', () => {
+  const cdw: LiveGraphNode = {
+    id: 'matkg:cdw', label: 'RSoXS Measurement of CDW', type: 'Measurement', description: '', graph_id: 'kg',
+  };
+  const answer = 'The CDW order was measured by RSoXS [KG: kg: RSoXS Measurement of CDW].';
+
+  it('parses the prefix as a graph id when a chat node names that graph', () => {
+    expect(parseInlineCite('[KG: kg: RSoXS Measurement of CDW]')?.name).toBe('kg: RSoXS Measurement of CDW');
+    const parsed = parseInlineCite('[KG: kg: RSoXS Measurement of CDW]', new Set(['kg']));
+    expect(parsed).toMatchObject({ graphId: 'kg', name: 'RSoXS Measurement of CDW' });
+  });
+
+  it('resolves the citation to the real node id, so a click never sends the tagged text', () => {
+    const [citation] = collectAnswerCitations(answer, [cdw, ...nodes]);
+    expect(citation.nodeId).toBe('matkg:cdw');
+    expect(citation.name).toBe('RSoXS Measurement of CDW');
+    expect(citation.graphId).toBe('kg');
+    expect(parseKgCitationNodeIds(answer, [cdw, ...nodes])).toEqual(['matkg:cdw']);
+  });
+
+  it('still finds the node when no chat node carries the graph id', () => {
+    const untagged = { ...cdw, graph_id: undefined };
+    expect(resolveInlineCiteNodeId('[KG: kg: RSoXS Measurement of CDW]', [untagged, ...nodes])).toBe('matkg:cdw');
+  });
+
+  it('keeps a node name that itself holds a colon', () => {
+    const colon: LiveGraphNode = { id: 'matkg:s', label: 'Sample: P3HT film', type: 'Sample', description: '', graph_id: 'kg' };
+    expect(resolveInlineCiteNodeId('[KG: Sample: P3HT film]', [colon])).toBe('matkg:s');
+    expect(resolveInlineCiteNodeId('[KG: kg: Sample: P3HT film]', [colon])).toBe('matkg:s');
+  });
+});

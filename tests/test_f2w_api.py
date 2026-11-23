@@ -2658,6 +2658,28 @@ def test_resolve_graph_node_uses_dual_kg_display_ids(tmp_path):
     assert ops_node.graph_label == "11.0.1.2 ops"
 
 
+def test_resolve_graph_node_reads_back_a_cited_graph_tag(tmp_path):
+    """`[KG: kg: <name>]` (session graph file kg.json) read back as an id still resolves the node (task 3)."""
+    session = tmp_path / "kg.json"
+    other = tmp_path / "matkg_rsoxs_v1.json"
+    session.write_text(
+        json.dumps({"things": [{"id": "RSoXS Measurement of CDW", "name": "RSoXS Measurement of CDW",
+                                "category": "Measurement", "definition": "Resonant soft x-ray scattering of CDW order"}]}),
+        encoding="utf-8",
+    )
+    other.write_text(json.dumps({"things": []}), encoding="utf-8")
+    paths = {"rsoxs_v1": other}
+
+    for cited in ("kg: RSoXS Measurement of CDW", "kg:RSoXS Measurement of CDW", "tiled: RSoXS Measurement of CDW"):
+        node = api_mod.resolve_graph_node(cited, fallback_path=session, graph_paths_by_id=paths)
+        assert node is not None, cited
+        assert node.id == "RSoXS Measurement of CDW"
+        assert node.description or node.label
+    assert api_mod.resolve_graph_node("kg: No such node", fallback_path=session, graph_paths_by_id=paths) is None
+    assert api_mod.strip_cited_graph_tag("matkg:Term") is None   # a real id has no whitespace after the colon
+    assert api_mod.strip_cited_graph_tag("kg: A: B") == "A: B"
+
+
 def test_node_publications_derives_identifiers_from_pdf_filenames():
     arxiv = api_mod._node_publications({"source_papers": ["2111.01897v1.pdf"]})
     assert arxiv == [{"source_paper": "2111.01897v1.pdf", "doi": "arXiv:2111.01897v1"}]

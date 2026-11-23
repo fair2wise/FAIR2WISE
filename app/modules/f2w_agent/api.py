@@ -921,9 +921,24 @@ def _split_display_node_id(node_id: str, graph_ids: Sequence[str]) -> tuple[str 
     cleaned = str(node_id or "").strip()
     for gid in sorted((str(item) for item in graph_ids if str(item)), key=len, reverse=True):
         prefix = f"{gid}:"
-        if cleaned.startswith(prefix) and len(cleaned) > len(prefix):
-            return gid, cleaned[len(prefix):]
+        remainder = cleaned[len(prefix):].strip() if cleaned.startswith(prefix) else ""
+        if remainder:
+            return gid, remainder
     return None, cleaned
+
+
+_CITED_GRAPH_TAG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,119}:\s+(\S.*)$", re.S)
+
+
+def strip_cited_graph_tag(node_id: str) -> str | None:
+    """The node name of a ``<graph_id>: <name>`` citation text, or ``None`` when ``node_id`` is not one.
+
+    The answer cites ``[KG: <graph_id>: <name>]`` (``kg: RSoXS Measurement of CDW`` for a session graph file
+    ``kg.json``). A real node id never has whitespace after its first colon, so the tag is a read-back of the citation
+    and the part after it is the node. Only used after the exact id failed to resolve.
+    """
+    match = _CITED_GRAPH_TAG_RE.match(str(node_id or "").strip())
+    return match.group(1).strip() if match else None
 
 
 def _tag_graph_node(node: GraphNode, graph_path: Path, graph_id: str | None = None) -> GraphNode:
@@ -957,6 +972,10 @@ def resolve_graph_node(
         if raw_id != node_id:
             search_order.append((other_id, path, node_id))
     seen: set[tuple[str, str]] = set()
+    stripped = strip_cited_graph_tag(node_id)
+    if stripped and stripped not in (node_id, raw_id):
+        for other_id, path in mapping.items():
+            search_order.append((other_id, path, stripped))
     for graph_key, path, lookup_id in search_order:
         key = (str(path), lookup_id)
         if key in seen or not lookup_id:
@@ -7554,6 +7573,8 @@ def create_app(
             except SourceError as exc:
                 raise _source_failure(exc) from None
             raw = picked.by_id.get(node_id)
+            if raw is None and (tagged := strip_cited_graph_tag(node_id)) is not None:
+                raw = picked.by_id.get(tagged)      # a `<graph_id>: <name>` citation read back as an id
             if raw is None:
                 raise HTTPException(status_code=404, detail=f"Node not found: {node_id}")
             return cast(GraphNode, guard.project_route(
@@ -7593,6 +7614,8 @@ def create_app(
             )
         if node is None:
             node = _tiled_graph_node(node_id)
+        if node is None and (tagged := strip_cited_graph_tag(node_id)) is not None:
+            node = _tiled_graph_node(tagged)
         if node is None:
             raise HTTPException(status_code=404, detail=f"Node not found: {node_id}")
         return node

@@ -8,6 +8,8 @@ const MARKDOWN_BOLD_RE = /\*\*([^*]+)\*\*/g;
 const CODE_FENCE_RE = /```[\s\S]*?```/g;
 const PDF_FILENAME_RE = /\b([A-Za-z0-9][A-Za-z0-9._-]*\.pdf)\b/gi;
 const GRAPH_ID_PREFIX_RE = /^(rsoxs_v\d+|bl1101|xray_demo|tiled):\s*(.+)$/i;
+/** Any `graph_id: name` spelling; the prefix counts as a graph id only when a node names it (see `knownGraphIds`). */
+const ANY_GRAPH_PREFIX_RE = /^([A-Za-z0-9][A-Za-z0-9_.-]{0,119}):\s+(.+)$/;
 const COOKBOOK_PAGE_RE = /^page(esafs?|proposals?|samples?|blueskyruns?)$/i;
 const ESAF_LABEL_RE = /\bESAF[:\s-]*([0-9]{4}[-_]\d{4,6})\b/i;
 
@@ -238,7 +240,23 @@ export interface InlineCite {
   name: string;
 }
 
-export function parseInlineCite(text: string): InlineCite | null {
+/**
+ * The graph ids the chat nodes name (`graph_id`, `corpus`), lower-cased. The answer cites `[KG: <graph_id>: <name>]`
+ * and the graph id is whatever the corpus is called (a session graph file `kg.json` gives `kg`), so the fixed list
+ * in `GRAPH_ID_PREFIX_RE` is not enough: the prefix of a citation is a graph id when a chat node says so.
+ */
+export function knownGraphIds(nodes: ReadonlyArray<Pick<LiveGraphNode, 'graph_id' | 'corpus'>>): Set<string> {
+  const ids = new Set<string>();
+  for (const node of nodes) {
+    for (const value of [node.graph_id, node.corpus]) {
+      const id = (value || '').trim().toLowerCase();
+      if (id) ids.add(id);
+    }
+  }
+  return ids;
+}
+
+export function parseInlineCite(text: string, graphIds?: ReadonlySet<string>): InlineCite | null {
   const match = text.trim().match(/^\[(KG|PDF|OPS|MP):\s*([^\]]+?)\s*\]$/i);
   if (!match) return null;
   const kind = match[1].toLowerCase() as InlineCiteKind;
@@ -247,6 +265,10 @@ export function parseInlineCite(text: string): InlineCite | null {
     const prefixed = body.match(GRAPH_ID_PREFIX_RE);
     if (prefixed) {
       return { kind, body, graphId: prefixed[1], name: prefixed[2].trim() };
+    }
+    const generic = graphIds && graphIds.size > 0 ? body.match(ANY_GRAPH_PREFIX_RE) : null;
+    if (generic && graphIds?.has(generic[1].toLowerCase())) {
+      return { kind, body, graphId: generic[1], name: generic[2].trim() };
     }
   }
   return { kind, body, name: body };
@@ -269,10 +291,11 @@ export function citationLookupPool(
   if (nodes.length === 0) return [];
   const wanted = new Set(highlightedIds.map(id => id.toLowerCase()));
   const names = new Set<string>();
+  const graphIds = knownGraphIds(nodes);
   TAGGED_CITE_RE.lastIndex = 0;
   let tagged: RegExpExecArray | null;
   while ((tagged = TAGGED_CITE_RE.exec(text)) !== null) {
-    const parsed = parseInlineCite(tagged[0]);
+    const parsed = parseInlineCite(tagged[0], graphIds);
     if (!parsed) continue;
     names.add(normalizeCitationName(parsed.name));
     names.add(normalizeNodeLookupName(parsed.name));
@@ -296,7 +319,7 @@ export function citationLookupPool(
 }
 
 function resolveKgCitation(citation: string, nodes: LiveGraphNode[]): string | null {
-  const parsed = parseInlineCite(`[KG: ${citation}]`);
+  const parsed = parseInlineCite(`[KG: ${citation}]`, knownGraphIds(nodes));
   const name = parsed?.name || citation;
   const graphId = parsed?.graphId;
   const pool = graphId
@@ -304,7 +327,12 @@ function resolveKgCitation(citation: string, nodes: LiveGraphNode[]): string | n
     : nodes;
   const search = pool.length > 0 ? pool : nodes;
   const graph = { nodes: search, edges: [], source_path: '' };
-  return resolveViewerNodeId(graph, name) || resolveViewerNodeId(graph, citation);
+  const resolved = resolveViewerNodeId(graph, name) || resolveViewerNodeId(graph, citation);
+  if (resolved || graphId) return resolved;
+  // A `graph_id: name` citation whose graph id no node names (the answer's graph tag is not on the nodes): the
+  // part after the colon is still the node, never the whole text with its tag.
+  const loose = citation.match(ANY_GRAPH_PREFIX_RE);
+  return loose ? resolveViewerNodeId({ nodes, edges: [], source_path: '' }, loose[2].trim()) : null;
 }
 
 export function resolveInlineCiteNodeId(
@@ -312,7 +340,7 @@ export function resolveInlineCiteNodeId(
   nodes: LiveGraphNode[],
   publications: PublicationInfo[] = [],
 ): string | null {
-  const parsed = typeof cite === 'string' ? parseInlineCite(cite) : cite;
+  const parsed = typeof cite === 'string' ? parseInlineCite(cite, knownGraphIds(nodes)) : cite;
   if (!parsed) {
     if (typeof cite === 'string' && /\.pdf$/i.test(cite.trim())) {
       return parseKgCitationNodeIds(cite, nodes, publications)[0] ?? null;
@@ -564,10 +592,11 @@ export function collectAnswerCitations(
   const found: Array<{ index: number; raw: string; parsed: InlineCite | { kind: 'pdf'; body: string; name: string } }> = [];
 
   const taggedRanges: Array<{ start: number; end: number }> = [];
+  const graphIds = knownGraphIds(nodes);
   TAGGED_CITE_RE.lastIndex = 0;
   let tagged: RegExpExecArray | null;
   while ((tagged = TAGGED_CITE_RE.exec(text)) !== null) {
-    const parsed = parseInlineCite(tagged[0]);
+    const parsed = parseInlineCite(tagged[0], graphIds);
     if (!parsed) continue;
     taggedRanges.push({ start: tagged.index, end: tagged.index + tagged[0].length });
     found.push({ index: tagged.index, raw: tagged[0], parsed });
