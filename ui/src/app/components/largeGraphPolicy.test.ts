@@ -194,8 +194,9 @@ describe('effectiveLayoutMode (default view)', () => {
     expect(effectiveLayoutMode('force', true, 5_000)).toBe('existing');
   });
 
-  it('keeps the chat sidebar graph on the fixed layout by default', () => {
-    expect(effectiveLayoutMode(null, false, 50)).toBe('existing');
-    expect(effectiveLayoutMode('force', false, 50)).toBe('force');
+  it('defaults the chat graph to force-directed too, and keeps its fixed layout above the limit or when chosen', () => {
+    expect(effectiveLayoutMode(null, false, 50)).toBe('force');
+    expect(effectiveLayoutMode(null, false, SLOW_LAYOUT_NODE_LIMIT + 1)).toBe('existing');
+    expect(effectiveLayoutMode('existing', false, 50)).toBe('existing');
   });
 });

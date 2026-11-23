@@ -42,16 +42,17 @@ export function forceLayoutAllowed(displayedNodeCount: number): boolean {
 
 /**
  * The layout the viewer draws (owner bug list 2026-11, task 6). A layout the user picked wins, except that force
- * stays off above `SLOW_LAYOUT_NODE_LIMIT` displayed nodes. With no choice the KG viewer is force-directed wherever
- * force is allowed (so a 300-node overview of a huge graph is force-directed too) and uses the fixed layout above the
- * limit; the chat sidebar graph keeps the fixed layout.
+ * stays off above `SLOW_LAYOUT_NODE_LIMIT` displayed nodes. With no choice every graph view (the KG viewer and the
+ * chat graph that opens first) is force-directed wherever force is allowed (so a 300-node overview of a huge graph is
+ * force-directed too) and uses the fixed layout above the limit. `isKgViewer` no longer changes the default (owner bug
+ * list 2026-11, follow-up: the chat graph is the view people see first, and it stayed fixed).
  */
 export function effectiveLayoutMode(
   userChoice: KgLayoutMode | null,
-  isKgViewer: boolean,
+  _isKgViewer: boolean,
   displayedNodeCount: number,
 ): KgLayoutMode {
-  const wanted: KgLayoutMode = userChoice ?? (isKgViewer ? 'force' : 'existing');
+  const wanted: KgLayoutMode = userChoice ?? 'force';
   return wanted === 'force' && !forceLayoutAllowed(displayedNodeCount) ? 'existing' : wanted;
 }
 
