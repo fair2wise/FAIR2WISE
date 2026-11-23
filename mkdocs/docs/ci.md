@@ -52,6 +52,15 @@ cache would cost more than the install). npm is cached by `actions/setup-node`.
 `publish-image.yml` is unchanged: its gate (`O06_APPROVED`, protected ref, the `ghcr-publish` and
 `ghcr-als-prod` environments) still decides every publication.
 
+## Known flaky tests
+
+| Test | Symptom | Seen on | Status |
+|---|---|---|---|
+| Vitest `GraphMockupLarge.test.tsx`, "Show more steps 300 → 1,000 → 2,000" | timeout | red once on commit `5407976` (the `fair2wise`-prefix leg); green on later UI runs | open; cause believed to be load-dependent timing; no fix applied |
+
+Rerun a red leg once before treating it as a regression, and add a row here for any other test that fails once
+and passes on the same code.
+
 ## Residual risk
 
 A push to `forge_merge` is not proven against a real Tiled server, a real browser, the Docling weights or a
