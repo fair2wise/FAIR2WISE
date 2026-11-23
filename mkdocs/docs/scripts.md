@@ -35,8 +35,9 @@ names.
 | `f2w-kg-snapshot` | `commands.build_kg_snapshot` | Freeze a versioned JSON KG snapshot; `--reconcile-edits` freezes the next version from the live snapshot plus the Save journal, `--confirm-commit <40-hex>` records the commit that holds it on the reconciled edits |
 | `f2w-kg-release` | `commands.prepare_kg_release` | Prepare, verify and export a KG release (never commits or pushes); `export` also leaves `<corpus>/<vN>.release_commit.json` on the mount so a publication receipt records `data_commit` |
 | `f2w-kg-adopt` | `commands.adopt_legacy_kg` | `adopt` (flat `matkg_*.json` to `<corpus>/v<N>/` releases; `--dry-run`, `--only`, `--code-commit`) and `descriptor` (candidate data-release descriptor from Git objects); no Git write, no network, no Tiled |
+| `f2w-library-backfill` | `commands.backfill_library_metadata` | Fill missing authors/abstracts in the library manifests from OpenAlex (DOI) and arXiv (id); dry run by default, `--apply`, `--limit`, `--delay`; see [Library tab](ui-library.md#backfill-authors-and-abstracts) |
 
-In the images the project is not pip-installed, so the same ten commands are installed as launchers in
+In the images the project is not pip-installed, so the same eleven commands are installed as launchers in
 `/usr/local/bin` at build time (`docker/entrypoint/install_console_scripts.py`, one launcher per
 `[project.scripts]` entry, running the image's Python with `/app` on the path); `docker exec f2w-local f2w-kg-adopt --help`
 works in a running `:local` container. See [The `:local` image](local-image.md#console-scripts-in-the-image).

@@ -678,6 +678,38 @@ def arxiv_search(search_text: str, max_results: int, *, get_bytes: GetBytes = ha
     return list(arxiv_results(search_text, max_results, get_bytes=get_bytes, retries=retries, limiter=limiter))
 
 
+def arxiv_lookup(arxiv_id: str, *, get_bytes: GetBytes = hardened_get_bytes, retries: int = ARXIV_RETRIES,
+                 limiter: RateLimiter | None = None, sleep: Callable[[float], None] | None = None) -> ArxivEntry | None:
+    """The arXiv entry of one id (``id_list=<id>``), or ``None`` when arXiv has no such entry.
+
+    One request through the same hardened getter, egress policy and process-wide 3 s limiter as
+    :func:`arxiv_results`; a failed request is retried ``retries`` more times.
+
+    Raises:
+        JSONFetchError: transport or policy failure after the retries.
+    """
+    limiter = limiter or (ARXIV_LIMITER if sleep is None else RateLimiter(ARXIV_MIN_INTERVAL_SECONDS, sleep=sleep))
+    url = f"{ARXIV_QUERY_URL}?{urlencode({'id_list': arxiv_id, 'max_results': '1'})}"
+
+    def spaced_get(request_url: str, **kw: Any) -> bytes:  # noqa: ANN401  # Any: forwarded getter keyword arguments
+        limiter.wait(ARXIV_MIN_INTERVAL_SECONDS)
+        try:
+            return get_bytes(request_url, **kw)
+        finally:
+            limiter.mark()
+
+    for attempt in range(retries + 1):
+        try:
+            body = _polite_call(spaced_get, url, headers=ATOM_HEADERS, sleep=limiter.sleep)
+        except JSONFetchError as exc:
+            if attempt >= retries or str(exc).startswith("blocked URL"):
+                raise
+            continue
+        entries, _total = parse_arxiv_feed(body)
+        return entries[0] if entries else None
+    return None
+
+
 @dataclass(frozen=True)
 class ArxivHit:
     """The ``arxiv.Result`` attributes the harvest scripts read, built from a parsed :class:`ArxivEntry`."""

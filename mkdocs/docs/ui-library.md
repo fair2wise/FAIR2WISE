@@ -26,6 +26,22 @@ The Harvester finds new papers for a topic and files them into a category.
 
 OpenAlex needs `OPENALEX_API_KEY` in the server environment; without it only arXiv is searched and the log says so.
 
+## Backfill authors and abstracts
+
+Papers harvested before the manifest stored authors and abstracts show "not stored" for them. `f2w-library-backfill` fills them from OpenAlex (rows with a DOI) or arXiv (rows with an arXiv id), changing only empty fields of `<category>/manifest.json` (never a stored value) and writing each manifest atomically inside the library directory. It never runs at startup. Rows without a DOI or arXiv id are reported as `unfillable`; nothing is guessed from a title.
+
+```
+f2w-library-backfill                         # dry run (default): no network, nothing written; counts what --apply would ask
+f2w-library-backfill --apply --limit 50      # fetch and write at most 50 rows; rerun to continue (filled rows are skipped)
+f2w-library-backfill --apply --category rsoxs --delay 2
+```
+
+In the pilot pod: `kubectl -n <namespace> exec deploy/<f2w-deployment> -- f2w-library-backfill --apply --limit 200` (it reads `F2W_LIBRARY_DIR` and `OPENALEX_API_KEY` from the container environment; `--library-dir` overrides the directory). Run the dry run first.
+
+- **Egress (with `--apply` only):** `api.openalex.org` (key sent as an `Authorization` header) and `export.arxiv.org` (one request per 3 seconds), through the same hardened fetch helpers and `F2W_SAFE_FETCH_TRUST_PROXY` setting as the Harvester. No other host.
+- **Output:** a JSON report with counts (`updated`, `not_found`, `no_data`, `failed`, `unfillable`, `already_filled`, `deferred`, `would_fetch`), `failed_codes` (for example `openalex_http_500`, `openalex_unreachable`, `arxiv_unreachable`) and library-relative PDF paths. Authors, abstracts and titles are never printed or logged. Exit status 1 means it stopped early (`openalex_no_key`, `openalex_quota`) or the directory is unusable; completed rows are kept.
+- **After it runs** the Library list shows the new values on the next refresh (the metadata reader notices the changed manifest file).
+
 ## API
 
 | Call | Purpose |
