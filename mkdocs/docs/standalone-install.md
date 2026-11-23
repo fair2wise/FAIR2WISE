@@ -12,10 +12,16 @@ CBORG authorizes by **source address**. A refusal is HTTP 403 with body type `ip
 (`app/modules/cborg_errors.py`); the app treats it as terminal and shows one fixed message, never the address.
 The 403 body may contain your public address, so the checks below print a state, not the body.
 
+Only a **keyed** call tests authorization. Verified on the pilot: with a valid key the call returns 200 from an
+authorized address; **without** a key CBORG answers 403 `ip_not_authorized` even from an authorized address, and
+an unauthenticated request gets 403, not 401. A keyless probe therefore cannot tell an authorized address from
+an unauthorized one, and `f2w-doctor` reports `no_key` rather than a pass when no key is set.
+
 ```sh
 # CBORG_BASE_URL and CBORG_API_KEY come from your env file; the key goes in on stdin, never in argv or output.
 set -a; . ./f2w.env; set +a
 probe() {  # $1 = -4 or -6
+  [ -n "$CBORG_API_KEY" ] || { echo "$1 no key set: a keyless call proves nothing"; return; }
   out=$(printf 'header = "Authorization: Bearer %s"\n' "$CBORG_API_KEY" |
         curl "$1" -sS -m 15 -K - -w '\n%{http_code}' "${CBORG_BASE_URL%/}/models" 2>&1) || { echo "$1 no connection"; return; }
   case $out in *ip_not_authorized*) echo "$1 REFUSED ip_not_authorized";; *) echo "$1 http ${out##*$'\n'}";; esac
@@ -26,9 +32,9 @@ probe -4; probe -6
 | Result | Meaning |
 |---|---|
 | `http 200` | this address family is authorized; the app can list models |
-| `REFUSED ip_not_authorized` | CBORG sees an address it has not authorized: use LBLnet or the VPN, or authorize the address in CBORG key management |
+| `REFUSED ip_not_authorized` | CBORG sees an address it has not authorized (with a valid key, see above): use LBLnet or the VPN, or authorize the network as described under "The host-side forwarder" below |
 | `-6 no connection` | the host has no IPv6 route; if only IPv6 is authorized, get one (or use VPN) |
-| `http 401` | address accepted, key wrong or missing (*unverified*: that CBORG checks the key after the address) |
+| `http 401` or another `http 4xx` | the address is not the problem, the key is: a key CBORG rejects, or a wrong `CBORG_BASE_URL` (the exact status for a wrong key from an authorized address is *unverified*) |
 
 The endpoint is `{CBORG_BASE_URL}/models` (`app/modules/model_catalog.py`; the code default for the base URL is
 `DEFAULT_CBORG_BASE` there). If only `-6` succeeds, the containers must leave over IPv6 too.
@@ -38,22 +44,54 @@ over the host's IPv4 address.
 
 | Option | How | Notes |
 |---|---|---|
-| IPv6 on the Docker network | daemon `"ipv6": true` plus `fixed-cidr-v6`, and compose network `enable_ipv6: true` | the container gets a ULA and NAT66s out; glibc then prefers IPv4, so also mount `docker/gai.conf` at `/etc/gai.conf:ro` (what `run_local_container.sh` does). Whether `CBORG_FORCE_IPV6=1` (pins the source address in `app/modules/cborg_http.py`) makes the mount unnecessary in a container: *unverified* |
+| IPv6 on the Docker network | daemon `"ipv6": true` plus `fixed-cidr-v6`, and compose network `enable_ipv6: true` | the container gets a ULA and NAT66s out; glibc then prefers IPv4, so also mount `docker/gai.conf` at `/etc/gai.conf:ro` (what `run_local_container.sh` does). Whether `CBORG_FORCE_IPV6=1` (pins the source address in `app/modules/cborg_http.py`) makes the mount unnecessary in a container: *unverified*; a container without a global IPv6 address of its own would pin `::` |
 | Host networking | `network_mode: host` | Linux only; Docker Desktop on macOS runs a VM, see `compose.hostnet.yaml`. The image is one container (supervisor runs API, worker, gateway), so there is no separate API/worker pair to switch |
-| Host-side forwarder | the pilot's approach | see the block below |
+| Host-side forwarder | the pilot's approach | see "The host-side forwarder" below |
 
-!!! warning "TODO(owner): paste forwarder details"
-    Pilot host-side IPv6 forwarder: what it is, how it is started, how the container is pointed at it
-    (env var or `extra_hosts`), and its health check. Not written here on purpose: not known to the agent,
-    and no host, address or port of the pilot belongs on this page.
+**The host-side forwarder (pilot).**
+
+*Why.* CBORG authorizes by client address. The cluster and the containers are IPv4-only, and their IPv4 egress
+leaves from an address CBORG rejects off LBLnet. The forwarder makes CBORG calls leave from the host's own IPv6
+address instead.
+
+*What.* A CONNECT-only forward proxy on the host: Squid 7.8 from Homebrew on macOS, run as a user LaunchAgent
+(no sudo). It listens on `127.0.0.1:3129` only and allows CONNECT to `api.cborg.lbl.gov:443` and nothing else. It
+holds no credential: the client's TLS session is tunnelled through and nothing is decrypted, so the API key never
+reaches it. Outbound connections are bound to the host's stable ("secured", non-temporary) global IPv6 address,
+`<host-ipv6>`, discovered at start and re-checked every 15 seconds. With no such address it does not start: it
+fails closed, with no IPv4 fallback.
+
+*Clients.*
+
+| Client | How it reaches the forwarder |
+|---|---|
+| Pilot cluster | the in-cluster egress proxy sends **only** `api.cborg.lbl.gov` to the forwarder as a parent (`cache_peer` plus `never_direct` for that host); every other host goes direct |
+| The VM (Lima) | the host loopback is reachable at the Lima gateway address, `<lima-gateway>`, port 3129 |
+| Docker | the equivalent is the host gateway name, port 3129. Route **only** CBORG traffic to it: the forwarder refuses everything else, so using it as the container's general `HTTP(S)_PROXY` would break every other call |
+
+A container that reaches CBORG through a proxy must leave `CBORG_FORCE_IPV6` and `CBORG_IP_FAMILY` unset: a
+pinned client builds an explicit transport and does not use `HTTP(S)_PROXY` (`openai_http_kwargs` in
+`app/modules/cborg_http.py`).
+
+*Authorizing the network.* Log in at `https://api.cborg.lbl.gov/key/manage` from a browser **on the same
+network**. That authorizes the network for 30 days and takes effect within about a minute. It was observed to cover
+more than the single address (probably the whole /64). Repeat after 30 days, or when the ISP changes the prefix.
+
+*Verified* on the pilot: with a valid key the call returns 200 through the forwarder. How a plain Docker host
+points its containers at it (an `extra_hosts` entry or an env var) is *unverified*.
+
+*Health check.* `f2w-doctor` (section 5), run where the app runs. `cborg: ok` means the call went through the
+path the app uses and was authorized. `cborg: ip_not_authorized` means the network needs authorizing, or the
+forwarder is not in the path. `cborg: unreachable` means the forwarder is down or not reachable from the client.
 
 **Proxies, as the code does them.**
 
 - `NO_PROXY` / `HTTP(S)_PROXY` are plain process environment, honored by `httpx`/`requests`. The Ollama model
   list (`app/modules/ollama_catalog.py`) says it explicitly: an Ollama host on a LAN must be named in `NO_PROXY`
   wherever an egress proxy is set, and the app does not add it. The supervisor appends only a non-public OTLP
-  collector host to `NO_PROXY`. Whether the CBORG client honors proxies when it pins an address (explicit
-  transport) is *unverified*.
+  collector host to `NO_PROXY`. The CBORG client honors them only when it does not pin an address: with
+  `CBORG_FORCE_IPV6` or `CBORG_IP_FAMILY` set it builds an explicit `httpx` transport, which ignores the
+  proxy variables (read from `app/modules/cborg_http.py`; not run against a proxy).
 - `F2W_SAFE_FETCH_TRUST_PROXY=1` (also `true|yes|on`; default off) affects **only** third-party PDF fetches
   (`app/modules/literature/safe_fetch.py`). That code refuses any private peer address; with the flag, a request
   that really goes through the configured `HTTP(S)_PROXY` (and is not excluded by `NO_PROXY`) may connect to the
@@ -217,7 +255,7 @@ Agent = app code or docs in the repo; Deploy = `docker/`, `deploy/`, workflows (
 | 3 | `f2w-init` (dirs, adopt, marker) and image commit exposure | Agent + Deploy (entrypoint, Dockerfile) | M, 6-8 h | owner call on commit exposure |
 | 4 | Standalone compose file and install page | Deploy | S-M, 3-5 h | 1, 3 |
 | 5 | KG trim in image, profile `F2W_GRAPH` repoint | Deploy | S, 2-3 h | owner data choice |
-| 6 | Verify IPv6 egress options and forwarder doc (section 1) | Deploy + owner | M, 4-8 h | owner forwarder details |
+| 6 | Verify IPv6 egress options (section 1); the forwarder is documented there | Deploy + owner | M, 4-8 h | none |
 | 7 | Publishable tag: variable, environments, merge or tag, visibility | Owner | S, 1-2 h plus a CI run | 2-5 merged |
 | 8 | Fresh-machine rehearsal from the pulled tag | Owner + agent | M, 3-4 h | 7 |
 
