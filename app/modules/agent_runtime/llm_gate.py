@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import contextvars
-from typing import Any, Protocol
+from typing import Protocol
 
 from .admission import Admission
 

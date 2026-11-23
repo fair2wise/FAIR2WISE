@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING, cast
 from urllib import request
 from urllib.parse import urlparse
 
-from ..contracts.json_types import JsonObject, JsonValue
+from ..contracts.json_types import JsonObject
 
 if TYPE_CHECKING:
     from ...api.post_extraction import PostExtractionPublisher

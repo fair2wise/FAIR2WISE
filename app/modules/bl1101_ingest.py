@@ -20,6 +20,8 @@ installs :mod:`.graph.imports.bl1101.compat`, so ``monkeypatch.setattr(bl1101_in
 module that uses ``name``. A plain ``sys.modules`` alias to one module could not do that once the code is split.
 """
 
+# Every import below is an intentional re-export (the `x as x` form); pyflakes does not honour it.
+# flake8: noqa: F401
 from __future__ import annotations
 
 import hashlib as hashlib  # re-exported: tests reach bl1101_ingest.hashlib
