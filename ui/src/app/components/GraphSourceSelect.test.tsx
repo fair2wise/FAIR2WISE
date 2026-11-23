@@ -46,14 +46,14 @@ describe('GraphSourceSelect default source (task 5)', () => {
     expect(window.localStorage.getItem('fair2wise-graph-source-v1')).toBeNull();
   });
 
-  it('keeps Splash Links selectable and remembers that explicit choice over the default', async () => {
-    saveAgentSettings({ ...DEFAULT_AGENT_SETTINGS, graphSource: 'splash_links' });
+  it('keeps Tiled Graph selectable and remembers that explicit choice over the default', async () => {
+    saveAgentSettings({ ...DEFAULT_AGENT_SETTINGS, graphSource: 'splash_links' }, { graphSourceChosen: true });
     stubListing(withDefault('json:rsoxs_v1'));
     renderSelect();
     await waitFor(() => expect(getSelectedGraphSource()).toBe('json:rsoxs_v1'));
     const select = screen.getByRole('combobox', { name: 'Graph source' });
-    const splash = await screen.findByRole('option', { name: 'Splash Links (Settings graph)' });
-    fireEvent.change(select, { target: { value: splash.getAttribute('value') } });
+    const tiledGraph = await screen.findByRole('option', { name: 'Tiled Graph (Settings graph)' });
+    fireEvent.change(select, { target: { value: tiledGraph.getAttribute('value') } });
     expect(getSelectedGraphSource()).toBeNull();
     cleanup();
     stubListing(withDefault('json:rsoxs_v1'));

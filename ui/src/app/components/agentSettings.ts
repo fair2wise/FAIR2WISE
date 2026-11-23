@@ -57,6 +57,59 @@ export interface AgentSettingsResponse {
 
 const STORAGE_KEY = 'fair2wise-agent-settings-v1';
 const GRAPH_LIST_CACHE_KEY = 'fair2wise-available-graphs-cache-v1';
+/**
+ * Side record of the settings blob: which settings version wrote it, whether the user ever explicitly picked the
+ * knowledge graph source, and whether a one-time "reset to the new default" notice is still to be shown.
+ */
+const META_KEY = 'fair2wise-agent-settings-meta-v1';
+/** Version 2: JSON is the default knowledge graph source and an explicit Tiled Graph pick is recorded. */
+const SETTINGS_VERSION = 2;
+
+interface SettingsMeta {
+  version: number;
+  graphSourceChosen: boolean;
+  graphSourceNotice: boolean;
+}
+
+function readMeta(): SettingsMeta | null {
+  try {
+    const raw = window.localStorage.getItem(META_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<SettingsMeta>;
+    if (typeof parsed.version !== 'number') return null;
+    return {
+      version: parsed.version,
+      graphSourceChosen: parsed.graphSourceChosen === true,
+      graphSourceNotice: parsed.graphSourceNotice === true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeMeta(meta: SettingsMeta): void {
+  try {
+    window.localStorage.setItem(META_KEY, JSON.stringify(meta));
+  } catch {
+    // Storage unavailable: the migration simply runs again on the next load.
+  }
+}
+
+/**
+ * Whether the one-time "your knowledge graph source was reset to JSON" notice is waiting. True only after a
+ * settings blob from before version 2 held the old default (Tiled Graph) with no recorded explicit pick.
+ */
+export function hasGraphSourceMigrationNotice(): boolean {
+  if (typeof window === 'undefined') return false;
+  return readMeta()?.graphSourceNotice === true;
+}
+
+/** Dismiss the migration notice (the user has seen it). */
+export function dismissGraphSourceMigrationNotice(): void {
+  if (typeof window === 'undefined') return;
+  const meta = readMeta();
+  if (meta) writeMeta({ ...meta, graphSourceNotice: false });
+}
 
 /**
  * Return the last successfully-fetched list of available JSON graph paths.
@@ -169,12 +222,40 @@ function normalizeExtractionMode(value: unknown): AgentExtractionMode {
   return DEFAULT_AGENT_SETTINGS.extractionMode;
 }
 
+/**
+ * The knowledge graph source to use for a stored settings blob. Blobs written before version 2 saved the whole
+ * settings object on every Save, so a stored `splash_links` there is mostly the old default rather than a pick.
+ * Such a value is read as "never chosen" and becomes the new default (JSON); a one-time notice tells the user and
+ * the change is persisted so it happens once. From version 2 on only an explicit radio pick is recorded, and
+ * an explicit Tiled Graph pick is always kept.
+ */
+function migrateGraphSource(parsed: Partial<AgentSettings>): AgentGraphSource {
+  const stored: AgentGraphSource = parsed.graphSource === 'splash_links' ? 'splash_links' : 'json';
+  const meta = readMeta();
+  if (meta && meta.version >= SETTINGS_VERSION) {
+    return stored === 'splash_links' && meta.graphSourceChosen ? 'splash_links' : 'json';
+  }
+  // Legacy blob (no meta): the choice cannot be told from the old default.
+  if (stored === 'splash_links') {
+    writeMeta({ version: SETTINGS_VERSION, graphSourceChosen: false, graphSourceNotice: true });
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...parsed, graphSource: 'json' }));
+    } catch {
+      // Storage unavailable.
+    }
+    return 'json';
+  }
+  writeMeta({ version: SETTINGS_VERSION, graphSourceChosen: false, graphSourceNotice: false });
+  return 'json';
+}
+
 export function loadAgentSettings(): AgentSettings {
   if (typeof window === 'undefined') return { ...DEFAULT_AGENT_SETTINGS };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...DEFAULT_AGENT_SETTINGS };
     const parsed = JSON.parse(raw) as Partial<AgentSettings>;
+    const migrated = migrateGraphSource(parsed);
     const backend: AgentBackend = parsed.backend === 'ollama' ? 'ollama' : 'cborg';
     const storedPath = parsed.jsonGraphPath || '';
     const jsonGraphPaths = normalizeJsonGraphPaths(
@@ -187,7 +268,7 @@ export function loadAgentSettings(): AgentSettings {
     return {
       backend,
       model: normalizeModel(parsed.model, backend),
-      graphSource: parsed.graphSource === 'splash_links' ? 'splash_links' : 'json',
+      graphSource: migrated,
       workflowMode: parsed.workflowMode === 'deterministic' ? 'deterministic' : DEFAULT_AGENT_SETTINGS.workflowMode,
       extractionMode: normalizeExtractionMode(parsed.extractionMode),
       targetedMaxPages: typeof parsed.targetedMaxPages === 'number' && parsed.targetedMaxPages > 0
@@ -212,9 +293,20 @@ export function loadAgentSettings(): AgentSettings {
   }
 }
 
-export function saveAgentSettings(settings: AgentSettings): void {
+/**
+ * Persist the settings. `graphSourceChosen: true` records that the user explicitly picked the knowledge graph
+ * source in this save (a Tiled Graph pick then survives reloads); left out, the earlier record is kept.
+ */
+export function saveAgentSettings(settings: AgentSettings, options?: { graphSourceChosen?: boolean }): void {
   if (typeof window === 'undefined') return;
+  const meta = readMeta();
+  const chosen = options?.graphSourceChosen ?? meta?.graphSourceChosen ?? false;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  writeMeta({
+    version: SETTINGS_VERSION,
+    graphSourceChosen: chosen,
+    graphSourceNotice: options?.graphSourceChosen ? false : meta?.graphSourceNotice === true,
+  });
 }
 
 export function graphSourceToApi(source: AgentGraphSource): 'splash' | 'json' {

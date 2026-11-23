@@ -123,7 +123,7 @@ describe('GraphMockup graph source wiring', () => {
 
 async function openNodePanel() {
   // The editable mode of Settings (the `json` mode never edits, whatever the source says).
-  saveAgentSettings({ ...loadAgentSettings(), graphSource: 'splash_links' });
+  saveAgentSettings({ ...loadAgentSettings(), graphSource: 'splash_links' }, { graphSourceChosen: true });
   await searchFor('alpha');
   fireEvent.click(await screen.findByRole('button', { name: /Alpha film/ }));
   await screen.findByRole('button', { name: 'Close node details' });

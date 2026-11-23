@@ -1,7 +1,7 @@
 /**
  * Per-viewer choice of the graph source the KG viewer reads (owner instruction 2026-11-06: read both
  * JSON KGs and Tiled KGs). The choice is an opaque server id (`json:<name>` or `tiled:<graph>`) listed by
- * `GET /v1/graph/sources`; `null` means the graph the server's Settings pick (Splash Links or a JSON file), and sends no
+ * `GET /v1/graph/sources`; `null` means the graph the server's Settings pick (Tiled Graph or a JSON file), and sends no
  * `source` parameter at all (so the default requests are unchanged).
  *
  * The id is remembered in localStorage per browser; every storage access is wrapped because storage can
@@ -26,7 +26,7 @@ export interface GraphSourceState {
   error: string | null;
 }
 
-/** Stored when the user explicitly picked the "Settings graph" option (e.g. Splash Links): the server default must not override it. */
+/** Stored when the user explicitly picked the "Settings graph" option (e.g. Tiled Graph): the server default must not override it. */
 const EXPLICIT_SETTINGS_GRAPH = '__settings__';
 
 /** The remembered choice: a source id, `null` for the Settings graph, and whether the user made any choice. */

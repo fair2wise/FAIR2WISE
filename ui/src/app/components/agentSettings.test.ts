@@ -10,6 +10,8 @@ import {
   defaultModelForBackend,
   graphSourceFromApi,
   graphSourceToApi,
+  dismissGraphSourceMigrationNotice,
+  hasGraphSourceMigrationNotice,
   loadAgentSettings,
   loadCachedGraphList,
   normalizeCborgModel,
@@ -307,5 +309,47 @@ describe('agentSettings', () => {
     saveCachedGraphList(['storage/kg/old.json']);
     saveCachedGraphList(['storage/kg/new.json']);
     expect(loadCachedGraphList()).toEqual(['storage/kg/new.json']);
+  });
+});
+
+describe('knowledge graph source default migration', () => {
+  const KEY = 'fair2wise-agent-settings-v1';
+  beforeEach(() => localStorage.clear());
+
+  it('defaults to JSON with no stored settings', () => {
+    expect(loadAgentSettings().graphSource).toBe('json');
+    expect(hasGraphSourceMigrationNotice()).toBe(false);
+  });
+
+  it('resets a legacy stored Tiled Graph (old default, no recorded pick) to JSON once, with a visible notice', () => {
+    localStorage.setItem(KEY, JSON.stringify({ ...DEFAULT_AGENT_SETTINGS, model: 'lbl/other', graphSource: 'splash_links' }));
+    const loaded = loadAgentSettings();
+    expect(loaded.graphSource).toBe('json');
+    expect(loaded.model).toBe('lbl/other'); // every other saved choice survives
+    expect(hasGraphSourceMigrationNotice()).toBe(true);
+    expect(JSON.parse(localStorage.getItem(KEY) as string).graphSource).toBe('json');
+    expect(loadAgentSettings().graphSource).toBe('json'); // stable on the second load
+    dismissGraphSourceMigrationNotice();
+    expect(hasGraphSourceMigrationNotice()).toBe(false);
+  });
+
+  it('keeps a legacy stored JSON choice and shows no notice', () => {
+    localStorage.setItem(KEY, JSON.stringify({ ...DEFAULT_AGENT_SETTINGS, graphSource: 'json' }));
+    expect(loadAgentSettings().graphSource).toBe('json');
+    expect(hasGraphSourceMigrationNotice()).toBe(false);
+  });
+
+  it('keeps an explicit Tiled Graph pick across reloads', () => {
+    saveAgentSettings({ ...DEFAULT_AGENT_SETTINGS, graphSource: 'splash_links' }, { graphSourceChosen: true });
+    expect(loadAgentSettings().graphSource).toBe('splash_links');
+    expect(loadAgentSettings().graphSource).toBe('splash_links');
+    // A later Save that does not touch the radio keeps the recorded pick.
+    saveAgentSettings({ ...DEFAULT_AGENT_SETTINGS, graphSource: 'splash_links', kgQueryHops: 3 });
+    expect(loadAgentSettings().graphSource).toBe('splash_links');
+  });
+
+  it('does not treat a version 2 Tiled Graph value without a recorded pick as a choice', () => {
+    saveAgentSettings({ ...DEFAULT_AGENT_SETTINGS, graphSource: 'splash_links' });
+    expect(loadAgentSettings().graphSource).toBe('json');
   });
 });

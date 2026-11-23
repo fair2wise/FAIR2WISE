@@ -21,9 +21,9 @@ export function sourceOptionLabel(source: GraphSourceInfo): string {
   return `${source.label}${count}`;
 }
 
-/** Label of the "no `source`" option: the graph chosen in Settings, named when it is Splash Links. */
+/** Label of the "no `source`" option: the graph chosen in Settings, named when it is Tiled Graph. */
 export function settingsGraphLabel(): string {
-  return loadAgentSettings().graphSource === 'splash_links' ? 'Splash Links (Settings graph)' : 'Default graph';
+  return loadAgentSettings().graphSource === 'splash_links' ? 'Tiled Graph (Settings graph)' : 'Default graph';
 }
 
 /** Human readable kind of a source id, for the badge. */
@@ -57,7 +57,7 @@ export function GraphSourceSelect({ onChange }: { onChange?: (id: string | null)
 
   // A remembered id the server no longer lists (file removed, Tiled graph gone): forget it, so the default applies.
   // With no choice made at all the viewer opens on the server's default JSON KG (owner bug list 2026-11, task 5);
-  // "Splash Links" / the Settings graph stays selectable as the first option and is remembered once picked.
+  // "Tiled Graph" / the Settings graph stays selectable as the first option and is remembered once picked.
   useEffect(() => {
     if (!listing) return;
     const current = getSelectedGraphSource();

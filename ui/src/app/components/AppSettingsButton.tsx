@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
 import { ButtonWithIcon } from '@blueskyproject/finch';
 import { Check, ChevronDown, Info, Save, Settings } from 'lucide-react';
@@ -9,6 +9,8 @@ import {
   KG_QUERY_HOPS_PRESETS,
   KG_QUERY_MAX_NODES_PRESETS,
   defaultModelForBackend,
+  dismissGraphSourceMigrationNotice,
+  hasGraphSourceMigrationNotice,
   loadAgentSettings,
   loadCachedGraphList,
   saveCachedGraphList,
@@ -190,6 +192,10 @@ export function AppSettingsButton({
   const [open, setOpen] = useState(false);
   const [savedSettings, setSavedSettings] = useState<AgentSettings>(() => loadAgentSettings());
   const [draftSettings, setDraftSettings] = useState<AgentSettings>(() => loadAgentSettings());
+  // One-time notice: a stored Tiled Graph source that was never explicitly picked was reset to the JSON default.
+  const [graphSourceNotice, setGraphSourceNotice] = useState<boolean>(() => hasGraphSourceMigrationNotice());
+  // The user clicked the knowledge graph source radio since the panel opened: Save records it as an explicit pick.
+  const graphSourceTouched = useRef(false);
   // Initialize from the localStorage cache so the list renders immediately on
   // panel open — even before the API responds and even if the backend is down.
   const [availableJsonGraphs, setAvailableJsonGraphs] = useState<string[]>(() => loadCachedGraphList());
@@ -222,6 +228,8 @@ export function AppSettingsButton({
       setError('');
       setErrorTitle('Settings unavailable');
       const saved = loadAgentSettings();
+      setGraphSourceNotice(hasGraphSourceMigrationNotice());
+      graphSourceTouched.current = false;
       setSavedSettings(saved);
       setDraftSettings(saved);
       try {
@@ -351,7 +359,9 @@ export function AppSettingsButton({
       recordSettingsDiff(savedSettings, saved);
       setSavedSettings(saved);
       setDraftSettings(saved);
-      saveAgentSettings(saved);
+      saveAgentSettings(saved, graphSourceTouched.current ? { graphSourceChosen: true } : undefined);
+      if (graphSourceTouched.current) setGraphSourceNotice(false);
+      graphSourceTouched.current = false;
       const savedGraphs = response.available_json_graphs ?? [];
       setAvailableJsonGraphs(savedGraphs);
       saveCachedGraphList(savedGraphs);
@@ -388,6 +398,7 @@ export function AppSettingsButton({
   }
 
   function updateGraphSource(graphSource: AgentGraphSource) {
+    graphSourceTouched.current = true;
     const jsonGraphPaths = draftSettings.jsonGraphPaths.length
       ? draftSettings.jsonGraphPaths
       : availableJsonGraphs.filter(path => DEFAULT_JSON_GRAPH_PATHS.includes(path as typeof DEFAULT_JSON_GRAPH_PATHS[number]));
@@ -622,6 +633,26 @@ export function AppSettingsButton({
 
             <div className="space-y-3">
               <Label className="text-xs font-medium text-slate-500">Knowledge graph source</Label>
+              {graphSourceNotice ? (
+                <Alert className="border-sky-200 bg-sky-50 text-sky-950" data-testid="graph-source-migrated">
+                  <Info aria-hidden="true" className="text-sky-700" />
+                  <AlertTitle className="text-sky-950">Knowledge graph source reset to JSON</AlertTitle>
+                  <AlertDescription className="text-sky-900">
+                    JSON is now the default. Your earlier setting was the old default (Tiled Graph) and had not been
+                    picked explicitly, so it was reset. Choose Tiled Graph below and Save to switch back; that choice is kept.
+                    <button
+                      type="button"
+                      className="ml-2 underline"
+                      onClick={() => {
+                        dismissGraphSourceMigrationNotice();
+                        setGraphSourceNotice(false);
+                      }}
+                    >
+                      Dismiss
+                    </button>
+                  </AlertDescription>
+                </Alert>
+              ) : null}
               <RadioGroup
                 value={draftSettings.graphSource}
                 onValueChange={value => updateGraphSource(value as AgentGraphSource)}
@@ -630,7 +661,7 @@ export function AppSettingsButton({
               >
                 <SettingOption
                   id="splash_links"
-                  label="splash_links"
+                  label="Tiled Graph"
                   description="Editable knowledge graph backed by Tiled Graph: edits in the graph view are saved to the Tiled publication target."
                 />
                 <SettingOption

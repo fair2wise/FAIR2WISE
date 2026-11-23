@@ -27,7 +27,7 @@ describe('AppSettingsButton knowledge graph source', () => {
     render(<AppSettingsButton />);
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
 
-    const editable = await screen.findByRole('radio', { name: /splash_links/ });
+    const editable = await screen.findByRole('radio', { name: /Tiled Graph/ });
     expect(editable).toHaveAttribute('id', 'splash_links');
     expect(editable).toHaveAttribute('value', 'splash_links');
     const readOnly = screen.getByRole('radio', { name: /^JSON/ });
@@ -61,5 +61,18 @@ describe('AppSettingsButton Ollama model dropdown', () => {
     expect(screen.getByLabelText('Ollama model')).toBeEnabled();
     expect(paths.filter(p => p.endsWith('/v1/ollama/models'))).toHaveLength(1);
     expect(paths.every(p => !p.includes('11434') && !p.includes('/api/tags'))).toBe(true);
+  });
+});
+
+describe('AppSettingsButton graph source migration', () => {
+  it('shows the one-time reset notice for a legacy Tiled Graph value and selects JSON', async () => {
+    window.localStorage.setItem('fair2wise-agent-settings-v1', JSON.stringify({ graphSource: 'splash_links' }));
+    stubSettingsEndpoint();
+    render(<AppSettingsButton />);
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(await screen.findByTestId('graph-source-migrated')).toHaveTextContent('reset to JSON');
+    expect(await screen.findByRole('radio', { name: /^JSON/ })).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByTestId('graph-source-migrated')).not.toBeInTheDocument();
   });
 });
