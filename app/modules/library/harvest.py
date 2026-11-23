@@ -23,6 +23,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import hashlib
+import json
 import logging
 from pathlib import Path
 import re
@@ -48,6 +49,7 @@ from ..literature.legacy_download import (
 )
 from ..literature.safe_fetch import BlockedURL, NetworkPolicy
 from .arrange import is_valid_folder_name
+from .bibmeta import cap_abstract, clean_author_list, openalex_authors
 from .service import LibraryService, VerifyUnavailable
 
 logger = logging.getLogger(__name__)
@@ -128,6 +130,7 @@ class Candidate:
     doi: str | None = None
     arxiv_id: str | None = None
     abstract: str = ""
+    authors: list[str] = field(default_factory=list)
     landing_url: str = ""
     pdf_urls: list[str] = field(default_factory=list)
     tier: str = "C"
@@ -188,6 +191,7 @@ def arxiv_searcher(*, get_bytes: GetBytes = hardened_get_bytes) -> Searcher:
                 found.append(Candidate(
                     title=" ".join(entry["title"].split()), source="arxiv", year=entry["year"],
                     doi=clean_doi(entry["doi"]), arxiv_id=arxiv_id, abstract=" ".join(entry["summary"].split()),
+                    authors=clean_author_list(entry.get("authors")),
                     landing_url=f"http://arxiv.org/abs/{entry['short_id']}",
                     pdf_urls=[f"https://arxiv.org/pdf/{arxiv_id}"]))
         return found
@@ -196,7 +200,7 @@ def arxiv_searcher(*, get_bytes: GetBytes = hardened_get_bytes) -> Searcher:
 
 
 _OPENALEX_FIELDS = ("id,doi,title,publication_year,primary_location,best_oa_location,locations,open_access,"
-                    "abstract_inverted_index")
+                    "abstract_inverted_index,authorships")
 
 
 def openalex_searcher(contact: Callable[[], str] = lambda: "", *, get_json: GetJson = hardened_get_json,
@@ -233,6 +237,7 @@ def openalex_searcher(contact: Callable[[], str] = lambda: "", *, get_json: GetJ
                 title=" ".join(str(work.get("title") or "").split()), source="openalex",
                 year=year if isinstance(year, int) else None, doi=doi,
                 abstract=abstract_from_inverted_index(work.get("abstract_inverted_index")) or "",
+                authors=openalex_authors(work),
                 landing_url=f"https://doi.org/{doi}" if doi else (str(primary) or str(work.get("id") or "")),
                 pdf_urls=openalex_work_urls(work)))
         return found
@@ -255,6 +260,7 @@ def merge_candidates(groups: Iterable[Iterable[Candidate]]) -> list[Candidate]:
             have.doi = have.doi or cand.doi
             have.arxiv_id = have.arxiv_id or cand.arxiv_id
             have.abstract = have.abstract or cand.abstract
+            have.authors = have.authors or cand.authors
             have.year = have.year or cand.year
             have.landing_url = have.landing_url or cand.landing_url
     return list(merged.values())
@@ -327,9 +333,12 @@ CREATE TABLE IF NOT EXISTS runs (
 CREATE TABLE IF NOT EXISTS candidates (
   id TEXT PRIMARY KEY, run_id TEXT NOT NULL, key TEXT NOT NULL, title TEXT NOT NULL, year INTEGER, doi TEXT,
   arxiv_id TEXT, source TEXT NOT NULL, tier TEXT NOT NULL, score REAL NOT NULL, status TEXT NOT NULL,
-  landing_url TEXT, pdf_url TEXT, relpath TEXT, detail TEXT, UNIQUE (run_id, key));
+  landing_url TEXT, pdf_url TEXT, relpath TEXT, detail TEXT, authors TEXT, abstract TEXT, UNIQUE (run_id, key));
 CREATE INDEX IF NOT EXISTS candidates_run ON candidates (run_id);
 """
+#: Columns added after the first release; an older ``harvest.sqlite`` gets them on open. ``authors`` (JSON list) and
+#: ``abstract`` are kept only to carry the registry's answer to the manifest row, never returned by the API.
+_ADDED_COLUMNS = (("authors", "TEXT"), ("abstract", "TEXT"))
 _CANDIDATE_FIELDS = ("id", "title", "year", "doi", "arxiv_id", "source", "tier", "score", "status", "landing_url",
                      "pdf_url", "relpath", "detail")
 
@@ -351,6 +360,11 @@ class HarvestStore:
         self._con.row_factory = sqlite3.Row
         with self._lock:
             self._con.executescript(_SCHEMA)
+            have = {r["name"] for r in self._con.execute("PRAGMA table_info(candidates)")}
+            for column, kind in _ADDED_COLUMNS:
+                if column not in have:
+                    self._con.execute(f"ALTER TABLE candidates ADD COLUMN {column} {kind}")
+            self._con.commit()
 
     def create_run(self, run_id: str, *, topic: str, category: str, schema: str | None, sources: Sequence[str],
                    max_downloads: int) -> None:
@@ -391,11 +405,13 @@ class HarvestStore:
         with self._lock, self._con:
             self._con.execute(
                 "INSERT INTO candidates (id,run_id,key,title,year,doi,arxiv_id,source,tier,score,status,landing_url,"
-                "pdf_url,relpath,detail) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+                "pdf_url,relpath,detail,authors,abstract) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
                 "ON CONFLICT(run_id,key) DO UPDATE SET status=excluded.status, pdf_url=excluded.pdf_url, "
-                "relpath=excluded.relpath, detail=excluded.detail",
+                "relpath=excluded.relpath, detail=excluded.detail, "
+                "authors=COALESCE(excluded.authors, authors), abstract=COALESCE(excluded.abstract, abstract)",
                 (cid, run_id, cand.key, cand.title, cand.year, cand.doi, cand.arxiv_id, cand.source, cand.tier,
-                 cand.score, status, cand.landing_url, pdf_url, relpath, detail))
+                 cand.score, status, cand.landing_url, pdf_url, relpath, detail,
+                 json.dumps(cand.authors) if cand.authors else None, cap_abstract(cand.abstract)))
         return cid
 
     def set_status(self, cid: str, status: str, *, relpath: str | None = None, detail: str = "") -> None:
@@ -411,11 +427,22 @@ class HarvestStore:
                                      (run_id, *PENDING_STATUSES)).fetchall()
         return {r["key"] for r in rows}
 
-    def candidate(self, cid: str) -> dict[str, Any] | None:
-        """One candidate (with its ``run_id``) or ``None``."""
+    def candidate(self, cid: str, *, with_metadata: bool = False) -> dict[str, Any] | None:
+        """One candidate (with its ``run_id``) or ``None``; ``authors``/``abstract`` only with ``with_metadata``."""
         with self._lock:
             row = self._con.execute("SELECT * FROM candidates WHERE id=?", (cid,)).fetchone()
-        return dict(row) if row else None
+        if row is None:
+            return None
+        out = dict(row)
+        authors, abstract = out.pop("authors", None), out.pop("abstract", None)
+        if with_metadata:
+            try:
+                parsed = json.loads(authors) if authors else []
+            except ValueError:
+                parsed = []
+            out["authors"] = clean_author_list(parsed if isinstance(parsed, list) else [])
+            out["abstract"] = abstract or None
+        return out
 
     def candidates(self, run_id: str) -> list[dict[str, Any]]:
         """The candidates of a run: best tier and score first."""
@@ -590,7 +617,7 @@ class Harvester:
                 ctx.log(f"{cand.title[:70]}: {status}", level="warning")
                 continue
             known = {"year": cand.year, "title": cand.title, "doi": cand.doi, "arxiv_id": cand.arxiv_id,
-                     "source": cand.source}
+                     "source": cand.source, "authors": cand.authors, "abstract": cand.abstract}
             try:
                 result = self.service.upload(f"{file_stem(cand)}.pdf", data, args["category"], known=known)
             except ContractError as exc:
@@ -619,11 +646,11 @@ class Harvester:
         Raises:
             ContractError: ``NOT_FOUND`` for an unknown candidate, ``CONFLICT`` unless it is ``paywalled``.
         """
-        row = self._paywalled(cid)
+        row = self._paywalled(cid, with_metadata=True)
         run = self.store.run(row["run_id"])
         category = run["category"] if run else ""
         known = {"year": row["year"], "title": row["title"], "doi": row["doi"], "arxiv_id": row["arxiv_id"],
-                 "source": row["source"]}
+                 "source": row["source"], "authors": row.get("authors"), "abstract": row.get("abstract")}
         result = self.service.upload(filename or f"{file_stem(Candidate(row['title'], row['source'], doi=row['doi'], arxiv_id=row['arxiv_id']))}.pdf",
                                      data, category, known=known)
         relpath = result["paper"]["relpath"]
@@ -639,8 +666,8 @@ class Harvester:
         self.store.set_status(cid, "dismissed", detail="dismissed by hand")
         return {"candidate": self.store.candidate(cid)}
 
-    def _paywalled(self, cid: str) -> dict[str, Any]:
-        row = self.store.candidate(cid)
+    def _paywalled(self, cid: str, *, with_metadata: bool = False) -> dict[str, Any]:
+        row = self.store.candidate(cid, with_metadata=with_metadata)
         if row is None:
             raise ContractError(ErrorCode.NOT_FOUND, "candidate not found")
         if row["status"] != "paywalled":

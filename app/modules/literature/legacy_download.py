@@ -513,6 +513,7 @@ class ArxivEntry(TypedDict):
     summary: str
     year: int | None
     published: datetime
+    authors: list[str]
 
 
 _ATOM = "{http://www.w3.org/2005/Atom}"
@@ -585,6 +586,8 @@ def parse_arxiv_feed(body: bytes) -> tuple[list[ArxivEntry], int]:
             "summary": _atom_text(entry, f"{_ATOM}summary") or "",
             "year": published.year,
             "published": published,
+            "authors": [" ".join(name.split()) for author in entry.iterfind(f"{_ATOM}author")
+                        if (name := _atom_text(author, f"{_ATOM}name")) and name.strip()],
         })
     return out, total
 

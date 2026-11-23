@@ -9,11 +9,14 @@ manifest that cannot be parsed is left untouched (the upload still succeeds and 
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import fcntl
 import json
 import logging
 from pathlib import Path
 from typing import Any
+
+from .bibmeta import cap_abstract, clean_author_list
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +34,14 @@ def _doi_key(doi: str | None) -> str:
 
 
 def _row(*, relpath: str, sha256: str, doi: str | None, title: str | None, year: int | None, now: str,
-         source: str = "upload", arxiv_id: str | None = None) -> dict[str, Any]:
+         source: str = "upload", arxiv_id: str | None = None, authors: list[str] | None = None,
+         abstract: str | None = None) -> dict[str, Any]:
     return {
         "doi": f"https://doi.org/{_doi_key(doi)}" if doi else None,
         "arxiv_id": arxiv_id,
         "title": title,
-        "abstract": None,
+        "authors": clean_author_list(authors) or None,
+        "abstract": cap_abstract(abstract),
         "publication_year": year,
         "publication_date": None,
         "source": source,
@@ -51,7 +56,8 @@ def _row(*, relpath: str, sha256: str, doi: str | None, title: str | None, year:
 
 
 def record_upload(root: Path, category: str, *, relpath: str, sha256: str, doi: str | None, title: str | None,
-                  year: int | None, now: str, source: str = "upload", arxiv_id: str | None = None) -> dict[str, Any]:
+                  year: int | None, now: str, source: str = "upload", arxiv_id: str | None = None,
+                  authors: list[str] | None = None, abstract: str | None = None) -> dict[str, Any]:
     """Add the uploaded paper to ``<root>/<category>/manifest.json`` (created when the category is new).
 
     Args:
@@ -65,6 +71,8 @@ def record_upload(root: Path, category: str, *, relpath: str, sha256: str, doi: 
         now: ISO timestamp recorded as ``downloaded_at``.
         source: The row's ``source`` (``upload`` or the registry a harvest found it in).
         arxiv_id: The arXiv id when known.
+        authors: Author display names from the registry, when known (stored as ``authors``; ``None`` when empty).
+        abstract: The abstract from the registry, when known (stored capped as ``abstract``).
 
     Returns:
         ``{"updated": bool, "path": "<category>/manifest.json", "detail": str}``; ``updated`` is false when the
@@ -101,7 +109,7 @@ def record_upload(root: Path, category: str, *, relpath: str, sha256: str, doi: 
                         out["detail"] = "already listed in the manifest"
                         return out
                 papers.append(_row(relpath=relpath, sha256=sha256, doi=doi, title=title, year=year, now=now,
-                                   source=source, arxiv_id=arxiv_id))
+                                   source=source, arxiv_id=arxiv_id, authors=authors, abstract=abstract))
                 tmp = manifest.with_suffix(".json.tmp")
                 tmp.write_text(json.dumps(data, indent=2, sort_keys=False) + "\n", encoding="utf-8")
                 tmp.replace(manifest)
@@ -115,4 +123,66 @@ def record_upload(root: Path, category: str, *, relpath: str, sha256: str, doi: 
         return out
 
 
-__all__ = ("PDF_PATH_PREFIX", "record_upload")
+def is_empty(value: object) -> bool:
+    """Whether a stored ``authors`` or ``abstract`` value counts as missing (absent, null, blank or an empty list)."""
+    if isinstance(value, str):
+        return not value.strip()
+    if isinstance(value, list):
+        return not any(str(v).strip() for v in value)
+    return value is None
+
+
+def fill_missing(row: dict[str, Any], *, authors: list[str] | None, abstract: str | None) -> list[str]:
+    """Set ``authors`` / ``abstract`` on ``row`` where it holds none; a non-empty stored value is never replaced.
+
+    Returns:
+        The names of the fields filled (``[]`` when nothing changed).
+    """
+    filled: list[str] = []
+    new_authors = clean_author_list(authors)
+    if new_authors and is_empty(row.get("authors")):
+        row["authors"] = new_authors
+        filled.append("authors")
+    new_abstract = cap_abstract(abstract)
+    if new_abstract and is_empty(row.get("abstract")):
+        row["abstract"] = new_abstract
+        filled.append("abstract")
+    return filled
+
+
+def fill_row_metadata(manifest: Path, match: Callable[[dict[str, Any]], bool], *, authors: list[str] | None,
+                      abstract: str | None) -> list[str]:
+    """Fill the missing authors/abstract of the manifest row ``match`` selects, writing the manifest atomically.
+
+    Runs under the same per-category lock as :func:`record_upload`, re-reads the file (so a row added meanwhile is
+    kept), changes only empty fields of the first matching row and replaces the file only when something changed.
+    An unreadable manifest, a missing row or an unwritable folder leaves everything as it was.
+
+    Returns:
+        The names of the fields filled.
+    """
+    if not (authors or abstract) or not manifest.is_file():
+        return []
+    try:
+        with (manifest.parent / ".manifest.lock").open("a+") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try:
+                data = json.loads(manifest.read_text(encoding="utf-8"))
+                papers = data.get("papers") if isinstance(data, dict) else None
+                if not isinstance(papers, list):
+                    return []
+                row = next((r for r in papers if isinstance(r, dict) and match(r)), None)
+                filled = fill_missing(row, authors=authors, abstract=abstract) if row is not None else []
+                if filled:
+                    tmp = manifest.with_suffix(".json.tmp")
+                    tmp.write_text(json.dumps(data, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+                    tmp.replace(manifest)
+                return filled
+            finally:
+                fcntl.flock(lock, fcntl.LOCK_UN)
+    except (OSError, ValueError) as exc:
+        logger.warning("manifest metadata not updated in %s: %s", manifest.parent.name, type(exc).__name__)
+        return []
+
+
+__all__ = ("PDF_PATH_PREFIX", "fill_missing", "fill_row_metadata", "is_empty", "record_upload")

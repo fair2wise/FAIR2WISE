@@ -52,8 +52,9 @@ from ..literature.openalex import (
 )
 from ..security.authorization import StartupConfigError, local_operator_context
 from .arrange import category_problem, guess_year, is_valid_folder_name, year_folder
+from .bibmeta import openalex_abstract, openalex_authors
 from .catalog import LibraryCatalog, sha256_file
-from .manifest import record_upload
+from .manifest import PDF_PATH_PREFIX, fill_row_metadata, record_upload
 from .metadata import ManifestMetadata
 from .probe import DEFAULT_TIMEOUT_SECONDS, Probe, ProbeResult, isolated_probe
 
@@ -425,7 +426,8 @@ class LibraryService:
         paper goes into the library root, as before.
 
         ``known`` is what the caller already knows of the paper (the harvester has it from the registry):
-        ``year`` replaces the local year guess, and ``title``, ``doi`` and ``source`` fill the manifest row.
+        ``year`` replaces the local year guess, and ``title``, ``doi``, ``source``, ``authors`` and ``abstract``
+        fill the manifest row (authors and abstract stay in the manifest; they are never logged).
 
         Returns:
             ``{"paper": dto, "duplicate": bool}``; a duplicate writes nothing. A filed paper also carries
@@ -480,7 +482,8 @@ class LibraryService:
                     root, relpath.split("/", 1)[0], relpath=relpath, sha256=sha,
                     doi=(known or {}).get("doi") or paper.get("doi"), title=(known or {}).get("title") or paper.get("title"),
                     year=year, now=datetime.now(UTC).isoformat(), source=str((known or {}).get("source") or "upload"),
-                    arxiv_id=(known or {}).get("arxiv_id"))
+                    arxiv_id=(known or {}).get("arxiv_id"),
+                    authors=(known or {}).get("authors"), abstract=(known or {}).get("abstract"))
             return out
 
     def _probe_bytes(self, root: Path, data: bytes) -> ProbeResult:
@@ -593,6 +596,7 @@ class LibraryService:
         if report.ok:
             self.catalog.save_verification(sha, status="verified", title=report.title or None,
                                            doi=report.doi or None, detail=None)
+            self._store_work_metadata(root, rel, sha, report.work)
             return self._paper_dto(rel)
         if report.status == "skipped:openalex_quota_paused" or (report.retryable and self.breaker.state() is not None):
             return self._paper_dto(rel, {"verify_status": "quota_open",
@@ -604,6 +608,17 @@ class LibraryService:
             self.catalog.save_verification(sha, status="not_found", title=None, doi=None, detail=report.detail or None)
             return self._paper_dto(rel)
         return self._paper_dto(rel, {"verify_status": "error", "verify_detail": report.detail or report.status})
+
+    @staticmethod
+    def _store_work_metadata(root: Path, relpath: str, sha256: str, work: Mapping[str, Any] | None) -> None:
+        """Keep the authors and abstract of the verified OpenAlex work in the paper's manifest row (empty fields only)."""
+        if not work or "/" not in relpath:
+            return
+        category = relpath.split("/", 1)[0]
+        path = f"{PDF_PATH_PREFIX}/{relpath}"
+        fill_row_metadata(root / category / "manifest.json",
+                          lambda r: r.get("pdf_path") == path or r.get("pdf_sha256") == sha256,
+                          authors=openalex_authors(work), abstract=openalex_abstract(work))
 
     def verify_all(self, ctx: RequestContext, *, progress: Callable[..., None] | None = None,
                    log: Callable[..., None] | None = None, guard: Callable[[], None] | None = None) -> dict[str, Any]:
