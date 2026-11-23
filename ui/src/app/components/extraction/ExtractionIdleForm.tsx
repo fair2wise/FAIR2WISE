@@ -17,6 +17,7 @@ import {
 } from '../extractionHooks';
 import { useLibraryPapers } from '../libraryHooks';
 import { errorWithReason } from '../providerErrors';
+import { buildModelChoices, modelSourceNote, noBackendNote } from './modelChoices';
 import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
 import { Input } from '../ui/input';
@@ -82,18 +83,19 @@ export function ExtractionIdleForm({ onStarted }: ExtractionIdleFormProps) {
   const schemaList = schemas.data?.schemas ?? [];
   const schema = schemaLocked ? parentBundle.schema : schemaChoice || schemaList[0]?.name || '';
 
-  const modelList = models.data?.models ?? [];
-  const backendAvailable = models.data?.available === true;
-  const noBackend = models.isSuccess ? !backendAvailable : models.isError;
-  const selectedModel = model || modelList[0] || '';
+  const choices = useMemo(() => buildModelChoices(models.data), [models.data]);
+  const choice = choices.find(c => c.value === model) ?? choices[0];
+  const selectedModel = choice?.model ?? '';
+  const selectedBackend = choice?.backend;
+  const noBackend = models.isSuccess ? choices.length === 0 : models.isError;
 
   const nameValid = isValidKgName(name);
   const nameTaken = bundleList.some(b => b.name === name);
   const parentReady = !continuing || parentValue !== '';
-  const estimateKey = JSON.stringify([[...selected].sort(), selectedModel, schema]);
+  const estimateKey = JSON.stringify([[...selected].sort(), choice?.value ?? '', schema]);
   const estimateCurrent = estimated !== null && estimated.key === estimateKey;
   const costConfirmed = confirmed && estimateCurrent;
-  const canEstimate = selected.size > 0 && selectedModel !== '' && schema !== '' && backendAvailable && parentReady;
+  const canEstimate = selected.size > 0 && selectedModel !== '' && schema !== '' && parentReady;
   const canStart = nameValid && !nameTaken && selected.size > 0 && costConfirmed && parentReady && !start.isPending
     && !continueKg.isPending;
 
@@ -134,6 +136,7 @@ export function ExtractionIdleForm({ onStarted }: ExtractionIdleFormProps) {
         topic: topic.trim() || null,
         schema,
         model: selectedModel,
+        ...(selectedBackend ? { backend: selectedBackend } : {}),
         papers: selectedPapers,
         confirmation: estimated.result.confirmation,
         nonce: newNonce(),
@@ -165,8 +168,7 @@ export function ExtractionIdleForm({ onStarted }: ExtractionIdleFormProps) {
     >
       {noBackend && (
         <p role="alert" className="rounded-md border border-border bg-muted p-3 text-sm" data-testid="no-backend">
-          No model backend is available{models.data?.error ? `: ${models.data.error}` : ''}. Configure a backend to
-          start an extraction.
+          {noBackendNote(models.data)}
         </p>
       )}
 
@@ -272,23 +274,27 @@ export function ExtractionIdleForm({ onStarted }: ExtractionIdleFormProps) {
           <Label htmlFor="kg-model">Model</Label>
           <select
             id="kg-model"
-            value={selectedModel}
-            disabled={!backendAvailable || modelList.length === 0}
+            value={choice?.value ?? ''}
+            disabled={choices.length === 0}
             onChange={event => {
               setModel(event.target.value);
               reset();
             }}
             className={SELECT_CLASS}
           >
-            {modelList.length === 0 && <option value="">No models available</option>}
-            {modelList.map(m => (
-              <option key={m} value={m}>{m}</option>
-            ))}
+            {choices.length === 0 && <option value="">No models available</option>}
+            {(['CBORG', 'Ollama'] as const).map(group => {
+              const inGroup = choices.filter(c => c.group === group);
+              if (inGroup.length === 0) return null;
+              // CBORG-only deployments keep the flat list; a second provider adds labelled groups.
+              const options = inGroup.map(c => <option key={c.value} value={c.value}>{c.model}</option>);
+              return choices.some(c => c.group !== group)
+                ? <optgroup key={group} label={group === 'Ollama' ? 'Ollama (local server)' : 'CBORG (free models)'}>{options}</optgroup>
+                : options;
+            })}
           </select>
           <p className="text-xs text-muted-foreground" data-testid="model-source">
-            {backendAvailable
-              ? `${modelList.length} models offered${models.data?.backend ? ` by ${models.data.backend.toUpperCase()}` : ''}. Used for this run only; Settings is unchanged.`
-              : 'Model list unavailable.'}
+            {modelSourceNote(models.data)}
           </p>
         </div>
       </div>

@@ -49,11 +49,13 @@ def test_policies_are_declared_and_local_only(local, als):
         assert getattr(c, method)(url).status_code == 404, url
 
 
-def test_models_schemas_and_unavailable_backend(local, kgs):
+def test_models_schemas_and_unavailable_backend(local, kgs, monkeypatch):
+    monkeypatch.delenv("OLLAMA_URL", raising=False)
     svc, _ = kgs
     c = local.client()
     body = c.get("/v1/library/models").json()
     policy = body.pop("model_policy")  # additive (free-model policy, 2026-11-09)
+    assert body.pop("ollama")["state"] == "unset"  # no OLLAMA_URL in the test environment
     assert policy["default_model"] == "lbl/cborg-chat" and policy["as_of"]
     assert body == {"available": True, "models": ["m1", "m2"], "source": "live", "error": None, "error_code": None,
                     "backend": "cborg"}
@@ -135,3 +137,44 @@ def test_bundles_do_not_disturb_settings_and_contract(local, kgs, monkeypatch):
     assert "kgs/child/matkg_child.json" in json.dumps(after.json())
     assert [g for g in before["available_json_graphs"]] == [g for g in after.json()["available_json_graphs"]
                                                            if not g.startswith("kgs/")] if "available_json_graphs" in before else True
+
+
+def test_models_403_ip_not_authorized_reports_the_reason_and_still_lists_ollama(local, kgs):
+    """The Extract tab's "model list unavailable" is CBORG's 403 on GET /models; Ollama is listed regardless."""
+    import httpx
+    import openai
+
+    from app.modules.cborg_errors import IP_NOT_AUTHORIZED_MESSAGE
+    from app.modules.model_catalog import list_cborg_models_live
+    from app.modules.ollama_catalog import OllamaListing
+
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(f"{request.method} {request.url.path}")
+        return httpx.Response(403, json={"error": {"type": "ip_not_authorized", "message": "IP 203.0.113.9 not allowed"}})
+
+    client = openai.OpenAI(api_key="k", base_url="https://cborg.invalid",
+                           http_client=httpx.Client(transport=httpx.MockTransport(handler)))
+    svc, _ = kgs
+    svc.catalog = CachedModelCatalog(lambda: list_cborg_models_live(client=client))
+    svc._ollama = lambda: OllamaListing("ok", ("llama3:8b",))
+    out = local.client().get("/v1/library/models").json()
+    assert calls == ["GET /models"]  # the app-side fetch is GET {base}/models and it is the one refused
+    assert out["available"] is False and out["models"] == [] and out["source"] == "unavailable"
+    assert out["error"] == IP_NOT_AUTHORIZED_MESSAGE and out["error_code"] == "cborg_ip_not_authorized"
+    assert "203.0.113.9" not in json.dumps(out)
+    assert out["ollama"] == {"state": "ok", "models": ["llama3:8b"], "error": None}
+
+
+def test_models_reports_every_ollama_state_without_a_url(local, kgs):
+    from app.modules.ollama_catalog import OllamaListing
+
+    svc, _ = kgs
+    c = local.client()
+    for listing in (OllamaListing("unset", error="OLLAMA_URL is not set on the server"),
+                    OllamaListing("unreachable", error="Ollama did not answer"), OllamaListing("empty")):
+        svc._ollama = lambda listing=listing: listing
+        out = c.get("/v1/library/models").json()
+        assert out["ollama"]["state"] == listing.state and out["ollama"]["models"] == []
+        assert out["available"] is True  # CBORG is independent of Ollama

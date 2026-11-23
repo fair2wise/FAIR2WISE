@@ -14,6 +14,7 @@ from typing import Any
 from . import bundles as B
 from ..contracts.errors import ContractError, ErrorCode
 from ..model_catalog import CachedModelCatalog
+from ..ollama_catalog import OllamaListing, list_ollama_models
 from ..schema.registry import SchemaRegistry
 from .estimate import ModelPrice, PaperFacts, PaperLookup, estimate_extraction, verify_confirmation
 from .schemas import list_schemas, manifest_block, resolve_schema
@@ -32,18 +33,21 @@ class KgLibrary:
         papers: T35 paper lookup; ``None`` until T35 installs it (estimate then answers ``unavailable``).
         prices: Optional price table by model id.
         registry: Schema registry factory (default: discover ``storage/schema``).
+        ollama: Lists the models of the deployment's Ollama server (default :func:`list_ollama_models`; tests inject).
     """
 
     def __init__(self, store: B.BundleStore, *, release_dir: Path | Callable[[], Path] | None = None,
                  catalog: CachedModelCatalog | None = None, papers: PaperLookup | None = None,
                  prices: Mapping[str, ModelPrice] | None = None,
-                 registry: Callable[[], SchemaRegistry] = SchemaRegistry.discover) -> None:
+                 registry: Callable[[], SchemaRegistry] = SchemaRegistry.discover,
+                 ollama: Callable[[], OllamaListing] = list_ollama_models) -> None:
         self.store = store
         self._release = release_dir
         self.catalog = catalog or CachedModelCatalog()
         self.papers = papers
         self.prices = dict(prices or {})
         self._registry = registry
+        self._ollama = ollama
 
     # -------------------------------------------------------------- reads
     def release_dir(self) -> Path:
@@ -66,7 +70,11 @@ class KgLibrary:
         return {"schemas": [{k: v for k, v in s.items() if k != "path"} for s in list_schemas(self._registry())]}
 
     def models(self, *, refresh: bool = False) -> dict[str, Any]:
-        """The free models of the live list (model policy); ``available=false`` without a backend. Never writes settings."""
+        """The free models of the live list (model policy); ``available=false`` without a backend. Never writes settings.
+
+        ``ollama`` is the status of the deployment's Ollama server (``state``, ``models``, ``error``; no URL), listed
+        independently of CBORG so an Ollama model can be chosen when CBORG refuses or is unconfigured.
+        """
         from ..model_policy import load_policy
 
         listing = self.catalog.get(refresh=refresh)
@@ -74,7 +82,8 @@ class KgLibrary:
         # Free-model policy (owner decision 2026-11-09): the picker offers only the free ids of the live list.
         models = policy.filter(listing.models, listing) if listing.available else []
         return {"available": bool(listing.available), "models": models, "source": listing.source,
-                "error": listing.error, "error_code": listing.error_code, "backend": listing.backend, "model_policy": policy.describe()}
+                "error": listing.error, "error_code": listing.error_code, "backend": listing.backend, "model_policy": policy.describe(),
+                "ollama": self._ollama().to_dict()}
 
     # -------------------------------------------------------------- estimate
     def _facts(self, paper_ids: list[str]) -> list[PaperFacts]:

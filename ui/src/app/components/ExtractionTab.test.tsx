@@ -206,6 +206,66 @@ describe('ExtractionTab idle', () => {
     expect(startButton()).toBeDisabled();
   });
 
+  it('CBORG refused this address: shows the specific reason and still lists the Ollama models', async () => {
+    routes['GET /v1/library/models'].body = {
+      available: false, models: [], source: 'unavailable', backend: 'cborg',
+      error: 'CBORG refused this network address; connect via LBLnet/VPN or authorize the address',
+      error_code: 'cborg_ip_not_authorized',
+      ollama: { state: 'ok', models: ['llama3:8b', 'qwen2.5:7b'], error: null },
+    };
+    const user = userEvent.setup();
+    renderTab();
+    await screen.findByRole('checkbox', { name: /Title p1/ });
+    await waitFor(() => expect(screen.getByLabelText('Model')).toHaveValue('ollama:llama3:8b'));
+    expect(screen.queryByTestId('no-backend')).not.toBeInTheDocument();
+    expect(screen.getByTestId('model-source')).toHaveTextContent('CBORG refused this network address; connect via LBLnet/VPN');
+    expect(screen.getByTestId('model-source')).toHaveTextContent('2 Ollama models');
+    expect(screen.getByLabelText('Model')).toBeEnabled();
+    await user.type(screen.getByLabelText(/KG name/), 'new-kg');
+    await user.click(screen.getByRole('checkbox', { name: /Title p1/ }));
+    await user.click(screen.getByRole('button', { name: /estimate cost/i }));
+    await user.click(await screen.findByRole('checkbox', { name: /confirm this cost/i }));
+    await user.click(startButton());
+    await waitFor(() => expect(screen.getByTestId('extraction-run')).toBeInTheDocument());
+    expect(calls.find(c => c.path === '/v1/library/estimate')?.body).toMatchObject({ model: 'llama3:8b' });
+    expect(calls.find(c => c.method === 'POST' && c.path === '/v1/jobs')?.body).toMatchObject({
+      inputs: { params: { model: 'llama3:8b', backend: 'ollama' } },
+    });
+  });
+
+  it('groups CBORG and Ollama models when both are offered; a CBORG choice carries no backend', async () => {
+    routes['GET /v1/library/models'].body = {
+      available: true, models: ['m1'], source: 'live', error: null, backend: 'cborg',
+      ollama: { state: 'ok', models: ['llama3:8b'], error: null },
+    };
+    const user = userEvent.setup();
+    renderTab();
+    await fillValidForm(user);
+    const select = screen.getByLabelText('Model');
+    expect(within(select).getAllByRole('group').map(g => g.getAttribute('label'))).toEqual([
+      'CBORG (free models)', 'Ollama (local server)',
+    ]);
+    await user.click(screen.getByRole('button', { name: /estimate cost/i }));
+    await user.click(await screen.findByRole('checkbox', { name: /confirm this cost/i }));
+    await user.click(startButton());
+    await waitFor(() => expect(screen.getByTestId('extraction-run')).toBeInTheDocument());
+    const params = (calls.find(c => c.method === 'POST' && c.path === '/v1/jobs')?.body as { inputs: { params: Record<string, unknown> } }).inputs.params;
+    expect(params.model).toBe('m1');
+    expect('backend' in params).toBe(false);
+  });
+
+  it('with neither provider usable it says why for each', async () => {
+    routes['GET /v1/library/models'].body = {
+      available: false, models: [], source: 'unavailable', error: 'no key', backend: null,
+      ollama: { state: 'unreachable', models: [], error: 'Ollama did not answer' },
+    };
+    renderTab();
+    const alert = await screen.findByTestId('no-backend');
+    expect(alert).toHaveTextContent('no key');
+    expect(alert).toHaveTextContent('Ollama is configured but did not answer');
+    expect(screen.getByLabelText('Model')).toBeDisabled();
+  });
+
   it('never calls PUT /settings and reports a failed estimate', async () => {
     routes['POST /v1/library/estimate'] = { status: 422, body: { detail: 'bad schema' } };
     const user = userEvent.setup();

@@ -59,13 +59,18 @@ class BackendUnavailable(Exception):
     """No LLM backend is configured for extraction."""
 
 
-def resolve_backend(env: Mapping[str, str]) -> dict[str, str] | None:
+def resolve_backend(env: Mapping[str, str], requested: str | None = None) -> dict[str, str] | None:
     """The configured extraction backend as ``{"name": ..., ...}``, or ``None`` when there is none.
 
     ``cborg`` needs ``CBORG_API_KEY``; ``ollama`` needs ``F2W_EXTRACT_BACKEND=ollama`` (the URL defaults to
-    the local daemon). Nothing is read from a dotenv file and nothing is contacted here.
+    the local daemon). ``requested`` (``"cborg"`` or ``"ollama"``, the job's own choice) overrides
+    ``F2W_EXTRACT_BACKEND``; a requested ``ollama`` needs ``OLLAMA_URL`` set explicitly (no localhost default: the
+    UI offered the models of that server). Nothing is read from a dotenv file and nothing is contacted here.
     """
-    chosen = (env.get(BACKEND_ENV) or "").strip().lower()
+    chosen = (requested or env.get(BACKEND_ENV) or "").strip().lower()
+    if requested == "ollama":
+        url = (env.get(OLLAMA_URL_ENV) or "").strip()
+        return {"name": "ollama", "ollama_url": url} if url else None
     if chosen == "ollama":
         return {"name": "ollama", "ollama_url": (env.get(OLLAMA_URL_ENV) or "http://localhost:11434").strip()}
     if chosen in ("", "cborg") and (env.get("CBORG_API_KEY") or "").strip():
@@ -185,6 +190,9 @@ class LibraryExtractor:
         model = text("model") or ""
         schema = text("schema") or ""
         topic = text("topic", required=False)
+        backend = text("backend", required=False)
+        if backend is not None and backend not in ("cborg", "ollama"):
+            raise ContractError(ErrorCode.INVALID_INPUT, "backend must be cborg or ollama")
         parent = text("continue_from", required=False)
         confirmation = text("confirmation") or ""
         papers = params.get("papers")
@@ -194,7 +202,7 @@ class LibraryExtractor:
             raise ContractError(ErrorCode.INVALID_INPUT, "too many papers")
         if parent is not None:
             B.validate_name(parent)
-        return {"bundle": name, "model": model, "schema": schema, "topic": topic, "continue_from": parent,
+        return {"bundle": name, "model": model, "schema": schema, "topic": topic, "backend": backend, "continue_from": parent,
                 "confirmation": confirmation, "papers": list(dict.fromkeys(papers))}
 
     def resolve_papers(self, refs: Sequence[str]) -> list[dict[str, Any]]:
@@ -212,9 +220,18 @@ class LibraryExtractor:
             raise ContractError(ErrorCode.INVALID_INPUT, "two selected papers share a file name")
         return ordered
 
-    def backend(self) -> dict[str, str]:
-        """The configured backend or a fail-closed ``unsupported_capability`` error (nothing was contacted)."""
-        backend = resolve_backend(self.env)
+    def backend(self, requested: str | None = None) -> dict[str, str]:
+        """The configured backend or a fail-closed ``unsupported_capability`` error (nothing was contacted).
+
+        ``requested`` is the job's own choice (``params.backend``); without it the startup environment decides.
+        """
+        backend = resolve_backend(self.env, requested)
+        if backend is None and requested == "ollama":
+            raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
+                                f"Ollama is not configured for extraction ({OLLAMA_URL_ENV} is not set on the server)")
+        if backend is None and requested == "cborg":
+            raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
+                                "CBORG is not configured for extraction (CBORG_API_KEY is not set on the server)")
         if backend is None:
             raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
                                 "no LLM backend is configured for extraction (set CBORG_API_KEY, or "
@@ -284,7 +301,7 @@ class LibraryExtractor:
     def run(self, ctx: StageContext) -> StageResult:
         """The ``library_extract`` stage body (see the module docstring)."""
         args = self.parse(ctx.inputs.params)
-        backend = self.backend()
+        backend = self.backend(args["backend"])
         if backend["name"] == "cborg":
             # Free-model policy (owner decision 2026-11-09): refused before the lock, the bundle or any client.
             from ..model_policy import require_free_cborg_model

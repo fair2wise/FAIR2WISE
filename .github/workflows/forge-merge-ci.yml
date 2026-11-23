@@ -42,7 +42,8 @@ env:
   # Re-pinned 2026-11-23 (owner bug list, task 2): provider refusal wording (providerErrors; judge model setting and extraction toasts show the CBORG address refusal); previous fe17f58d.
   # Re-pinned 2026-11-23 (owner bug list, task 10): Library list shows stored year, authors and abstract with a not-stored marker; previous bdf888d3.
   # Re-pinned 2026-11-23 (owner bug list, task 7): chat citation click loads the full entity record (GraphMockup NodeDetailPanel, nodeDetailSource, liveAgent type); previous f780e527.
-  FROZEN_UI_TREE: e1a6fec0714c829da8df660a8ed07cd74a39817f
+  # Re-pinned 2026-11-23 (owner bug list, task 3): Extract tab model list: CBORG address-refusal reason and Ollama models in a grouped picker (modelChoices, ExtractionIdleForm, extractionApi); previous e1a6fec0.
+  FROZEN_UI_TREE: a21f090662fee656f12f4edeaee05cf1731a7be9
   KG_RAG_RETRIEVAL_BACKEND: lexical
   KG_RAG_FORCE_CPU: "1"
   F2W_SOURCE_RAG: "0"

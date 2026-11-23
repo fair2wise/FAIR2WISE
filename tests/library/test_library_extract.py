@@ -504,3 +504,55 @@ def test_a_term_store_with_a_tripped_fence_ignores_every_write(tmp_path):
     assert {t["term"] for t in json.loads(out.read_text())["terms"]} == {"A"}  # B was in memory only, C refused
     fenced[0] = False  # latched: once fenced the store stays fenced
     assert store.upsert(TermRecord(term="D", definition="d", category="Thing", pages=[1], source_papers=["a.pdf"]))[1] is False
+
+
+# -- per-job backend (the Extract tab lists Ollama models beside CBORG ones) ------------------------------------------
+
+OLLAMA_ENV = {"CBORG_API_KEY": "test-not-a-real-key", "OLLAMA_URL": "http://ollama.cluster.invalid:11434"}
+
+
+def test_a_job_can_choose_ollama_and_a_paid_looking_name_is_not_policed_as_a_cborg_model(tmp_path):
+    world = World(tmp_path, env=OLLAMA_ENV)  # CBORG is configured too: the job's own choice wins
+    names = _three(world)
+    handle, state = world.run(world.params(names, model="anthropic/claude-x:latest", backend="ollama"))
+    assert state is JobState.SUCCEEDED, world.job_error(handle)
+    backend = world.factory_calls[0]["backend"]
+    assert backend["name"] == "ollama" and backend["ollama_url"] == OLLAMA_ENV["OLLAMA_URL"]
+    assert world.factory_calls[0]["model"] == "anthropic/claude-x:latest"
+
+
+def test_the_same_model_through_cborg_is_still_refused_by_the_free_model_policy(tmp_path):
+    world = World(tmp_path, env=OLLAMA_ENV)
+    handle, state = world.run(world.params(_three(world), model="anthropic/claude-x:latest", backend="cborg"))
+    assert state is JobState.FAILED and world.factory_calls == []
+
+
+def test_requested_ollama_without_ollama_url_fails_closed_and_never_defaults_to_localhost(tmp_path):
+    world = World(tmp_path, env=KEY_ENV)
+    handle, state = world.run(world.params(_three(world), backend="ollama"))
+    assert state is JobState.FAILED and world.factory_calls == [] and not world.store.exists("run1")
+    assert "OLLAMA_URL is not set" in world.job_error(handle)
+    assert resolve_backend(KEY_ENV, "ollama") is None
+    assert resolve_backend({"F2W_EXTRACT_BACKEND": "ollama"})["ollama_url"] == "http://localhost:11434"  # unchanged
+    assert resolve_backend({"F2W_EXTRACT_BACKEND": "ollama", **KEY_ENV}, "cborg")["name"] == "cborg"
+
+
+def test_an_unknown_backend_value_is_invalid_input(tmp_path):
+    world = World(tmp_path, env=OLLAMA_ENV)
+    _, state = world.run(world.params(_three(world), backend="openai"))
+    assert state is JobState.FAILED and world.factory_calls == []
+
+
+def test_a_cborg_address_refusal_ends_the_job_at_the_first_paper_with_the_fixed_message(tmp_path):
+    from app.modules.cborg_errors import IP_NOT_AUTHORIZED_MESSAGE, CborgIpNotAuthorized
+
+    def hook(orch: FakeOrchestrator, name: str) -> None:
+        orch.refusal = CborgIpNotAuthorized()  # what the real orchestrator records at the first 403
+
+    world = World(tmp_path, hook=hook)
+    names = _three(world)
+    handle, state = world.run(world.params(names))
+    assert state is JobState.FAILED
+    assert len(FakeOrchestrator.instances[0].calls) == 1  # the other papers were never tried
+    assert IP_NOT_AUTHORIZED_MESSAGE in world.job_error(handle)
+    assert "could not be read" not in world.job_error(handle)

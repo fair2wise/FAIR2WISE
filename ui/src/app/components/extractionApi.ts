@@ -96,6 +96,17 @@ export interface SchemasResponse {
   schemas: SchemaChoice[];
 }
 
+/** State of the deployment's Ollama server listing (no URL is ever sent to the browser). */
+export type OllamaListingState = 'ok' | 'empty' | 'unset' | 'unreachable' | 'error';
+
+/** The Ollama block of `GET /v1/library/models` and the body of `GET /v1/ollama/models`. */
+export interface OllamaListing {
+  state: OllamaListingState;
+  models: string[];
+  /** Short fixed reason for `unset`/`unreachable`/`error`. */
+  error: string | null;
+}
+
 /** `GET /v1/library/models` (the live provider list, as for the judge model; never hardcoded). */
 export interface ModelsResponse {
   available: boolean;
@@ -106,6 +117,8 @@ export interface ModelsResponse {
   error_code?: string | null;
   /** Provider backend name (e.g. `openai`), or null. */
   backend?: string | null;
+  /** Ollama models, listed independently of CBORG (absent on an older server). */
+  ollama?: OllamaListing;
 }
 
 /** Body of `POST /v1/library/estimate` (pages times model). */
@@ -140,6 +153,8 @@ export interface StartExtractionRequest {
   /** Registry id such as `matkg_schema@0.3.1`; locked on continuation. */
   schema: string;
   model: string;
+  /** Set to `ollama` when `model` comes from the Ollama list; omitted for CBORG (the server default). */
+  backend?: 'ollama';
   /** T35 library paper ids. */
   papers: string[];
   confirmation: string;
