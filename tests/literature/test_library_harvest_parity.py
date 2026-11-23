@@ -102,6 +102,7 @@ def old_arxiv_searcher(client: Any) -> Callable[[str, int], list[Candidate]]:
                 found.append(Candidate(
                     title=" ".join(str(result.title).split()), source="arxiv", year=result.published.year,
                     doi=clean_doi(result.doi), arxiv_id=arxiv_id, abstract=" ".join(str(result.summary).split()),
+                    authors=[" ".join(str(a.name).split()) for a in result.authors],
                     landing_url=str(result.entry_id), pdf_urls=[f"https://arxiv.org/pdf/{arxiv_id}"]))
         return found
 
