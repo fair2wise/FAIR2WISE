@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   GRAPH_SOURCE_ID_RE,
+  applyDefaultGraphSource,
+  clearGraphSourceChoice,
   getGraphSourceState,
   getSelectedGraphSource,
   graphSourceFromPath,
@@ -23,13 +25,13 @@ describe('graph source store', () => {
     expect(getSelectedGraphSource()).toBeNull();
   });
 
-  it('remembers the choice per viewer in localStorage and clears it for the default', () => {
+  it('remembers the choice per viewer in localStorage, an explicit default choice as __settings__', () => {
     setSelectedGraphSource('tiled:e2e_demo');
     expect(getSelectedGraphSource()).toBe('tiled:e2e_demo');
     expect(window.localStorage.getItem(KEY)).toBe('tiled:e2e_demo');
     setSelectedGraphSource(null);
     expect(getSelectedGraphSource()).toBeNull();
-    expect(window.localStorage.getItem(KEY)).toBeNull();
+    expect(window.localStorage.getItem(KEY)).toBe('__settings__');
   });
 
   it('never stores or sends an id the server would not accept (paths, URLs)', () => {
@@ -37,7 +39,7 @@ describe('graph source store', () => {
       expect(GRAPH_SOURCE_ID_RE.test(bad)).toBe(false);
       setSelectedGraphSource(bad);
       expect(getSelectedGraphSource()).toBeNull();
-      expect(window.localStorage.getItem(KEY)).toBeNull();
+      expect(window.localStorage.getItem(KEY)).toBe('__settings__');
     }
     for (const good of ['json:rsoxs_v1', 'json:synthetic/v1', 'tiled:e2e_demo']) {
       expect(GRAPH_SOURCE_ID_RE.test(good)).toBe(true);
@@ -77,5 +79,18 @@ describe('graphSourceFromPath', () => {
     for (const other of ['storage/kg/matkg_rsoxs_v1.json', 'tiled://graphql', 'query:abc', 'source:../x', '', undefined, null]) {
       expect(graphSourceFromPath(other)).toBeNull();
     }
+  });
+
+  it('applies the server default only while the user has made no choice, and never stores it', () => {
+    expect(applyDefaultGraphSource('../x')).toBe(false);
+    expect(applyDefaultGraphSource('json:rsoxs/v4')).toBe(true);
+    expect(getSelectedGraphSource()).toBe('json:rsoxs/v4');
+    expect(window.localStorage.getItem(KEY)).toBeNull();
+    setSelectedGraphSource(null);
+    expect(applyDefaultGraphSource('json:rsoxs/v4')).toBe(false);
+    expect(getSelectedGraphSource()).toBeNull();
+    clearGraphSourceChoice();
+    expect(window.localStorage.getItem(KEY)).toBeNull();
+    expect(applyDefaultGraphSource('json:rsoxs/v4')).toBe(true);
   });
 });

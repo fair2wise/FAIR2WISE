@@ -28,6 +28,8 @@ export interface GraphSourceInfo {
 export interface GraphSourceListing {
   sources: GraphSourceInfo[];
   tiled: { status: TiledStatus; detail: string | null };
+  /** The JSON source the viewer opens on when the user made no choice; `null` when none is listed or the server is older. */
+  default: string | null;
 }
 
 const TILED_STATUSES: ReadonlySet<string> = new Set(['ok', 'unavailable', 'not_offered']);
@@ -67,7 +69,9 @@ export function parseGraphSourceListing(raw: unknown): GraphSourceListing {
   const status = typeof tiled.status === 'string' && TILED_STATUSES.has(tiled.status)
     ? (tiled.status as TiledStatus)
     : 'not_offered';
-  return { sources, tiled: { status, detail: text(tiled.detail) } };
+  const def = text(body.default);
+  const usable = def !== null && sources.some(source => source.id === def && source.kind === 'json' && source.available);
+  return { sources, tiled: { status, detail: text(tiled.detail) }, default: usable ? def : null };
 }
 
 /** `GET /v1/graph/sources`. Rejects with `ApiError` (callers hide the selector on `HIDDEN_STATUSES`). */

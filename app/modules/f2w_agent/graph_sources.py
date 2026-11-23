@@ -66,6 +66,7 @@ KIND_JSON = "json"
 KIND_TILED = "tiled"
 #: A source id as a request may spell it; anything else is refused before the catalog lookup.
 SOURCE_ID_RE = re.compile(r"^(json|tiled):[A-Za-z0-9][A-Za-z0-9_.@/-]{0,119}$")
+_RSOXS_FLAT_RE = re.compile(r"^rsoxs_v([0-9]+)$")
 _NAME_CLEAN_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 _CORPUS_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 #: A corpus name as the PATCH route's ``corpus`` parameter may spell it (one path-safe segment, no ``/`` or ``@``).
@@ -186,11 +187,14 @@ class SourceListing:
     sources: tuple[SourceInfo, ...]
     tiled_status: str
     tiled_detail: str | None = None
+    #: The ``json:`` source the viewer opens on when the user has made no choice (:meth:`GraphSources.default_json_id`).
+    default: str | None = None
 
     def as_json(self) -> JsonObject:
         """The wire form."""
         return {"sources": [s.as_json() for s in self.sources],
-                "tiled": {"status": self.tiled_status, "detail": self.tiled_detail}}
+                "tiled": {"status": self.tiled_status, "detail": self.tiled_detail},
+                "default": self.default}
 
 
 def build_source_graph(source_id: str, kind: str, graph_id: str, graph_label: str, revision: str,
@@ -512,17 +516,61 @@ class GraphSources:
                 tiled_id=gid)
         return entries
 
+    def _live_corpus(self, corpus: str) -> bool:
+        """Whether ``corpus`` is live on the Save target (the editable rule; false when none is installed)."""
+        if self._editable is None or not CORPUS_NAME_RE.match(corpus):
+            return False
+        try:
+            return bool(self._editable(corpus))
+        except Exception:
+            logger.warning("live-corpus rule failed for %s", corpus, exc_info=True)
+            return False
+
+    def default_json_id(self, entries: Mapping[str, _Entry]) -> str | None:
+        """The ``json:`` source the viewer opens on without a user choice (owner bug list 2026-11, task 5).
+
+        Deterministic rule, first match wins: (1) the newest adopted release (``json:<corpus>/<vN>``) of the corpus that
+        is live on the Save target; (2) the newest ``matkg_rsoxs_vN.json`` file (the same pick as the Settings default);
+        (3) the newest adopted release of any corpus (corpus name, then ``vN`` number); (4) the first JSON file in
+        listing order. ``None`` when no JSON source is listed.
+        """
+        flat: list[tuple[str, _Entry]] = []
+        releases: list[tuple[str, int, str, _Entry]] = []
+        for sid, entry in entries.items():
+            item = entry.json_file
+            if item is None:
+                continue
+            if "/" in item.name:
+                corpus, _, snapshot = item.name.partition("/")
+                releases.append((corpus, int(snapshot[1:]) if snapshot[1:].isdigit() else 0, sid, entry))
+            else:
+                flat.append((sid, entry))
+        live = [r for r in releases if self._live_corpus(r[0])]
+        if live:
+            return max(live, key=lambda r: (r[1], r[0]))[2]
+        best_n, best_sid = -1, None
+        for sid, entry in flat:
+            match = _RSOXS_FLAT_RE.match(entry.json_file.name) if entry.json_file else None
+            if match and int(match.group(1)) > best_n:
+                best_n, best_sid = int(match.group(1)), sid
+        if best_sid is not None:
+            return best_sid
+        if releases:
+            return max(releases, key=lambda r: (r[0], r[1]))[2]
+        return flat[0][0] if flat else None
+
     def listing(self) -> SourceListing:
         """The selectable sources (JSON files and releases first, then Tiled graphs) and the Tiled status."""
         entries = self._json_entries()
+        default = self.default_json_id(entries)
         if self._tiled is None:
             return SourceListing(tuple(e.info for e in entries.values()), "not_offered",
-                                 "Tiled is not offered by this deployment")
+                                 "Tiled is not offered by this deployment", default)
         scan = self._tiled_scan()
         if scan.error is not None:
-            return SourceListing(tuple(e.info for e in entries.values()), "unavailable", scan.error.message)
+            return SourceListing(tuple(e.info for e in entries.values()), "unavailable", scan.error.message, default)
         entries.update(self._tiled_entries(scan))
-        return SourceListing(tuple(e.info for e in entries.values()), "ok")
+        return SourceListing(tuple(e.info for e in entries.values()), "ok", None, default)
 
     # -- reads
     def graph(self, source_id: str) -> SourceGraph:

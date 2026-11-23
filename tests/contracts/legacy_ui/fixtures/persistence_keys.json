@@ -190,23 +190,23 @@
       "owner": "ui/src/app/components/graphSourceStore.ts",
       "declared_at": "ui/src/app/components/graphSourceStore.ts:12",
       "read_at": [
-        "ui/src/app/components/graphSourceStore.ts:31"
+        "ui/src/app/components/graphSourceStore.ts:35"
       ],
       "written_at": [
-        "ui/src/app/components/graphSourceStore.ts:41"
+        "ui/src/app/components/graphSourceStore.ts:45"
       ],
       "removed_at": [
-        "ui/src/app/components/graphSourceStore.ts:43"
+        "ui/src/app/components/graphSourceStore.ts:94"
       ],
       "callers": {
         "read": [
-          "ui/src/app/components/graphSourceStore.ts:50 (module load: initial store state)"
+          "ui/src/app/components/graphSourceStore.ts:51 (module load: initial store state)"
         ],
         "write": [
-          "ui/src/app/components/GraphSourceSelect.tsx:74 (the viewer's Source select)"
+          "ui/src/app/components/GraphSourceSelect.tsx:92 (the viewer's Source select)"
         ],
         "clear": [
-          "ui/src/app/components/GraphSourceSelect.tsx:51 (the remembered id is no longer listed by GET /v1/graph/sources)"
+          "ui/src/app/components/GraphSourceSelect.tsx:65 (the remembered id is no longer listed by GET /v1/graph/sources)"
         ]
       },
       "value_format": "raw string (not JSON): an opaque server source id, `json:<name>` or `tiled:<graph>`; only a value matching GRAPH_SOURCE_ID_RE is read back or stored",

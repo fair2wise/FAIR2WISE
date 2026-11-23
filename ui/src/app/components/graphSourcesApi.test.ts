@@ -31,7 +31,7 @@ describe('parseGraphSourceListing', () => {
     expect(parsed.sources).toHaveLength(1);
     expect(parsed.sources[0]).toMatchObject({ label: 'json:a', read_only: true, available: true, node_count: null });
     expect(parsed.tiled.status).toBe('not_offered');
-    expect(parseGraphSourceListing(null)).toEqual({ sources: [], tiled: { status: 'not_offered', detail: null } });
+    expect(parseGraphSourceListing(null)).toEqual({ sources: [], tiled: { status: 'not_offered', detail: null }, default: null });
   });
 });
 

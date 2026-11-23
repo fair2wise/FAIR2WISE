@@ -36,7 +36,8 @@ env:
   # 4046edb); previous 059b7a46.
   # Re-pinned 2026-11-23 (owner bug list, task 8): Harvester shows papers as found/downloading/settled with a
   # failure reason while the run goes; previous e627b360.
-  FROZEN_UI_TREE: fe160a2df2a6e70b1d13baed5fe56da9c01906c5
+  # Re-pinned 2026-11-23 (owner bug list, task 5): KG viewer defaults to a JSON source (GraphSourceSelect, graphSourceStore, graphSourcesApi, agentSettings fallback); previous fe160a2d.
+  FROZEN_UI_TREE: f6449d9a4af9c5ed34fcf6fb2aa549e53759081a
   KG_RAG_RETRIEVAL_BACKEND: lexical
   KG_RAG_FORCE_CPU: "1"
   F2W_SOURCE_RAG: "0"

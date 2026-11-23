@@ -1,7 +1,7 @@
 /**
  * Per-viewer choice of the graph source the KG viewer reads (owner instruction 2026-11-06: read both
  * JSON KGs and Tiled KGs). The choice is an opaque server id (`json:<name>` or `tiled:<graph>`) listed by
- * `GET /v1/graph/sources`; `null` means the default graph the server's Settings pick, and sends no
+ * `GET /v1/graph/sources`; `null` means the graph the server's Settings pick (Splash Links or a JSON file), and sends no
  * `source` parameter at all (so the default requests are unchanged).
  *
  * The id is remembered in localStorage per browser; every storage access is wrapped because storage can
@@ -26,28 +26,32 @@ export interface GraphSourceState {
   error: string | null;
 }
 
-function readStored(): string | null {
+/** Stored when the user explicitly picked the "Settings graph" option (e.g. Splash Links): the server default must not override it. */
+const EXPLICIT_SETTINGS_GRAPH = '__settings__';
+
+/** The remembered choice: a source id, `null` for the Settings graph, and whether the user made any choice. */
+function readStored(): { selected: string | null; chosen: boolean } {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw && GRAPH_SOURCE_ID_RE.test(raw) ? raw : null;
+    if (raw === EXPLICIT_SETTINGS_GRAPH) return { selected: null, chosen: true };
+    return raw && GRAPH_SOURCE_ID_RE.test(raw) ? { selected: raw, chosen: true } : { selected: null, chosen: false };
   } catch {
-    return null;
+    return { selected: null, chosen: false };
   }
 }
 
 function writeStored(id: string | null): void {
   try {
-    if (id) {
-      window.localStorage.setItem(STORAGE_KEY, id);
-    } else {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
+    window.localStorage.setItem(STORAGE_KEY, id ?? EXPLICIT_SETTINGS_GRAPH);
   } catch {
     // Storage unavailable: the choice lives for this page only.
   }
 }
 
-let state: GraphSourceState = { selected: readStored(), loading: false, error: null };
+const initial = readStored();
+/** True once the user picked a source (or the Settings graph) in this browser; the default never overrides it. */
+let userChose = initial.chosen;
+let state: GraphSourceState = { selected: initial.selected, loading: false, error: null };
 const listeners = new Set<() => void>();
 
 function publish(next: GraphSourceState): void {
@@ -68,8 +72,31 @@ export function getSelectedGraphSource(): string | null {
 /** Select a source (`null` = default), remember it and clear any previous error. Invalid ids select the default. */
 export function setSelectedGraphSource(id: string | null): void {
   const next = id && GRAPH_SOURCE_ID_RE.test(id) ? id : null;
+  userChose = true;
   writeStored(next);
   publish({ selected: next, loading: false, error: null });
+}
+
+/**
+ * Open on the server's default JSON source when the user has never chosen one (owner bug list 2026-11, task 5).
+ * Not remembered: the choice stays "no choice" until the user picks, so a later server default still applies.
+ * Returns whether the selection changed.
+ */
+export function applyDefaultGraphSource(id: string | null | undefined): boolean {
+  if (userChose || state.selected !== null || !id || !GRAPH_SOURCE_ID_RE.test(id)) return false;
+  publish({ selected: id, loading: false, error: null });
+  return true;
+}
+
+/** Forget the remembered choice (a remembered id the server no longer lists): the server default applies again. */
+export function clearGraphSourceChoice(): void {
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Storage unavailable.
+  }
+  userChose = false;
+  publish({ selected: null, loading: false, error: null });
 }
 
 /** Record that a graph read started (`loading`), succeeded (`error` null) or failed (`error` text). */
@@ -100,6 +127,11 @@ export function graphSourceFromPath(sourcePath: string | undefined | null): stri
 
 /** Reset to the default graph and forget the stored choice (tests). */
 export function resetGraphSourceStore(): void {
-  writeStored(null);
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Storage unavailable.
+  }
+  userChose = false;
   publish({ selected: null, loading: false, error: null });
 }

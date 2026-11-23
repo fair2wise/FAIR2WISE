@@ -202,7 +202,7 @@ describe('agentSettings', () => {
     expect(loadAgentSettings()).toEqual({
       backend: 'cborg',
       model: DEFAULT_CBORG_MODEL,
-      graphSource: 'splash_links',
+      graphSource: 'json',
       workflowMode: 'agentic',
       extractionMode: DEFAULT_AGENT_SETTINGS.extractionMode,
       targetedMaxPages: DEFAULT_AGENT_SETTINGS.targetedMaxPages,

@@ -289,6 +289,49 @@ def test_adopted_releases_are_offered_only_under_a_real_snapshot_layout(tmp_path
         sources.graph("json:synthetic/v2")
 
 
+def _release(root, corpus, snap):
+    d = root / corpus / snap
+    d.mkdir(parents=True)
+    (d / "graph.json").write_text(json.dumps({"nodes": [{"id": "a", "name": "A"}], "edges": []}))
+
+
+def _flat(tmp_path, *names):
+    kg = tmp_path / "kg"
+    kg.mkdir(exist_ok=True)
+    files = []
+    for name in names:
+        (kg / f"matkg_{name}.json").write_text(json.dumps({"nodes": [], "edges": []}))
+        files.append(gs.JsonFile(name, name, f"matkg_{name}.json", kg / f"matkg_{name}.json"))
+    return files
+
+
+def test_default_source_is_json_never_tiled_and_follows_a_fixed_rule(tmp_path):
+    """Task 5: the viewer opens on a JSON KG. Live corpus release > newest rsoxs file > newest release > first file."""
+    root = tmp_path / "storage_kg"
+    _release(root, "qwen3_235b_580papers", "v1")
+    _release(root, "rsoxs", "v3")
+    _release(root, "rsoxs", "v4")
+    files = _flat(tmp_path, "bl1101_v9", "rsoxs_v2", "rsoxs_v10")
+    entities, links = seed_rows()
+
+    def sources(live=None, flat=files, rel=root):
+        out = gs.GraphSources(flat_json=lambda: flat, release_root=rel, tiled=FakeScanner(entities, links))
+        out.set_editable((lambda c: c == live) if live else None)
+        return out
+
+    # (1) the newest release of the live corpus wins over everything, even a Tiled graph being listed
+    assert sources(live="rsoxs").listing().default == "json:rsoxs/v4"
+    assert sources(live="qwen3_235b_580papers").listing().default == "json:qwen3_235b_580papers/v1"
+    # (2) no live corpus: the newest matkg_rsoxs_vN file (numeric, v10 > v2), as the Settings default picks
+    assert sources().listing().default == "json:rsoxs_v10"
+    # (3) no rsoxs file: the newest release of any corpus (corpus name, then version)
+    assert sources(flat=_flat(tmp_path, "bl1101_v9")).listing().default == "json:rsoxs/v4"
+    # (4) only flat files: the first one in listing order; nothing JSON: None
+    assert sources(flat=_flat(tmp_path, "bl1101_v9", "zzz"), rel=None).listing().default == "json:bl1101_v9"
+    assert sources(flat=[], rel=None).listing().default is None
+    assert sources().listing().as_json()["default"] == "json:rsoxs_v10"
+
+
 # --------------------------------------------------------------------------- routes (local)
 
 def test_the_policy_row_is_the_same_entry_capability_as_get_graph():

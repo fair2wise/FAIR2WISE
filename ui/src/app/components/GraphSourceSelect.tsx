@@ -1,7 +1,14 @@
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { ApiError, HIDDEN_STATUSES } from './apiHttp';
-import { getSelectedGraphSource, setSelectedGraphSource, useGraphSourceState } from './graphSourceStore';
+import { loadAgentSettings } from './agentSettings';
+import {
+  applyDefaultGraphSource,
+  clearGraphSourceChoice,
+  getSelectedGraphSource,
+  setSelectedGraphSource,
+  useGraphSourceState,
+} from './graphSourceStore';
 import { useGraphSources } from './graphSourcesHooks';
 import type { GraphSourceInfo, GraphSourceListing } from './graphSourcesApi';
 
@@ -12,6 +19,11 @@ export const DEFAULT_SOURCE_VALUE = '';
 export function sourceOptionLabel(source: GraphSourceInfo): string {
   const count = source.node_count === null ? '' : ` (${source.node_count.toLocaleString()} nodes)`;
   return `${source.label}${count}`;
+}
+
+/** Label of the "no `source`" option: the graph chosen in Settings, named when it is Splash Links. */
+export function settingsGraphLabel(): string {
+  return loadAgentSettings().graphSource === 'splash_links' ? 'Splash Links (Settings graph)' : 'Default graph';
 }
 
 /** Human readable kind of a source id, for the badge. */
@@ -43,14 +55,18 @@ export function GraphSourceSelect({ onChange }: { onChange?: (id: string | null)
   const { selected, loading, error } = useGraphSourceState();
   const listing = query.data;
 
-  // A remembered id the server no longer lists (file removed, Tiled graph gone): fall back to the default.
+  // A remembered id the server no longer lists (file removed, Tiled graph gone): forget it, so the default applies.
+  // With no choice made at all the viewer opens on the server's default JSON KG (owner bug list 2026-11, task 5);
+  // "Splash Links" / the Settings graph stays selectable as the first option and is remembered once picked.
   useEffect(() => {
-    if (!listing || listing.tiled.status === 'unavailable') return;
+    if (!listing) return;
     const current = getSelectedGraphSource();
-    if (current !== null && !listing.sources.some(source => source.id === current)) {
-      setSelectedGraphSource(null);
+    if (current !== null && listing.tiled.status !== 'unavailable' && !listing.sources.some(source => source.id === current)) {
+      clearGraphSourceChoice();
       onChange?.(null);
     }
+    const applied = applyDefaultGraphSource(listing.default);
+    if (applied) onChange?.(listing.default);
   }, [listing, onChange]);
 
   if (isHidden(query.error)) return null;
@@ -78,7 +94,7 @@ export function GraphSourceSelect({ onChange }: { onChange?: (id: string | null)
           }}
           className="max-w-[16rem] bg-transparent text-sm font-medium text-slate-700 outline-none"
         >
-          <option value={DEFAULT_SOURCE_VALUE}>Default graph</option>
+          <option value={DEFAULT_SOURCE_VALUE}>{settingsGraphLabel()}</option>
           {selected !== null && !known ? <option value={selected}>{selected}</option> : null}
           {json.length > 0 ? (
             <optgroup label="JSON KGs">

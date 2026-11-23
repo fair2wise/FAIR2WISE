@@ -187,7 +187,7 @@ export function loadAgentSettings(): AgentSettings {
     return {
       backend,
       model: normalizeModel(parsed.model, backend),
-      graphSource: parsed.graphSource === 'json' ? 'json' : 'splash_links',
+      graphSource: parsed.graphSource === 'splash_links' ? 'splash_links' : 'json',
       workflowMode: parsed.workflowMode === 'deterministic' ? 'deterministic' : DEFAULT_AGENT_SETTINGS.workflowMode,
       extractionMode: normalizeExtractionMode(parsed.extractionMode),
       targetedMaxPages: typeof parsed.targetedMaxPages === 'number' && parsed.targetedMaxPages > 0

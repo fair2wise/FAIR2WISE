@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GraphSourceSelect, sourceKindLabel, sourceOptionLabel } from './GraphSourceSelect';
+import { DEFAULT_AGENT_SETTINGS, saveAgentSettings } from './agentSettings';
 import { getSelectedGraphSource, resetGraphSourceStore, setGraphSourceStatus, setSelectedGraphSource } from './graphSourceStore';
 import { parseGraphSourceListing } from './graphSourcesApi';
 
@@ -31,6 +32,46 @@ beforeEach(() => {
   resetGraphSourceStore();
 });
 afterEach(() => vi.unstubAllGlobals());
+
+describe('GraphSourceSelect default source (task 5)', () => {
+  const withDefault = (id: string | null) => ({ ...listing(), default: id });
+
+  it('opens on the server default JSON KG when the user never chose, without remembering it', async () => {
+    stubListing(withDefault('json:rsoxs_v1'));
+    const onChange = vi.fn();
+    renderSelect(onChange);
+    await waitFor(() => expect(getSelectedGraphSource()).toBe('json:rsoxs_v1'));
+    expect(onChange).toHaveBeenCalledWith('json:rsoxs_v1');
+    expect((screen.getByRole('combobox', { name: 'Graph source' }) as HTMLSelectElement).value).toBe('json:rsoxs_v1');
+    expect(window.localStorage.getItem('fair2wise-graph-source-v1')).toBeNull();
+  });
+
+  it('keeps Splash Links selectable and remembers that explicit choice over the default', async () => {
+    saveAgentSettings({ ...DEFAULT_AGENT_SETTINGS, graphSource: 'splash_links' });
+    stubListing(withDefault('json:rsoxs_v1'));
+    renderSelect();
+    await waitFor(() => expect(getSelectedGraphSource()).toBe('json:rsoxs_v1'));
+    const select = screen.getByRole('combobox', { name: 'Graph source' });
+    const splash = await screen.findByRole('option', { name: 'Splash Links (Settings graph)' });
+    fireEvent.change(select, { target: { value: splash.getAttribute('value') } });
+    expect(getSelectedGraphSource()).toBeNull();
+    cleanup();
+    stubListing(withDefault('json:rsoxs_v1'));
+    renderSelect();
+    await waitFor(() => expect(screen.getByRole('option', { name: /matkg_rsoxs_v1/ })).toBeInTheDocument());
+    expect(getSelectedGraphSource()).toBeNull();
+  });
+
+  it('never overrides a remembered source, and ignores a default that is not a listed JSON source', async () => {
+    setSelectedGraphSource('tiled:e2e_demo');
+    stubListing(withDefault('json:rsoxs_v1'));
+    renderSelect();
+    await waitFor(() => expect(screen.getByRole('option', { name: /matkg_rsoxs_v1/ })).toBeInTheDocument());
+    expect(getSelectedGraphSource()).toBe('tiled:e2e_demo');
+    expect(parseGraphSourceListing({ ...listing(), default: 'json:ghost' }).default).toBeNull();
+    expect(parseGraphSourceListing({ ...listing(), default: 'tiled:e2e_demo' }).default).toBeNull();
+  });
+});
 
 describe('GraphSourceSelect', () => {
   it('lists the default graph, JSON KGs and Tiled graphs in groups, with node counts', async () => {
