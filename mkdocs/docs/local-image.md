@@ -200,7 +200,7 @@ Source: the "E2E rehearsal record" in
 The image installs every `[project.scripts]` entry of `pyproject.toml`
 (`f2w-run`, `f2w-tiled-server`, `f2w-harvest`, `f2w-paper-finder`,
 `f2w-corpus-qa`, `f2w-download-pdfs`, `f2w-repair-corpus`, `f2w-kg-snapshot`,
-`f2w-kg-release`, `f2w-kg-adopt`) as a launcher in `/usr/local/bin`. The
+`f2w-kg-release`, `f2w-kg-adopt`, `f2w-library-backfill`, `f2w-doctor`) as a launcher in `/usr/local/bin`. The
 generator is `docker/entrypoint/install_console_scripts.py`, run by the
 Dockerfile; each launcher runs the image's Python in isolated mode and adds
 `/app` to the path itself, because `-I` ignores `PYTHONPATH`. Check with
@@ -308,3 +308,7 @@ IPv6 sources the same label as global destinations, so IPv6 wins). Nothing else 
 IPv6 it falls back to IPv4. `F2W_GAI_CONF=none` skips the mount. Check from inside a running container:
 `docker exec f2w-local python -c "import socket;print(socket.getaddrinfo('api.cborg.lbl.gov',443)[0][0])"`
 should print `AddressFamily.AF_INET6`. On LBLnet or the VPN IPv4 is also authorized and the mount is harmless.
+
+To test authorization instead of guessing, run `docker exec f2w-local f2w-doctor --only cborg`: it makes one keyed model-list
+call and prints `cborg: ok` or `cborg: ip_not_authorized` (a call without a key cannot tell, so no key prints `cborg: no_key`).
+See [Standalone install](standalone-install.md#5-f2w-doctor-implemented).

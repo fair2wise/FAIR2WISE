@@ -1,6 +1,6 @@
 # Standalone install from a pulled image (scoping plan)
 
-Status: plan, nothing here is built. Requirement (owner): install FAIR2WISE on a fresh machine from a
+Status: plan; items 1 and 2 of section 7 (the `.env.example` and `f2w-doctor`) are built, the rest is not. Requirement (owner): install FAIR2WISE on a fresh machine from a
 pulled image, the shipped KGs working, every external connection set in **one env file**, no Keycloak, no
 Traefik. The `:local` image already runs without either (`F2W_AUTHORIZATION_MODE=local_trusted`,
 `docker/profiles/local.json`); what is missing is the packaging around it. Items marked *unverified* were
@@ -200,31 +200,52 @@ approval is the owner's act (`seed.sh --i-approve`). Gap: `f2w-kg-adopt` needs `
 from the image label via `docker inspect`, which is not visible inside the container, so the image must expose its
 commit another way.
 
-## 5. `f2w-doctor` spec
+## 5. `f2w-doctor` (implemented)
 
-`docker run --rm --env-file f2w.env --entrypoint f2w-doctor IMAGE` (the image entrypoint is the supervisor; also usable via `docker exec`). Prints states only.
+Console script `f2w-doctor` (`app/modules/commands/doctor.py`, launch facade `scripts/doctor.py`; the image installs
+it like every `[project.scripts]` entry). Run it where the app runs, with the app's environment:
 
-| Check | States |
-|---|---|
-| CBORG | `ok`, `ip_not_authorized` (distinct, from `is_ip_not_authorized`), `key_missing`, `rejected`, `unreachable` |
-| OpenAlex, arXiv | `ok`, `unreachable`, `proxy_blocked` |
-| Ollama | `unset`, `ok`, `empty`, `unreachable`, `error` (the states of `ollama_catalog.py`) |
-| Library dir, state dir | `writable`, `read_only`, `missing`, `wrong_owner` |
+```sh
+docker exec f2w-local f2w-doctor                       # a running container: sees the image profile's values
+docker run --rm --env-file f2w.env --entrypoint f2w-doctor IMAGE   # sees only what the env file sets
+f2w-doctor --json --only cborg,openalex --timeout 15
+```
 
-Exit codes: 0 all required ok; 1 an optional check failed (Ollama, OpenAlex); 2 a required one failed (CBORG,
-state dir); 78 the env file is refused by the profile (as the supervisor). Never prints a key, host, address, URL or
-response body; reuses `cborg_errors`, `model_catalog` and `ollama_catalog`, which already return fixed messages.
+It prints one `<name>: <state>` line per check and nothing else, and never a key, host, address, path, URL or
+proxy: the states come from a fixed vocabulary, never from an error message.
+
+| Check | What it does | States |
+|---|---|---|
+| `cborg` | **one keyed** `GET {CBORG_BASE_URL}/models` through the app's own client (address pinning, proxies), classified with `app/modules/cborg_errors.py` | `ok`, `ip_not_authorized`, `auth_failed` (401, or a 403 that is not the address refusal), `unreachable`, `no_key`, `timeout`, `error` |
+| `openalex` | `GET /works?per-page=1` through the hardened fetch helper (egress policy); `OPENALEX_API_KEY` from the process environment, in the `Authorization` header only | `ok`, `unreachable`, `timeout`, `blocked_by_proxy` (the proxy refused the tunnel), `blocked_by_policy` (the egress policy refused the URL), `no_key` (401/403 and no key set), `rejected` (401/403 with a key), `rate_limited`, `error` |
+| `arxiv` | one query to `export.arxiv.org`, same helper, no key | as OpenAlex without `no_key`/`rejected` |
+| `ollama` | the model list of `app/modules/ollama_catalog.py` | `ok` (answered, even with zero models), `unreachable`, `timeout`, `error`, `skipped` (`OLLAMA_URL` unset) |
+| `library`, `state` | creates and removes a temporary file in `F2W_LIBRARY_DIR` and `F2W_WORKDIR` | `ok`, `not_writable`, `missing`, `skipped` (variable unset) |
+| `tiled_key` | the managed Tiled writer key file (`F2W_TILED_WRITER_SECRET_FILE`, else `$F2W_TILED_DATA_DIR/secrets/writer.key`) against the AUD-15 rule (mode 0600 or 0400, owned by the running user) | `ok`, `too_open`, `missing`, `error`, `skipped` |
+
+A keyless CBORG call cannot tell authorized from unauthorized (section 1), so with no key the state is `no_key`,
+never `ok`. `skipped` means the setting is not configured and does not fail the run.
+
+Flags: `--json` prints `{"checks": [{"name": ..., "state": ...}], "ok": true|false}`; `--timeout SECONDS`
+(default 8) bounds each network call; `--only a,b` and `--skip a,b` choose checks (names above, always run in
+the order shown). Exit status: 0 every check `ok` or `skipped`, 1 any other state, 2 usage error.
 
 ```text
-f2w-doctor
-  cborg      ip_not_authorized   connect via LBLnet/VPN or authorize the address
-  openalex   ok
-  arxiv      ok
-  ollama     unset
-  library    writable
-  state      writable
-exit 2
+$ f2w-doctor
+cborg: ip_not_authorized
+openalex: ok
+arxiv: ok
+ollama: skipped
+library: ok
+state: ok
+tiled_key: skipped
+$ echo $?
+1
 ```
+
+Tests (`tests/commands/test_doctor.py`) inject the HTTP layer and cover every state, the scrub (a fake key, host
+and address that appear in the underlying error text never reach stdout, stderr or `--json`), the flags and the
+exit codes. It has not been run against the real CBORG, OpenAlex, arXiv or Ollama.
 
 ## 6. Publishing a pullable tag
 
@@ -251,7 +272,7 @@ Agent = app code or docs in the repo; Deploy = `docker/`, `deploy/`, workflows (
 | # | Item | Side | Effort | Depends on |
 |---|---|---|---|---|
 | 1 | Reconcile `.env.example` (section 2), fix `splash` default | Agent, **done** | S, 1-2 h | none |
-| 2 | `f2w-doctor` command and tests | Agent | M, 6-10 h | 1 |
+| 2 | `f2w-doctor` command and tests | Agent, **done** | M, 6-10 h | 1 |
 | 3 | `f2w-init` (dirs, adopt, marker) and image commit exposure | Agent + Deploy (entrypoint, Dockerfile) | M, 6-8 h | owner call on commit exposure |
 | 4 | Standalone compose file and install page | Deploy | S-M, 3-5 h | 1, 3 |
 | 5 | KG trim in image, profile `F2W_GRAPH` repoint | Deploy | S, 2-3 h | owner data choice |

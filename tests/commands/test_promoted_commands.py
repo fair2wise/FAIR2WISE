@@ -28,6 +28,7 @@ EXPECTED = {
     "f2w-kg-release": ("commands.prepare_kg_release", "main", "prepare_kg_release.py"),
     "f2w-kg-adopt": ("commands.adopt_legacy_kg", "main", "adopt_legacy_kg.py"),
     "f2w-library-backfill": ("commands.backfill_library_metadata", "main", "library_backfill.py"),
+    "f2w-doctor": ("commands.doctor", "main", "doctor.py"),
 }
 SECRETISH = re.compile(r"key|token|secret|password|passwd|credential", re.I)
 

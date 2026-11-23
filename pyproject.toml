@@ -107,6 +107,7 @@ f2w-kg-snapshot = "f2w.modules.commands.build_kg_snapshot:main"
 f2w-kg-release = "f2w.modules.commands.prepare_kg_release:main"
 f2w-kg-adopt = "f2w.modules.commands.adopt_legacy_kg:main"
 f2w-library-backfill = "f2w.modules.commands.backfill_library_metadata:main"
+f2w-doctor = "f2w.modules.commands.doctor:main"
 
 [tool.setuptools]
 package-dir = { "f2w" = "app" }
