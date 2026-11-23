@@ -60,9 +60,10 @@ from typing import TYPE_CHECKING, Any
 from fastapi import FastAPI
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from ..modules import tracing
+from ..modules import metrics, tracing
 from ..modules.deployment.front import FrontApp, front_enabled, ui_root_from_env
 from ..modules.deployment.gateway import MODEL_API_MOUNT, layout_from_env
+from ..modules.metrics.asgi import install as install_metrics_middleware
 from ..modules.security.authorization import StartupConfigError
 from ..modules.tracing.asgi import install as install_tracing_middleware
 from .auth import undeclared_routes, warn_if_exposed
@@ -407,6 +408,9 @@ def create_api_app(
     # Request spans (OpenTelemetry): added only when tracing is on, so a default deployment keeps its stack.
     tracing.init(process="api")
     install_tracing_middleware(app)
+    # Request metrics: likewise only when F2W_METRICS_ENABLED and an OTLP endpoint are set.
+    metrics.init(process="api")
+    install_metrics_middleware(app)
     missing = undeclared_routes(app)
     if missing:  # DEP-19 at startup: every mounted route carries a declared policy (fail closed)
         raise StartupConfigError(f"config_rejected: routes without a declared access policy: {', '.join(missing)}")

@@ -266,3 +266,79 @@ What was and was not run: the exporter and the span shapes were checked against 
 (2.3.0 and 2.22.0), and the Jaeger configuration in the ConfigMap was run under the same container hardening
 (read-only root, non-root, no capabilities). The manifests themselves were checked structurally, not applied to
 a cluster, and the hub's collector (contrib 0.120.0) was not run.
+
+## Metrics (OpenTelemetry over OTLP/HTTP to a collector, scraped by Prometheus)
+
+FAIR2WISE can also export application **metrics** (request rates and latencies, jobs, model calls, harvest,
+Tiled and library operations). Like tracing it is **off by default** and costs nothing when off: no SDK import,
+and every instrument call returns at once. Recording is in memory only; the OpenTelemetry SDK exports on its
+own thread every `F2W_METRICS_EXPORT_INTERVAL_S` seconds, so a slow or dead collector never delays or fails a
+request or a job. A failed export logs one warning, and one note when exports recover.
+
+Metrics are on only when **both** `F2W_METRICS_ENABLED` is truthy **and** `OTEL_EXPORTER_OTLP_ENDPOINT` is set
+(there is no default endpoint). The API process and the worker process each export their own series
+(`f2w.process` = `api` or `worker`).
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `F2W_METRICS_ENABLED` | unset (off) | `1`, `true`, `yes` or `on` turns metrics on (and an endpoint must be set) |
+| `F2W_METRICS_EXPORT_INTERVAL_S` | `15` | seconds between exports; values below `1` are raised to `1` |
+
+Reused, not new (see the table above): `OTEL_EXPORTER_OTLP_ENDPOINT` (the metrics URL is the base URL plus
+`/v1/metrics`; a trailing `/v1/traces` is stripped; `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` is **not** read),
+`OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_SERVICE_NAME`, `F2W_OTEL_EXPORT_TIMEOUT_S` (export timeout, default 3 s),
+`F2W_CODE_COMMIT`/`GIT_COMMIT` and `F2W_IMAGE_PROFILE` (resource attributes). The exporter is the same
+`requests`-based OTLP/HTTP exporter as tracing, so it honours `NO_PROXY` and never goes through the egress proxy.
+
+**Temporality is pinned to cumulative** for counters, histograms and gauges, set explicitly in code;
+`OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE` is ignored.
+
+**Resource.** A small, separate metrics resource built with the plain SDK constructor: `service.name`, `f2w.process`, and
+`f2w.profile` when set. Nothing else: no `service.instance.id` (the SDK's default would be a random uuid per start,
+which the collector turns into the Prometheus `instance` label), no `telemetry.sdk.*`, `process.pid`, `host.name`,
+and no commit (traces keep `f2w.code_commit`). A restart or a new release therefore continues the same series.
+The commit is exposed by one metric, `f2w.build.info`, instead.
+
+### Instruments
+
+| OTel name | Type, unit | Labels | Prometheus name |
+| --- | --- | --- | --- |
+| `f2w.build.info` | observable gauge, `{info}` | `commit`, `profile` | `f2w_build_info` (value 1; emitted by the API process only, not the worker) |
+| `f2w.http.requests` | counter, `{request}` | `http_route`, `http_method`, `status_class` | `f2w_http_requests_total` |
+| `f2w.http.request.duration` | histogram, `s` | `http_route`, `http_method`, `status_class` | `f2w_http_request_duration_seconds_bucket`, `_sum`, `_count` |
+
+`http_route` is the matched route **template** (`/v1/jobs/{job_id}`), never the raw path; a request that matched
+no route is `unmatched`. `status_class` is `2xx`..`5xx`. Health probes (`/livez`, `/readyz`, `/health`,
+`/healthz`) are not counted. Histogram boundaries (seconds, set with OpenTelemetry Views):
+`0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30`. Long streams (job events) fall in the top bucket.
+
+**Label safety.** Every label value comes from a closed set (or a route template the application declared);
+anything else becomes `other`. DOIs, URLs, query strings, uuids, file names, node ids, paper titles, user ids
+and prompts can never be a label value. Model names are not a label.
+
+### Collector requirements
+
+The collector (the hub's, or one you run) must provide:
+
+- an `otlp` receiver with the `http` protocol on port 4318;
+- a metrics pipeline `otlp` receiver to `prometheus` exporter, the exporter listening on an internal port;
+- on the Prometheus exporter, `resource_constant_labels` with `included: ["f2w.process", "f2w.profile"]` (it takes
+  precedence), so those resource attributes become the labels `f2w_process` and `f2w_profile`; safe, because the
+  metrics resource carries no per-restart ids. `resource_to_telemetry_conversion` does the same for every
+  attribute but is deprecated in collector 0.165.0; use it only as an alternative. `target_info` carries the
+  resource attributes by default;
+- `metric_expiration` of about `5m` on the Prometheus exporter, so series of a retired pod disappear;
+- one Prometheus scrape job against the collector's exporter port;
+- NetworkPolicies allowing Prometheus to the collector on the exporter port, and the FAIR2WISE pods to the
+  collector on 4318;
+- `NO_PROXY` in the FAIR2WISE Deployment must cover the collector Service name (otherwise the exporter would
+  try the egress proxy).
+
+**Single replica assumed.** FAIR2WISE runs as exactly one replica (SQLite stores, `Recreate` rollout), so the
+metrics resource deliberately has no per-pod attribute: one API process and one worker process produce one series
+each, and a restart continues it. If the Deployment were ever scaled beyond one replica, cumulative series from
+the replicas would collide in the collector, and a per-pod attribute would have to be added (at the cost of series
+churn on every restart).
+
+The collector target is `opentelemetry-collector-contrib` 0.165.0; the Prometheus names above are confirmed
+against it on the pilot, not before.

@@ -16,7 +16,7 @@ import sys
 import threading
 from typing import Any, cast
 
-from .. import tracing
+from .. import metrics, tracing
 from .executor import WorkerExecutor
 
 _FACTORY = re.compile(r"^app\.modules(\.[A-Za-z_][A-Za-z0-9_]*)+:[A-Za-z_][A-Za-z0-9_]*$")
@@ -39,6 +39,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args(argv)
     tracing.init(process="worker")  # no-op unless F2W_OTEL_ENABLED; flushed at exit
+    metrics.init(process="worker")  # no-op unless F2W_METRICS_ENABLED and an OTLP endpoint; flushed at exit
     service = load_factory(args.factory)(args.db)
     executor = WorkerExecutor(service, max_concurrency=args.concurrency).start()
     stop = threading.Event()
