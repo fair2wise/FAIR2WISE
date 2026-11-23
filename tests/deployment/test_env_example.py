@@ -18,8 +18,6 @@ _VALUE_LINE = re.compile(r"^([A-Z][A-Z0-9_]*)=(.*)$")
 # Optional (commented-out) settings are written as `# NAME=value` and count as listed names too.
 _OPTIONAL_LINE = re.compile(r"^# ([A-Z][A-Z0-9_]*)=(.*)$")
 _TEXT_SUFFIXES = {".py", ".sh", ".toml", ".yaml", ".yml", ".json", ".md", ".txt", ".cfg", ".ini", ".env", ""}
-#: Names whose reader is on a branch not merged into this one yet. Remove an entry once its code lands.
-_READER_NOT_MERGED: frozenset[str] = frozenset({"F2W_METRICS_ENABLED"})
 
 
 def _entries() -> list[tuple[str, str, bool]]:
@@ -100,7 +98,7 @@ def test_every_listed_name_is_read_in_app_or_scripts() -> None:
     source = _source_text()
     stale = sorted({
         name for name, _, _ in _entries()
-        if name not in _READER_NOT_MERGED and not re.search(rf"(?<![A-Z0-9_]){re.escape(name)}(?![A-Z0-9_])", source)
+        if not re.search(rf"(?<![A-Z0-9_]){re.escape(name)}(?![A-Z0-9_])", source)
     })
     assert stale == [], f"names in .env.example that nothing in app/ or scripts/ references: {stale}"
 
