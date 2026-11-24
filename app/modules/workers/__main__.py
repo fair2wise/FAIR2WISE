@@ -17,6 +17,7 @@ import threading
 from typing import Any, cast
 
 from .. import metrics, tracing
+from ..jobs.log_retention import JobLogRetention
 from .executor import WorkerExecutor
 
 _FACTORY = re.compile(r"^app\.modules(\.[A-Za-z_][A-Za-z0-9_]*)+:[A-Za-z_][A-Za-z0-9_]*$")
@@ -44,6 +45,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     depth = getattr(service, "queue_depth", None)
     if callable(depth):  # the worker owns the queue, so it reports its depth (a factory may return a bare service)
         metrics.set_queue_depth_source(depth)
+    store = getattr(service, "store", None)
+    retention = None
+    if getattr(store, "log_dir", None) is not None:  # the worker alone prunes the job log files (never an API request)
+        retention = JobLogRetention.from_env(store).start()  # sweeps once now, then every 15 minutes
     executor = WorkerExecutor(service, max_concurrency=args.concurrency).start()
     stop = threading.Event()
     if threading.current_thread() is threading.main_thread():
@@ -56,6 +61,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             stop.wait()
     finally:
         clean = executor.shutdown()
+        if retention is not None:
+            retention.stop()
     return 0 if clean else 1
 
 

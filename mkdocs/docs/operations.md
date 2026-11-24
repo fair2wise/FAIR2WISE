@@ -161,3 +161,21 @@ around graph mutation, see [Data provenance](provenance.md) and
 | `.cache/pystow/` | Repository-local PyStow cache |
 
 These are runtime artifacts and should not be treated as source modules.
+
+## Job log files
+
+Besides the last 2,000 lines per job kept in the job database (the `/v1/jobs/{id}/logs` API), the job store appends
+every stored log line of a job to its own file, `<jobs-db-dir>/job-logs/<job_id>.log` (the directory beside the jobs
+SQLite file; created `0600`, at most 5 MiB per job, one tab-separated line per record). Lines are scrubbed before they
+are stored (credentials, tokens and absolute local paths are reduced or removed), so the files hold the same text the
+API shows, only the whole run instead of the tail. The API never serves the files; they are for the operator.
+
+Only the worker prunes them, once when it starts and then every 15 minutes (an API request never deletes anything):
+
+- files not modified for `F2W_JOB_LOG_RETENTION_DAYS` days (default `30`) are removed;
+- if the files still add up to more than `F2W_JOB_LOG_MAX_MIB` MiB (default `500`), the oldest are removed until they fit;
+- the log of a running or leased job and any file modified in the last five minutes are never removed;
+- only regular files named `<job id>.log` directly in that directory are considered: symlinks, other names and
+  subdirectories are ignored, and nothing is followed;
+- each sweep writes one line to the worker's log with counts (no paths); an error in a sweep is logged and never
+  stops the worker. Setting a limit to `0` turns that rule off.

@@ -69,6 +69,8 @@ directory by the standard launcher.
 | `F2W_CANDIDATE_POOL` | `25` | Literature candidates searched |
 | `F2W_DOWNLOAD_DELAY` | `0` in UI launcher | Delay between download attempts |
 | `F2W_WORKERS` | `8` | Page extraction workers |
+| `F2W_JOB_LOG_RETENTION_DAYS` | `30` | Worker only: per-job log files in `<jobs-db-dir>/job-logs/` older than this many days are deleted (`0` turns the age rule off). See [Job log files](operations.md#job-log-files) |
+| `F2W_JOB_LOG_MAX_MIB` | `500` | Worker only: the job log directory is kept within this many MiB by deleting the oldest files first (`0` turns the size rule off) |
 | `F2W_WORKFLOW_MODE` | `agentic` | `agentic` or `deterministic` |
 | `F2W_EXTRACTION_MODE` | `targeted` | `targeted` or `full` |
 | `F2W_TARGETED_MAX_PAGES` | `6` | Per-PDF targeted page cap |
