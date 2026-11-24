@@ -3,7 +3,7 @@
 The instrumentation packages are not in ``pixi.lock``; adding them would pull more packages than the
 exporter does, so this middleware records the same semantic-convention attributes itself:
 ``http.request.method``, ``http.route`` (the matched route template once routing ran), ``url.path`` (the
-template when known, never the query string), ``http.response.status_code`` and the server duration
+template, or the literal ``unmatched`` for a request that matched no route: never the raw path or the query string), ``http.response.status_code`` and the server duration
 (``f2w.http.duration_ms``). Health and probe paths (``/livez``, ``/readyz``, ``/health``, ``/healthz``) are
 not traced. When tracing is on the response also carries ``X-F2W-Trace-Id`` (the 32-hex trace id, no body
 change) so a browser or curl user can look the request up in Jaeger.
@@ -31,18 +31,21 @@ def excluded(path: str) -> bool:
     return any(trimmed.endswith(p) for p in EXCLUDED_PATHS)  # each entry starts with "/", so this is a segment match
 
 
-def route_template(scope: Scope) -> str | None:
-    """The matched route's path template (``/v1/jobs/{job_id}``), or ``None`` before/without routing."""
-    route = scope.get("route")  # set by FastAPI's routes
-    template = getattr(route, "path", None)
-    if isinstance(template, str):
-        return template
-    params = scope.get("path_params") or {}  # plain Starlette: rebuild the template from the matched parameters
-    if not params:
+def request_route(scope: Scope) -> str | None:
+    """The matched route template, or ``None`` for a request that matched no declared route (a 404).
+
+    Uses the helpers of the metrics middleware (``matched_template``, ``declared_routes`` and the label rule
+    ``http_route``), so traces and metrics agree on what is a route and a raw path can never be returned.
+    """
+    from ..metrics import labels
+    from ..metrics.asgi import declared_routes, matched_template
+
+    try:
+        known = declared_routes(scope.get("app"))
+        route = labels.http_route(matched_template(scope), known)
+    except Exception:  # a custom route type: treat as unmatched rather than record the path
         return None
-    by_value = {str(value): name for name, value in params.items()}
-    segments = [f"{{{by_value[seg]}}}" if seg in by_value else seg for seg in str(scope.get("path", "")).split("/")]
-    return "/".join(segments)
+    return None if route == labels.UNMATCHED else route
 
 
 def _incoming_traceparent(scope: Scope) -> str | None:
@@ -63,12 +66,13 @@ class TracingMiddleware:
         if scope["type"] != "http" or not runtime.is_enabled() or excluded(scope.get("path", "")):
             await self.app(scope, receive, send)
             return
-        method = str(scope.get("method", "GET"))
+        from ..metrics.labels import http_method
+
+        method = http_method(scope.get("method", "GET"))  # a closed set: a raw method token is client text
         started = time.perf_counter()
         status: list[int] = []
         parent = _incoming_traceparent(scope)
-        with runtime.start(method, {"http.request.method": method, "url.path": scope.get("path", ""),
-                                    "url.scheme": scope.get("scheme", "http")},
+        with runtime.start(method, {"http.request.method": method, "url.scheme": scope.get("scheme", "http")},
                            traceparent=parent if runtime.valid_traceparent(parent) else None,
                            kind="server") as handle:
             trace_id = handle.trace_id
@@ -88,10 +92,11 @@ class TracingMiddleware:
 
     @staticmethod
     def _finish(handle: runtime.SpanHandle, scope: Scope, method: str, status: list[int], started: float) -> None:
-        template = route_template(scope)
+        template = request_route(scope)
+        handle.update_name(f"{method} {template or 'unmatched'}")
+        handle.set_attribute("url.path", template or "unmatched")
         if template:
-            handle.update_name(f"{method} {template}")
-            handle.set_attributes({"http.route": template, "url.path": template})
+            handle.set_attribute("http.route", template)
         handle.set_attribute("f2w.http.duration_ms", round((time.perf_counter() - started) * 1000, 3))
         if status:
             handle.set_attribute("http.response.status_code", status[0])

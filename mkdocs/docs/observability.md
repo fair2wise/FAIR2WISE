@@ -51,7 +51,11 @@ Resource attributes on every span: `service.name`, `service.version`, `f2w.code_
 
 **Request spans.** Every API request is a `SERVER` span named `<METHOD> <route template>` (for example
 `POST /chat`, `GET /v1/jobs/{job_id}`) with `http.request.method`, `http.route`, `url.path` (the template, never the
-query string), `http.response.status_code`, `f2w.http.duration_ms`, and error status for a 5xx or an exception.
+raw path or the query string), `http.response.status_code`, `f2w.http.duration_ms`, and error status for a 5xx or an
+exception. A request that matches no route (a 404) is named `<METHOD> unmatched` and records `url.path` =
+`unmatched` and no `http.route`; the raw path (which may hold a DOI, a file name or an id) is never recorded. The
+route rule is the one the metrics middleware uses (`http_route` label), and a method outside the standard set is
+recorded as `other`.
 `/livez`, `/readyz`, `/health` and `/healthz` are not traced. An incoming `traceparent` header becomes the parent.
 
 **Function spans.** The built-in list below, plus whatever you add (next section). A call is one span with

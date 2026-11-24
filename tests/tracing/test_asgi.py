@@ -114,3 +114,60 @@ def test_disabled_installs_nothing_and_passes_requests_through() -> None:
     with TestClient(app) as client:
         response = client.get("/v1/jobs/1")
     assert response.status_code == 200 and "x-f2w-trace-id" not in response.headers
+
+
+RAW = ("/v1/papers/10.1000/xyz123/Nanoscale%20Perovskite%20Study", "/v1/jobs/job-0123456789abcdef01234567/nope")
+
+
+@pytest.mark.parametrize("path", RAW)
+def test_unmatched_request_records_no_raw_path(traced_app, path: str) -> None:  # noqa: ANN001
+    app, exporter = traced_app
+    with TestClient(app) as client:
+        assert client.get(f"{path}?doi=10.1000/abc&token={SECRET}").status_code == 404
+    (server,) = exporter.get_finished_spans()
+    assert server.name == "GET unmatched"
+    assert server.attributes["url.path"] == "unmatched" and "http.route" not in server.attributes
+    blob = " ".join(every_string([server]))
+    for needle in ("10.1000", "Perovskite", "xyz123", "job-0123", "nope", "doi=", "token", SECRET, "?"):
+        assert needle not in blob, needle
+
+
+def test_matched_route_is_the_template_and_unmatched_is_literal(traced_app) -> None:  # noqa: ANN001
+    app, exporter = traced_app
+    with TestClient(app) as client:
+        client.get("/v1/jobs/job-abc?x=1")
+        client.get("/v1/jobs/job-abc/extra")
+    ok, missing = [s for s in exporter.get_finished_spans() if s.kind.name == "SERVER"]
+    assert (ok.name, ok.attributes["http.route"], ok.attributes["url.path"]) == (
+        "GET /v1/jobs/{job_id}",) + ("/v1/jobs/{job_id}",) * 2
+    assert (missing.name, missing.attributes["url.path"]) == ("GET unmatched", "unmatched")
+
+
+def test_fastapi_unmatched_and_odd_method_record_no_client_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    from fastapi import FastAPI
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+    from app.modules.tracing import runtime
+
+    monkeypatch.setenv("F2W_OTEL_ENABLED", "1")
+    monkeypatch.setenv("F2W_OTEL_TRACE_FUNCTIONS", "")
+    monkeypatch.setenv("F2W_OTEL_TRACE_HTTP", "0")
+    memory = InMemorySpanExporter()
+    assert runtime.init(process="test", exporter=memory)
+    api = FastAPI()
+
+    @api.get("/v1/jobs/{job_id}")
+    def job(job_id: str) -> dict[str, str]:
+        return {"id": job_id}
+
+    asgi.install(api)
+    with TestClient(api) as client:
+        assert client.get("/v1/jobs/job-1").status_code == 200
+        assert client.get("/v1/papers/10.1000/secret-title").status_code == 404
+        client.request("SECRETMETHOD", "/v1/jobs/job-1")
+    ok, missing, odd = memory.get_finished_spans()
+    assert ok.name == "GET /v1/jobs/{job_id}" and ok.attributes["http.route"] == "/v1/jobs/{job_id}"
+    assert missing.name == "GET unmatched" and missing.attributes["url.path"] == "unmatched"
+    assert odd.attributes["http.request.method"] == "other" and odd.name.startswith("other ")
+    blob = " ".join(every_string([ok, missing, odd]))
+    assert "secret-title" not in blob and "SECRETMETHOD" not in blob and "job-1" not in blob
