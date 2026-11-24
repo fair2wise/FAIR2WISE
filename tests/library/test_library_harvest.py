@@ -476,3 +476,41 @@ def test_an_open_access_paper_whose_locations_give_no_link_is_failed_not_paywall
     handle, _ = world.run(sources=["arxiv"])
     row = world.store.candidates(handle.job_id)[0]
     assert row["status"] == "failed" and row["detail"] == "open access, but no direct PDF link was found"
+
+
+def test_an_http_link_on_a_blocked_port_is_retried_over_https_and_the_upgrade_is_recorded(tmp_path):
+    paper = cand(GOOD, doi="10.1/u", urls=["http://journal.example:8080/a.pdf"])
+    paper.oa = True
+    net = Net({"http://journal.example:8080/a.pdf": "blocked:port@journal.example",
+               "https://journal.example/a.pdf": pdf("upgraded")})
+    world = World(tmp_path, {"arxiv": fixed(paper)}, net)
+    handle, _ = world.run(sources=["arxiv"])
+    row = world.store.candidates(handle.job_id)[0]
+    assert net.calls == ["http://journal.example:8080/a.pdf", "https://journal.example/a.pdf"]
+    assert row["status"] == "downloaded" and row["link_rule"] == "arxiv+https_upgrade"
+    assert row["detail"] == "found via arxiv+https_upgrade (http upgraded to https)"
+
+
+def test_a_failed_upgrade_reports_the_upgrades_own_failure_and_other_blocks_are_not_retried(tmp_path):
+    paper = cand(GOOD, doi="10.1/v", urls=["http://journal.example:8080/a.pdf"])
+    paper.oa = True
+    other = cand("Resonant soft X-ray scattering private", doi="10.1/w", urls=["http://internal.example/b.pdf"])
+    other.oa = True
+    net = Net({"http://journal.example:8080/a.pdf": "blocked:port@journal.example", "https://journal.example/a.pdf": "failed:network",
+               "http://internal.example/b.pdf": "blocked:private_address@internal.example"})
+    world = World(tmp_path, {"arxiv": fixed(paper, other)}, net)
+    handle, _ = world.run(sources=["arxiv"])
+    rows = {r["title"]: r for r in world.store.candidates(handle.job_id)}
+    assert rows[GOOD]["status"] == "failed" and "failed:network" in rows[GOOD]["detail"] and "journal.example" in rows[GOOD]["detail"]
+    assert rows[other.title]["status"] == "blocked" and net.calls.count("http://internal.example/b.pdf") == 1
+    assert not any(c.startswith("https://internal.example") for c in net.calls)   # only a port block is upgraded
+
+
+def test_https_upgrade_only_changes_plain_http_and_drops_the_port():
+    from app.modules.library.harvest import https_upgrade
+
+    assert https_upgrade("http://host.example:8080/p/a.pdf?x=1") == "https://host.example/p/a.pdf?x=1"
+    assert https_upgrade("http://host.example/a.pdf") == "https://host.example/a.pdf"
+    assert https_upgrade("https://host.example:8443/a.pdf") is None
+    assert https_upgrade("http://user:pw@host.example/a.pdf") is None
+    assert https_upgrade("ftp://host.example/a.pdf") is None

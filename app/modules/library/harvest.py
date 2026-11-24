@@ -597,6 +597,21 @@ def _host(url: str) -> str:
         return "?"
 
 
+def https_upgrade(url: str) -> str | None:
+    """The same address over https (any explicit port dropped) for an ``http://`` URL, else ``None``.
+
+    Used when the network policy refused the http URL's port (it allows only 80 and 443): the https attempt goes through
+    the same checks as any download.
+    """
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return None
+    if parts.scheme != "http" or not parts.hostname or parts.username or parts.password:
+        return None
+    return parts._replace(scheme="https", netloc=parts.hostname).geturl()
+
+
 def file_stem(cand: Candidate) -> str:
     """A plain file name stem: the DOI with ``/`` as ``_`` (the harvest scripts' convention), else the arXiv id."""
     if cand.doi:
@@ -787,20 +802,19 @@ class Harvester:
         downloading()
         first_rule = "arxiv" if cand.source == "arxiv" else "openalex_selector"
         for link in self._links(ctx, cand, first_rule):
-            url = link.url
-            ctx.guard()
-            try:
-                data, status = downloader(url, max_bytes)
-            except Exception as exc:  # noqa: BLE001 - one paper's failure must not abort the rest of the run
-                data, status = None, f"failed:{type(exc).__name__}"
-            metrics.record_harvest_fetch(source="pdf", outcome=metrics.fetch_outcome(status))
-            self._sleep(self.delay)
+            url, rule = link.url, link.rule
+            data, status = self._fetch(ctx, downloader, url, max_bytes)
+            upgraded = https_upgrade(url) if status.startswith("blocked:port") else None
+            if data is None and upgraded:   # http on a port the policy does not allow: the same address over https
+                ctx.log(f"{cand.title[:70]}: {status.split('@', 1)[0]}; trying the same address over https", level="warning")
+                url, rule = upgraded, f"{link.rule}+https_upgrade"
+                data, status = self._fetch(ctx, downloader, url, max_bytes)
             if data is None:
                 last, last_url = status, url
                 ctx.log(f"{cand.title[:70]}: {status.split('@', 1)[0]} at {status.split('@', 1)[1] if '@' in status else _host(url)}"
-                        f" ({link.rule})", level="warning")
+                        f" ({rule})", level="warning")
                 continue
-            cand.link_rule = link.rule
+            cand.link_rule = rule
             known = {"year": cand.year, "title": cand.title, "doi": cand.doi, "arxiv_id": cand.arxiv_id,
                      "source": cand.source, "authors": cand.authors, "abstract": cand.abstract}
             try:
@@ -814,8 +828,8 @@ class Harvester:
             relpath = result["paper"]["relpath"]
             if result["duplicate"]:
                 return "in_library", f"identical to {relpath}", relpath, url
-            ctx.log(f"filed {relpath} (found via {link.rule})")
-            return "downloaded", f"found via {link.rule}", relpath, url
+            ctx.log(f"filed {relpath} (found via {rule})")
+            return "downloaded", f"found via {rule}" + (" (http upgraded to https)" if rule.endswith("+https_upgrade") else ""), relpath, url
         if not last:   # the open-access locations were searched and none gave a PDF link
             return "failed", "open access, but no direct PDF link was found", None, None
         status_text, _, hop_host = last.partition("@")
@@ -823,6 +837,17 @@ class Harvester:
         if status_text.startswith("blocked:"):   # the network policy refused it: not a paywall, and the fix is the allowlist
             return "blocked", f"open access, blocked by network policy ({status_text.split(':', 1)[1]}) at {host}", None, None
         return "failed", f"open access, but the fetch failed ({status_text or 'download failed'}) at {host}", None, None
+
+    def _fetch(self, ctx: StageContext, downloader: Downloader, url: str, max_bytes: int) -> tuple[bytes | None, str]:
+        """One download attempt with its metrics, politeness delay and the guard that one paper's failure aborts nothing."""
+        ctx.guard()
+        try:
+            data, status = downloader(url, max_bytes)
+        except Exception as exc:  # noqa: BLE001 - one paper's failure must not abort the rest of the run
+            data, status = None, f"failed:{type(exc).__name__}"
+        metrics.record_harvest_fetch(source="pdf", outcome=metrics.fetch_outcome(status))
+        self._sleep(self.delay)
+        return data, status
 
     def _links(self, ctx: StageContext, cand: Candidate, first_rule: str) -> Iterable[ResolvedLink]:
         """The links of a candidate: the ones the source listed, then (open access only) the ``oa_links`` rules, lazily."""

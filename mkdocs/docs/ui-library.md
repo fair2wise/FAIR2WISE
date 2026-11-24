@@ -88,6 +88,8 @@ Every request goes through the same network check as a download (scheme, port an
 
 The detail never holds a URL path, query or key, only the host and the reason.
 
+Reasons given for `blocked`: `private_address` (the host resolves to a private or otherwise non-public address in this deployment), `unresolvable` (the host does not resolve from the server), `scheme` and `credentials_in_url` (only plain http(s) links without user-info are fetched), `proxy_refused` (the egress proxy's allowlist said no), `too_many_redirects`, and **`port`**: the link names a port other than 80 or 443 (for example `http://host:8080/file.pdf`), which the network policy never connects to. For an `http://` link blocked on its port the Harvester tries the same address over `https://` (port 443, still through the network check); if that works the candidate records the rule as `<rule>+https_upgrade` and its detail says the link was upgraded, otherwise the status reports the https attempt's own failure.
+
 ## Not used: content.openalex.org
 
 OpenAlex offers cached full-text PDFs for about 60 million open-access works at `https://content.openalex.org/works/<id>.pdf`. It is **metered**: a key is required (a keyless request answers HTTP 401) and each download costs about $0.01 (OpenAlex's example-costs page lists the cached PDF at $10 per 1,000 calls; a free key's $1/day budget covers about 100). The PDFs keep their original copyright. **This is deliberately not used** (owner decision 2026-11-24): the Harvester does not request `content_urls`, does not use it as a candidate URL and has no pay-per-fetch route. Open-access papers are fetched only from the free links OpenAlex lists (repository and publisher open-access locations). Do not propose it again without a new decision.
