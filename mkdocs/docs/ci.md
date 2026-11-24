@@ -79,6 +79,7 @@ a venv without the OTLP exporter package makes mypy report two `import-not-found
 | Test | Symptom | Seen on | Status |
 |---|---|---|---|
 | Vitest `GraphMockupLarge.test.tsx`, "Show more steps 300 → 1,000 → 2,000" | timeout | red once on commit `5407976` (the `fair2wise`-prefix leg); green on later UI runs | open; cause believed to be load-dependent timing; no fix applied |
+| `tests/images/test_images_supervisor.py::test_optional_child_is_restarted_with_backoff_then_marked_failed` | `assert 'running' == 'failed'` (a restart-backoff timing assertion) | red once in a local shard 3 run on `d7640ae` while shards 1 and 2 were running in parallel; 4 reruns on the same code (alone, and under `-n 4`) passed | open; timing under machine load, no fix applied |
 
 Rerun a red leg once before treating it as a regression, and add a row here for any other test that fails once
 and passes on the same code.
