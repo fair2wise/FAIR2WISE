@@ -46,6 +46,10 @@ OpenTelemetry specification defines them.
 
 Resource attributes on every span: `service.name`, `service.version`, `f2w.code_commit`, `f2w.profile`,
 `f2w.process` (`api`, `worker`...), `host.name`, `process.pid`, runtime name and version.
+`f2w.code_commit` (spelled with an underscore) and the `commit` label of the `f2w.build.info` metric read the same source,
+`tracing.runtime.code_commit()`: `F2W_CODE_COMMIT`, else `GIT_COMMIT`, else `git rev-parse HEAD` of a checkout. An image
+has no `.git`, so with neither variable set the trace resource omits `f2w.code_commit` and the metric reports
+`commit="unknown"`; set one of the two variables at build time.
 
 ## What is traced
 
