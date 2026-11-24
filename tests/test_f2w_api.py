@@ -2732,23 +2732,78 @@ def test_node_route_builds_the_record_with_evidence_from_a_json_source(tmp_path)
     assert paper_a["snippets"][0]["text"] == "CDW order peaks at 283 eV."
 
 
-def test_node_route_response_withholds_snippet_text_under_the_disclosure_policy(tmp_path, monkeypatch):
-    """OWNER GATE: ``snippets`` is a private evidence key (disclosure ``_PRIVATE_KEY_RE``, ADR section 5), so the
-    projected ``GET /graph/node`` body keeps the bounded per-paper count but not the passages. Releasing the text to
-    the node card is a disclosure-policy decision; when the owner makes it, this test changes with that rule."""
+def _node_app(tmp_path, monkeypatch, raw):
     monkeypatch.setattr(api_mod, "RetrievalAgent", FakeRetrieval)
     monkeypatch.setattr(api_mod, "DownloadAgent", FakeDownload)
     monkeypatch.setattr(api_mod, "ExtractorAgent", FakeExtractor)
     graph = tmp_path / "kg.json"
-    graph.write_text(json.dumps({"things": [dict(_EVIDENCE_RAW)], "associations": []}), encoding="utf-8")
-    app = api_mod.create_app(CoordinatorConfig(graph=str(graph), workdir=tmp_path / "run", kg_mode="json"))
-    response = TestClient(app).get("/graph/node/matkg:cdw")
-    assert response.status_code == 200
-    papers = {p["source_paper"]: p for p in response.json()["publications"]}
-    paper_a = papers["10.1039_C8TC00875B.pdf"]
+    graph.write_text(json.dumps({"things": [raw], "associations": []}), encoding="utf-8")
+    return TestClient(api_mod.create_app(CoordinatorConfig(graph=str(graph), workdir=tmp_path / "run", kg_mode="json")))
+
+
+def test_node_route_response_withholds_snippet_text_unless_the_owner_opt_in_is_set(tmp_path, monkeypatch):
+    """OWNER GATE, OFF (default and any non-truthy value): ``snippets`` is a private evidence key (disclosure
+    ``_PRIVATE_KEY_RE``, ADR section 5), so the projected ``GET /graph/node`` body keeps the per-paper count and no text."""
+    client = _node_app(tmp_path, monkeypatch, dict(_EVIDENCE_RAW))
+    for value in (None, "", "0", "false", "off", "no", "maybe"):
+        if value is None:
+            monkeypatch.delenv("F2W_DISCLOSE_SNIPPETS", raising=False)
+        else:
+            monkeypatch.setenv("F2W_DISCLOSE_SNIPPETS", value)
+        response = client.get("/graph/node/matkg:cdw")
+        assert response.status_code == 200
+        papers = {p["source_paper"]: p for p in response.json()["publications"]}
+        paper_a = papers["10.1039_C8TC00875B.pdf"]
+        assert paper_a["snippet_count"] == 2
+        assert "snippets" not in paper_a
+        assert "CDW order peaks" not in response.text and "Second passage" not in response.text
+
+
+def test_node_route_response_releases_bounded_snippet_text_with_the_owner_opt_in(tmp_path, monkeypatch):
+    """OWNER GATE, ON (``F2W_DISCLOSE_SNIPPETS=1``, owner decision 2026-11-23, single-operator deployments): the
+    single-node body carries the bounded passages (20 per paper, 1,200 chars, 100 per node), scrubbed, count kept."""
+    monkeypatch.setenv("F2W_DISCLOSE_SNIPPETS", "1")
+    client = _node_app(tmp_path, monkeypatch, dict(_EVIDENCE_RAW))
+    body = client.get("/graph/node/matkg:cdw").json()
+    paper_a = {p["source_paper"]: p for p in body["publications"]}["10.1039_C8TC00875B.pdf"]
+    assert paper_a["snippets"] == [{"text": "CDW order peaks at 283 eV.", "page": 4}, {"text": "Second passage"}]
     assert paper_a["snippet_count"] == 2
-    assert "snippets" not in paper_a
-    assert "CDW order peaks" not in response.text
+
+    many = [{"text": f"passage {i} " + "x" * 3000, "source_paper": f"p{i % 8}.pdf", "page": i} for i in range(400)]
+    raw = {"id": "n", "name": "N", "publications": [{"source_paper": f"p{i}.pdf"} for i in range(8)],
+           "context_snippets": many}
+    (tmp_path / "b").mkdir()
+    body = _node_app(tmp_path / "b", monkeypatch, raw).get("/graph/node/n").json()
+    pubs = body["publications"]
+    texts = [item["text"] for pub in pubs for item in pub.get("snippets", [])]
+    assert all(len(pub.get("snippets", [])) <= 20 for pub in pubs)
+    assert len(texts) == 100
+    assert all(len(text) <= 1200 for text in texts)
+    assert sum(pub["snippet_count"] for pub in pubs) == 400
+
+
+def test_snippet_opt_in_scrubs_secrets_paths_and_never_reaches_other_surfaces(monkeypatch):
+    """The disclosure layer re-bounds and scrubs the passages itself, and only the node projection releases them."""
+    from app.modules.security import disclosure as disc
+    from app.modules.security.disclosure import DisclosureProjector
+
+    pub = {"source_paper": "a.pdf", "snippet_count": 3, "snippets": [
+        {"text": "key sk-abcdef123456789 and /Users/me/private/paper.pdf in text", "page": 2, "crop_path": "/x"},
+        {"text": "file:///etc/passwd"}, {"text": "  "}, "bare string", {"text": "ok", "page": True}]}
+    projector = DisclosureProjector()
+    monkeypatch.delenv("F2W_DISCLOSE_SNIPPETS", raising=False)
+    assert "snippets" not in projector.project_publication(pub)
+    monkeypatch.setenv("F2W_DISCLOSE_SNIPPETS", "true")
+    assert disc.snippets_disclosed()
+    # Chat, trace and export callers do not pass the node budget, so the key stays private even when on.
+    assert "snippets" not in projector.project_publication(pub)
+    out = projector.project_publication(pub, snippet_budget=[100])
+    assert out["snippet_count"] == 3  # type: ignore[index]
+    shown = out["snippets"]  # type: ignore[index]
+    assert [set(item) for item in shown] == [{"text", "page"}, {"text"}]
+    assert "sk-abcdef" not in shown[0]["text"] and "/Users/me" not in shown[0]["text"]
+    assert (disc.SNIPPETS_PER_PAPER, disc.SNIPPET_MAX_CHARS, disc.SNIPPETS_PER_NODE) == (
+        api_mod.EVIDENCE_SNIPPETS_PER_PAPER, api_mod.EVIDENCE_SNIPPET_MAX_CHARS, api_mod.EVIDENCE_NODE_MAX_SNIPPETS)
 
 
 def test_node_publications_derives_identifiers_from_pdf_filenames():

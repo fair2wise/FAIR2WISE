@@ -72,6 +72,7 @@ directory by the standard launcher.
 | `F2W_WORKFLOW_MODE` | `agentic` | `agentic` or `deterministic` |
 | `F2W_EXTRACTION_MODE` | `targeted` | `targeted` or `full` |
 | `F2W_TARGETED_MAX_PAGES` | `6` | Per-PDF targeted page cap |
+| `F2W_DISCLOSE_SNIPPETS` | off | Set to `1` (also `true`, `yes`, `on`) to show bounded verbatim supporting passages on the node card (`GET /graph/node/{id}`: at most 20 per paper, 1,200 characters each, 100 per node). Off: the card shows only the passage count. Owner opt-in (2026-11-23) for single-operator deployments only; leave it off on any multi-user or shared deployment. Read from the process environment at each response. |
 
 ## Retrieval
 

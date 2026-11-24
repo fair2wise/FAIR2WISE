@@ -39,6 +39,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 import hashlib
+import os
 import re
 import threading
 import time
@@ -142,6 +143,27 @@ DEFAULT_BUDGET = DisclosureBudget(
     max_actor_quoted_chars_per_work=None,
     max_region_fraction=0.4,
 )
+
+#: Owner decision (2026-11-23): bounded verbatim supporting passages (``publications[].snippets``) may be
+#: shown on the node card as an explicit opt-in for single-operator deployments. Off unless this variable
+#: is truthy; ``docs/adr/content-disclosure.md`` section 4.1.
+DISCLOSE_SNIPPETS_ENV = "F2W_DISCLOSE_SNIPPETS"
+#: Bounds applied again at the disclosure layer (they match the node record in ``f2w_agent.api``).
+SNIPPETS_PER_PAPER = 20
+SNIPPET_MAX_CHARS = 1200
+SNIPPETS_PER_NODE = 100
+_TRUTHY = frozenset({"1", "true", "yes", "on"})
+
+
+def snippets_disclosed(environ: Mapping[str, str] | None = None) -> bool:
+    """Return True when ``F2W_DISCLOSE_SNIPPETS`` opts in to node-card passages (default off).
+
+    Read from the process environment at each projection (``environ`` overrides it for tests), so the
+    setting follows the container's environment and never a request, header or stored user setting.
+    """
+    env = os.environ if environ is None else environ
+    return str(env.get(DISCLOSE_SNIPPETS_ENV) or "").strip().lower() in _TRUTHY
+
 
 # --------------------------------------------------------------------------- patterns
 
@@ -964,12 +986,42 @@ class DisclosureProjector:
 
     # ------------------------------------------------------------------ graph
 
-    def project_publication(self, pub: object) -> JsonValue:
-        """Bibliographic record: drop private keys, cut ``abstract_text``, redact paths."""
+    def _project_snippets(self, value: object, remaining: list[int]) -> list[dict[str, Any]]:
+        """Bounded ``[{text, page?}]`` passages: 20 per paper, 1,200 chars each, ``remaining[0]`` left per node.
+
+        Text goes through the same secret and path scrub as other free text; entries that are not
+        ``{text}`` mappings, are empty or look like artifact paths are dropped. Only ``text`` and an
+        integer ``page`` are kept.
+        """
+        out: list[dict[str, Any]] = []
+        for item in value if isinstance(value, list) else []:
+            if len(out) >= SNIPPETS_PER_PAPER or remaining[0] <= 0:
+                break
+            text = item.get("text") if isinstance(item, Mapping) else None
+            if not isinstance(text, str) or not text.strip() or self._artifact_value(text):
+                continue
+            entry: dict[str, Any] = {"text": self._safe_str(text.strip(), SNIPPET_MAX_CHARS)}
+            page = item.get("page")
+            if isinstance(page, int) and not isinstance(page, bool) and page >= 0:
+                entry["page"] = page
+            out.append(entry)
+            remaining[0] -= 1
+        return out
+
+    def project_publication(self, pub: object, *, snippet_budget: list[int] | None = None) -> JsonValue:
+        """Bibliographic record: drop private keys, cut ``abstract_text``, redact paths.
+
+        ``snippet_budget`` (one-item list of passages left for the node) is passed only by the
+        single-node projection while :func:`snippets_disclosed` is on; without it ``snippets`` is a
+        private evidence key and only ``snippet_count`` remains.
+        """
         if not isinstance(pub, Mapping):
             return pub
         out: dict[str, Any] = {}
         for key, value in pub.items():
+            if key == "snippets" and snippet_budget is not None:
+                out[key] = self._project_snippets(value, snippet_budget)
+                continue
             if _PRIVATE_KEY_RE.match(str(key)) or self._artifact_value(value):
                 continue
             if key in ("abstract_text", "abstract") and isinstance(value, str):
@@ -1045,7 +1097,9 @@ class DisclosureProjector:
                 text = self.project_text(value, viewer, evidence=evidence, sources=sources, state=state)
                 out[key] = _clip(self.redact_paths(text), self.budget.max_description_chars)
             elif key == "publications":
-                out[key] = [self.project_publication(p) for p in value] if isinstance(value, list) else value
+                budget = [SNIPPETS_PER_NODE] if snippets_disclosed() else None
+                out[key] = [self.project_publication(p, snippet_budget=budget) for p in value] \
+                    if isinstance(value, list) else value
             elif key == "code_snippet":
                 out[key] = self._project_code(value)
             elif key == "linked_code_snippets":
