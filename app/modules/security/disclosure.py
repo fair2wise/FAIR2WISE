@@ -152,6 +152,8 @@ DISCLOSE_SNIPPETS_ENV = "F2W_DISCLOSE_SNIPPETS"
 SNIPPETS_PER_PAPER = 20
 SNIPPET_MAX_CHARS = 1200
 SNIPPETS_PER_NODE = 100
+#: Total characters of passage text released per paper; a passage that would not fit is dropped whole.
+SNIPPETS_PER_PAPER_CHARS = 6000
 _TRUTHY = frozenset({"1", "true", "yes", "on"})
 
 
@@ -987,13 +989,20 @@ class DisclosureProjector:
     # ------------------------------------------------------------------ graph
 
     def _project_snippets(self, value: object, remaining: list[int]) -> list[dict[str, Any]]:
-        """Bounded ``[{text, page?}]`` passages: 20 per paper, 1,200 chars each, ``remaining[0]`` left per node.
+        """Bounded ``[{text, page?}]`` passages: 20 per paper, 1,200 chars each, 6,000 in total per paper.
+
+        ``remaining[0]`` is the number of passages left for the node.
+
+        The per-paper character cap works on whole passages in stored order: the first passage whose scrubbed
+        text would take the paper past ``SNIPPETS_PER_PAPER_CHARS`` ends the list (nothing is split mid-text
+        and nothing after it is shown).
 
         Text goes through the same secret and path scrub as other free text; entries that are not
         ``{text}`` mappings, are empty or look like artifact paths are dropped. Only ``text`` and an
         integer ``page`` are kept.
         """
         out: list[dict[str, Any]] = []
+        chars = 0
         for item in value if isinstance(value, list) else []:
             if len(out) >= SNIPPETS_PER_PAPER or remaining[0] <= 0:
                 break
@@ -1001,6 +1010,9 @@ class DisclosureProjector:
             if not isinstance(text, str) or not text.strip() or self._artifact_value(text):
                 continue
             entry: dict[str, Any] = {"text": self._safe_str(text.strip(), SNIPPET_MAX_CHARS)}
+            if chars + len(entry["text"]) > SNIPPETS_PER_PAPER_CHARS:
+                break
+            chars += len(entry["text"])
             page = item.get("page")
             if isinstance(page, int) and not isinstance(page, bool) and page >= 0:
                 entry["page"] = page

@@ -2777,9 +2777,36 @@ def test_node_route_response_releases_bounded_snippet_text_with_the_owner_opt_in
     pubs = body["publications"]
     texts = [item["text"] for pub in pubs for item in pub.get("snippets", [])]
     assert all(len(pub.get("snippets", [])) <= 20 for pub in pubs)
-    assert len(texts) == 100
     assert all(len(text) <= 1200 for text in texts)
+    assert all(sum(len(i["text"]) for i in pub.get("snippets", [])) <= 6000 for pub in pubs)
     assert sum(pub["snippet_count"] for pub in pubs) == 400
+
+    # Per-node cap (100) still binds when passages are short: 8 papers x 20 short passages = 160 -> 100 shown.
+    short = [{"text": f"s{i}", "source_paper": f"p{i % 8}.pdf", "page": i} for i in range(400)]
+    raw = {"id": "m", "name": "M", "publications": [{"source_paper": f"p{i}.pdf"} for i in range(8)],
+           "context_snippets": short}
+    (tmp_path / "c").mkdir()
+    pubs = _node_app(tmp_path / "c", monkeypatch, raw).get("/graph/node/m").json()["publications"]
+    assert sum(len(pub.get("snippets", [])) for pub in pubs) == 100
+
+
+def test_snippet_per_paper_character_cap_drops_whole_passages_in_order(monkeypatch):
+    """Owner cap: at most 6,000 characters of passage text per paper; the first passage that does not fit ends the
+    list, nothing is split, ``snippet_count`` keeps the recorded total."""
+    from app.modules.security.disclosure import SNIPPETS_PER_PAPER_CHARS, DisclosureProjector
+
+    assert SNIPPETS_PER_PAPER_CHARS == 6000
+    monkeypatch.setenv("F2W_DISCLOSE_SNIPPETS", "1")
+    texts = ["a" * 1200, "b" * 1200, "c" * 1200, "d" * 1200, "e" * 1100, "f" * 200, "g" * 10]
+    pub = {"source_paper": "a.pdf", "snippet_count": len(texts), "snippets": [{"text": t} for t in texts]}
+    out = DisclosureProjector().project_publication(pub, snippet_budget=[100])
+    shown = [i["text"] for i in out["snippets"]]  # type: ignore[index]
+    assert shown == texts[:5]  # 5,900 chars; the 200-char passage would make 6,100, so it and "g" are dropped
+    assert sum(map(len, shown)) <= 6000
+    assert out["snippet_count"] == 7  # type: ignore[index]
+    # Another paper has its own allowance.
+    again = DisclosureProjector().project_publication(pub, snippet_budget=[100])
+    assert len(again["snippets"]) == 5  # type: ignore[index]
 
 
 def test_snippet_opt_in_scrubs_secrets_paths_and_never_reaches_other_surfaces(monkeypatch):
