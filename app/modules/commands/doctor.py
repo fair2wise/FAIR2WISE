@@ -30,16 +30,21 @@ Output is one ``<name>: <state>`` line per check and nothing else (``--json``: `
 "ok": bool}``). States come from a fixed vocabulary: no key, host, address, path, URL, proxy or error text is
 ever printed. Exit status: 0 every check ok or skipped, 1 any other state, 2 usage error.
 
-Run it where the app runs, with the app's environment: ``docker exec CONTAINER f2w-doctor`` shows the image
-profile's values (library and state directories); ``docker run --rm --env-file F2W.ENV --entrypoint f2w-doctor
-IMAGE`` sees only what the env file sets.
+Run it where the app runs. A process started with ``docker exec`` or ``kubectl exec`` does not get the environment
+the image supervisor gives the app, so names it does not set (``F2W_LIBRARY_DIR``, ``F2W_WORKDIR``...) are read from
+the image profile (``/etc/fair2wise/profile.json``, ``F2W_PROFILE_FILE`` overrides the path); a variable that is set
+always wins. ``docker exec CONTAINER f2w-doctor`` therefore sees the app's library and state directories, and so
+does ``docker run --rm --env-file F2W.ENV --entrypoint f2w-doctor IMAGE`` (the profile is baked into the image).
+No ``logging`` output (httpx logs full URLs) is emitted.
 """
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+import contextlib
 from dataclasses import dataclass, field
 import json
+import logging
 import os
 from pathlib import Path
 import sys
@@ -59,6 +64,12 @@ PASSING = frozenset({"ok", "skipped"})
 
 OPENALEX_PROBE_URL = "https://api.openalex.org/works?per-page=1&select=id"
 ARXIV_PROBE_URL = "https://export.arxiv.org/api/query?search_query=all:electron&max_results=1"
+#: The image profile the supervisor reads (``F2W_PROFILE_FILE`` overrides the path, as for the app's tracing).
+PROFILE_FILE_ENV = "F2W_PROFILE_FILE"
+DEFAULT_PROFILE_FILE = "/etc/fair2wise/profile.json"
+#: Loggers whose records would show URLs or hosts (the doctor prints states only).
+_NOISY_LOGGERS = ("httpx", "httpcore", "urllib3", "openai", "hpack", "asyncio")
+_SILENT = logging.CRITICAL + 1
 TILED_DATA_DIR_ENV = "F2W_TILED_DATA_DIR"
 #: Env var naming the writer key file (not named *_SECRET_*: that shape trips the credential-literal guard).
 TILED_WRITER_KEYFILE_ENV = "F2W_TILED_WRITER_SECRET_FILE"
@@ -87,6 +98,64 @@ class Context:
     http_client: httpx.Client | None = None
     policy: Any = None  # Any: a NetworkPolicy; imported lazily so that importing this module stays cheap
     ollama_fetch: Callable[[str, float, int], tuple[int, bytes]] | None = None
+
+
+def profile_environ(environ: Mapping[str, str], *, default_path: str | None = None) -> dict[str, str]:
+    """``environ`` completed with what the image supervisor gives its children, read from the image profile.
+
+    A process started by ``kubectl exec`` or ``docker exec`` does not inherit the supervisor's environment, so
+    the profile's ``locked_env`` and ``env`` (the same two maps the supervisor applies) are the fallback for
+    names the process does not set; a non-blank variable always wins. The file is ``F2W_PROFILE_FILE`` when set,
+    else ``default_path``; a missing or unreadable file changes nothing.
+
+    Args:
+        environ: The process environment.
+        default_path: Profile path used when ``F2W_PROFILE_FILE`` is unset (``None``: read nothing).
+
+    Returns:
+        A new mapping; never contains anything the profile and ``environ`` do not.
+    """
+    path = str(environ.get(PROFILE_FILE_ENV) or "").strip() or default_path
+    merged = dict(environ)
+    if not path:
+        return merged
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return merged
+    if not isinstance(data, dict):
+        return merged
+    for key in ("env", "locked_env"):
+        block = data.get(key)
+        if not isinstance(block, dict):
+            continue
+        for name, value in block.items():
+            if isinstance(name, str) and isinstance(value, str) and not str(merged.get(name) or "").strip():
+                merged[name] = value
+    return merged
+
+
+@contextlib.contextmanager
+def quiet_logging() -> Iterator[None]:
+    """Emit nothing through ``logging`` (httpx logs full URLs at INFO) except the doctor's own ``f2w.output`` lines.
+
+    The root logger and the HTTP libraries are raised above CRITICAL and a ``NullHandler`` keeps a later
+    ``logging.basicConfig`` (several app modules call it at import) and the last-resort stderr handler from
+    printing. The previous levels are restored on exit. ``f2w.output`` has its own level and does not propagate.
+    """
+    names = ("", *_NOISY_LOGGERS)
+    saved = {n: logging.getLogger(n).level for n in names}
+    root = logging.getLogger()
+    null = logging.NullHandler()
+    root.addHandler(null)
+    for name in names:
+        logging.getLogger(name).setLevel(_SILENT)
+    try:
+        yield
+    finally:
+        root.removeHandler(null)
+        for name, level in saved.items():
+            logging.getLogger(name).setLevel(level)
 
 
 def _env(ctx: Context, name: str) -> str:
@@ -349,10 +418,13 @@ def main(argv: Sequence[str] | None = None, *, environ: Mapping[str, str] | None
             except OSError:
                 output.warning("doctor: F2W_DOTENV does not name a readable file")
                 return EXIT_USAGE
-            environ = os.environ
+            environ = profile_environ(os.environ, default_path=DEFAULT_PROFILE_FILE)
+        else:
+            environ = profile_environ(environ)
         context = Context(environ=environ)
     context.timeout = args.timeout
-    results = run_checks(args.names, context)
+    with quiet_logging():
+        results = run_checks(args.names, context)
     everything_ok = all(state in PASSING for _, state in results)
     if args.json:
         output.info(json.dumps({"checks": [{"name": n, "state": s} for n, s in results], "ok": everything_ok}))

@@ -185,6 +185,44 @@ def test_directory_states(check: Callable[[Context], str], var: str, tmp_path: P
             locked.chmod(0o700)
 
 
+def _profile(tmp_path: Path, **blocks: dict[str, str]) -> Path:
+    path = tmp_path / "profile.json"
+    path.write_text(json.dumps(blocks), encoding="utf-8")
+    return path
+
+
+def test_only_the_profile_file_present_library_and_state_come_from_it(tmp_path: Path,
+                                                                      capsys: pytest.CaptureFixture[str]) -> None:
+    lib, state = tmp_path / "lib", tmp_path / "state"
+    lib.mkdir()
+    state.mkdir()
+    profile = _profile(tmp_path, env={"F2W_LIBRARY_DIR": str(lib), "F2W_WORKDIR": str(state)})
+    ctx = _ctx(env={"F2W_PROFILE_FILE": str(profile)})
+    ctx.environ = doctor.profile_environ(ctx.environ)
+    assert doctor.check_library(ctx) == "ok" and doctor.check_state(ctx) == "ok"
+    # through main(): environ holds only the profile pointer, no F2W_LIBRARY_DIR / F2W_WORKDIR
+    assert doctor.main(["--only", "library,state"], environ={"F2W_PROFILE_FILE": str(profile)}) == 0
+    assert capsys.readouterr().out.splitlines() == ["library: ok", "state: ok"]
+
+
+def test_profile_locked_env_counts_and_a_set_variable_wins(tmp_path: Path) -> None:
+    profile_dir, own = tmp_path / "from-profile", tmp_path / "own"
+    profile_dir.mkdir()
+    own.mkdir()
+    profile = _profile(tmp_path, env={"F2W_LIBRARY_DIR": str(profile_dir)}, locked_env={"F2W_WORKDIR": str(profile_dir)})
+    merged = doctor.profile_environ({"F2W_PROFILE_FILE": str(profile), "F2W_LIBRARY_DIR": str(own), "F2W_WORKDIR": "  "})
+    assert merged["F2W_LIBRARY_DIR"] == str(own)  # the variable wins
+    assert merged["F2W_WORKDIR"] == str(profile_dir)  # blank is unset
+
+
+def test_a_missing_or_broken_profile_changes_nothing(tmp_path: Path) -> None:
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not json")
+    for pointer in (str(tmp_path / "absent.json"), str(bad)):
+        assert doctor.profile_environ({"F2W_PROFILE_FILE": pointer}) == {"F2W_PROFILE_FILE": pointer}
+    assert doctor.profile_environ({}) == {}  # no default path unless the caller passes one
+
+
 def test_unset_state_dir_checks_the_apps_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from app.modules.workdir import DEFAULT_WORKDIR
 
@@ -329,6 +367,49 @@ def test_nothing_sensitive_is_printed(flags: list[str], tmp_path: Path, capsys: 
                    "http://", "https://", "Bearer"):
         assert secret not in shown, secret
     assert "cborg: unreachable" in shown or '"cborg"' in shown
+
+
+def test_real_logging_output_shows_no_url_or_host(tmp_path: Path, capsys: pytest.CaptureFixture[str],
+                                                  caplog: pytest.LogCaptureFixture) -> None:
+    import logging
+
+    def chatty_web(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"results": []})
+
+    ctx = _ctx(_models, env={**KEYED, "OLLAMA_URL": f"http://{FAKE_HOST}:11434", "F2W_LIBRARY_DIR": str(tmp_path),
+                             "F2W_WORKDIR": str(tmp_path)}, web=chatty_web,
+               ollama_fetch=lambda url, timeout, max_bytes: _real_httpx_get(f"http://{FAKE_HOST}:11434/api/tags"))
+    logging.getLogger().addHandler(logging.StreamHandler())  # a real stderr handler, as basicConfig would add
+    try:
+        with caplog.at_level(logging.DEBUG):
+            logging.getLogger("httpx").setLevel(logging.INFO)  # httpx logs every request at INFO
+            assert doctor.main(["--only", "cborg,openalex,ollama,library,state"], context=ctx) in (0, 1)
+    finally:
+        for handler in [h for h in logging.getLogger().handlers if type(h) is logging.StreamHandler]:
+            logging.getLogger().removeHandler(handler)
+        logging.getLogger("httpx").setLevel(logging.NOTSET)
+    out, err = capsys.readouterr()
+    foreign = [r for r in caplog.records if r.name != "f2w.output"]  # the doctor's own lines are its output logger
+    logged = " ".join(record.getMessage() for record in foreign)
+    for text in (out, err, logged):
+        assert FAKE_HOST not in text and "http://" not in text and "https://" not in text and "HTTP Request" not in text
+    assert foreign == []
+    assert err == "" and all(line.split(":")[0] in doctor.CHECKS for line in out.splitlines())
+
+
+def _real_httpx_get(url: str) -> tuple[int, bytes]:
+    with httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, json={"models": []}))) as client:
+        response = client.get(url)  # a real httpx call: httpx itself logs "HTTP Request: GET <url>" at INFO
+    return response.status_code, response.content
+
+
+def test_logging_levels_are_restored_after_the_run() -> None:
+    import logging
+
+    before = (logging.getLogger().level, logging.getLogger("httpx").level)
+    with doctor.quiet_logging():
+        assert not logging.getLogger("httpx").isEnabledFor(logging.CRITICAL)
+    assert (logging.getLogger().level, logging.getLogger("httpx").level) == before
 
 
 def test_ip_refusal_body_address_is_not_printed(capsys: pytest.CaptureFixture[str]) -> None:
