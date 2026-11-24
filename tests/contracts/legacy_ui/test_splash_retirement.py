@@ -248,7 +248,10 @@ def test_packaging_carries_no_splash_dependency():
 def test_retirement_packet_names_every_code_or_config_file_that_mentions_splash():
     packet = PACKET.read_text(encoding="utf-8")
     missing = sorted(f for f in _inventory_files() if f"`{f}`" not in packet)
-    assert missing == [], f"add these to docs/migration/reviews/H8/splash_retirement.md: {missing}"
+    assert missing == [], (
+        f"add these to docs/migration/reviews/H8/splash_retirement.md (a UI or e2e file that only mentions "
+        f"'Splash Links' in a comment or a fixture counts too): {missing}"
+    )
     for section in ("## 2. Class (a)", "## 3. Class (b)", "## 4. Class (c)", "## 5. Class (d)",
                     "## 6. Proposed compatibility window", "## 7. Proposed deletion list"):
         assert section in packet, section
