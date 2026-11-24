@@ -332,14 +332,44 @@ def continue_from_kg(store: BundleStore, kg_path: Path, name: str, *, schema: Ma
 # ---------------------------------------------------------------------- export
 
 
+RELEASE_DIRNAME = "kg_releases"
+
+
 def default_release_dir() -> Path:
-    """The configured release directory: ``F2W_KG_RELEASE_DIR`` or the application's ``storage/kg``."""
+    """The release directory: ``F2W_KG_RELEASE_DIR``, else ``<F2W_WORKDIR>/kg_releases``, else the application's ``storage/kg``.
+
+    The image's ``storage/kg`` is read-only on a deployment with a read-only root filesystem, so a workdir (the
+    writable state volume) is preferred over it when no directory is configured.
+    """
     configured = (os.environ.get(RELEASE_DIR_ENV) or "").strip()
     if configured:
         return Path(configured)
+    workdir = (os.environ.get(WORKDIR_ENV) or "").strip()
+    if workdir:
+        return Path(workdir) / RELEASE_DIRNAME
     from ..resources import resolve_resource
 
     return Path(resolve_resource("storage/kg"))
+
+
+def ensure_release_dir(path: Path) -> None:
+    """Create ``path`` if needed and prove it is writable; raise ``ContractError(UNAVAILABLE)`` naming the fix otherwise.
+
+    Used at startup so a read-only or missing release directory fails there, not at the first export.
+    """
+    try:
+        Path(path).mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=path, prefix=".write-check.", suffix=".tmp")
+        os.close(fd)
+        Path(tmp).unlink(missing_ok=True)
+    except OSError as exc:
+        raise ContractError(ErrorCode.UNAVAILABLE, release_dir_message(path, exc), retryable=False) from exc
+
+
+def release_dir_message(path: Path, exc: OSError) -> str:
+    """Plain words for a release directory that cannot be written (no stack, no secrets)."""
+    return (f"the KG release directory {path} is not writable ({exc.strerror or type(exc).__name__}); "
+            f"set {RELEASE_DIR_ENV} to a directory on a writable volume")
 
 
 def export_file_name(name: str) -> str:
@@ -383,7 +413,10 @@ def export_bundle(bundle: Bundle, release_dir: Path, schema: Mapping[str, Any] |
                 "schema": schema_block["id"], "schema_info": schema_block, "f2w_bundle": bundle.name,
                 "topic": bundle.manifest.get("topic"), "model": bundle.manifest.get("model"),
                 "reconstructed": bool(bundle.manifest.get("reconstructed")), "exported_at": now_iso()}
-    _write_json(target, {**kg, "metadata": metadata}, trailing_newline=False)  # adoption wants this serialization
+    try:
+        _write_json(target, {**kg, "metadata": metadata}, trailing_newline=False)  # adoption wants this serialization
+    except OSError as exc:
+        raise ContractError(ErrorCode.UNAVAILABLE, release_dir_message(release_dir, exc), retryable=False) from exc
     return target.name
 
 
@@ -469,7 +502,7 @@ def schema_path_for_registered_graph(path: str, workdir: Path | str | None = Non
 
 __all__ = (
     "BUNDLES_DIRNAME", "BUNDLE_FILES", "Bundle", "BundleStore", "PaperRef", "RELEASE_DIR_ENV", "WORKDIR_ENV",
-    "bundle_root", "continue_from_kg", "default_release_dir", "ensure_schema_locked", "export_bundle",
+    "bundle_root", "continue_from_kg", "default_release_dir", "ensure_release_dir", "ensure_schema_locked", "export_bundle",
     "export_file_name", "registered_graph_paths", "resolve_registered_graph",
     "schema_path_for_registered_graph", "validate_name", "virtual_graph_path",
 )

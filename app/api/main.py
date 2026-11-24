@@ -141,9 +141,14 @@ class PublicRootPath:
 def _install_kg_library(app: FastAPI, cfg: CoordinatorConfig, judge_settings: JudgeModelService | None) -> None:
     """T38: KG bundle routes (``:local`` only); the model catalog is the judge setting's (one provider cache)."""
     from . import routes_library_kgs
-    from ..modules.library.bundles import BUNDLES_DIRNAME, BundleStore
+    from ..modules.contracts.errors import ContractError
+    from ..modules.library.bundles import BUNDLES_DIRNAME, BundleStore, default_release_dir, ensure_release_dir
     from ..modules.library.kg_service import KgLibrary
 
+    try:   # a read-only or missing release directory fails here, with the fix named, not at the first export
+        ensure_release_dir(default_release_dir())
+    except ContractError as exc:
+        raise StartupConfigError(f"config_rejected: {exc}") from exc
     store = BundleStore(Path(cfg.workdir) / BUNDLES_DIRNAME)
     # The estimate resolves paper ids through the T35 catalog service (built just before on :local).
     routes_library_kgs.install(app, KgLibrary(store, catalog=getattr(judge_settings, "catalog", None),

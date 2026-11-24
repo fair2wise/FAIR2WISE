@@ -44,8 +44,12 @@ Environment, all optional:
 
 The Library's export needs its release directory to exist and the app never
 creates it; the script creates it with `docker exec ... mkdir -p` after start.
-Without `F2W_KG_RELEASE_DIR` the app would use its own `storage/kg`, which is
-read-only in the image.
+Without `F2W_KG_RELEASE_DIR` the app uses `<F2W_WORKDIR>/kg_releases` (on the
+writable state volume) and, with no workdir either, its own `storage/kg`, which
+is read-only in the image. The app creates the directory at start and checks that
+it can write there; if not, it refuses to start with a message naming the
+directory and `F2W_KG_RELEASE_DIR`. An export that still fails answers a typed
+`unavailable` error with the same message instead of a 500.
 
 **Model cost.** The Extract tab lists the provider's live model list and shows a
 cost estimate you must confirm before it starts. The owner's rehearsal and

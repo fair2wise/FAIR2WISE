@@ -196,3 +196,59 @@ def test_keyword_ranking_is_deterministic():
     assert [p["name"] for p in ranked] == ["a.pdf", "z.pdf", "rsoxs_notes.pdf", "b.pdf"]
     assert [p["name"] for p in rank_papers(papers, "")] == ["a.pdf", "b.pdf", "rsoxs_notes.pdf", "z.pdf"]
     assert KeywordRanker().rank(papers, "zzz")[0][0] == 0
+
+
+def test_default_release_dir_prefers_env_then_workdir_then_storage(tmp_path, monkeypatch):
+    monkeypatch.delenv(B.RELEASE_DIR_ENV, raising=False)
+    monkeypatch.delenv(B.WORKDIR_ENV, raising=False)
+    assert B.default_release_dir().parts[-2:] == ("storage", "kg")
+    monkeypatch.setenv(B.WORKDIR_ENV, str(tmp_path / "state"))
+    assert B.default_release_dir() == tmp_path / "state" / "kg_releases"   # the writable volume, not /app/storage/kg
+    monkeypatch.setenv(B.RELEASE_DIR_ENV, str(tmp_path / "rel"))
+    assert B.default_release_dir() == tmp_path / "rel"
+
+
+def test_ensure_release_dir_creates_and_proves_it_is_writable(tmp_path):
+    target = tmp_path / "state" / "kg_releases"
+    B.ensure_release_dir(target)
+    assert target.is_dir() and list(target.iterdir()) == []   # the probe file is removed
+
+
+def test_ensure_release_dir_on_a_read_only_directory_names_the_fix(tmp_path):
+    ro = tmp_path / "ro"
+    ro.mkdir()
+    ro.chmod(0o500)
+    try:
+        if _can_write(ro):
+            pytest.skip("running as a user that ignores directory permissions")
+        with pytest.raises(ContractError) as err:
+            B.ensure_release_dir(ro)
+        assert err.value.code == ErrorCode.UNAVAILABLE and err.value.retryable is False
+        assert B.RELEASE_DIR_ENV in str(err.value) and str(ro) in str(err.value)
+    finally:
+        ro.chmod(0o700)
+
+
+def test_export_to_a_read_only_directory_is_a_structured_error_not_an_oserror(store, tmp_path, monkeypatch):
+    release = tmp_path / "release"
+    release.mkdir()
+    bundle = store.create("alpha", schema=SCHEMA, topic="x", kg=_kg())
+
+    def refuse(*args, **kwargs):
+        raise OSError(30, "Read-only file system")
+
+    monkeypatch.setattr(B.tempfile, "mkstemp", refuse)
+    with pytest.raises(ContractError) as err:
+        B.export_bundle(bundle, release)
+    assert err.value.code == ErrorCode.UNAVAILABLE and B.RELEASE_DIR_ENV in str(err.value)
+    assert "Read-only" in str(err.value)
+
+
+def _can_write(directory: Path) -> bool:
+    probe = directory / ".probe"
+    try:
+        probe.write_text("x")
+    except OSError:
+        return False
+    probe.unlink()
+    return True
