@@ -25,7 +25,6 @@ import {
   type AgentWorkflowMode,
 } from './agentSettings';
 import { AppErrorMessage } from './AppErrorMessage';
-import { AsciiOrb } from './AsciiOrb';
 import { fetchAgentSettings, updateAgentSettings } from './data/liveAgent';
 import { recordUiEvent } from './uiTelemetry';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
@@ -170,10 +169,10 @@ function SettingOption({
       <RadioGroupPrimitive.Item
         id={id}
         value={id}
-        className="mt-0.5 flex size-4 shrink-0 items-center justify-center overflow-hidden outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border-2 border-slate-400 bg-white outline-none transition-colors focus-visible:ring-2 focus-visible:ring-sky-500/50 data-[state=checked]:border-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <RadioGroupPrimitive.Indicator className="flex items-center justify-center">
-          <AsciiOrb size={16} className="text-sky-400" interactive={false} />
+          <span aria-hidden="true" className="block size-2 rounded-full bg-sky-600" />
         </RadioGroupPrimitive.Indicator>
       </RadioGroupPrimitive.Item>
       <span className="min-w-0">

@@ -1,4 +1,3 @@
-import '@blueskyproject/finch/style.css';
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { BrowserRouter } from 'react-router';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';

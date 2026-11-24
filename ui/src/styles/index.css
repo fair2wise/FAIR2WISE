@@ -1,3 +1,8 @@
+/* Finch's stylesheet is a compiled Tailwind v3 build with no cascade layer. Unlayered rules beat every layered one,
+   so its hsl(var(--token)) utilities and its button reset overrode this app's Tailwind v4 utilities (a shadcn dialog
+   came out transparent, default buttons had no fill). Put it in the lowest layer, below Tailwind's. */
+@layer finch, theme, base, components, utilities;
 @import './fonts.css';
+@import '@blueskyproject/finch/style.css' layer(finch);
 @import './tailwind.css';
 @import './theme.css';
