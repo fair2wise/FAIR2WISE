@@ -116,6 +116,11 @@ def test_value_rules(monkeypatch: pytest.MonkeyPatch) -> None:
 # ---------------------------------------------------------------------------- config-driven wrapping
 
 
+#: Duration floor for the filter tests: far above any scheduler stall on a loaded CI runner (``fast`` takes
+#: microseconds, so a 10 ms floor flaked under xdist) and well below ``slow``'s sleep.
+FLOOR_MS = 150
+
+
 @pytest.fixture
 def sample(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """A throwaway package ``app.modules._otel_sample`` with a class, module functions and an importer of them."""
@@ -136,7 +141,7 @@ def sample(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             return x * 2
 
         def slow():
-            time.sleep(0.03)
+            time.sleep(0.4)
 
         def fast():
             return 1
@@ -220,7 +225,7 @@ def test_bad_targets_are_logged_not_raised(sample, monkeypatch, caplog) -> None:
 
 def test_min_duration_filter(sample, monkeypatch) -> None:  # noqa: ANN001
     exp = memory()
-    enable(monkeypatch, exp, f"{sample}:slow@10,{sample}:fast@10")
+    enable(monkeypatch, exp, f"{sample}:slow@{FLOOR_MS},{sample}:fast@{FLOOR_MS}")
     lib = importlib.import_module(sample)
     lib.slow()
     lib.fast()
@@ -239,7 +244,7 @@ def test_min_duration_never_hides_errors(sample, monkeypatch) -> None:  # noqa: 
 
 def test_module_prefix_with_global_floor(sample, monkeypatch) -> None:  # noqa: ANN001
     exp = memory()
-    monkeypatch.setenv("F2W_OTEL_MIN_SPAN_MS", "10")
+    monkeypatch.setenv("F2W_OTEL_MIN_SPAN_MS", str(FLOOR_MS))
     enable(monkeypatch, exp, "", modules="app_sample")
     lib = importlib.import_module(sample)
     lib.slow()
