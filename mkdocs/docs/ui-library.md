@@ -24,7 +24,7 @@ The Harvester finds new papers for a topic and files them into a category.
 4. **Paywalled queue.** An A/B paper with no free PDF (or whose "open" link is not a PDF) is **paywalled**. The queue shows an **Open publisher** link (opens in your own browser; the server never requests the publisher), a drop slot for the PDF you save, and **Dismiss**. A PDF you drop is filed in the run's category by the paper's year and the candidate becomes *filed*.
 5. **Run view.** Progress, a live log, **Cancel**, and a results table with the status of every candidate: *downloaded*, *in library*, *paywalled*, *filed*, *failed*, *skipped*, *dismissed*. Past runs are listed and can be reopened; a run still in progress is re-attached after a page reload. The page follows the run by short polling (the job state and `GET /v1/jobs/{id}/logs?after=<seq>`, about every 2 s, slower when idle or after errors), not by a long-lived stream, so a proxy that cuts idle connections cannot break it. Polling pauses while the tab or the browser page is hidden and resumes, from the last line seen, when it is shown again.
 
-OpenAlex needs `OPENALEX_API_KEY` in the server environment; without it only arXiv is searched and the log says so.
+OpenAlex needs `OPENALEX_API_KEY` in the server environment; without it only arXiv is searched and the log says so. After the searches the log carries one `search summary` line in plain words: what each source returned or why it could not be searched, how many results the merge dropped (no title, duplicates) and how many distinct papers remain. A search that found nothing says whether that is an empty answer or a source that never ran.
 
 ## Backfill authors and abstracts
 

@@ -25,7 +25,7 @@ from app.modules.library.harvest import (
     topic_terms,
 )
 from app.modules.library.probe import ProbeResult
-from app.modules.library.service import LibraryService
+from app.modules.library.service import LibraryService, VerifyUnavailable
 from tests.jobs.jobs_fakes import Clock
 from tests.library.test_library_service import pdf
 from tests.security.security_fakes import local_settings
@@ -181,6 +181,27 @@ def test_a_failing_source_is_logged_and_the_others_still_run(tmp_path):
     assert state is JobState.SUCCEEDED and world.statuses(handle.job_id) == {GOOD: "downloaded"}
     logs = " ".join(entry.message for entry in world.jobs.store.logs(handle.job_id))
     assert "arxiv search skipped" in logs
+
+
+def test_an_empty_search_says_why_in_plain_words(tmp_path):
+    def no_key(topic: str, per_query: int):
+        raise VerifyUnavailable("OPENALEX_API_KEY is not configured")
+
+    world = World(tmp_path, {"arxiv": fixed(), "openalex": no_key}, Net({}))
+    handle, state = world.run(topic="plecostomus")
+    assert state is JobState.SUCCEEDED
+    logs = [e.message for e in world.jobs.store.logs(handle.job_id)]
+    text = next(m for m in logs if m.startswith("search summary"))
+    assert "arxiv returned 0" in text and "openalex could not be searched (OPENALEX_API_KEY is not configured)" in text
+    assert "does not mean the topic has no papers" in text and "0 distinct papers" in text
+
+
+def test_the_summary_counts_what_the_merge_dropped(tmp_path):
+    dup = (cand(GOOD, doi="10.1/a", urls=["https://oa.example/a.pdf"]), cand("", doi="10.1/z"))
+    world = World(tmp_path, {"arxiv": fixed(*dup), "openalex": fixed(cand(GOOD, source="openalex", doi="10.1/A"))}, Net(SERVED))
+    handle, _ = world.run()
+    text = next(e.message for e in world.jobs.store.logs(handle.job_id) if e.message.startswith("search summary"))
+    assert "3 results in all, 1 dropped for having no title, 1 dropped as duplicates (same DOI or arXiv id), 1 distinct papers" in text
 
 
 def test_every_source_failing_fails_the_job(tmp_path):

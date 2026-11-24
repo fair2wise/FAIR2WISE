@@ -267,6 +267,30 @@ def merge_candidates(groups: Iterable[Iterable[Candidate]]) -> list[Candidate]:
     return list(merged.values())
 
 
+def why_nothing_or_counts(per_source: Mapping[str, str], returned: int, untitled: int, distinct: int) -> str:
+    """Plain words on what each source gave and what the merge dropped (and why a search found nothing).
+
+    Args:
+        per_source: ``source -> "returned N"`` or ``"could not be searched (reason)"``.
+        returned: Total results over the sources that ran.
+        untitled: Results dropped for having no title.
+        distinct: Papers left after dropping untitled results and duplicates.
+    """
+    parts = "; ".join(f"{name} {what}" for name, what in per_source.items())
+    skipped = [n for n, what in per_source.items() if what.startswith("could not")]
+    text = (f"search summary: {parts}. {returned} results in all, {untitled} dropped for having no title, "
+            f"{returned - untitled - distinct} dropped as duplicates (same DOI or arXiv id), {distinct} distinct papers.")
+    if distinct == 0:
+        if skipped:
+            text += (f" Nothing was found, but {', '.join(skipped)} could not be searched at all, so the empty result "
+                     "does not mean the topic has no papers there; see the warning above for the reason.")
+        else:
+            text += " Every source that ran answered with no results for this topic."
+    elif skipped:
+        text += f" Not searched: {', '.join(skipped)}."
+    return text
+
+
 # -- download -----------------------------------------------------------------------------------------------
 
 #: ``(url, max_bytes) -> (bytes | None, status)``; status is ``ok`` or a ``SafeFetcher``-style reason.
@@ -540,6 +564,7 @@ class Harvester:
         ctx.log(f"harvest {args['topic']!r} into {args['category']!r} from {', '.join(args['sources'])} "
                 f"(schema {args['schema'] or 'none'}, up to {args['max_downloads']} downloads)")
         groups, searched = [], 0
+        per_source: dict[str, str] = {}
         for source in args["sources"]:
             ctx.guard()
             try:
@@ -547,14 +572,20 @@ class Harvester:
             except Exception as exc:  # noqa: BLE001 - a source that cannot run must not stop the others
                 metrics.record_harvest_fetch(source=source, outcome="failed")
                 ctx.log(f"{source} search skipped: {exc}", level="warning")
+                per_source[source] = f"could not be searched ({exc})"
                 continue
             metrics.record_harvest_fetch(source=source, outcome="ok")
             searched += 1
             ctx.log(f"{source}: {len(found)} results")
+            per_source[source] = f"returned {len(found)}"
             groups.append(found)
         if searched == 0:
             raise ContractError(ErrorCode.UNAVAILABLE, "no source could be searched (see the log)")
         candidates = merge_candidates(groups)
+        returned = sum(len(g) for g in groups)
+        untitled = sum(1 for g in groups for c in g if not c.title)
+        summary = why_nothing_or_counts(per_source, returned, untitled, len(candidates))
+        ctx.log(summary, level="warning" if not candidates else "info")
         for cand in candidates:
             cand.score, cand.tier = score_candidate(args["topic"], cand.title, cand.abstract)
         candidates.sort(key=lambda c: (c.tier, -c.score, c.title))
@@ -567,7 +598,9 @@ class Harvester:
                 f"B {sum(c.tier == 'B' for c in candidates)}, C {sum(c.tier == 'C' for c in candidates)}")
         counts = self._process(ctx, run_id, args, candidates)
         ctx.log("done: " + ", ".join(f"{k} {v}" for k, v in counts.items()))
-        return StageResult(progress={"done": len(candidates), "total": len(candidates), **counts}, data={"run": run_id, "category": args["category"]})
+        return StageResult(progress={"done": len(candidates), "total": len(candidates), **counts},
+                           data={"run": run_id, "category": args["category"], "summary": summary,
+                                 "sources": per_source})
 
     def _process(self, ctx: StageContext, run_id: str, args: Mapping[str, Any], candidates: list[Candidate]) -> dict[str, int]:
         counts = {"downloaded": 0, "in_library": 0, "paywalled": 0, "failed": 0, "skipped": 0}
