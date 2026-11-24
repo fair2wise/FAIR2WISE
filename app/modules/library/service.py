@@ -55,7 +55,7 @@ from ..security.authorization import StartupConfigError, local_operator_context
 from .arrange import category_problem, guess_year, is_valid_folder_name, year_folder
 from .bibmeta import openalex_abstract, openalex_authors
 from .catalog import LibraryCatalog, sha256_file
-from .manifest import PDF_PATH_PREFIX, fill_row_metadata, record_upload
+from .manifest import PDF_PATH_PREFIX, fill_row_metadata, record_upload, remove_upload
 from .metadata import ManifestMetadata
 from .probe import DEFAULT_TIMEOUT_SECONDS, Probe, ProbeResult, isolated_probe
 
@@ -497,8 +497,35 @@ class LibraryService:
                     doi=(known or {}).get("doi") or paper.get("doi"), title=(known or {}).get("title") or paper.get("title"),
                     year=year, now=datetime.now(UTC).isoformat(), source=str((known or {}).get("source") or "upload"),
                     arxiv_id=(known or {}).get("arxiv_id"),
-                    authors=(known or {}).get("authors"), abstract=(known or {}).get("abstract"))
+                    authors=(known or {}).get("authors"), abstract=(known or {}).get("abstract"),
+                    provenance=(known or {}).get("provenance"), supplied_by=(known or {}).get("supplied_by"))
             return out
+
+    def remove_filed(self, relpath: str, sha256: str) -> dict[str, Any]:
+        """Undo one filed upload: delete that file, its manifest row and its catalog row (nothing else).
+
+        The file is removed only when it is a regular file (never a link) under the library root whose sha256 is the
+        given one; any other file, even at the same path, is left alone. The category folder and its other papers are
+        untouched.
+
+        Returns:
+            ``{"file": bool, "manifest": bool}``: what was removed.
+
+        Raises:
+            ContractError: ``UNSUPPORTED_CAPABILITY`` when nothing is mounted.
+        """
+        root = self._require_root()
+        category = relpath.split("/", 1)[0]
+        target = root / relpath
+        removed_file = False
+        with self._upload_lock:
+            if (not target.is_symlink() and target.is_file() and target.resolve().is_relative_to(root.resolve())
+                    and hashlib.sha256(target.read_bytes()).hexdigest() == sha256):
+                target.unlink()
+                removed_file = True
+            removed_row = remove_upload(root, category, sha256=sha256) if "/" in relpath else False
+            self.refresh(max_probe=0)
+        return {"file": removed_file, "manifest": removed_row}
 
     def _probe_bytes(self, root: Path, data: bytes) -> ProbeResult:
         """Probe ``data`` through a hidden temporary file in ``root`` (the probe reads paths)."""

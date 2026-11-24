@@ -35,8 +35,8 @@ def _doi_key(doi: str | None) -> str:
 
 def _row(*, relpath: str, sha256: str, doi: str | None, title: str | None, year: int | None, now: str,
          source: str = "upload", arxiv_id: str | None = None, authors: list[str] | None = None,
-         abstract: str | None = None) -> dict[str, Any]:
-    return {
+         abstract: str | None = None, provenance: str | None = None, supplied_by: str | None = None) -> dict[str, Any]:
+    row = {
         "doi": f"https://doi.org/{_doi_key(doi)}" if doi else None,
         "arxiv_id": arxiv_id,
         "title": title,
@@ -53,11 +53,17 @@ def _row(*, relpath: str, sha256: str, doi: str | None, title: str | None, year:
         "pdf_sha256": sha256,
         "downloaded_at": now,
     }
+    if provenance:   # a file a person supplied by hand: how it was matched and who supplied it
+        row["provenance"] = provenance
+        if supplied_by:
+            row["supplied_by"] = supplied_by
+    return row
 
 
 def record_upload(root: Path, category: str, *, relpath: str, sha256: str, doi: str | None, title: str | None,
                   year: int | None, now: str, source: str = "upload", arxiv_id: str | None = None,
-                  authors: list[str] | None = None, abstract: str | None = None) -> dict[str, Any]:
+                  authors: list[str] | None = None, abstract: str | None = None, provenance: str | None = None,
+                  supplied_by: str | None = None) -> dict[str, Any]:
     """Add the uploaded paper to ``<root>/<category>/manifest.json`` (created when the category is new).
 
     Args:
@@ -73,6 +79,8 @@ def record_upload(root: Path, category: str, *, relpath: str, sha256: str, doi: 
         arxiv_id: The arXiv id when known.
         authors: Author display names from the registry, when known (stored as ``authors``; ``None`` when empty).
         abstract: The abstract from the registry, when known (stored capped as ``abstract``).
+        provenance: ``user_supplied`` (or a confirmed variant) for a PDF a person supplied by hand; stored on the row.
+        supplied_by: Who supplied it (the acting principal's subject), stored next to ``provenance``.
 
     Returns:
         ``{"updated": bool, "path": "<category>/manifest.json", "detail": str}``; ``updated`` is false when the
@@ -109,7 +117,8 @@ def record_upload(root: Path, category: str, *, relpath: str, sha256: str, doi: 
                         out["detail"] = "already listed in the manifest"
                         return out
                 papers.append(_row(relpath=relpath, sha256=sha256, doi=doi, title=title, year=year, now=now,
-                                   source=source, arxiv_id=arxiv_id, authors=authors, abstract=abstract))
+                                   source=source, arxiv_id=arxiv_id, authors=authors, abstract=abstract,
+                                   provenance=provenance, supplied_by=supplied_by))
                 tmp = manifest.with_suffix(".json.tmp")
                 tmp.write_text(json.dumps(data, indent=2, sort_keys=False) + "\n", encoding="utf-8")
                 tmp.replace(manifest)
@@ -121,6 +130,35 @@ def record_upload(root: Path, category: str, *, relpath: str, sha256: str, doi: 
         logger.warning("manifest update failed for %s: %s", relpath, exc)
         out["detail"] = f"manifest not updated: {exc}"
         return out
+
+
+def remove_upload(root: Path, category: str, *, sha256: str) -> bool:
+    """Remove the row with this ``pdf_sha256`` from ``<root>/<category>/manifest.json`` (undo of a filed upload).
+
+    Only that one row is removed, under the same lock and with the same atomic rewrite as :func:`record_upload`; every
+    other row keeps its place. Returns whether a row was removed (``False`` for an unreadable or absent manifest).
+    """
+    manifest = root / category / "manifest.json"
+    try:
+        with (root / category / ".manifest.lock").open("a+") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try:
+                data = json.loads(manifest.read_text(encoding="utf-8"))
+                papers = data.get("papers") if isinstance(data, dict) else None
+                if not isinstance(papers, list):
+                    return False
+                kept = [row for row in papers if not (isinstance(row, dict) and row.get("pdf_sha256") == sha256)]
+                if len(kept) == len(papers):
+                    return False
+                data["papers"] = kept
+                tmp = manifest.with_suffix(".json.tmp")
+                tmp.write_text(json.dumps(data, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+                tmp.replace(manifest)
+                return True
+            finally:
+                fcntl.flock(lock, fcntl.LOCK_UN)
+    except (OSError, ValueError):
+        return False
 
 
 def is_empty(value: object) -> bool:

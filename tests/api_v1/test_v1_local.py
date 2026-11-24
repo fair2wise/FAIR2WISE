@@ -45,7 +45,7 @@ def test_every_route_is_declared_and_v1_matches_the_policy_table(local):
     routes = _routes(local.app)
     v1 = {r for r in routes if r[1].startswith(V1_PREFIX + "/")}
     assert v1 == {(p.method, p.path) for p in API_ROUTE_POLICIES}
-    assert len(API_ROUTE_POLICIES) == len({p.route_id for p in API_ROUTE_POLICIES}) == 70
+    assert len(API_ROUTE_POLICIES) == len({p.route_id for p in API_ROUTE_POLICIES}) == 72
     legacy = {(p.method, p.path) for p in ROUTE_POLICIES if p.surface == AGENT_SURFACE}
     assert len(legacy) == 19 and legacy <= routes  # the 19 UI routes are still served
     assert routes - v1 - legacy == {("GET", "/docs"), ("GET", "/docs/oauth2-redirect"), ("GET", "/redoc"),

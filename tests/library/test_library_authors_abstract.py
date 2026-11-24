@@ -174,7 +174,7 @@ def test_a_hand_supplied_paywalled_pdf_keeps_the_candidates_authors_and_abstract
     handle, _ = world.run(sources=["arxiv"])
     row = next(c for c in world.store.candidates(handle.job_id) if c["status"] == "paywalled")
     assert "authors" not in row and "abstract" not in row  # the list API never carries them
-    out = world.harvester.file_candidate_pdf(row["id"], "x.pdf", pdf("by-hand"))
+    out = world.harvester.supply_pdf(row["id"], "x.pdf", pdf("by-hand"), confirm=True)
     assert "authors" not in out["candidate"] and "abstract" not in out["candidate"]
     stored = next(r for r in _manifest(world.lib)["papers"] if r["doi"] == "https://doi.org/10.1/p")
     assert stored["authors"] == ["P. Wall"] and stored["abstract"] == "Behind a paywall."
