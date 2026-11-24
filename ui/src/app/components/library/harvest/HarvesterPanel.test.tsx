@@ -299,4 +299,17 @@ describe('HarvesterPanel results', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('not a folder');
     expect(screen.getByLabelText('Category')).toHaveValue('\u0000new');
   });
+
+  it('says OpenAlex runs without a key, at a reduced rate, only when the server says so', async () => {
+    routes['GET /v1/library/harvest/runs'].body = { runs: [], openalex_keyed: false };
+    renderPanel();
+    expect(await screen.findByText('running without a key, reduced rate')).toBeInTheDocument();
+  });
+
+  it.each([{ runs: [], openalex_keyed: true }, { runs: [] }])('shows no key note for %j', async body => {
+    routes['GET /v1/library/harvest/runs'].body = body;
+    renderPanel();
+    await waitFor(() => expect(calls.some(call => call.path === '/v1/library/harvest/runs')).toBe(true));
+    expect(screen.queryByText('running without a key, reduced rate')).not.toBeInTheDocument();
+  });
 });

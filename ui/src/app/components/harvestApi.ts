@@ -77,6 +77,8 @@ export interface HarvestRun {
 /** `GET /v1/library/harvest/runs`. */
 export interface HarvestRunsResponse {
   runs: HarvestRun[];
+  /** Whether OpenAlex is searched with a key; `false` means unauthenticated at a reduced rate. Absent: unknown. */
+  openalex_keyed?: boolean;
 }
 
 /** One paper the search found and what happened to it. */

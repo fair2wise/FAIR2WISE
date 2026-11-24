@@ -258,6 +258,11 @@ export function HarvesterPanel() {
                     : current.filter(entry => entry !== source.id)))}
               />
               <Label htmlFor={id(`source-${source.id}`)}>{source.label}</Label>
+              {source.id === 'openalex' && runs.data?.openalex_keyed === false ? (
+                <span className="text-xs text-muted-foreground" data-testid="openalex-unkeyed">
+                  running without a key, reduced rate
+                </span>
+              ) : null}
             </div>
           ))}
         </div>
