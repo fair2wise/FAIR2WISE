@@ -26,9 +26,10 @@ test.describe('Publish to Tiled', () => {
     // The Finch stylesheet's `hsl(var(--token))` utilities beat Tailwind's for the shadcn tokens, which left this
     // dialog transparent and off-centre (pilot 2026-11-24): it has to be opaque, centred and its confirm button filled.
     await expect(dialog).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    // Centred in the layout viewport (a classic scrollbar, as on the Linux runner, narrows it; overlay ones do not).
     const box = await dialog.boundingBox();
-    const viewport = page.viewportSize();
-    expect(box && viewport && Math.abs(box.x + box.width / 2 - viewport.width / 2) < 2).toBe(true);
+    const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(box !== null && Math.abs(box.x + box.width / 2 - clientWidth / 2) < 12).toBe(true);
     await expect(dialog.getByRole('button', { name: 'Publish to Tiled' })).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await expect(page.getByTestId('publish-ref')).toHaveText('demo/v2');
     await expect(dialog).toContainText('The plan still needs your approval');
