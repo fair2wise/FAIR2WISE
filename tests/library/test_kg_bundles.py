@@ -287,3 +287,24 @@ def test_chat_node_lookup_finds_the_extracted_entity_by_its_graph(tmp_path, monk
                               graph_paths_by_id={"tomo_test": real})
     assert node is not None and node.graph_id == "tomo_test" and node.label == "cloud tomography"
     assert node.graph_label != "kg"
+
+
+def test_operations_see_registered_bundles_under_the_bundle_name(tmp_path, monkeypatch):
+    from app.modules.graph.backends.json import JsonGraphBackend
+    from app.modules.operations.knowledge import storage_graph_files
+
+    _bundle_with_cloud_tomography(tmp_path, monkeypatch)
+    root = tmp_path / "project"    # no storage/kg at all, as on the read-only image's empty release directory
+    files = storage_graph_files(root)
+    assert [Path(f).parent.name for f in files] == ["tomo_test"]
+    assert JsonGraphBackend(files).graph_ids() == ["tomo_test"]
+
+
+def test_active_json_graph_files_resolve_virtual_bundle_paths(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from app.modules.runtime_bridge.legacy_adapter import active_json_graph_files
+
+    _, bundle = _bundle_with_cloud_tomography(tmp_path, monkeypatch)
+    runtime = SimpleNamespace(graph_source="json", json_graph_paths=[B.virtual_graph_path("tomo_test")])
+    assert active_json_graph_files(SimpleNamespace(runtime=runtime)) == [str((bundle.directory / B.KG_FILE).resolve())]

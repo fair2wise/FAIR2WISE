@@ -143,8 +143,11 @@ def active_json_graph_files(pipeline: Any) -> list[str]:  # noqa: ANN401  # Any:
     paths_fn = getattr(pipeline, "_runtime_json_paths", None)
     raw = list(paths_fn() if callable(paths_fn) else (getattr(runtime, "json_graph_paths", None) or []))
     out: list[str] = []
+    from ..library.bundles import resolve_registered_graph
+
     for path in raw:
-        candidate = Path(str(path))
+        bundle = resolve_registered_graph(str(path))   # a virtual ``kgs/<name>/matkg_<name>.json`` path
+        candidate = bundle if bundle is not None else Path(str(path))
         if not candidate.is_absolute():
             candidate = (Path.cwd() / candidate).resolve()
         if candidate.is_file() and str(candidate) not in out:

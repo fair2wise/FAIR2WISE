@@ -388,7 +388,7 @@ _VERSIONED_NAME = re.compile(r"^(matkg_.+)_v(\d+)\.json$")
 
 
 def storage_graph_files(root: str | Path) -> list[str]:
-    """``<root>/storage/kg/*.json``, sorted by name, one file per graph id.
+    """``<root>/storage/kg/*.json`` plus the registered KG bundles, sorted by name, one file per graph id.
 
     The legacy ``list_storage_kg_json_files`` rule, with one addition: successive versions of
     one graph (``matkg_bl1101_v1.json`` ... ``matkg_bl1101_v9.json`` all carry the id
@@ -399,10 +399,13 @@ def storage_graph_files(root: str | Path) -> list[str]:
     """
     from ..graph.snapshots import graph_id_for_snapshot
 
+    from ..library.bundles import registered_graph_files
+
     kg_dir = Path(root) / "storage" / "kg"
-    if not kg_dir.is_dir():
+    paths = sorted(kg_dir.glob("*.json"), key=lambda p: p.name.lower()) if kg_dir.is_dir() else []
+    paths += [Path(p) for p in registered_graph_files()]   # extracted KG bundles (<workdir>/kgs/<name>), named by bundle
+    if not paths:
         return []
-    paths = sorted(kg_dir.glob("*.json"), key=lambda p: p.name.lower())
     by_id: dict[str, list[Path]] = {}
     for path in paths:
         by_id.setdefault(graph_id_for_snapshot(path), []).append(path)

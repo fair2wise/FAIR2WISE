@@ -450,6 +450,20 @@ def registered_graph_paths(workdir: Path | str | None = None) -> list[str]:
         return []
 
 
+def registered_graph_files(workdir: Path | str | None = None) -> list[str]:
+    """Real ``kg.json`` paths of the registered bundles (non-empty KG, no link), sorted by name. Never raises.
+
+    The file-system twin of :func:`registered_graph_paths`: Knowledge Operations read files, not virtual paths.
+    ``graph_id_for_path`` names each one by its bundle.
+    """
+    out: list[str] = []
+    for virtual in registered_graph_paths(workdir):
+        real = resolve_registered_graph(virtual, workdir)
+        if real is not None:
+            out.append(str(real))
+    return out
+
+
 _VIRTUAL_RE = re.compile(r"^kgs/([A-Za-z0-9][A-Za-z0-9_-]{0,63})/matkg_([A-Za-z0-9][A-Za-z0-9_-]{0,63})\.json$")
 
 
@@ -503,6 +517,6 @@ def schema_path_for_registered_graph(path: str, workdir: Path | str | None = Non
 __all__ = (
     "BUNDLES_DIRNAME", "BUNDLE_FILES", "Bundle", "BundleStore", "PaperRef", "RELEASE_DIR_ENV", "WORKDIR_ENV",
     "bundle_root", "continue_from_kg", "default_release_dir", "ensure_release_dir", "ensure_schema_locked", "export_bundle",
-    "export_file_name", "registered_graph_paths", "resolve_registered_graph",
+    "export_file_name", "registered_graph_files", "registered_graph_paths", "resolve_registered_graph",
     "schema_path_for_registered_graph", "validate_name", "virtual_graph_path",
 )
