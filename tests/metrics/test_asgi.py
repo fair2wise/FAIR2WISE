@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse, PlainTextResponse
+from starlette.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
@@ -83,3 +83,44 @@ def test_duration_histogram_counts_each_request(reader: Any) -> None:  # noqa: A
         client.get("/down")
     (point,) = points(reader, "f2w.http.request.duration")
     assert point.count == 2 and point.sum >= 0
+
+
+def _streaming_app() -> Starlette:
+    async def events() -> Any:  # noqa: ANN401
+        yield b"data: 1\n\n"
+
+    async def job_stream(request: Request) -> StreamingResponse:
+        return StreamingResponse(events(), media_type="text/event-stream")
+
+    async def sse_elsewhere(request: Request) -> StreamingResponse:  # not in the template list: content type decides
+        return StreamingResponse(events(), media_type="text/event-stream; charset=utf-8")
+
+    async def download(request: Request) -> StreamingResponse:  # a streamed body that is not SSE is timed
+        return StreamingResponse(events(), media_type="application/octet-stream")
+
+    async def plain(request: Request) -> PlainTextResponse:
+        return PlainTextResponse("ok")
+
+    app = Starlette(routes=[Route("/v1/jobs/{job_id}/stream", job_stream), Route("/other/events", sse_elsewhere),
+                            Route("/download", download), Route("/plain", plain)])
+    assert asgi.install(app) is True
+    return app
+
+
+def test_streaming_routes_are_counted_but_have_no_duration(reader: Any) -> None:  # noqa: ANN401
+    with TestClient(_streaming_app()) as client:
+        assert client.get("/v1/jobs/abc/stream").status_code == 200
+        assert client.get("/other/events").status_code == 200
+        assert client.get("/plain").status_code == 200
+        assert client.get("/download").status_code == 200
+    counted = {p.attributes["http_route"]: p.value for p in points(reader, "f2w.http.requests")}
+    assert counted == {"/v1/jobs/{job_id}/stream": 1, "/other/events": 1, "/plain": 1, "/download": 1}
+    timed = {p.attributes["http_route"]: p.count for p in points(reader, "f2w.http.request.duration")}
+    assert timed == {"/plain": 1, "/download": 1}  # a normal route records both; the two streams record no duration
+
+
+def test_chat_stream_templates_are_listed() -> None:
+    assert {"/v1/jobs/{job_id}/stream", "/chat/stream", "/chat/action/stream"} <= asgi.STREAMING_ROUTES
+    assert asgi.is_streaming("/x", b"Text/Event-Stream; charset=utf-8") is True
+    assert asgi.is_streaming("/x", b"application/json") is False
+    assert asgi.is_streaming(None, None) is False

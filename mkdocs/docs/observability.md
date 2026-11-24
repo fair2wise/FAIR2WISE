@@ -318,7 +318,10 @@ The commit is exposed by one metric, `f2w.build.info`, instead.
 `http_route` is the matched route **template** (`/v1/jobs/{job_id}`), never the raw path; a request that matched
 no route is `unmatched`. `status_class` is `2xx`..`5xx`. Health probes (`/livez`, `/readyz`, `/health`,
 `/healthz`) are not counted. Histogram boundaries (seconds, set with OpenTelemetry Views):
-`0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30`. Long streams (job events) fall in the top bucket.
+`0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30`. Streaming routes (the job event stream
+`/v1/jobs/{job_id}/stream`, `/chat/stream`, `/chat/action/stream`, and any response with content type
+`text/event-stream`) are counted in `f2w.http.requests` but record **no** `f2w.http.request.duration`: a stream lasts
+as long as the client listens, so its duration is not server latency.
 
 Jobs: `kind` is a registered job kind (`ingest`, `build_snapshot`, `publish`, ...; anything else is `other`) and
 `outcome` is `succeeded`, `failed`, `cancelled`, `paused` (budget, provider or review pause) or `requeued`: a run

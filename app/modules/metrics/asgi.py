@@ -3,7 +3,9 @@
 Labels are the matched route *template* (``/v1/jobs/{job_id}``, never the raw path), the method and the status
 class. A request that matched no route (a 404) is ``unmatched``. Health probes (``/livez``, ``/readyz``,
 ``/health``, ``/healthz``) are skipped, as in tracing: they are answered before routing and would only add noise.
-The duration covers the whole response, so long streams (job events) land in the top buckets.
+The duration covers the whole response. Streaming routes (:data:`STREAMING_ROUTES`, and any response whose
+content type is ``text/event-stream``) are counted in ``f2w.http.requests`` but record no duration: a stream lasts
+as long as the client listens, which says nothing about server latency.
 
 Add it with :func:`install`, which does nothing when metrics are off.
 """
@@ -17,6 +19,17 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from . import runtime
 from ..tracing.asgi import excluded
+
+#: Route templates that answer with a server-sent event stream (the job events and the two chat streams).
+STREAMING_ROUTES = frozenset({"/v1/jobs/{job_id}/stream", "/chat/stream", "/chat/action/stream"})
+EVENT_STREAM = b"text/event-stream"
+
+
+def is_streaming(template: str | None, content_type: bytes | None) -> bool:
+    """Whether a request is a stream: a listed route template, or an ``text/event-stream`` response."""
+    if template is not None and template in STREAMING_ROUTES:
+        return True
+    return content_type is not None and content_type.split(b";", 1)[0].strip().lower() == EVENT_STREAM
 
 
 def declared_routes(app: Any) -> frozenset[str]:  # noqa: ANN401  # Any: a Starlette/FastAPI app or router (only ``routes`` is read)
@@ -67,23 +80,29 @@ class MetricsMiddleware:
             return
         started = time.perf_counter()
         status: list[int] = []
+        content_type: list[bytes] = []
 
         async def counting_send(message: Message) -> None:
             if message["type"] == "http.response.start":
                 status.append(int(message["status"]))
+                for name, value in message.get("headers") or ():
+                    if bytes(name).lower() == b"content-type":
+                        content_type.append(bytes(value))
             await send(message)
 
         try:
             await self.app(scope, receive, counting_send)
         finally:
-            self._finish(scope, status, started)
+            self._finish(scope, status, started, content_type[0] if content_type else None)
 
-    def _finish(self, scope: Scope, status: list[int], started: float) -> None:
+    def _finish(self, scope: Scope, status: list[int], started: float, content_type: bytes | None) -> None:
         try:
             if self._known is None:
                 self._known = declared_routes(scope.get("app"))
-            runtime.record_http_request(route=matched_template(scope), method=scope.get("method"), status=status[0] if status else 500,
-                                        seconds=time.perf_counter() - started, known_routes=self._known)
+            template = matched_template(scope)
+            runtime.record_http_request(route=template, method=scope.get("method"), status=status[0] if status else 500,
+                                        seconds=time.perf_counter() - started, known_routes=self._known,
+                                        streaming=is_streaming(template, content_type))
         except Exception:  # recording must never fail the request
             return
 

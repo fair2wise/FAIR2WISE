@@ -198,8 +198,8 @@ def _observe(key: str, attrs: Mapping[str, str], value: float) -> None:
 
 
 def record_http_request(*, route: object, method: object, status: object, seconds: float,
-                        known_routes: frozenset[str] | None) -> None:
-    """Count one HTTP request and record its duration.
+                        known_routes: frozenset[str] | None, streaming: bool = False) -> None:
+    """Count one HTTP request and, unless it is a stream, record its duration.
 
     Args:
         route: The matched route template, or ``None`` when no route matched.
@@ -207,13 +207,16 @@ def record_http_request(*, route: object, method: object, status: object, second
         status: Response status code (a failed request without one is passed as 500).
         seconds: Server-side duration.
         known_routes: The templates the application declared; a ``route`` outside them is ``unmatched``.
+        streaming: The response is a long-lived stream (SSE): it is counted but its duration is not recorded,
+            because a stream lasts as long as the client listens and would only fill the top buckets.
     """
     if not _STATE.enabled:
         return
     attrs = {"http_route": labels.http_route(route, known_routes), "http_method": labels.http_method(method),
              "status_class": labels.status_class(status)}
     _add("http_requests", attrs)
-    _observe("http_duration", attrs, seconds)
+    if not streaming:
+        _observe("http_duration", attrs, seconds)
 
 
 #: Run results counted as a job outcome: the states that end a run, plus ``queued`` (the run ended requeued).
