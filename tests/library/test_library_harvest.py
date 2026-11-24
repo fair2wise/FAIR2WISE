@@ -17,7 +17,9 @@ from app.modules.library.handlers import library_handlers
 from app.modules.library.harvest import (
     Candidate,
     HarvestStore,
+    OPENALEX_RATE_LIMITED,
     Harvester,
+    OpenAlexRateLimited,
     arxiv_queries,
     merge_candidates,
     pdf_downloader,
@@ -25,7 +27,7 @@ from app.modules.library.harvest import (
     topic_terms,
 )
 from app.modules.library.probe import ProbeResult
-from app.modules.library.service import LibraryService, VerifyUnavailable
+from app.modules.library.service import LibraryService
 from tests.jobs.jobs_fakes import Clock
 from tests.library.test_library_service import pdf
 from tests.security.security_fakes import local_settings
@@ -184,16 +186,39 @@ def test_a_failing_source_is_logged_and_the_others_still_run(tmp_path):
 
 
 def test_an_empty_search_says_why_in_plain_words(tmp_path):
-    def no_key(topic: str, per_query: int):
-        raise VerifyUnavailable("OPENALEX_API_KEY is not configured")
+    def rate_limited(topic: str, per_query: int):
+        raise OpenAlexRateLimited(OPENALEX_RATE_LIMITED)
 
-    world = World(tmp_path, {"arxiv": fixed(), "openalex": no_key}, Net({}))
+    world = World(tmp_path, {"arxiv": fixed(), "openalex": rate_limited}, Net({}))
     handle, state = world.run(topic="plecostomus")
     assert state is JobState.SUCCEEDED
     logs = [e.message for e in world.jobs.store.logs(handle.job_id)]
+    assert OPENALEX_RATE_LIMITED in logs
     text = next(m for m in logs if m.startswith("search summary"))
-    assert "arxiv returned 0" in text and "openalex could not be searched (OPENALEX_API_KEY is not configured)" in text
+    assert "arxiv returned 0" in text and f"openalex could not be searched ({OPENALEX_RATE_LIMITED})" in text
     assert "does not mean the topic has no papers" in text and "0 distinct papers" in text
+
+
+def test_without_a_key_openalex_runs_and_the_log_and_summary_say_so(tmp_path, monkeypatch):
+    monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
+    world = World(tmp_path, {"arxiv": fixed(), "openalex": fixed(cand(GOOD, source="openalex", doi="10.1/A"))}, Net({}))
+    handle, state = world.run()
+    assert state is JobState.SUCCEEDED
+    logs = [e.message for e in world.jobs.store.logs(handle.job_id)]
+    note = next(m for m in logs if m.startswith("OpenAlex: running without an API key"))
+    assert "reduced rate (about 1 request per second, at most 1 request per search)" in note
+    assert logs.index(note) < logs.index("openalex: 1 results")
+    summary = next(m for m in logs if m.startswith("search summary"))
+    assert "openalex returned 1 (running without an API key, reduced rate)" in summary
+    assert "could not be searched" not in summary
+
+
+def test_with_a_key_there_is_no_reduced_rate_note(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENALEX_API_KEY", "k-test-value")
+    world = World(tmp_path, {"arxiv": fixed(), "openalex": fixed(cand(GOOD, source="openalex", doi="10.1/A"))}, Net({}))
+    handle, _ = world.run()
+    text = " ".join(e.message for e in world.jobs.store.logs(handle.job_id))
+    assert "without an API key" not in text and "k-test-value" not in text
 
 
 def test_the_summary_counts_what_the_merge_dropped(tmp_path):

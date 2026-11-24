@@ -40,7 +40,7 @@ Environment, all optional:
 | `F2W_PAPERS_DIR` | repo `papers/` | the read-only folder root |
 | `F2W_LIBRARY_HOST_DIR` | same as the papers folder | the read-write Library folder |
 | `F2W_KG_RELEASE_DIR` | `/var/lib/fair2wise/state/kg_releases` | directory inside the container where **Export** writes `matkg_<name>.json` |
-| `OPENALEX_API_KEY` | unset | passed through only when exported in your shell (never read from the dotenv file); without it the Harvester searches arXiv only |
+| `OPENALEX_API_KEY` | unset | passed through only when exported in your shell (never read from the dotenv file); without it the Harvester searches OpenAlex unauthenticated at a reduced rate (about 1 request per second) |
 
 The Library's export needs its release directory to exist and the app never
 creates it; the script creates it with `docker exec ... mkdir -p` after start.

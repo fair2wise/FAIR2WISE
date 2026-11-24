@@ -24,7 +24,7 @@ The Harvester finds new papers for a topic and files them into a category.
 4. **Paywalled queue.** An A/B paper with no free PDF (or whose "open" link is not a PDF) is **paywalled**. The queue shows an **Open publisher** link (opens in your own browser; the server never requests the publisher), a drop slot for the PDF you save, and **Dismiss**. A PDF you drop is filed in the run's category by the paper's year and the candidate becomes *filed*.
 5. **Run view.** Progress, a live log, **Cancel**, and a results table with the status of every candidate: *downloaded*, *in library*, *paywalled*, *filed*, *failed*, *skipped*, *dismissed*. Past runs are listed and can be reopened; a run still in progress is re-attached after a page reload. The page follows the run by short polling (the job state and `GET /v1/jobs/{id}/logs?after=<seq>`, about every 2 s, slower when idle or after errors), not by a long-lived stream, so a proxy that cuts idle connections cannot break it. Polling pauses while the tab or the browser page is hidden and resumes, from the last line seen, when it is shown again.
 
-OpenAlex needs `OPENALEX_API_KEY` in the server environment; without it only arXiv is searched and the log says so. After the searches the log carries one `search summary` line in plain words: what each source returned or why it could not be searched, how many results the merge dropped (no title, duplicates) and how many distinct papers remain. A search that found nothing says whether that is an empty answer or a source that never ran.
+OpenAlex is searched with `OPENALEX_API_KEY` when the server environment has one. Without a key it is still searched, unauthenticated and at a reduced rate (about one request per second, one request per search, the contact address sent when one is configured); the Harvester panel shows "running without a key, reduced rate" next to OpenAlex and the job log starts the OpenAlex stage with a line saying so. If OpenAlex answers that the unauthenticated search is rate limited, OpenAlex is skipped for that run with a plain log line ("add OPENALEX_API_KEY") and arXiv results still count. Library metadata verify and backfill still require the key. After the searches the log carries one `search summary` line in plain words: what each source returned or why it could not be searched, how many results the merge dropped (no title, duplicates) and how many distinct papers remain. A search that found nothing says whether that is an empty answer or a source that never ran.
 
 ## Backfill authors and abstracts
 
@@ -56,3 +56,7 @@ In the pilot pod: `kubectl -n <namespace> exec deploy/<f2w-deployment> -- f2w-li
 The full route table with capabilities is in `docs/migration/api/README.md`. All of these need the local-operator `library.*` capabilities.
 
 To turn a harvested and extracted KG into a published graph, continue with [The `:local` image, end to end](local-image.md).
+
+## Planned: bioRxiv
+
+bioRxiv is not searched yet. The plan is to search it through OpenAlex with `filter=primary_location.source.id:<bioRxiv source id>`; the source id is to be looked up first with `/sources?search=biorxiv` (not yet done). Nothing is built for this now. bioRxiv's own API has no keyword search, so it cannot be used as a source directly.

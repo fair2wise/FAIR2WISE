@@ -67,7 +67,7 @@ def test_openalex_key_comes_from_the_exported_environment_through_the_helper_onl
     keyed = [k.value for call in _calls("openalex_get") for k in call.keywords if k.arg == "api_key"]
     assert keyed and all(isinstance(v, ast.Call) and getattr(v.func, "id", "") == "openalex_api_key" and not v.args
                          for v in keyed)
-    assert "OPENALEX_API_KEY" not in SOURCE.replace('"OPENALEX_API_KEY is not configured"', "")
+    assert "OPENALEX_API_KEY" not in SOURCE.replace("; add OPENALEX_API_KEY\"", "\"")
     assert "api_key=" not in SOURCE.replace("api_key=openalex_api_key()", "")  # never a URL parameter
     assert harvest.openalex_api_key is legacy_download.openalex_api_key
 

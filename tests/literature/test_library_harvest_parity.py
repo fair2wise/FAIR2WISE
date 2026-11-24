@@ -24,7 +24,6 @@ import pytest
 
 from app.modules.library import harvest as hv
 from app.modules.library.harvest import Candidate, arxiv_queries, arxiv_searcher, clean_doi, openalex_searcher
-from app.modules.library.service import VerifyUnavailable
 from app.modules.literature import legacy_download as ld
 from app.modules.literature.legacy_download import JSONFetchError, hardened_get_bytes, hardened_get_json
 from app.modules.literature.openalex import (
@@ -269,12 +268,75 @@ def test_openalex_request_is_the_same_query_with_the_key_in_the_header_only(keye
     assert request.headers["authorization"] == f"Bearer {KEY}" and request.headers["from"] == MAILTO
 
 
-def test_openalex_without_an_exported_key_is_skipped_not_called(monkeypatch: pytest.MonkeyPatch):
+@pytest.fixture
+def unkeyed(monkeypatch: pytest.MonkeyPatch) -> tuple[ld.RateLimiter, list[float]]:
+    """No exported key; an unauthenticated limiter on a fake clock (its pauses are returned)."""
     monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
+    clock, pauses = [0.0], []
+
+    def sleep(seconds: float) -> None:
+        pauses.append(seconds)
+        clock[0] += seconds
+
+    return ld.RateLimiter(1.0, clock=lambda: clock[0], sleep=sleep), pauses
+
+
+def test_openalex_without_a_key_searches_unauthenticated_with_the_contact(unkeyed):
+    limiter, _ = unkeyed
     wire = Wire((200, OA_BODY))
-    with pytest.raises(VerifyUnavailable, match="OPENALEX_API_KEY is not configured"):
-        openalex_searcher(lambda: "", get_json=wire.getter(hardened_get_json))("rsoxs", 5)
-    assert wire.requests == []
+    found = openalex_searcher(lambda: MAILTO, get_json=wire.getter(hardened_get_json), limiter=limiter)("rsoxs", 5)
+    assert len(found) == 3 and len(wire.requests) == 1
+    request = wire.requests[0]
+    assert "authorization" not in request.headers and "api_key" not in _query(wire.urls[0])
+    assert request.headers["from"] == MAILTO and _query(wire.urls[0])["mailto"] == [MAILTO]
+
+
+def test_openalex_without_a_key_keeps_one_second_between_requests(unkeyed):
+    limiter, pauses = unkeyed
+    wire = Wire((200, OA_BODY))
+    search = openalex_searcher(lambda: MAILTO, get_json=wire.getter(hardened_get_json), limiter=limiter)
+    search("rsoxs", 5)
+    search("rsoxs", 5)
+    search("rsoxs", 5)
+    assert len(wire.requests) == 3 and pauses == [1.0, 1.0]
+
+
+def test_openalex_without_a_key_stops_on_429_without_retrying(unkeyed):
+    limiter, pauses = unkeyed
+    slept: list[float] = []
+    wire = Wire((429, b"", {"Retry-After": "4"}), (200, OA_BODY))
+    with pytest.raises(hv.OpenAlexRateLimited, match="add OPENALEX_API_KEY"):
+        openalex_searcher(get_json=wire.getter(hardened_get_json), sleep=slept.append, limiter=limiter)("rsoxs", 5)
+    assert len(wire.requests) == 1 and slept == []
+    assert str(hv.OpenAlexRateLimited(hv.OPENALEX_RATE_LIMITED)) == (
+        "OpenAlex rate-limited the unauthenticated search; add OPENALEX_API_KEY")
+
+
+def test_openalex_without_a_key_other_errors_stay_errors(unkeyed):
+    limiter, _ = unkeyed
+    wire = Wire((403, b""))
+    with pytest.raises(JSONFetchError, match="HTTP 403"):
+        openalex_searcher(get_json=wire.getter(hardened_get_json), limiter=limiter)("rsoxs", 5)
+
+
+def test_openalex_with_a_key_ignores_the_unauthenticated_limiter(unkeyed, monkeypatch: pytest.MonkeyPatch):
+    limiter, pauses = unkeyed
+    monkeypatch.setenv("OPENALEX_API_KEY", KEY)
+    wire = Wire((200, OA_BODY))
+    search = openalex_searcher(lambda: MAILTO, get_json=wire.getter(hardened_get_json), limiter=limiter)
+    search("rsoxs", 5)
+    search("rsoxs", 5)
+    assert pauses == [] and wire.requests[0].headers["authorization"] == f"Bearer {KEY}"
+
+
+def test_the_mode_note_and_the_keyed_boolean(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
+    assert hv.openalex_keyed() is False
+    note = hv.openalex_mode_note(MAILTO)
+    assert note == "OpenAlex: running without an API key, reduced rate (about 1 request per second, at most 1 request per search)"
+    assert "no contact address" in (hv.openalex_mode_note("") or "")
+    monkeypatch.setenv("OPENALEX_API_KEY", KEY)
+    assert hv.openalex_keyed() is True and hv.openalex_mode_note(MAILTO) is None
 
 
 def test_openalex_polite_contact_is_optional(keyed: None):

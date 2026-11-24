@@ -52,6 +52,15 @@ def test_runs_lists_the_run_with_counts_per_status(world):
     assert counts["paywalled"] == 1 and counts["filed"] == 1
 
 
+def test_runs_say_whether_openalex_has_a_key_and_never_the_key(world, monkeypatch):
+    app, _, _, _, _ = world
+    monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
+    assert app.client().get(f"{BASE}/runs").json()["openalex_keyed"] is False
+    monkeypatch.setenv("OPENALEX_API_KEY", "secret-key-value-123")
+    resp = app.client().get(f"{BASE}/runs")
+    assert resp.json()["openalex_keyed"] is True and "secret-key-value-123" not in resp.text
+
+
 def test_candidates_of_a_run_and_unknown_or_malformed_run_ids(world):
     app, _, cid, _, _ = world
     c = app.client()

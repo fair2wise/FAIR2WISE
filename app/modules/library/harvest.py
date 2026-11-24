@@ -42,6 +42,8 @@ from ..literature.legacy_download import (
     ARXIV_MIN_INTERVAL_SECONDS,
     GetBytes,
     GetJson,
+    JSONFetchError,
+    RateLimiter,
     arxiv_results,
     hardened_get_bytes,
     hardened_get_json,
@@ -51,7 +53,7 @@ from ..literature.legacy_download import (
 from ..literature.safe_fetch import BlockedURL, NetworkPolicy
 from .arrange import is_valid_folder_name
 from .bibmeta import cap_abstract, clean_author_list, openalex_authors
-from .service import LibraryService, VerifyUnavailable
+from .service import LibraryService
 
 logger = logging.getLogger(__name__)
 
@@ -204,30 +206,72 @@ _OPENALEX_FIELDS = ("id,doi,title,publication_year,primary_location,best_oa_loca
                     "abstract_inverted_index,authorships")
 
 
+#: Without a key OpenAlex is searched at a conservative rate: one request per second, process-wide, and one request
+#: per search (the page the searcher fetches; it never paginates).
+OPENALEX_UNKEYED_MIN_INTERVAL_SECONDS = 1.0
+OPENALEX_MAX_REQUESTS_PER_SEARCH = 1
+OPENALEX_UNKEYED_LIMITER = RateLimiter(OPENALEX_UNKEYED_MIN_INTERVAL_SECONDS)
+OPENALEX_RATE_LIMITED = "OpenAlex rate-limited the unauthenticated search; add OPENALEX_API_KEY"
+
+
+class OpenAlexRateLimited(Exception):
+    """OpenAlex answered 429 to an unauthenticated search; the source stops for the run (no retry)."""
+
+
+def openalex_keyed() -> bool:
+    """Whether the OpenAlex key is exported (the boolean only; the key is never returned or logged)."""
+    return openalex_api_key() is not None
+
+
+def openalex_mode_note(contact: str) -> str | None:
+    """The plain-words job-log line for a search without a key, or ``None`` when a key is set."""
+    if openalex_keyed():
+        return None
+    note = (f"OpenAlex: running without an API key, reduced rate (about 1 request per second, at most "
+            f"{OPENALEX_MAX_REQUESTS_PER_SEARCH} request{'s' if OPENALEX_MAX_REQUESTS_PER_SEARCH != 1 else ''} per search)")
+    if not contact:
+        note += "; no contact address is configured, so requests go without one"
+    return note
+
+
 def openalex_searcher(contact: Callable[[], str] = lambda: "", *, get_json: GetJson = hardened_get_json,
-                      sleep: Callable[[float], None] | None = None) -> Searcher:
+                      sleep: Callable[[float], None] | None = None,
+                      limiter: RateLimiter | None = None) -> Searcher:
     """A searcher over the hardened OpenAlex helper (relevance order, open-access links collected).
 
     The key is read from the process environment at request time (:func:`openalex_api_key`) and sent only as the
-    ``Authorization: Bearer`` header; without one the source cannot run (OpenAlex has required a key since
-    2026-02-13) and the harvest skips it, as it did when the key was missing from the settings.
+    ``Authorization: Bearer`` header. Without a key the search still runs, unauthenticated: the polite-pool
+    ``mailto`` is sent as with a key, requests are at least one second apart process-wide, there is one request per
+    search, and a 429 stops the source with :class:`OpenAlexRateLimited` instead of a retry.
 
     Args:
         contact: ``() -> polite-pool address`` (``""`` for none); read per search.
         get_json: The hardened JSON getter (tests patch it); the egress policy rides on it.
-        sleep: Pause function for the one ``Retry-After`` wait.
+        sleep: Pause function for the one ``Retry-After`` wait (keyed requests only).
+        limiter: Spacing for unauthenticated requests (the process-wide one by default; tests inject a fake clock).
     """
     from ..literature.acquire import openalex_work_urls
     from ..literature.openalex import abstract_from_inverted_index
 
     def search(topic: str, per_query: int) -> list[Candidate]:
-        if openalex_api_key() is None:
-            raise VerifyUnavailable("OPENALEX_API_KEY is not configured")
+        key = openalex_api_key()
+        fetch_json = get_json
+        if key is None:
+            (limiter or OPENALEX_UNKEYED_LIMITER).wait()
+
+            def no_retry(url: str, **kw: Any) -> Any:  # noqa: ANN401 - the hardened getter's own signature
+                try:
+                    return get_json(url, **kw)
+                except JSONFetchError as exc:
+                    if exc.status == 429:
+                        raise OpenAlexRateLimited(OPENALEX_RATE_LIMITED) from None
+                    raise
+
+            fetch_json = no_retry
         rows, _cursor = openalex_get("works", search=" ".join(topic_terms(topic)) or topic,
                                      per_page=min(per_query, 100),
                                      params={"sort": "relevance_score:desc", "select": _OPENALEX_FIELDS},
-                                     mailto=contact() or None, api_key=openalex_api_key(), get_json=get_json,
-                                     sleep=sleep)
+                                     mailto=contact() or None, api_key=openalex_api_key(), get_json=fetch_json, sleep=sleep)
         found: list[Candidate] = []
         for work in rows:
             doi = clean_doi(work.get("doi"))
@@ -565,10 +609,20 @@ class Harvester:
                 f"(schema {args['schema'] or 'none'}, up to {args['max_downloads']} downloads)")
         groups, searched = [], 0
         per_source: dict[str, str] = {}
+        openalex_mode: str | None = None
         for source in args["sources"]:
             ctx.guard()
+            mode = openalex_mode_note(self.service.contact_email) if source == "openalex" else None
+            if mode:
+                ctx.log(mode)
+                openalex_mode = mode
             try:
                 found = self._search_functions()[source](args["topic"], args["per_query"])
+            except OpenAlexRateLimited as exc:
+                metrics.record_harvest_fetch(source=source, outcome="failed")
+                ctx.log(str(exc), level="warning")
+                per_source[source] = f"could not be searched ({exc})"
+                continue
             except Exception as exc:  # noqa: BLE001 - a source that cannot run must not stop the others
                 metrics.record_harvest_fetch(source=source, outcome="failed")
                 ctx.log(f"{source} search skipped: {exc}", level="warning")
@@ -577,7 +631,7 @@ class Harvester:
             metrics.record_harvest_fetch(source=source, outcome="ok")
             searched += 1
             ctx.log(f"{source}: {len(found)} results")
-            per_source[source] = f"returned {len(found)}"
+            per_source[source] = f"returned {len(found)}" + (" (running without an API key, reduced rate)" if mode else "")
             groups.append(found)
         if searched == 0:
             raise ContractError(ErrorCode.UNAVAILABLE, "no source could be searched (see the log)")
@@ -600,7 +654,7 @@ class Harvester:
         ctx.log("done: " + ", ".join(f"{k} {v}" for k, v in counts.items()))
         return StageResult(progress={"done": len(candidates), "total": len(candidates), **counts},
                            data={"run": run_id, "category": args["category"], "summary": summary,
-                                 "sources": per_source})
+                                 "sources": per_source, "openalex_mode": openalex_mode})
 
     def _process(self, ctx: StageContext, run_id: str, args: Mapping[str, Any], candidates: list[Candidate]) -> dict[str, int]:
         counts = {"downloaded": 0, "in_library": 0, "paywalled": 0, "failed": 0, "skipped": 0}
@@ -714,5 +768,5 @@ class Harvester:
 
 
 __all__ = ("Candidate", "Harvester", "HarvestStore", "PAYWALL_STATUSES", "SOURCES", "STATUSES", "arxiv_queries",
-           "arxiv_searcher", "candidate_id", "clean_doi", "file_stem", "merge_candidates", "openalex_searcher",
+           "arxiv_searcher", "candidate_id", "clean_doi", "file_stem", "merge_candidates", "openalex_keyed", "openalex_searcher",
            "pdf_downloader", "score_candidate", "topic_terms")

@@ -15,7 +15,7 @@ from starlette.concurrency import run_in_threadpool
 
 from ..modules.contracts.context import RequestContext
 from ..modules.contracts.errors import ContractError, ErrorCode
-from ..modules.library.harvest import Harvester
+from ..modules.library.harvest import Harvester, openalex_keyed
 from .multipart_upload import PartFile, read_single_file
 from .routes_common import Prefixed, context, project
 from .upload_limits import read_upload_limited
@@ -43,8 +43,13 @@ def install(app: FastAPI) -> FastAPI:
 
     @router.get("/runs")
     def runs(request: Request, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
-        """Every harvest run, newest first, with counts per candidate status."""
-        return cast(dict[str, Any], project(request, {"runs": harvester(request).store.runs()}))
+        """Every harvest run, newest first, with counts per candidate status.
+
+        ``openalex_keyed`` says whether OpenAlex is searched with a key (``false``: unauthenticated, reduced rate);
+        it is the boolean only, never the key.
+        """
+        return cast(dict[str, Any], project(request, {"runs": harvester(request).store.runs(),
+                                                      "openalex_keyed": openalex_keyed()}))
 
     @router.get("/runs/{run_id}/candidates")
     def candidates(run_id: str, request: Request, ctx: RequestContext = Depends(context)) -> dict[str, Any]:

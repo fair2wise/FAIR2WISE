@@ -20,7 +20,7 @@ Set `FAIR2WISE_CONFIG` to load a different YAML file.
 | `CBORG_API_KEY` | Using CBORG | Hosted LLM authentication |
 | `CBORG_BASE_URL` | Optional | CBORG-compatible base URL |
 | `OPENALEX_EMAIL` | Recommended | OpenAlex polite-pool identity and Unpaywall lookup |
-| `OPENALEX_API_KEY` | Optional | OpenAlex key, `Authorization: Bearer` header only; process environment only (never read from `.env`) |
+| `OPENALEX_API_KEY` | Optional | OpenAlex key, `Authorization: Bearer` header only; process environment only (never read from `.env`). Without it the Harvester still searches OpenAlex unauthenticated at a reduced rate (about 1 request per second, 1 request per search; a 429 stops OpenAlex for that run); library verify and backfill still need the key |
 | `MP_API_KEY` | Optional | Materials Project chemistry validation |
 | `GITHUB_TOKEN` | Optional | Higher-rate GitHub source-code retrieval |
 | `GLOBUS_COMPUTE_ENDPOINT_ID` | Remote extraction | Globus Compute endpoint |
