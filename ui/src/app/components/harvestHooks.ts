@@ -2,7 +2,7 @@
  * TanStack Query hooks for the Harvester panel (A8, T46). Server state only: the form, the watched run
  * and the log stream are owned by the panel components.
  */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   dismissHarvestCandidate,
   fetchHarvestCandidates,
@@ -54,11 +54,24 @@ export function useHarvestCandidates(runId: string | null, pollMs: number | fals
   });
 }
 
+/** Poll interval while a harvest runs (or was just started). */
+export const HARVEST_POLL_FAST_MS = 5000;
+/** Poll interval while none runs: the tab stays cheap on an idle deployment. */
+export const HARVEST_POLL_IDLE_MS = 30_000;
+/** After the user starts a run the poll stays fast this long even if the job list does not show it yet. */
+const FAST_AFTER_START_MS = 60_000;
+
+const startedAt = new WeakMap<QueryClient, number>();
+
 /**
  * The running harvest job, if any: after a page reload this re-attaches the panel to the run.
  * `data` is the job or `null` when none is running.
+ *
+ * Polls every `pollMs` (5 s) while a run is active or was just started, and every `idlePollMs` (30 s)
+ * when none is; a start from this tab returns to the fast interval immediately.
  */
-export function useRunningHarvest(enabled = true, pollMs = 5000) {
+export function useRunningHarvest(enabled = true, pollMs = HARVEST_POLL_FAST_MS, idlePollMs = HARVEST_POLL_IDLE_MS) {
+  const queryClient = useQueryClient();
   return useQuery<JobInfo | null>({
     queryKey: harvestKeys.running,
     queryFn: async () => {
@@ -66,16 +79,21 @@ export function useRunningHarvest(enabled = true, pollMs = 5000) {
       return jobs[0] ?? null;
     },
     enabled,
-    refetchInterval: pollMs,
+    refetchInterval: query => {
+      if (query.state.data) return pollMs;
+      const started = startedAt.get(queryClient);
+      return started !== undefined && Date.now() - started < FAST_AFTER_START_MS ? pollMs : idlePollMs;
+    },
   });
 }
 
-/** Start a harvest run; refreshes the running job and the run list. */
+/** Start a harvest run; refreshes the running job and the run list and returns the running poll to its fast interval. */
 export function useStartHarvest() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (request: StartHarvestRequest) => startHarvest(request),
     onSuccess: () => {
+      startedAt.set(queryClient, Date.now());
       void queryClient.invalidateQueries({ queryKey: harvestKeys.running });
       void queryClient.invalidateQueries({ queryKey: harvestKeys.runs });
     },
