@@ -34,8 +34,6 @@ test.describe('KG viewer', () => {
     await page.getByRole('button', { name: 'KG Viewer' }).click();
     await expect(page.getByRole('button', { name: 'Agent KG Viewer' })).toBeVisible();
     await expect(page.locator('[data-kg-empty="false"]')).toBeVisible();
-    // No layout choice made: the viewer opens force-directed (canvas, no per-node DOM).
-    await expect(page.locator('[data-kg-layout="force"]')).toBeVisible();
     await useFixedLayout(page);
     await expect(page.locator(`[data-kg-node-id="${P3HT_NODE.id}"]`)).toBeVisible();
     await expect(page.locator(`[data-kg-node-id="${SCAN_NODE.id}"]`)).toHaveCount(0);

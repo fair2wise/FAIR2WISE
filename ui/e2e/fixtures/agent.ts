@@ -197,6 +197,11 @@ export interface MockAgentOptions {
   judgeModels?: string[] | 'forbidden';
   /** Captures PUT /v1/validation/judge-model bodies. */
   judgePuts?: Array<Record<string, unknown>>;
+  /**
+   * Seed the browser's own graph source as an explicit pick of Splash Links (the local, editable graph), so the
+   * UI applies it instead of the JSON default. Use it with a mocked `graph_source: 'splash'` server.
+   */
+  localGraphSource?: 'splash_links';
   /** T18D: GET /v1/capabilities `can_save` (default true); 'absent' makes the route 404 (older server). */
   canSave?: boolean | 'absent';
   /** T19E: GET /v1/capabilities `can_run_operations` (default true). 'omitted' leaves the field out (older server). */
@@ -240,6 +245,16 @@ export interface MockAgentOptions {
 
 export async function mockAgent(page: Page, options: MockAgentOptions = {}) {
   const settings = { ...defaultSettings(), ...(options.settings ?? {}) };
+  if (options.localGraphSource) {
+    await page.addInitScript((graphSource) => {
+      try {
+        window.localStorage.setItem(
+          'fair2wise-agent-settings-v1',
+          JSON.stringify({ graphSource, settingsVersion: 2, graphSourceChosen: true }),
+        );
+      } catch { /* storage blocked: the spec then fails loudly on the missing Edit button */ }
+    }, options.localGraphSource);
+  }
   const graph = options.graph ?? CATALOG_GRAPH;
   const chatQueue = [...(options.chatQueue ?? [citationChatResponse()])];
   const publications = options.publications ?? [PAPER_PUB];
