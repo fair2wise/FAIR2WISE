@@ -5,6 +5,7 @@ import {
   openSettings,
   P3HT_NODE,
   SCAN_NODE,
+  useFixedLayout,
   waitForTypedAnswer,
 } from './fixtures/agent';
 
@@ -33,6 +34,9 @@ test.describe('KG viewer', () => {
     await page.getByRole('button', { name: 'KG Viewer' }).click();
     await expect(page.getByRole('button', { name: 'Agent KG Viewer' })).toBeVisible();
     await expect(page.locator('[data-kg-empty="false"]')).toBeVisible();
+    // No layout choice made: the viewer opens force-directed (canvas, no per-node DOM).
+    await expect(page.locator('[data-kg-layout="force"]')).toBeVisible();
+    await useFixedLayout(page);
     await expect(page.locator(`[data-kg-node-id="${P3HT_NODE.id}"]`)).toBeVisible();
     await expect(page.locator(`[data-kg-node-id="${SCAN_NODE.id}"]`)).toHaveCount(0);
 
@@ -57,7 +61,7 @@ test.describe('KG viewer', () => {
     await expect(page.getByRole('button', { name: 'View Knowledge Graph' })).toBeVisible();
     await expect(page.getByText('2 nodes')).toBeVisible();
     // Force-directed (the default) draws on a canvas with no per-node DOM; switch to the fixed SVG layout to count nodes.
-    await page.getByRole('button', { name: 'Fixed Layout' }).click();
+    await useFixedLayout(page);
     await expect(page.locator(`[data-kg-node-id="${P3HT_NODE.id}"]`)).toHaveCount(1);
   });
 
@@ -67,6 +71,7 @@ test.describe('KG viewer', () => {
     await expect(page.getByRole('heading', { name: 'Settings' })).toHaveCount(0);
     await page.getByRole('button', { name: 'KG Viewer' }).click();
     await expect(page.locator('[data-kg-empty="false"]')).toBeVisible();
+    await useFixedLayout(page);
     await expect(page.locator(`[data-kg-node-id="${P3HT_NODE.id}"]`)).toBeVisible();
   });
 });
@@ -108,6 +113,7 @@ test.describe('KG viewer graph sources', () => {
 
     await select.selectOption('tiled:e2e_demo');
     await expect(page.getByTestId('graph-source-kind')).toHaveText('Tiled · read-only');
+    await useFixedLayout(page);
     await expect(page.locator('[data-kg-node-id="m:alpha"]')).toBeVisible();
     await expect(page.locator(`[data-kg-node-id="${P3HT_NODE.id}"]`)).toHaveCount(0);
     expect(requests).toContain('GET /graph?source=tiled%3Ae2e_demo');
@@ -125,6 +131,7 @@ test.describe('KG viewer graph sources', () => {
     await page.reload();
     await page.getByRole('button', { name: 'KG Viewer' }).click();
     await expect(page.getByLabel('Graph source')).toHaveValue('tiled:e2e_demo');
+    await useFixedLayout(page); // the layout choice is not remembered across a reload
     await expect(page.locator('[data-kg-node-id="m:alpha"]')).toBeVisible();
 
     await page.getByLabel('Graph source').selectOption('');

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mockAgent } from './fixtures/agent';
+import { mockAgent, useFixedLayout } from './fixtures/agent';
 import { BIG_GRAPH_SPECS, syntheticGraph, type BigGraph, type BigGraphSpec } from './fixtures/bigGraph';
 
 // Owner decision 2026-11-10: the two demo graphs (RSoXS KG v4, 22,012 nodes / 57,575 edges; 580-paper OPV KG,
@@ -107,6 +107,7 @@ test.describe('KG viewer on the large demo graphs', () => {
 
   test('search covers all nodes and focusing one shows its neighbourhood, with a way back', async ({ page }) => {
     const { graph } = await openLarge(page, BIG_GRAPH_SPECS.rsoxs22k);
+    await useFixedLayout(page);
     const overviewIds = await page.locator('[data-kg-node-id]').evaluateAll(
       elements => new Set(elements.map(element => element.getAttribute('data-kg-node-id'))).size,
     );

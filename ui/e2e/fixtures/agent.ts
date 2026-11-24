@@ -509,3 +509,12 @@ export async function openSettings(page: Page) {
   await dialog.getByRole('heading', { name: 'Settings' }).waitFor();
   await dialog.getByRole('radio', { name: /JSON/ }).waitFor();
 }
+
+/**
+ * Force-directed (the default) draws on a canvas with no per-node DOM, so data-kg-node-id locators never appear.
+ * Switch the open KG viewer to the fixed SVG layout, which renders one element per node.
+ */
+export async function useFixedLayout(page: Page) {
+  await page.getByRole('button', { name: 'Fixed Layout' }).click();
+  await page.locator('[data-kg-layout="existing"]').waitFor();
+}
