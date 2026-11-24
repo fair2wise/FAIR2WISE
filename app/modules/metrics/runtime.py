@@ -216,24 +216,26 @@ def record_http_request(*, route: object, method: object, status: object, second
     _observe("http_duration", attrs, seconds)
 
 
-#: Job states that end a run for metrics purposes (a ``queued`` result is a requeue, not a finish).
+#: Run results counted as a job outcome: the states that end a run, plus ``queued`` (the run ended requeued).
+#: A lost lease (``state`` ``None``) is also ``requeued``: the job did not finish here and will run again.
 _JOB_OUTCOME = {"succeeded": "succeeded", "failed": "failed", "cancelled": "cancelled", "paused_budget": "paused",
-                "paused_provider": "paused", "awaiting_review": "paused"}
+                "paused_provider": "paused", "awaiting_review": "paused", "queued": "requeued"}
 
 
 def record_job(*, kind: object, state: object, seconds: float, kinds: Iterable[str]) -> None:
-    """Count one finished job run and record its duration.
+    """Count one job run (finished, or ended requeued / lease lost) and record its duration.
 
     Args:
         kind: The job kind; one of ``kinds`` (the kinds the job service registered) or it is ``other``.
-        state: The state the run ended in (``JobState`` or its value; ``failed`` for a run that raised).
+        state: The state the run ended in (``JobState`` or its value; ``failed`` for a run that raised;
+            ``None`` for a run whose lease was lost, counted ``requeued`` like a ``queued`` result).
         seconds: Wall-clock duration of the run.
         kinds: The registered job kinds (code-defined, a closed set).
     """
     if not _STATE.enabled:
         return
-    outcome = _JOB_OUTCOME.get(str(getattr(state, "value", state)))
-    if outcome is None:  # requeued or lease lost: the job did not finish here
+    outcome = "requeued" if state is None else _JOB_OUTCOME.get(str(getattr(state, "value", state)))
+    if outcome is None:  # a state that is not a run result (for example ``running``)
         return
     attrs = {"kind": labels.enum(kind, kinds), "outcome": outcome}
     _add("jobs", attrs)

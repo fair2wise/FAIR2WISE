@@ -342,6 +342,7 @@ class JobService:
             self._running_jobs.add(claimed[1].job_id)
         lease, job = claimed
         beat = threading.Event()
+        started = time.monotonic()
         try:
             entry = self.kind(job.kind)
             beat = self._start_heartbeat(lease)
@@ -356,6 +357,7 @@ class JobService:
                 raise
             metrics.record_job(kind=job.kind, state=state, seconds=time.monotonic() - started, kinds=self._kinds)
         except LeaseLost:
+            metrics.record_job(kind=job.kind, state=None, seconds=time.monotonic() - started, kinds=self._kinds)
             beat.set()
             self.store.release_lease(lease)
             return job.job_id, None

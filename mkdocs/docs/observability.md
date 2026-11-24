@@ -321,8 +321,10 @@ no route is `unmatched`. `status_class` is `2xx`..`5xx`. Health probes (`/livez`
 `0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30`. Long streams (job events) fall in the top bucket.
 
 Jobs: `kind` is a registered job kind (`ingest`, `build_snapshot`, `publish`, ...; anything else is `other`) and
-`outcome` is `succeeded`, `failed`, `cancelled` or `paused` (budget, provider or review pause). A run that ends
-requeued (interrupted) or loses its lease is not a finish and is not counted. Job duration boundaries (seconds):
+`outcome` is `succeeded`, `failed`, `cancelled`, `paused` (budget, provider or review pause) or `requeued`: a run
+that ends requeued (interrupted, busy) or loses its lease to another owner did not finish here and will run again,
+so each such run is counted once with `requeued` (its duration is recorded too). The counter therefore counts job
+*runs*, not distinct jobs: one job can add several `requeued` runs before its final `succeeded` or `failed`. Job duration boundaries (seconds):
 `1, 5, 10, 30, 60, 120, 300, 600, 1200, 1800, 3600`. The queue depth gauge (`state` is `queued` or `running`) is
 reported by the worker only, from one small SQLite query per export interval; the API reports no queue depth.
 

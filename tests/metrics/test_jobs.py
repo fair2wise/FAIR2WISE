@@ -9,6 +9,7 @@ import pytest
 from app.modules import metrics
 from app.modules.contracts.jobs import JobState
 from app.modules.jobs import JobService, JobStore, Pipeline, StageResult, StageSpec
+from app.modules.jobs.store import LeaseLost
 from tests.jobs.jobs_fakes import inputs, local_ctx
 
 from .conftest import points
@@ -56,12 +57,31 @@ def test_outcome_mapping(reader: Any, state: JobState, outcome: str) -> None:  #
     assert job_counts(reader) == {("ingest", outcome): 1}
 
 
-def test_requeue_and_lease_loss_are_not_finishes_and_unknown_kind_is_other(reader: Any) -> None:  # noqa: ANN401
-    metrics.record_job(kind="ingest", state=JobState.QUEUED, seconds=1.0, kinds=("ingest",))
-    metrics.record_job(kind="ingest", state=None, seconds=1.0, kinds=("ingest",))
-    assert job_counts(reader) == {}
+def test_requeue_and_lease_loss_count_as_requeued_and_unknown_kind_is_other(reader: Any) -> None:  # noqa: ANN401
+    metrics.record_job(kind="ingest", state=JobState.QUEUED, seconds=2.0, kinds=("ingest",))
+    metrics.record_job(kind="ingest", state=None, seconds=3.0, kinds=("ingest",))
+    metrics.record_job(kind="ingest", state=JobState.RUNNING, seconds=1.0, kinds=("ingest",))  # not a run result
+    assert job_counts(reader) == {("ingest", "requeued"): 2}
+    durations = points(reader, "f2w.job.duration")
+    assert [(p.attributes["outcome"], p.count, p.sum) for p in durations] == [("requeued", 2, 5.0)]
     metrics.record_job(kind="10.1000/paper title", state=JobState.FAILED, seconds=1.0, kinds=("ingest",))
-    assert job_counts(reader) == {("other", "failed"): 1}
+    assert job_counts(reader) == {("ingest", "requeued"): 2, ("other", "failed"): 1}
+
+
+def test_outcome_label_enum_has_the_five_outcomes() -> None:
+    assert metrics.labels.JOB_OUTCOMES == ("succeeded", "failed", "cancelled", "paused", "requeued")
+
+
+def test_a_run_that_loses_its_lease_is_counted_requeued_by_work_one(tmp_path: Any, reader: Any) -> None:  # noqa: ANN401
+    def handler(sc: Any) -> StageResult:  # noqa: ANN401
+        raise LeaseLost("taken over")
+
+    service = build(tmp_path, handler)
+    submit(service, 1)
+    result = service.work_one("t")
+    assert result is not None and result[1] is None
+    assert job_counts(reader) == {("ingest", "requeued"): 1}
+    assert [p.count for p in points(reader, "f2w.job.duration")] == [1]
 
 
 def test_queue_depth_is_reported_from_the_source(tmp_path: Any, reader: Any) -> None:  # noqa: ANN401
