@@ -48,7 +48,7 @@ env:
   # Re-pinned 2026-11-23 (owner bug list, task 3): Extract tab model list: CBORG address-refusal reason and Ollama models in a grouped picker (modelChoices, ExtractionIdleForm, extractionApi); previous e1a6fec0.
   # Re-pinned 2026-11-23 (owner bug list, task 4): Ollama model dropdown in Settings (OllamaModelSetting, ollamaApi) fed by GET /v1/ollama/models; previous a21f0906.
   # Re-pinned 2026-11-23 (owner request, extraction feedback): Extract page shows live progress, KG growth, a filterable log, a runs list and survives reload/tab switch (ExtractionTab, extraction/Run*, useJobLogPolling, extractionApi/Hooks, KeepAliveMainContent, tabActivity); previous b34dce75.
-  FROZEN_UI_TREE: 490cf4736e5719b8564caa92265f091992685a5f
+  FROZEN_UI_TREE: 444c304f2b95e9cd8f077151055d0d1e9f1c722b
   KG_RAG_RETRIEVAL_BACKEND: lexical
   KG_RAG_FORCE_CPU: "1"
   F2W_SOURCE_RAG: "0"
@@ -386,7 +386,8 @@ jobs:
         with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: ui/package-lock.json }
       - run: npm ci
       - run: npx playwright install --with-deps chrome
-      - run: npx playwright test --reporter=line
+      # `github` adds an annotation per failure (file, line, message) readable without the logs; `html` feeds the artifact.
+      - run: npx playwright test --reporter=line,github,html
         env: { CI: "1" }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         if: failure()
