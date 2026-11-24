@@ -308,3 +308,22 @@ def test_active_json_graph_files_resolve_virtual_bundle_paths(tmp_path, monkeypa
     _, bundle = _bundle_with_cloud_tomography(tmp_path, monkeypatch)
     runtime = SimpleNamespace(graph_source="json", json_graph_paths=[B.virtual_graph_path("tomo_test")])
     assert active_json_graph_files(SimpleNamespace(runtime=runtime)) == [str((bundle.directory / B.KG_FILE).resolve())]
+
+
+def test_an_extracted_nodes_record_carries_its_supporting_passages_per_paper(tmp_path, monkeypatch):
+    """Owner pilot bug 1: the passages an extraction stores reach the single-node record (the card's source)."""
+    from app.modules.f2w_agent.api import graph_node_from_file
+
+    workdir = tmp_path / "state"
+    monkeypatch.setenv(B.WORKDIR_ENV, str(workdir))
+    terms = [{"term": "cloud tomography", "definition": "Imaging of clouds.", "category": "Method",
+              "source_papers": ["a.pdf", "b.pdf"], "pages": [1, 2],
+              "context_snippets": [{"text": "We image clouds with tomography.", "source_paper": "a.pdf", "page": 1},
+                                   {"text": "Tomography of cumulus.", "source_paper": "b.pdf", "page": 2}]}]
+    store = B.BundleStore(workdir / "kgs", clock=lambda: "2026-11-24T00:00:00Z")
+    bundle = store.create("tomo_test", schema=SCHEMA, topic="tomo", kg=build_graph_isolated(terms, []))
+    node = graph_node_from_file(bundle.directory / B.KG_FILE, "matkg:cloudtomography")
+    assert node is not None
+    by_paper = {p["source_paper"]: p for p in node.publications}
+    assert [s["text"] for s in by_paper["a.pdf"]["snippets"]] == ["We image clouds with tomography."]
+    assert by_paper["b.pdf"]["snippets"][0]["page"] == 2 and by_paper["b.pdf"]["snippet_count"] == 1
