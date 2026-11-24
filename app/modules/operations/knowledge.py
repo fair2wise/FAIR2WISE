@@ -398,7 +398,6 @@ def storage_graph_files(root: str | Path) -> list[str]:
     refuses two genuinely different graphs.
     """
     from ..graph.snapshots import graph_id_for_snapshot
-
     from ..library.bundles import registered_graph_files
 
     kg_dir = Path(root) / "storage" / "kg"
