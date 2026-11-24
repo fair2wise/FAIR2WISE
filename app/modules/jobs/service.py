@@ -248,10 +248,16 @@ class JobService:
         self._visible(ctx, self.store.get(job_id))
         return self.store.events(job_id, after=after)
 
-    def logs(self, ctx: RequestContext, job_id: str, *, after: int = -1, limit: int = 500) -> list[JobLog]:
-        """Log lines after ``seq`` ``after`` (visibility rule of :meth:`events`)."""
+    def logs(self, ctx: RequestContext, job_id: str, *, after: int = -1, limit: int = 500,
+             tail: bool = False) -> list[JobLog]:
+        """Log lines after ``seq`` ``after``, or the newest ``limit`` with ``tail`` (visibility rule of :meth:`events`)."""
         self._visible(ctx, self.store.get(job_id))
-        return self.store.logs(job_id, after=after, limit=limit)
+        return self.store.log_tail(job_id, limit) if tail else self.store.logs(job_id, after=after, limit=limit)
+
+    def log_stats(self, ctx: RequestContext, job_id: str) -> dict[str, int]:
+        """Kept and total log line counts of a job (visibility rule of :meth:`events`)."""
+        self._visible(ctx, self.store.get(job_id))
+        return self.store.log_stats(job_id)
 
     def progress(self, ctx: RequestContext, job_id: str) -> dict[str, Any]:
         """Per-phase progress (parsing, extraction, validation, review, import)."""
@@ -260,6 +266,14 @@ class JobService:
         job = self.store.get(job_id)
         self._visible(ctx, job)
         return job_progress(self.store, self.kind(job.kind).pipeline, job_id)
+
+    def summary(self, ctx: RequestContext, job_id: str, *, detail: bool = True) -> dict[str, Any]:
+        """Live status of one job for a person watching it (see :mod:`.run_summary`)."""
+        from .run_summary import run_summary
+
+        job = self.store.get(job_id)
+        self._visible(ctx, job)
+        return run_summary(self.store, job, detail=detail)
 
     def cancel(self, ctx: RequestContext, job_id: str) -> JobHandle:
         """Cancel: immediate when nobody runs it, otherwise a stop request honored at the next boundary."""

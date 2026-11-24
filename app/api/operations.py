@@ -64,6 +64,7 @@ from ..modules.contracts.jobs import JobEvent, JobHandle, JobState
 from ..modules.contracts.json_types import JsonValue
 from ..modules.contracts.tools import ToolResult, ToolStatus
 from ..modules.jobs.keys import OperationInputs
+from ..modules.jobs.process_support import scrub
 from ..modules.jobs.service import JobService
 from ..modules.jobs.store import JobLog
 from ..modules.security.authorization import (
@@ -294,13 +295,22 @@ class F2WOperations:
         """Durable events after sequence ``after``."""
         return self.jobs.events(ctx, job_id, after=after)
 
-    def job_logs(self, ctx: RequestContext, job_id: str, *, after: int = -1, limit: int = 500) -> list[JobLog]:
-        """Log lines after ``seq`` ``after``."""
-        return self.jobs.logs(ctx, job_id, after=after, limit=limit)
+    def job_logs(self, ctx: RequestContext, job_id: str, *, after: int = -1, limit: int = 500,
+                 tail: bool = False) -> list[JobLog]:
+        """Log lines after ``seq`` ``after``, or the newest ``limit`` lines with ``tail``."""
+        return self.jobs.logs(ctx, job_id, after=after, limit=limit, tail=tail)
+
+    def job_log_stats(self, ctx: RequestContext, job_id: str) -> dict[str, int]:
+        """``{"kept", "total", "cap"}`` of the job's log."""
+        return self.jobs.log_stats(ctx, job_id)
 
     def job_progress(self, ctx: RequestContext, job_id: str) -> dict[str, Any]:
-        """Per-phase progress."""
-        return self.jobs.progress(ctx, job_id)
+        """Per-phase progress, plus the additive ``summary`` (stage, phase, papers, KG growth, outcome, log size)."""
+        return {**self.jobs.progress(ctx, job_id), "summary": self.jobs.summary(ctx, job_id)}
+
+    def job_summary(self, ctx: RequestContext, job_id: str, *, detail: bool = False) -> dict[str, Any]:
+        """The compact live summary of one job (list rows)."""
+        return self.jobs.summary(ctx, job_id, detail=detail)
 
     def cancel_job(self, ctx: RequestContext, job_id: str) -> JobHandle:
         """Cancel now, or request a stop at the next boundary when a worker holds the job."""
@@ -1214,7 +1224,7 @@ def job_event_json(event: JobEvent) -> dict[str, Any]:
 def job_log_json(log: JobLog) -> dict[str, Any]:
     """JSON payload of one job log line (``/logs`` and SSE ``job_log`` data)."""
     return {"seq": log.seq, "at": datetime.fromtimestamp(log.at, UTC).isoformat(), "level": log.level,
-            "stage": log.stage, "message": log.message}
+            "stage": log.stage, "message": scrub(log.message)}  # read-time scrub: rows stored before a rule was added
 
 
 __all__ = ("ALS_APPROVAL_TTL", "DEFAULT_APPROVAL_TTL", "MAX_BULK_REVIEW", "PLAN_ITEM_KINDS", "PROFILE_APPROVAL_TTL",

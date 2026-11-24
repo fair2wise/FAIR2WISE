@@ -37,6 +37,8 @@ from .auth import request_context
 from .operations import job_event_json, job_log_json
 from .routes_common import Prefixed, context, dump, fresh_context, operations, project, project_dict
 
+#: Most rows ``GET /v1/jobs?detail=summary`` returns.
+MAX_SUMMARY_JOBS = 50
 #: States in which a job stays until a person acts (the stream ends with ``waiting``).
 WAITING_STATES = frozenset({JobState.AWAITING_REVIEW, JobState.PAUSED_BUDGET, JobState.PAUSED_PROVIDER})
 
@@ -110,10 +112,20 @@ def install(app: FastAPI, *, poll_seconds: float = 0.5, max_stream_seconds: floa
     def list_jobs(request: Request, state: str | None = Query(default=None, max_length=40),
                   kind: str | None = Query(default=None, max_length=100),
                   limit: int = Query(default=100, ge=1, le=1000),
+                  detail: str | None = Query(default=None, pattern="^summary$"),
                   ctx: RequestContext = Depends(context)) -> dict[str, Any]:
-        """Jobs the caller may see, most recently updated first."""
-        jobs = operations(request).list_jobs(ctx, state=state, kind=kind, limit=limit)
-        return project_dict(request, {"jobs": [dump(j) for j in jobs]})
+        """Jobs the caller may see, most recently updated first.
+
+        ``detail=summary`` adds each job's compact live ``summary`` (outcome, papers, KG growth, elapsed, log size) and
+        keeps the page to ``MAX_SUMMARY_JOBS`` rows (a runs list, newest first).
+        """
+        ops = operations(request)
+        jobs = ops.list_jobs(ctx, state=state, kind=kind, limit=min(limit, MAX_SUMMARY_JOBS) if detail else limit)
+        rows = [dump(j) for j in jobs]
+        if detail:
+            for row, handle in zip(rows, jobs, strict=True):
+                row["summary"] = ops.job_summary(ctx, handle.job_id)
+        return project_dict(request, {"jobs": rows})
 
     @router.get("/{job_id}")
     def get_job(request: Request, job_id: str, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
@@ -129,11 +141,19 @@ def install(app: FastAPI, *, poll_seconds: float = 0.5, max_stream_seconds: floa
 
     @router.get("/{job_id}/logs")
     def job_logs(request: Request, job_id: str, after: int = Query(default=-1, ge=-1),
-                 limit: int = Query(default=500, ge=1, le=1000),
+                 limit: int = Query(default=500, ge=1, le=1000), tail: bool = Query(default=False),
                  ctx: RequestContext = Depends(context)) -> dict[str, Any]:
-        """Log lines after ``seq`` ``after`` (polling; the SSE ``job_log`` frames carry the same lines)."""
-        logs = operations(request).job_logs(ctx, job_id, after=after, limit=limit)
-        return project_dict(request, {"job_id": job_id, "logs": [job_log_json(entry) for entry in logs]})
+        """Log lines after ``seq`` ``after`` (polling; the SSE ``job_log`` frames carry the same lines).
+
+        ``tail=true`` ignores ``after`` and answers the newest ``limit`` lines (a reloaded page derives its
+        cursor from the last one). ``kept`` and ``total`` say how many lines the store holds and how many were
+        written (``total - kept`` fell off the per-job cap). Every message is scrubbed again on the way out.
+        """
+        ops = operations(request)
+        logs = ops.job_logs(ctx, job_id, after=after, limit=limit, tail=tail)
+        stats = ops.job_log_stats(ctx, job_id)
+        return project_dict(request, {"job_id": job_id, "logs": [job_log_json(entry) for entry in logs],
+                                      "kept": stats["kept"], "total": stats["total"]})
 
     @router.get("/{job_id}/progress")
     def job_progress(request: Request, job_id: str, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
@@ -215,4 +235,4 @@ def install(app: FastAPI, *, poll_seconds: float = 0.5, max_stream_seconds: floa
     return app
 
 
-__all__ = ("JobResumeRequest", "JobSubmitRequest", "PaperJobRequest", "WAITING_STATES", "install")
+__all__ = ("JobResumeRequest", "JobSubmitRequest", "PaperJobRequest", "MAX_SUMMARY_JOBS", "WAITING_STATES", "install")
