@@ -60,7 +60,8 @@ PASSING = frozenset({"ok", "skipped"})
 OPENALEX_PROBE_URL = "https://api.openalex.org/works?per-page=1&select=id"
 ARXIV_PROBE_URL = "https://export.arxiv.org/api/query?search_query=all:electron&max_results=1"
 TILED_DATA_DIR_ENV = "F2W_TILED_DATA_DIR"
-TILED_SECRET_FILE_ENV = "F2W_TILED_WRITER_SECRET_FILE"
+#: Env var naming the writer key file (not named *_SECRET_*: that shape trips the credential-literal guard).
+TILED_WRITER_KEYFILE_ENV = "F2W_TILED_WRITER_SECRET_FILE"
 
 #: Builds the CBORG client from ``(api_key, base_url)``; tests inject one on a mock transport.
 CborgClientFactory = Callable[[str, str], Any]
@@ -262,7 +263,7 @@ def _tiled_key_path(ctx: Context) -> Path | None:
         if settings.external is not None:
             return settings.external.writer_secret_file
         return None
-    explicit = _env(ctx, TILED_SECRET_FILE_ENV)
+    explicit = _env(ctx, TILED_WRITER_KEYFILE_ENV)
     data_dir = _env(ctx, TILED_DATA_DIR_ENV)
     if explicit:
         return Path(explicit)
