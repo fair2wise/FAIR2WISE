@@ -27,6 +27,11 @@ export interface Capabilities {
    * publication reaches its own Tiled (the checks of `POST /v1/library/kgs/{name}/publish`). Shown only on `true`.
    */
   can_publish: boolean | null;
+  /**
+   * Owner decision 2026-11-23: the deployment's `F2W_DISCLOSE_SNIPPETS` opt-in (server environment, never settable by
+   * the client). Only used to word the node card's count-only state; missing (older server) counts as `false`.
+   */
+  snippets_disclosed: boolean | null;
 }
 
 const ROLES: ReadonlySet<string> = new Set(['local_operator', 'admin', 'user']);
@@ -44,6 +49,7 @@ export function parseCapabilities(raw: unknown): Capabilities {
     can_run_operations: flag(body.can_run_operations),
     can_approve: flag(body.can_approve),
     can_publish: flag(body.can_publish),
+    snippets_disclosed: flag(body.snippets_disclosed),
   };
 }
 
@@ -69,6 +75,11 @@ export function canApprove(caps: Capabilities | null | undefined): boolean {
  */
 export function canPublish(caps: Capabilities | null | undefined): boolean {
   return caps?.can_publish === true;
+}
+
+/** Whether the server releases supporting passages on the node card; only an explicit `true` counts. */
+export function snippetsDisclosed(caps: Capabilities | null | undefined): boolean {
+  return caps?.snippets_disclosed === true;
 }
 
 /** `GET /v1/capabilities`. Rejects with `ApiError` on 401/404/other failures (callers keep defaults). */

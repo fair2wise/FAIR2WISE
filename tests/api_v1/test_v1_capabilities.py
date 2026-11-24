@@ -23,7 +23,8 @@ def test_til22_local_operator_can_edit_and_save(local):
     body = local.client().get("/v1/capabilities").json()
     assert body == {"role": "local_operator", "profile": "local", "can_edit": True, "can_save": True,
                     "can_upload": True, "can_run_operations": True, "can_approve": True,
-                    "can_publish": False}  # no publication to its own Tiled wired in this fake world
+                    "can_publish": False,  # no publication to its own Tiled wired in this fake world
+                    "snippets_disclosed": False}
 
 
 def test_til22_als_admin_can_edit_and_save(als):
@@ -36,10 +37,11 @@ def test_til22_als_non_admin_sees_no_edit_or_save_and_the_server_still_refuses(a
     body = user.get("/v1/capabilities").json()
     assert body == {"role": "user", "profile": "als-dev", "can_edit": False, "can_save": False, "can_upload": False,
                     "can_run_operations": True,  # T19E: every signed-in user holds chat.ask (V25-V29 reads)
-                    "can_approve": False, "can_publish": False}  # Pending Approvals (2026-11-09): graph.publish and a verified admin
+                    "can_approve": False, "can_publish": False,
+                    "snippets_disclosed": False}  # Pending Approvals (2026-11-09): graph.publish and a verified admin
     # The capability read never leaks more than the booleans and the role.
     assert set(body) == {"role", "profile", "can_edit", "can_save", "can_upload", "can_run_operations",
-                        "can_approve", "can_publish"}
+                        "can_approve", "can_publish", "snippets_disclosed"}
     # Forged headers do not change the answer.
     forged = als.client("user", headers=FORGED).get("/v1/capabilities").json()
     assert forged == body
@@ -69,3 +71,18 @@ def test_can_save_is_false_in_read_only_json_mode(local):
                                     "json_graph_paths": [f"storage/kg/{H.GRAPH_FILENAME}"]}).status_code == 200
     body = c.get("/v1/capabilities").json()
     assert body["can_edit"] is True and body["can_save"] is False, "the PATCH would answer 400 in JSON mode"
+
+
+def test_snippets_disclosed_follows_the_server_environment_and_nothing_in_the_request(local, monkeypatch):
+    """Owner decision 2026-11-23: the flag mirrors ``F2W_DISCLOSE_SNIPPETS`` at request time and cannot be set by a caller."""
+    client = local.client()
+    monkeypatch.delenv("F2W_DISCLOSE_SNIPPETS", raising=False)
+    assert client.get("/v1/capabilities").json()["snippets_disclosed"] is False
+    # Client influence (query, header, cookie) is ignored.
+    hostile = {"X-F2W-Disclose-Snippets": "1", "F2W_DISCLOSE_SNIPPETS": "1", "Cookie": "F2W_DISCLOSE_SNIPPETS=1"}
+    got = client.get("/v1/capabilities?snippets_disclosed=true&F2W_DISCLOSE_SNIPPETS=1", headers=hostile)
+    assert got.json()["snippets_disclosed"] is False
+    monkeypatch.setenv("F2W_DISCLOSE_SNIPPETS", "1")
+    assert client.get("/v1/capabilities").json()["snippets_disclosed"] is True
+    monkeypatch.setenv("F2W_DISCLOSE_SNIPPETS", "off")
+    assert client.get("/v1/capabilities").json()["snippets_disclosed"] is False

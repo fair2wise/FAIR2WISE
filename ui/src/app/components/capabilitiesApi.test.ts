@@ -1,10 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { canApprove, canEditNode, canPublish, canRunOperations, fetchCapabilities, parseCapabilities } from './capabilitiesApi';
+import { canApprove, canEditNode, canPublish, canRunOperations, fetchCapabilities, parseCapabilities, snippetsDisclosed } from './capabilitiesApi';
 
 const FULL = { role: 'user', profile: 'als', can_edit: false, can_save: false, can_upload: false, can_run_operations: true, can_approve: false,
-  can_publish: false };
+  can_publish: false, snippets_disclosed: false };
 
 afterEach(() => vi.unstubAllGlobals());
+
+describe('snippetsDisclosed', () => {
+  it('is true only for an explicit true; an older server without the field means false', () => {
+    expect(snippetsDisclosed(parseCapabilities({ snippets_disclosed: true }))).toBe(true);
+    expect(snippetsDisclosed(parseCapabilities({ snippets_disclosed: false }))).toBe(false);
+    expect(snippetsDisclosed(parseCapabilities({ can_edit: true }))).toBe(false);
+    expect(snippetsDisclosed(parseCapabilities({ snippets_disclosed: 'true' }))).toBe(false);
+    expect(snippetsDisclosed(undefined)).toBe(false);
+    expect(snippetsDisclosed(null)).toBe(false);
+  });
+});
 
 describe('parseCapabilities', () => {
   it('parses the eight fields', () => {
@@ -13,7 +24,7 @@ describe('parseCapabilities', () => {
   it('turns missing, malformed or non-boolean fields into null', () => {
     expect(parseCapabilities({ role: 'root', can_save: 'false', can_edit: 0, profile: 3 })).toEqual({
       role: null, profile: null, can_edit: null, can_save: null, can_upload: null, can_run_operations: null,
-      can_approve: null, can_publish: null,
+      can_approve: null, can_publish: null, snippets_disclosed: null,
     });
     for (const bad of [null, undefined, 'x', 42, []]) {
       expect(parseCapabilities(bad).can_save).toBeNull();

@@ -69,9 +69,10 @@ export function paperSnippets(publication: PublicationInfo): Array<{ text: strin
 /**
  * The text snippets of one paper that support the entity: a collapsed list (plain text only, never HTML), the
  * first few shown, the rest behind "Show more". Nothing is drawn for a paper with no snippets; when only a count
- * arrived (the server withholds the text) the count is stated and no text is invented.
+ * arrived the count is stated and no text is invented; the wording depends on whether the deployment enables
+ * passages (`disclosed`, from `GET /v1/capabilities`).
  */
-function PaperSnippets({ publication }: { publication: PublicationInfo }) {
+function PaperSnippets({ publication, disclosed }: { publication: PublicationInfo; disclosed: boolean }) {
   const [open, setOpen] = useState(false);
   const [all, setAll] = useState(false);
   const snippets = paperSnippets(publication);
@@ -79,7 +80,8 @@ function PaperSnippets({ publication }: { publication: PublicationInfo }) {
   if (snippets.length === 0) {
     return recorded > 0 ? (
       <p className="mt-1 text-[11px] text-slate-500" data-testid="paper-snippets-withheld">
-        {recorded} supporting passage{recorded === 1 ? '' : 's'} recorded; the text is not provided to this view.
+        {recorded} supporting passage{recorded === 1 ? '' : 's'} recorded;{' '}
+        {disclosed ? 'the text is not provided to this view.' : 'showing them is not enabled on this deployment.'}
       </p>
     ) : null;
   }
@@ -130,6 +132,7 @@ export function PublicationList({
   intro = 'Here are a list of relevant publications:',
   showSupportingNodes = false,
   showSnippets = false,
+  snippetsDisclosed = false,
   showFavorite = true,
   collapseLimit,
   className = '',
@@ -142,6 +145,8 @@ export function PublicationList({
   showSupportingNodes?: boolean;
   /** List each paper's supporting text snippets (the node card). */
   showSnippets?: boolean;
+  /** The deployment releases passages (`capabilities.snippets_disclosed`); false or unknown words the count-only state as not enabled. */
+  snippetsDisclosed?: boolean;
   showFavorite?: boolean;
   /** When set, show this many publications until expanded. */
   collapseLimit?: number;
@@ -237,7 +242,7 @@ export function PublicationList({
                   )}
                 </div>
               )}
-              {showSnippets && <PaperSnippets publication={publication} />}
+              {showSnippets && <PaperSnippets publication={publication} disclosed={snippetsDisclosed} />}
               {showSupportingNodes && supportingNodes.length > 0 && (
                 <div className="mt-1 text-slate-500">
                   Supports: {supportingNodes.slice(0, 5).map(node => node.name || node.id).join(', ')}

@@ -20,7 +20,7 @@ import {
 import { PublicationList } from './PublicationList';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable';
 import { loadAgentSettings } from './agentSettings';
-import { canEditNode } from './capabilitiesApi';
+import { canEditNode, snippetsDisclosed } from './capabilitiesApi';
 import { GraphSourceSelect } from './GraphSourceSelect';
 import { graphSourceFromPath, useGraphSourceState } from './graphSourceStore';
 import { useGraphSources } from './graphSourcesHooks';
@@ -1429,6 +1429,7 @@ function NodeDetailPanel({
                         intro={null}
                         collapseLimit={3}
                         showSnippets
+                        snippetsDisclosed={snippetsDisclosed(capabilities)}
                         className="mt-0"
                       />
                     </div>

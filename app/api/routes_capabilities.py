@@ -18,6 +18,9 @@ entry (T18D, TIL-22).
 * ``can_publish`` (additive, owner decision 2026-11-10): the "Publish to Tiled" button may show: profile ``:local``, the
   caller holds ``graph.publish`` and ``library.extract`` and the deployment's publication reaches its own Tiled (the
   checks of V83). The button needs an explicit ``true``.
+* ``snippets_disclosed`` (additive, owner decision 2026-11-23): the deployment's own ``F2W_DISCLOSE_SNIPPETS`` opt-in
+  (``security.disclosure.snippets_disclosed()``), read from the server's environment at each request. Nothing in
+  the request (query, body, header, cookie) can change it; the UI only uses it to word the node card.
 * ``role``: ``local_operator`` (``:local``, no sign-in), ``admin`` (verified Tiled admin) or ``user``.
 """
 
@@ -29,6 +32,7 @@ from fastapi import Depends, FastAPI, Request
 
 from ..modules.contracts.context import DeploymentProfile, RequestContext
 from ..modules.security.authorization import can_review_approvals
+from ..modules.security.disclosure import snippets_disclosed
 from .routes_common import Prefixed, context, project
 
 
@@ -43,7 +47,7 @@ def capabilities_for_caller(ctx: RequestContext, *, editable_source: bool = True
     return {"role": role, "profile": ctx.profile.value, "can_edit": can_edit,
             "can_save": can_edit and editable_source, "can_upload": "graph.upload" in ctx.capabilities,
             "can_run_operations": "chat.ask" in ctx.capabilities, "can_approve": can_review_approvals(ctx),
-            "can_publish": can_publish}
+            "can_publish": can_publish, "snippets_disclosed": snippets_disclosed()}
 
 
 def install(app: FastAPI) -> FastAPI:

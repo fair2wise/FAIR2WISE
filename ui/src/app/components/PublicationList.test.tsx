@@ -64,9 +64,16 @@ describe('per-paper supporting snippets', () => {
     const { rerender } = render(<PublicationList publications={[paper()]} intro={null} showSnippets />);
     expect(screen.queryByTestId('paper-snippets')).toBeNull();
     expect(screen.queryByTestId('paper-snippets-withheld')).toBeNull();
-    rerender(<PublicationList publications={[paper({ snippet_count: 3 })]} intro={null} showSnippets />);
+    rerender(<PublicationList publications={[paper({ snippet_count: 3 })]} intro={null} showSnippets snippetsDisclosed />);
     expect(screen.queryByTestId('paper-snippets')).toBeNull();
     expect(screen.getByTestId('paper-snippets-withheld')).toHaveTextContent('3 supporting passages recorded; the text is not provided to this view.');
+  });
+
+  it('says showing passages is not enabled when the deployment does not disclose them (or the server is older)', () => {
+    const { rerender } = render(<PublicationList publications={[paper({ snippet_count: 1 })]} intro={null} showSnippets />);
+    expect(screen.getByTestId('paper-snippets-withheld')).toHaveTextContent('1 supporting passage recorded; showing them is not enabled on this deployment.');
+    rerender(<PublicationList publications={[paper({ snippet_count: 4 })]} intro={null} showSnippets snippetsDisclosed={false} />);
+    expect(screen.getByTestId('paper-snippets-withheld')).toHaveTextContent('4 supporting passages recorded; showing them is not enabled on this deployment.');
   });
 
   it('is off unless the caller asks for it, and drops malformed entries', () => {
