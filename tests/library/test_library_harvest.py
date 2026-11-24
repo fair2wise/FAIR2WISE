@@ -14,6 +14,7 @@ from app.modules.contracts.jobs import JobState
 from app.modules.jobs import JobService, JobStore
 from app.modules.library import LIBRARY_HARVEST_KIND, library_inputs, register_library_jobs
 from app.modules.library.handlers import library_handlers
+from app.modules.literature.legacy_download import JSONFetchError
 from app.modules.library.harvest import (
     Candidate,
     HarvestStore,
@@ -182,7 +183,9 @@ def test_a_failing_source_is_logged_and_the_others_still_run(tmp_path):
     handle, state = world.run()
     assert state is JobState.SUCCEEDED and world.statuses(handle.job_id) == {GOOD: "downloaded"}
     logs = " ".join(entry.message for entry in world.jobs.store.logs(handle.job_id))
-    assert "arxiv search skipped" in logs
+    assert "arxiv search failed" in logs
+    status = world.store.run(handle.job_id)["source_status"]
+    assert status["arxiv"]["state"] == "error" and status["openalex"] == {"state": "ok", "returned": 1, "message": status["openalex"]["message"]}
 
 
 def test_an_empty_search_says_why_in_plain_words(tmp_path):
@@ -191,7 +194,7 @@ def test_an_empty_search_says_why_in_plain_words(tmp_path):
 
     world = World(tmp_path, {"arxiv": fixed(), "openalex": rate_limited}, Net({}))
     handle, state = world.run(topic="plecostomus")
-    assert state is JobState.SUCCEEDED
+    assert state is JobState.FAILED      # a source that errors is an error, never "0 found"
     logs = [e.message for e in world.jobs.store.logs(handle.job_id)]
     assert OPENALEX_RATE_LIMITED in logs
     text = next(m for m in logs if m.startswith("search summary"))
@@ -356,3 +359,34 @@ def test_the_downloader_checks_redirect_hops_and_the_pdf_signature():
     assert download("http://example.com/html", 1000) == (None, "refused:not_pdf")
     assert download("http://example.com/big", 1000) == (None, "refused:too_large")
     assert download("http://example.com/ok.pdf", 1000) == (b"%PDF-1.4 ok", "ok")
+
+
+def _refused_by_openalex(status: int):
+    def search(topic: str, per_query: int):
+        raise JSONFetchError(f"HTTP {status}", status=status)
+
+    return search
+
+
+def test_a_rejected_openalex_key_is_an_error_in_the_run_and_the_log_not_zero_results(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENALEX_API_KEY", "not-a-real-key")
+    world = World(tmp_path, {"arxiv": fixed(), "openalex": _refused_by_openalex(401)}, Net({}))
+    handle, state = world.run(topic="plecostomus")
+    assert state is JobState.FAILED
+    entries = world.jobs.store.logs(handle.job_id)
+    failed = next(e for e in entries if e.message.startswith("openalex search failed"))
+    assert failed.level == "error" and "HTTP 401" in failed.message and "API key was not accepted" in failed.message
+    assert "not-a-real-key" not in " ".join(e.message for e in entries)
+    run = world.store.run(handle.job_id)
+    assert run["counts"]["total"] == 0
+    assert run["source_status"]["openalex"]["state"] == "error"
+    assert run["source_status"]["arxiv"] == {"state": "ok", "returned": 0, "message": ""}
+
+
+def test_an_error_in_one_source_with_results_from_the_other_stays_visible_on_the_run(tmp_path):
+    world = World(tmp_path, {"arxiv": fixed(PAPERS[0]), "openalex": _refused_by_openalex(503)}, Net(SERVED))
+    handle, state = world.run()
+    assert state is JobState.SUCCEEDED
+    status = world.store.run(handle.job_id)["source_status"]
+    assert status["openalex"]["state"] == "error" and "HTTP 503" in status["openalex"]["message"]
+    assert status["arxiv"]["state"] == "ok" and status["arxiv"]["returned"] == 1

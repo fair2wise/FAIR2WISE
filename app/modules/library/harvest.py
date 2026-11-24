@@ -214,6 +214,22 @@ OPENALEX_UNKEYED_LIMITER = RateLimiter(OPENALEX_UNKEYED_MIN_INTERVAL_SECONDS)
 OPENALEX_RATE_LIMITED = "OpenAlex rate-limited the unauthenticated search; add OPENALEX_API_KEY"
 
 
+def source_error_message(source: str, exc: Exception) -> str:
+    """Plain words for a source that failed; no URL, no key (the exception text of a fetch can name a status only)."""
+    label = {"openalex": "OpenAlex", "arxiv": "arXiv"}.get(source, source)
+    status = getattr(exc, "status", None)
+    if isinstance(exc, JSONFetchError) and status in (401, 403):
+        extra = (" The API key was not accepted: it may be wrong, not yet activated (OpenAlex emails an activation link), "
+                 "or not sent in the way OpenAlex expects." if source == "openalex" else "")
+        return f"{label} refused the request (HTTP {status}).{extra}"
+    if isinstance(exc, JSONFetchError) and status:
+        return f"{label} answered HTTP {status}."
+    if isinstance(exc, BlockedURL):
+        return f"{label} is blocked by this installation's network policy."
+    text = str(exc).strip()
+    return f"{label} could not be searched ({text[:160] or type(exc).__name__})."
+
+
 class OpenAlexRateLimited(Exception):
     """OpenAlex answered 429 to an unauthenticated search; the source stops for the run (no retry)."""
 
@@ -398,7 +414,7 @@ def pdf_downloader(http: httpx.Client | None = None, policy: NetworkPolicy | Non
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
   id TEXT PRIMARY KEY, topic TEXT NOT NULL, category TEXT NOT NULL, schema_label TEXT, sources TEXT NOT NULL,
-  max_downloads INTEGER NOT NULL, created_at TEXT NOT NULL);
+  max_downloads INTEGER NOT NULL, created_at TEXT NOT NULL, source_status TEXT);
 CREATE TABLE IF NOT EXISTS candidates (
   id TEXT PRIMARY KEY, run_id TEXT NOT NULL, key TEXT NOT NULL, title TEXT NOT NULL, year INTEGER, doi TEXT,
   arxiv_id TEXT, source TEXT NOT NULL, tier TEXT NOT NULL, score REAL NOT NULL, status TEXT NOT NULL,
@@ -408,6 +424,8 @@ CREATE INDEX IF NOT EXISTS candidates_run ON candidates (run_id);
 #: Columns added after the first release; an older ``harvest.sqlite`` gets them on open. ``authors`` (JSON list) and
 #: ``abstract`` are kept only to carry the registry's answer to the manifest row, never returned by the API.
 _ADDED_COLUMNS = (("authors", "TEXT"), ("abstract", "TEXT"))
+#: The same for the ``runs`` table: what each source answered (``{source: {state, returned, message}}`` as JSON).
+_ADDED_RUN_COLUMNS = (("source_status", "TEXT"),)
 _CANDIDATE_FIELDS = ("id", "title", "year", "doi", "arxiv_id", "source", "tier", "score", "status", "landing_url",
                      "pdf_url", "relpath", "detail")
 
@@ -433,6 +451,10 @@ class HarvestStore:
             for column, kind in _ADDED_COLUMNS:
                 if column not in have:
                     self._con.execute(f"ALTER TABLE candidates ADD COLUMN {column} {kind}")
+            have_runs = {r["name"] for r in self._con.execute("PRAGMA table_info(runs)")}
+            for column, kind in _ADDED_RUN_COLUMNS:
+                if column not in have_runs:
+                    self._con.execute(f"ALTER TABLE runs ADD COLUMN {column} {kind}")
             self._con.commit()
 
     def create_run(self, run_id: str, *, topic: str, category: str, schema: str | None, sources: Sequence[str],
@@ -443,6 +465,11 @@ class HarvestStore:
                 "INSERT OR IGNORE INTO runs (id,topic,category,schema_label,sources,max_downloads,created_at) "
                 "VALUES (?,?,?,?,?,?,?)",
                 (run_id, topic, category, schema, ",".join(sources), max_downloads, datetime.now(UTC).isoformat()))
+
+    def set_source_status(self, run_id: str, status: Mapping[str, Mapping[str, Any]]) -> None:
+        """Record what each source answered for the run (``state`` ok, error or rate_limited; ``returned``; ``message``)."""
+        with self._lock, self._con:
+            self._con.execute("UPDATE runs SET source_status=? WHERE id=?", (json.dumps(status), run_id))
 
     def run(self, run_id: str) -> dict[str, Any] | None:
         """The run record or ``None``."""
@@ -457,6 +484,10 @@ class HarvestStore:
         return [self._run_dto(r) for r in rows]
 
     def _run_dto(self, row: sqlite3.Row) -> dict[str, Any]:
+        try:
+            source_status = json.loads(row["source_status"]) if row["source_status"] else {}
+        except (ValueError, TypeError):
+            source_status = {}
         with self._lock:
             counted = self._con.execute("SELECT status, COUNT(*) AS n FROM candidates WHERE run_id=? GROUP BY status",
                                         (row["id"],)).fetchall()
@@ -465,7 +496,8 @@ class HarvestStore:
         counts["total"] = sum(r["n"] for r in counted)
         return {"id": row["id"], "topic": row["topic"], "category": row["category"], "schema": row["schema_label"],
                 "sources": row["sources"].split(",") if row["sources"] else [],
-                "max_downloads": row["max_downloads"], "created_at": row["created_at"], "counts": counts}
+                "max_downloads": row["max_downloads"], "created_at": row["created_at"], "counts": counts,
+                "source_status": source_status if isinstance(source_status, dict) else {}}
 
     def save_candidate(self, run_id: str, cand: Candidate, *, status: str, pdf_url: str | None = None,
                        relpath: str | None = None, detail: str = "") -> str:
@@ -609,6 +641,7 @@ class Harvester:
                 f"(schema {args['schema'] or 'none'}, up to {args['max_downloads']} downloads)")
         groups, searched = [], 0
         per_source: dict[str, str] = {}
+        source_status: dict[str, dict[str, Any]] = {}
         openalex_mode: str | None = None
         for source in args["sources"]:
             ctx.guard()
@@ -622,24 +655,34 @@ class Harvester:
                 metrics.record_harvest_fetch(source=source, outcome="failed")
                 ctx.log(str(exc), level="warning")
                 per_source[source] = f"could not be searched ({exc})"
+                source_status[source] = {"state": "rate_limited", "returned": 0, "message": str(exc)}
                 continue
             except Exception as exc:  # noqa: BLE001 - a source that cannot run must not stop the others
                 metrics.record_harvest_fetch(source=source, outcome="failed")
-                ctx.log(f"{source} search skipped: {exc}", level="warning")
-                per_source[source] = f"could not be searched ({exc})"
+                message = source_error_message(source, exc)
+                ctx.log(f"{source} search failed: {message}", level="error")
+                per_source[source] = f"could not be searched ({message})"
+                source_status[source] = {"state": "error", "returned": 0, "message": message}
                 continue
             metrics.record_harvest_fetch(source=source, outcome="ok")
             searched += 1
             ctx.log(f"{source}: {len(found)} results")
             per_source[source] = f"returned {len(found)}" + (" (running without an API key, reduced rate)" if mode else "")
+            source_status[source] = {"state": "ok", "returned": len(found), "message": "reduced rate, no API key" if mode else ""}
             groups.append(found)
+        self.store.set_source_status(run_id, source_status)
+        failed_sources = [name for name, st in source_status.items() if st["state"] != "ok"]
         if searched == 0:
-            raise ContractError(ErrorCode.UNAVAILABLE, "no source could be searched (see the log)")
+            raise ContractError(ErrorCode.UNAVAILABLE, "no source could be searched: "
+                                + "; ".join(f"{n}: {source_status[n]['message']}" for n in failed_sources))
         candidates = merge_candidates(groups)
         returned = sum(len(g) for g in groups)
         untitled = sum(1 for g in groups for c in g if not c.title)
         summary = why_nothing_or_counts(per_source, returned, untitled, len(candidates))
         ctx.log(summary, level="warning" if not candidates else "info")
+        if not candidates and failed_sources:
+            raise ContractError(ErrorCode.UNAVAILABLE, "nothing was found and "
+                                + "; ".join(f"{n}: {source_status[n]['message']}" for n in failed_sources))
         for cand in candidates:
             cand.score, cand.tier = score_candidate(args["topic"], cand.title, cand.abstract)
         candidates.sort(key=lambda c: (c.tier, -c.score, c.title))
