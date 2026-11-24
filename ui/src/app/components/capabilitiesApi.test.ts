@@ -7,13 +7,13 @@ const FULL = { role: 'user', profile: 'als', can_edit: false, can_save: false, c
 afterEach(() => vi.unstubAllGlobals());
 
 describe('snippetsDisclosed', () => {
-  it('is true only for an explicit true; an older server without the field means false', () => {
+  it('is tri-state: true/false only when the server said so, null while loading, failed or for an older server', () => {
     expect(snippetsDisclosed(parseCapabilities({ snippets_disclosed: true }))).toBe(true);
     expect(snippetsDisclosed(parseCapabilities({ snippets_disclosed: false }))).toBe(false);
-    expect(snippetsDisclosed(parseCapabilities({ can_edit: true }))).toBe(false);
-    expect(snippetsDisclosed(parseCapabilities({ snippets_disclosed: 'true' }))).toBe(false);
-    expect(snippetsDisclosed(undefined)).toBe(false);
-    expect(snippetsDisclosed(null)).toBe(false);
+    expect(snippetsDisclosed(parseCapabilities({ can_edit: true }))).toBeNull();
+    expect(snippetsDisclosed(parseCapabilities({ snippets_disclosed: 'true' }))).toBeNull();
+    expect(snippetsDisclosed(undefined)).toBeNull();
+    expect(snippetsDisclosed(null)).toBeNull();
   });
 });
 

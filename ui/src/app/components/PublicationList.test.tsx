@@ -69,11 +69,17 @@ describe('per-paper supporting snippets', () => {
     expect(screen.getByTestId('paper-snippets-withheld')).toHaveTextContent('3 supporting passages recorded; the text is not provided to this view.');
   });
 
-  it('says showing passages is not enabled when the deployment does not disclose them (or the server is older)', () => {
-    const { rerender } = render(<PublicationList publications={[paper({ snippet_count: 1 })]} intro={null} showSnippets />);
-    expect(screen.getByTestId('paper-snippets-withheld')).toHaveTextContent('1 supporting passage recorded; showing them is not enabled on this deployment.');
-    rerender(<PublicationList publications={[paper({ snippet_count: 4 })]} intro={null} showSnippets snippetsDisclosed={false} />);
-    expect(screen.getByTestId('paper-snippets-withheld')).toHaveTextContent('4 supporting passages recorded; showing them is not enabled on this deployment.');
+  it('words the count-only state by the tri-state: neutral unless the server said false', () => {
+    const pubs = [paper({ snippet_count: 4 })];
+    const { rerender } = render(<PublicationList publications={pubs} intro={null} showSnippets />);
+    const text = () => screen.getByTestId('paper-snippets-withheld').textContent;
+    expect(text()).toBe('4 supporting passages recorded.'); // prop absent: loading, failed or older server
+    rerender(<PublicationList publications={pubs} intro={null} showSnippets snippetsDisclosed={null} />);
+    expect(text()).toBe('4 supporting passages recorded.');
+    rerender(<PublicationList publications={pubs} intro={null} showSnippets snippetsDisclosed={false} />);
+    expect(text()).toBe('4 supporting passages recorded; showing them is not enabled on this deployment.');
+    rerender(<PublicationList publications={[paper({ snippet_count: 1 })]} intro={null} showSnippets snippetsDisclosed />);
+    expect(text()).toBe('1 supporting passage recorded; the text is not provided to this view.');
   });
 
   it('is off unless the caller asks for it, and drops malformed entries', () => {

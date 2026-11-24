@@ -29,7 +29,7 @@ export interface Capabilities {
   can_publish: boolean | null;
   /**
    * Owner decision 2026-11-23: the deployment's `F2W_DISCLOSE_SNIPPETS` opt-in (server environment, never settable by
-   * the client). Only used to word the node card's count-only state; missing (older server) counts as `false`.
+   * the client). Only used to word the node card's count-only state; `null` (missing in an older server) is unknown, not `false`.
    */
   snippets_disclosed: boolean | null;
 }
@@ -77,9 +77,13 @@ export function canPublish(caps: Capabilities | null | undefined): boolean {
   return caps?.can_publish === true;
 }
 
-/** Whether the server releases supporting passages on the node card; only an explicit `true` counts. */
-export function snippetsDisclosed(caps: Capabilities | null | undefined): boolean {
-  return caps?.snippets_disclosed === true;
+/**
+ * Tri-state: whether the server releases supporting passages on the node card. `true`/`false` only when the server
+ * said so; `null` while capabilities are loading or failed, or when the field is missing (older server).
+ */
+export function snippetsDisclosed(caps: Capabilities | null | undefined): boolean | null {
+  const value = caps?.snippets_disclosed;
+  return typeof value === 'boolean' ? value : null;
 }
 
 /** `GET /v1/capabilities`. Rejects with `ApiError` on 401/404/other failures (callers keep defaults). */
