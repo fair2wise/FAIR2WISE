@@ -131,3 +131,6 @@ def test_http_span_names_use_a_closed_method_set(exporter, secret_env) -> None: 
     names = [s.name for s in exporter.get_finished_spans()]
     assert names == ["HTTP GET", "HTTP other", "HTTP other"]
     assert SENTINEL.upper() not in " ".join(names).upper()
+    attr_methods = [s.attributes["http.request.method"] for s in exporter.get_finished_spans()]
+    assert attr_methods == ["GET", "other", "other"]
+    assert SENTINEL.upper() not in " ".join(attr_methods).upper()

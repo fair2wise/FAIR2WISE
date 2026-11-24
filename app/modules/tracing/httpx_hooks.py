@@ -31,8 +31,10 @@ def _span_name(request: httpx.Request) -> str:
 
 
 def _attrs(request: httpx.Request) -> dict[str, object]:
+    from ..metrics.labels import http_method
+
     url = request.url
-    return {"http.request.method": request.method, "server.address": url.host, "server.port": url.port or (
+    return {"http.request.method": http_method(request.method), "server.address": url.host, "server.port": url.port or (
         443 if url.scheme == "https" else 80), "url.scheme": url.scheme}
 
 
