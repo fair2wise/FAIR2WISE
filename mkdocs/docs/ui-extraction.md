@@ -13,7 +13,7 @@ Without a configured model backend the tab says so and Start stays disabled: set
 
 ## Run view
 
-Progress bar (papers done of total), a live log (bounded to the latest lines), and **Cancel**. Cancelling stops between PDFs and keeps what finished. A run is resumable: a PDF is re-processed only if its bytes, the model or the schema changed. When the job succeeds, **Export** writes the KG to the configured release folder; **New extraction** returns to the idle view.
+Progress bar (papers done of total), a live log (bounded to the latest lines; followed by short polling of `GET /v1/jobs/{id}/logs?after=<seq>`, paused while the tab or page is hidden), and **Cancel**. Cancelling stops between PDFs and keeps what finished. A run is resumable: a PDF is re-processed only if its bytes, the model or the schema changed. When the job succeeds, **Export** writes the KG to the configured release folder; **New extraction** returns to the idle view.
 
 ## Publish to Tiled
 
