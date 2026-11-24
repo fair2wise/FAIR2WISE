@@ -66,6 +66,13 @@ leeway and answer stages in order, each with its timing.
 passes `trace.record_llm_call`, which now also emits an `llm.call <label>` span: `gen_ai.request.model`,
 `f2w.llm.label`, `f2w.llm.status`, `f2w.llm.latency_ms`, and the sizes `f2w.llm.prompt_chars` and
 `f2w.llm.response_chars`. Token counts are not recorded (the call sites do not have them).
+The label is one of a closed set in `app/modules/tracing/runtime.py` (`LLM_LABELS`): `baseline`, `KG-RAG`,
+`KG-RAG-judge`, `KG-RAG-leeway`, `chat`, `evidence-debate`, `session-memory-compress`, `legacy-route`,
+`direct-response`, `domain-knowledge-fallback`, `rewrite-question`, `general-answer`, `json-graph-leeway`,
+`pending-download-intent`, `pdf-validate`, `paper-evidence`, `vision.orientation`, `vision.classify`,
+`orchestrator-classify`, `supervisor-plan`, and `other`. Any label outside the set is recorded as `other`, so the span
+name never holds user or model text and the number of distinct names stays bounded. A new call site adds its label
+to the set (a test scans the code for literal labels).
 
 **HTTP calls.** `httpx` clients (model API, OpenAlex, downloads, identity) produce `HTTP <METHOD>` spans with
 `server.address`, `server.port`, `url.scheme`, `http.response.status_code`. `requests`-based clients (the Tiled

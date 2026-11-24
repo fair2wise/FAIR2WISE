@@ -28,23 +28,23 @@ def test_fake_chat_turn_with_model_calls_leaks_nothing(exporter, secret_env) -> 
     messages = [{"role": "system", "content": f"system {SENTINEL} {SECRET}"}, {"role": "user", "content": SENTINEL}]
     with tracing.span("POST /chat") as request_span:
         collector = turn_trace.open_turn(request={"message": SENTINEL})
-        turn_trace.record_llm_call(label="judge", model="lbl/cborg-chat", messages=messages,
+        turn_trace.record_llm_call(label="KG-RAG-judge", model="lbl/cborg-chat", messages=messages,
                                    response=f"answer {SENTINEL}", latency_ms=42.5, timeout=60.0)
-        turn_trace.record_llm_call(label="leeway", model="lbl/cborg-chat", messages=messages, response=None,
+        turn_trace.record_llm_call(label="KG-RAG-leeway", model="lbl/cborg-chat", messages=messages, response=None,
                                    latency_ms=7.0, error=RuntimeError(f"upstream said {SENTINEL} {SECRET}"))
         turn_trace.finish_turn()
         trace_id = request_span.trace_id
     spans = exporter.get_finished_spans()
     blob = " ".join(every_string(spans))
     assert SENTINEL not in blob and SECRET not in blob and "sk-test" not in blob
-    judge = next(s for s in spans if s.name == "llm.call judge")
+    judge = next(s for s in spans if s.name == "llm.call KG-RAG-judge")
     assert judge.attributes["gen_ai.request.model"] == "lbl/cborg-chat"
     assert judge.attributes["f2w.llm.status"] == "ok" and judge.attributes["f2w.llm.latency_ms"] == 42.5
     assert judge.attributes["f2w.llm.prompt_chars"] == sum(len(m["content"]) for m in messages)
     assert judge.attributes["f2w.llm.response_chars"] == len(f"answer {SENTINEL}")
     assert judge.parent is not None  # nested under the request span
     assert (judge.end_time - judge.start_time) / 1e6 == pytest.approx(42.5, abs=1.0)
-    leeway = next(s for s in spans if s.name == "llm.call leeway")
+    leeway = next(s for s in spans if s.name == "llm.call KG-RAG-leeway")
     assert leeway.status.status_code.name == "ERROR" and leeway.status.description == "RuntimeError"
     assert collector.data["otel_trace_id"] == trace_id  # the JSON turn record links to Jaeger
 

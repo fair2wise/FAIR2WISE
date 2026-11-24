@@ -357,11 +357,28 @@ def record_span(name: str, attrs: Mapping[str, object], *, duration_ms: float, e
     sp.end(end_time=end)
 
 
+#: The closed set of model-call labels a span may carry: every literal passed as ``label``/``trace_label`` in code,
+#: ``chat`` (the default) and ``other``. Anything else (a label built from user or model text) becomes ``other``,
+#: so the ``llm.call <label>`` span name has bounded cardinality and never holds free text.
+LLM_LABELS = frozenset({
+    "baseline", "KG-RAG", "KG-RAG-judge", "KG-RAG-leeway", "chat", "evidence-debate", "session-memory-compress",
+    "legacy-route", "direct-response", "domain-knowledge-fallback", "rewrite-question", "general-answer",
+    "json-graph-leeway", "pending-download-intent", "pdf-validate", "paper-evidence", "vision.orientation",
+    "vision.classify", "orchestrator-classify", "supervisor-plan", "other",
+})
+
+
+def llm_label(label: object) -> str:
+    """``label`` when it is in :data:`LLM_LABELS`, else ``"other"``."""
+    return label if isinstance(label, str) and label in LLM_LABELS else "other"
+
+
 def record_model_call(*, label: str, model: str | None, latency_ms: float, prompt_chars: int, response_chars: int | None,
                       error: BaseException | None) -> None:
     """Span for one model call: model name, call-site label, latency, sizes and status. Never the text."""
     if not _STATE.enabled:
         return
+    label = llm_label(label)
     record_span(f"llm.call {label}", {
         "gen_ai.request.model": model, "f2w.llm.label": label, "f2w.llm.latency_ms": round(latency_ms, 3),
         "f2w.llm.prompt_chars": prompt_chars, "f2w.llm.response_chars": response_chars,
