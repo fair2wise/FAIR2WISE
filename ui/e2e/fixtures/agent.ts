@@ -190,6 +190,8 @@ export interface MockAgentOptions {
   hangChatMs?: number;
   failChat?: 'network' | 500;
   failSettings?: boolean;
+  /** Captures PUT /settings bodies (the UI's graph-source apply on load sends {graph_source} only). */
+  settingsPuts?: Array<Record<string, unknown>>;
   publications?: Array<Record<string, unknown>>;
   /** O-U2 judge picker: live model ids the server lists, or 'forbidden' (ALS non-admin). Unset: route absent. */
   judgeModels?: string[] | 'forbidden';
@@ -262,6 +264,7 @@ export async function mockAgent(page: Page, options: MockAgentOptions = {}) {
 
     if (path === '/settings' && method === 'PUT') {
       const body = request.postDataJSON() as Record<string, unknown>;
+      options.settingsPuts?.push(body);
       Object.assign(settings, body);
       await route.fulfill(json(settings));
       return;

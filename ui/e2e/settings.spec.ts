@@ -55,3 +55,21 @@ test.describe('settings', () => {
     await expect(page.getByRole('dialog').getByRole('checkbox', { name: /Source RAG/ })).toBeChecked();
   });
 });
+
+test.describe('graph source apply on load', () => {
+  test('server in splash mode: the UI sends one partial PUT with its own JSON source', async ({ page }) => {
+    const puts: Array<Record<string, unknown>> = [];
+    await mockAgent(page, { settings: { graph_source: 'splash' }, settingsPuts: puts });
+    await page.goto('/');
+    await expect.poll(() => puts).toEqual([{ graph_source: 'json' }]);
+  });
+
+  test('server already in JSON mode: no PUT on load', async ({ page }) => {
+    const puts: Array<Record<string, unknown>> = [];
+    await mockAgent(page, { settingsPuts: puts });
+    await page.goto('/');
+    await expect(page.getByPlaceholder('Ask a domain-specific question...')).toBeVisible();
+    await page.waitForTimeout(500);
+    expect(puts).toEqual([]);
+  });
+});

@@ -1,7 +1,7 @@
 import '@blueskyproject/finch/style.css';
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { BrowserRouter } from 'react-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import {
   FinchConfigProvider,
   HubHeader,
@@ -16,7 +16,7 @@ import { OperationsTab } from './components/OperationsTab';
 import { Toaster } from './components/ui/sonner';
 import { useLibraryProbe } from './components/libraryHooks';
 import { canApprove, canRunOperations } from './components/capabilitiesApi';
-import { useCapabilities } from './components/capabilitiesHooks';
+import { capabilitiesKey, useCapabilities } from './components/capabilitiesHooks';
 import { AppBookmarksButton } from './components/AppBookmarksButton';
 import { AppNewChatButton } from './components/AppNewChatButton';
 import { AppPaperSearchButton } from './components/AppPaperSearchButton';
@@ -34,14 +34,10 @@ import {
   type ChatMessage,
 } from './components/chatSessions';
 import { ExampleQuery } from './components/data/mockupData';
-import {
-  saveAgentSettings,
-  settingsFromApiResponse,
-} from './components/agentSettings';
+import { createGraphSourceApplier } from './components/graphSourceApply';
 import {
   deleteAgentSession,
   EMPTY_GRAPH,
-  fetchAgentSettings,
   fetchLiveGraph,
   GraphPayload,
 } from './components/data/liveAgent';
@@ -208,27 +204,31 @@ function AppShell() {
     });
   }, [graph, reloadGraph]);
 
+  const queryClient = useQueryClient();
+  const graphSourceApplier = useMemo(() => createGraphSourceApplier(queryClient), [queryClient]);
+
+  // The UI applies its own graph source to the server on load and on focus (fire and forget: never blocks render).
   useEffect(() => {
     let cancelled = false;
-
-    async function boot() {
-      try {
-        const response = await fetchAgentSettings();
-        if (!cancelled) saveAgentSettings(settingsFromApiResponse(response));
-      } catch (error) {
-        console.warn('Failed to load agent settings', error);
-        recordUiEvent('console_warning', {
-          message: 'Failed to load agent settings',
-          detail: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-
-    void boot();
+    void graphSourceApplier.boot(() => cancelled);
+    const onFocus = () => void graphSourceApplier.focus();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') onFocus();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       cancelled = true;
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
     };
-  }, []);
+  }, [graphSourceApplier]);
+
+  // After a Save the server's graph source (and so its capabilities) may have changed.
+  const onSettingsApplied = useCallback(async () => {
+    void queryClient.invalidateQueries({ queryKey: capabilitiesKey });
+    await reloadGraph();
+  }, [queryClient, reloadGraph]);
 
   const routes = useMemo(() => [
     {
@@ -323,7 +323,7 @@ function AppShell() {
                   <AppPaperSearchButton />
                   <AppBookmarksButton />
                   <AppDocsButton />
-                  <AppSettingsButton onSettingsApplied={reloadGraph} />
+                  <AppSettingsButton onSettingsApplied={onSettingsApplied} />
                 </div>
               }
             />

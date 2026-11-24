@@ -414,6 +414,12 @@ function withBlobMeta(settings: AgentSettings, options?: { graphSourceChosen?: b
   };
 }
 
+/** Whether the user explicitly picked the knowledge graph source in the Settings radio (recorded in the blob). */
+export function isGraphSourceChosen(): boolean {
+  if (typeof window === 'undefined') return false;
+  return readBlobMeta()?.graphSourceChosen === true;
+}
+
 /** Whether the one-time "your knowledge graph source was reset to JSON" notice is waiting. */
 export function hasGraphSourceMigrationNotice(): boolean {
   if (typeof window === 'undefined') return false;
