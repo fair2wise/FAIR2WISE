@@ -23,6 +23,7 @@ from ..modules.contracts.context import RequestContext
 from ..modules.contracts.errors import ContractError, ErrorCode
 from ..modules.library.kg_service import KgLibrary
 from ..modules.library.schema_generate import SchemaGenerator
+from ..modules.library.schema_preview import SchemaPreview
 from ..modules.library.schema_prompt import MAX_DESCRIPTION
 from ..modules.library.user_schema_validation import MAX_BYTES, insert_required_core, validate_schema_text
 from ..modules.library.user_schemas import SchemaInvalid, UserSchemaStore, validate_schema_name
@@ -96,6 +97,8 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> FastAPI:
     """Mount the routes on ``app`` (``:local`` only); ``env`` is the startup environment of the generate route."""
     router = Prefixed(app, "/v1/library")
     app.state.f2w_schema_generator = SchemaGenerator(env)
+    app.state.f2w_schema_preview = SchemaPreview(lambda: app.state.f2w_kg_library, lambda: app.state.f2w_library,
+                                                 lambda: app.state.f2w_schema_generator)
 
     @router.post("/schemas/validate")
     async def validate(request: Request, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
@@ -159,6 +162,28 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> FastAPI:
         model = text_field(body, "model", limit=200, required=False)
         generator = schema_generator(request)
         return await run_in_threadpool(lambda: generator.generate(description, backend=backend, model=model))
+
+    @router.post("/schemas/preview")
+    async def preview(request: Request, ctx: RequestContext = Depends(context)) -> Any:  # noqa: ANN401  # Any: JSON body or a typed 422 response
+        """Try a schema on one paper (<= 3 pages, one model call per page, nothing stored). Without ``confirm`` it only estimates."""
+        body = await read_json_body(request)
+        schema = text_field(body, "schema", limit=MAX_BYTES) or ""
+        paper_id = text_field(body, "paper_id", limit=200) or ""
+        backend = text_field(body, "backend", limit=20, required=False)
+        if backend is not None and backend not in ("cborg", "ollama"):
+            raise ContractError(ErrorCode.INVALID_INPUT, "backend must be cborg or ollama", retryable=False)
+        model = text_field(body, "model", limit=200, required=False)
+        confirmation = text_field(body, "confirmation", limit=200, required=False)
+        confirm = body.get("confirm", False)
+        if not isinstance(confirm, bool):
+            raise ContractError(ErrorCode.INVALID_INPUT, "confirm must be true or false", retryable=False)
+        service: SchemaPreview = request.app.state.f2w_schema_preview
+        try:
+            return await run_in_threadpool(lambda: service.preview(schema, paper_id, model=model, backend=backend,
+                                                                   confirm=confirm, confirmation=confirmation))
+        except SchemaInvalid as exc:
+            return JSONResponse({"code": exc.code.value, "message": str(exc), "retryable": False, "reason": exc.reason,
+                                 "report": exc.report.as_dict()}, status_code=422)
 
     return app
 

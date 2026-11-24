@@ -71,7 +71,7 @@ def test_anonymous_gets_sign_in_required_on_every_v1_route(als):
             continue
         assert resp.status_code == 401, (policy.route_id, resp.status_code, resp.text)
         assert resp.json()["code"] == "sign_in_required"
-    assert local_only == 28 and {p.path for p in API_ROUTE_POLICIES if not p.on_als} == {
+    assert local_only == 29 and {p.path for p in API_ROUTE_POLICIES if not p.on_als} == {
         "/v1/folders/roots", "/v1/folders/list", "/v1/folders/index",
         # T35 (A8): library status, papers (list and upload) and verify
         "/v1/library", "/v1/library/papers", "/v1/library/papers/{paper_id}/verify",
@@ -85,7 +85,7 @@ def test_anonymous_gets_sign_in_required_on_every_v1_route(als):
         "/v1/library/categories",
         # schema generation: validate, insert-core, save (shares /schemas), list/read/diff/delete of user schemas
         "/v1/library/schemas/validate", "/v1/library/schemas/insert-core", "/v1/library/schemas/user",
-        "/v1/library/schemas/user/{ref}", "/v1/library/schemas/user/{name}/diff", "/v1/library/schemas/generate"}
+        "/v1/library/schemas/user/{ref}", "/v1/library/schemas/user/{name}/diff", "/v1/library/schemas/generate", "/v1/library/schemas/preview"}
     assert als.ops.jobs.store.list_jobs() == []
 
 

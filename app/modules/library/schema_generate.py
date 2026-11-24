@@ -94,7 +94,8 @@ class SchemaGenerator:
         return SP.build_prompt(description, view=self.view(budget))
 
     # ------------------------------------------------------------------ the call
-    def _model(self, backend: dict[str, str], model: str | None) -> str:
+    def model_for(self, backend: dict[str, str], model: str | None) -> str:
+        """The model to call: a CBORG model must be free (``DENIED`` otherwise; the policy default when omitted); Ollama needs one."""
         chosen = (model or "").strip()
         if backend["name"] == "cborg":
             return require_free_cborg_model(chosen or default_free_model(), context="schema generation model")
@@ -102,7 +103,12 @@ class SchemaGenerator:
             raise ContractError(ErrorCode.INVALID_INPUT, "choose a model for the Ollama backend", retryable=False)
         return chosen
 
-    def _complete(self, backend: dict[str, str], model: str, prompt: str) -> str:
+    def complete(self, backend: dict[str, str], model: str, prompt: str, *, timeout: int = CALL_TIMEOUT,
+                 max_tokens: int = CALL_MAX_TOKENS, system: str = SYSTEM) -> str:
+        """One model call under the provider admission and a hard deadline of ``timeout`` seconds (label ``schema-generate``).
+
+        Failures are typed with plain words only (see the module docstring); the schema preview shares this path.
+        """
         from ..cborg_http import call_with_deadline
         from ..llm_admission import ProviderAdmission
 
@@ -115,16 +121,16 @@ class SchemaGenerator:
 
         def call() -> str:
             client = self.client_factory(**kwargs)
-            return str(client.chat(prompt, temperature=0.0, timeout=CALL_TIMEOUT, trace_label=LABEL, system=SYSTEM,
-                                   max_tokens=CALL_MAX_TOKENS, **extra))
+            return str(client.chat(prompt, temperature=0.0, timeout=timeout, trace_label=LABEL, system=system,
+                                   max_tokens=max_tokens, **extra))
 
         try:
             with ProviderAdmission().slot("schema_generate"):
-                return run(call, float(CALL_TIMEOUT))
+                return run(call, float(timeout))
         except ContractError:  # incl. the free-model refusal and CBORG's address refusal: already plain words
             raise
         except TimeoutError:
-            raise ContractError(ErrorCode.UNAVAILABLE, f"the model did not answer within {CALL_TIMEOUT} seconds",
+            raise ContractError(ErrorCode.UNAVAILABLE, f"the model did not answer within {timeout} seconds",
                                 retryable=True, reason="model_timeout") from None
         except (requests.ConnectionError, requests.Timeout):
             what = "Ollama" if backend["name"] == "ollama" else "the model server"
@@ -162,13 +168,13 @@ class SchemaGenerator:
             raise ContractError(ErrorCode.INVALID_INPUT, f"the description is longer than {SP.MAX_DESCRIPTION} characters",
                                 retryable=False)
         chosen_backend = require_backend(self.env, backend, purpose="schema generation")
-        chosen_model = self._model(chosen_backend, model)
+        chosen_model = self.model_for(chosen_backend, model)
         attempts: list[dict[str, Any]] = []
         prompt = self.first_prompt(description, chosen_backend["name"])
         stopped: str | None = None
         for round_no in range(MAX_REPAIRS + 1):
             try:
-                text = self._clean(self._complete(chosen_backend, chosen_model, prompt))
+                text = self._clean(self.complete(chosen_backend, chosen_model, prompt))
             except ContractError as exc:
                 if not attempts:
                     raise

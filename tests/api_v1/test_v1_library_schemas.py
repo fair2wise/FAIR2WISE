@@ -18,8 +18,8 @@ BASE = "/v1/library/schemas"
 
 def test_the_capability_is_local_only_and_the_rows_declare_it(local, als):
     assert "library.author_schema" in CAPABILITIES and "library.author_schema" in LOCAL_ONLY_CAPABILITIES
-    rows = {p.route_id: p for p in API_ROUTE_POLICIES if p.route_id in {f"V{n}" for n in range(89, 97)}}
-    assert set(rows) == {f"V{n}" for n in range(89, 97)} and all(not p.on_als for p in rows.values())
+    rows = {p.route_id: p for p in API_ROUTE_POLICIES if p.route_id in {f"V{n}" for n in range(89, 98)}}
+    assert set(rows) == {f"V{n}" for n in range(89, 98)} and all(not p.on_als for p in rows.values())
     assert {r.capabilities == frozenset({"library.author_schema"}) for k, r in rows.items() if k in ("V89", "V90", "V91", "V95")} == {True}
     assert undeclared_routes(local.app) == []
     assert local.client().get("/v1/library/schemas/user").status_code == 200   # the local operator holds the library caps
@@ -32,6 +32,7 @@ def test_als_answers_404_for_every_route_and_no_als_principal_holds_the_capabili
         assert c.post(f"{BASE}/insert-core", json={"text": GOOD}).status_code == 404
         assert c.post(BASE, json={"name": "catfish", "text": GOOD}).status_code == 404
         assert c.post(f"{BASE}/generate", json={"description": "catfish"}).status_code == 404
+        assert c.post(f"{BASE}/preview", json={"schema": GOOD, "paper_id": "p"}).status_code == 404
         assert c.get(f"{BASE}/user").status_code == 404
         assert c.get(f"{BASE}/user/catfish@v1").status_code == 404
         assert c.get(f"{BASE}/user/catfish/diff?from=1&to=2").status_code == 404
@@ -203,3 +204,21 @@ def test_generate_route_typed_errors_have_no_key_or_url(local, tmp_path):
     assert c.post(f"{BASE}/generate", json={"description": "x", "backend": "openai"}).status_code == 422
     assert c.post(f"{BASE}/generate", content=json.dumps({"description": "x" * 20000}),
                   headers={"content-type": "application/json"}).json()["reason"] == "body_too_large"
+
+
+def test_preview_route_refuses_an_invalid_schema_with_the_report_and_validates_fields(local, tmp_path):
+    c = local.client()
+    _install(local, tmp_path, [GOOD])
+    bad = c.post(f"{BASE}/preview", json={"schema": GOOD.replace("    domain: Species\n", "    domain: Nope\n"), "paper_id": "p1"})
+    assert bad.status_code == 422 and bad.json()["reason"] == "schema_invalid" and bad.json()["report"]["ok"] is False
+    assert c.post(f"{BASE}/preview", json={"schema": GOOD}).status_code == 422                       # paper_id missing
+    assert c.post(f"{BASE}/preview", json={"schema": GOOD, "paper_id": "p", "confirm": "yes"}).status_code == 422
+    assert c.post(f"{BASE}/preview", json={"schema": GOOD, "paper_id": "p", "backend": "x"}).status_code == 422
+    unknown = c.post(f"{BASE}/preview", json={"schema": GOOD, "paper_id": "nope", "model": "lbl/cborg-chat"})
+    assert unknown.status_code == 422 and "unknown paper" in unknown.text
+    paid = c.post(f"{BASE}/preview", json={"schema": GOOD, "paper_id": "p", "model": "anthropic/claude-opus"})
+    assert paid.status_code == 403
+    big = c.post(f"{BASE}/preview", content=json.dumps({"schema": "x" * 300000, "paper_id": "p"}),
+                 headers={"content-type": "application/json"})
+    assert big.json()["reason"] == "body_too_large"
+    assert not local.app.state.f2w_kg_library.store.root.exists()
