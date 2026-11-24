@@ -335,8 +335,14 @@ def create_api_app(
 
         startup_env = os.environ if startup_config is None else startup_config
         from ..modules.library.harvest import Harvester, HarvestStore
+        from ..modules.library.open_link import ProxyPrefixError, proxy_prefix_from_env
 
-        app.state.f2w_harvest = Harvester(library_service, HarvestStore(Path(cfg.workdir) / "library" / "harvest.sqlite"))
+        try:   # the institutional library proxy prefix: a string for the person's browser, validated here, never requested
+            proxy_prefix = proxy_prefix_from_env(startup_env)
+        except ProxyPrefixError as exc:
+            raise StartupConfigError(f"config_rejected: {exc}") from exc
+        app.state.f2w_harvest = Harvester(library_service, HarvestStore(Path(cfg.workdir) / "library" / "harvest.sqlite"),
+                                          proxy_prefix=proxy_prefix)
         library_handlers_ = library_handlers(library_service, extractor=LibraryExtractor(
             library_service, BundleStore(Path(cfg.workdir) / BUNDLES_DIRNAME), env=startup_env),
             harvester=app.state.f2w_harvest)

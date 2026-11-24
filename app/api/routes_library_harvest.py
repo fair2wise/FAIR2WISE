@@ -54,11 +54,15 @@ def install(app: FastAPI) -> FastAPI:
 
     @router.get("/runs/{run_id}/candidates")
     def candidates(run_id: str, request: Request, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
-        """The candidates of one run: tier, status, landing URL and where a downloaded PDF was filed."""
+        """The candidates of one run: tier, status, landing URL, ``open_url`` and where a downloaded PDF was filed.
+
+        ``open_url`` is built from the DOI (else the landing page), behind the deployment's library proxy prefix when
+        one is set. The server only builds the string; the person's browser opens it.
+        """
         found = harvester(request)
         if found.store.run(_id(run_id)) is None:
             raise ContractError(ErrorCode.NOT_FOUND, "run not found")
-        return cast(dict[str, Any], project(request, {"candidates": found.store.candidates(run_id)}))
+        return cast(dict[str, Any], project(request, {"candidates": found.candidates_view(run_id)}))
 
     @router.post("/candidates/{candidate_id}/pdf")
     async def supply_pdf(candidate_id: str, request: Request, confirm: bool = False, to: str | None = None,

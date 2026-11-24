@@ -58,6 +58,7 @@ from ..literature.safe_fetch import BlockedURL, NetworkPolicy
 from .arrange import is_valid_folder_name
 from .bibmeta import cap_abstract, clean_author_list, openalex_authors
 from .oa_links import ResolvedLink, oa_locations, resolve_links
+from .open_link import open_url
 from .pdf_match import best_match, facts_from_probe, match_candidate, other_candidate
 from .service import LibraryService
 
@@ -658,7 +659,8 @@ class Harvester:
     def __init__(self, service: LibraryService, store: HarvestStore, *, searchers: Mapping[str, Searcher] | None = None,
                  downloader: Downloader | None = None, delay: float = 1.0,
                  sleep: Callable[[float], None] = time.sleep,
-                 link_resolver: Callable[[Candidate], Iterable[ResolvedLink]] | None = None) -> None:
+                 link_resolver: Callable[[Candidate], Iterable[ResolvedLink]] | None = None,
+                 proxy_prefix: str | None = None) -> None:
         """Create a harvester.
 
         Args:
@@ -670,7 +672,10 @@ class Harvester:
             sleep: Clock for the delay.
             link_resolver: ``candidate -> further free links`` for open-access papers (default: :func:`resolve_links`
                 over the hardened getters; tests inject a fake).
+            proxy_prefix: The validated ``F2W_LIBRARY_PROXY_PREFIX`` (or ``None``); only put in front of the
+                ``open_url`` links the candidates response carries, never requested.
         """
+        self.proxy_prefix = proxy_prefix
         self._link_resolver = link_resolver
         self.service = service
         self.store = store
@@ -1002,6 +1007,11 @@ class Harvester:
         restored = row.get("prev_status") if row.get("prev_status") in MANUAL_STATUSES else "failed"
         self.store.clear_supplied(cid, status=str(restored), detail="the supplied file was removed again (undo)")
         return {"candidate": self.store.candidate(cid), "removed": removed}
+
+    def candidates_view(self, run_id: str) -> list[dict[str, Any]]:
+        """The run's candidates as the API lists them: each with ``open_url`` (the link the person opens, or ``None``)."""
+        return [{**row, "open_url": open_url(self.proxy_prefix, row.get("doi"), row.get("landing_url"))}
+                for row in self.store.candidates(run_id)]
 
     def dismiss(self, cid: str) -> dict[str, Any]:
         """Mark a candidate that needs a PDF by hand ``dismissed``."""
