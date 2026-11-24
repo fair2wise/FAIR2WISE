@@ -4,9 +4,9 @@ Spans may carry ids, names, timings, counts, model names, status and sizes. They
 text, retrieved passages, document text, API keys, tokens, file contents or e-mail addresses. Rather
 than trusting each call site, :func:`sanitize` drops what is not provably safe:
 
-* the key must be in :data:`SAFE_KEYS` or end in a :data:`SAFE_SUFFIXES` entry, and must not contain a
-  :data:`FORBIDDEN_FRAGMENTS` word (a count or size such as ``f2w.prompt_chars`` is allowed: it measures
-  the content without carrying it);
+* the key must be in the explicit :data:`ALLOWED_KEYS` list (no suffix rule: a key such as ``f2w.paper.name``
+  is dropped; a size such as ``f2w.llm.prompt_chars`` is listed because it measures the content without
+  carrying it);
 * the value must be a bool, an int, a float, or a short single-line string without an e-mail address,
   a ``?query`` part, or the value of any secret-named environment variable.
 """
@@ -21,48 +21,29 @@ import time
 
 logger = logging.getLogger(__name__)
 
-#: Attribute keys allowed as they are (semantic-convention names plus the ``f2w.*`` ones this repo sets).
-SAFE_KEYS = frozenset({
+#: The explicit allowlist of span attribute keys: semantic-convention names plus the ``f2w.*`` ones this repo sets.
+#: A key not listed here is dropped whatever its spelling (a suffix such as ``.name`` or ``_id`` proves nothing:
+#: ``f2w.paper.name`` would be a paper title). Add a key here, with a test and a line in
+#: ``mkdocs/docs/observability.md``, only when its value is a bounded word, an id, a number or a status.
+ALLOWED_KEYS = frozenset({
     "http.request.method", "http.response.status_code", "http.route", "url.path", "url.scheme",
     "server.address", "server.port", "error.type", "code.function", "code.namespace",
     "gen_ai.request.model", "gen_ai.system", "gen_ai.usage.input_tokens", "gen_ai.usage.output_tokens",
     "f2w.job_id", "f2w.job_kind", "f2w.stage", "f2w.turn_id", "f2w.llm.label", "f2w.llm.status",
     "f2w.llm.latency_ms", "f2w.llm.prompt_chars", "f2w.llm.response_chars", "f2w.corpus", "f2w.status",
-    "f2w.process", "f2w.stage_status", "f2w.http.client",
+    "f2w.process", "f2w.stage_status", "f2w.http.client", "f2w.http.duration_ms",
 })
-#: A key not in :data:`SAFE_KEYS` is allowed only when it ends in one of these (ids, counts, sizes...).
-SAFE_SUFFIXES = (".id", "_id", ".count", "_count", ".name", ".status", "_status", ".size", "_bytes", "_chars",
-                 ".model", "_ms", ".host", ".kind", ".stage", ".version", "_total", "_n")
-#: Words (split on ``.`` and ``_``) that make a key unsafe whatever its suffix.
-FORBIDDEN_FRAGMENTS = frozenset({
-    "prompt", "text", "content", "passage", "passages", "body", "query", "secret", "password", "token",
-    "authorization", "credential", "email", "mail", "document", "message", "answer", "question", "url",
-    "key", "apikey", "header", "headers", "cookie",
-})
-#: Keys ending like this are counts or sizes of the thing they name (``f2w.prompt_chars``), so only
-#: :data:`HARD_FORBIDDEN` words block them.
-_COUNT_SUFFIXES = ("_count", ".count", "_chars", "_bytes", ".size", "_total", "_n", "_ms")
-HARD_FORBIDDEN = frozenset({"secret", "password", "authorization", "credential", "apikey", "cookie", "email"})
 MAX_VALUE_CHARS = 128
 _EMAIL = re.compile(r"[^\s@]+@[^\s@]+\.[A-Za-z]{2,}")
 _SECRET_NAME = re.compile(r"(API_KEY|SECRET|TOKEN|PASSWORD|AUTHORIZATION|CREDENTIAL)", re.IGNORECASE)
 _MIN_SECRET_CHARS = 8
-_WORDS = re.compile(r"[._-]+")
 
 AttributeValue = bool | int | float | str
 
 
 def key_allowed(key: str) -> bool:
-    """Whether ``key`` may be recorded (see the module docstring)."""
-    if key in SAFE_KEYS:
-        return True
-    lowered = key.lower()
-    if not lowered.endswith(SAFE_SUFFIXES):
-        return False
-    words = set(_WORDS.split(lowered))
-    if lowered.endswith(_COUNT_SUFFIXES):  # a count or size of something is not the something
-        return not words & HARD_FORBIDDEN
-    return not words & FORBIDDEN_FRAGMENTS
+    """Whether ``key`` may be recorded: it must be in :data:`ALLOWED_KEYS` (exact match, no suffix rule)."""
+    return key in ALLOWED_KEYS
 
 
 _SECRET_CACHE: tuple[float, list[str]] = (0.0, [])

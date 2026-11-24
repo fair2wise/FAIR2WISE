@@ -92,14 +92,29 @@ it. Spans carry **ids, names, timings, counts, model names, status and sizes**. 
 retrieved passages, document text, file contents, API keys, tokens, headers, request or response bodies, query
 strings or e-mail addresses. This is enforced, not trusted:
 
-- every attribute goes through `app/modules/tracing/safe.py`: the key must be on a short allowlist or end in an
-  id/count/size/name/status suffix and must not name content (`prompt`, `text`, `content`, `passage`, `body`,
-  `query`, `key`, `token`, `url`...); the value must be a number, a bool or a short single-line string with no
-  e-mail address, URL query or value of a secret-named environment variable;
+- every attribute goes through `app/modules/tracing/safe.py`: the key must be on the **explicit allowlist** below
+  (an exact match: there is no suffix rule, so `f2w.paper.name` or `f2w.doc_id` are dropped, whatever they end in);
+  the value must be a number, a bool or a short single-line string (128 characters at most) with no e-mail address,
+  URL query or value of a secret-named environment variable;
 - an error records only the exception **class name** (`error.type`, status description), never its message
   (messages quote content);
 - `tests/tracing/test_no_content.py` pushes sentinel prompt text and a fake API key through a chat turn, model
   calls, HTTP calls and failures and asserts that no span name, attribute, event or resource contains them.
+
+#### Span attribute allowlist
+
+`ALLOWED_KEYS` in `app/modules/tracing/safe.py` is the complete list. Anything else is dropped (logged at debug);
+add a key only with a test, a row here, and a value that is a bounded word, an id, a number or a status.
+
+| Key | Value |
+|---|---|
+| `http.request.method`, `http.response.status_code`, `http.route`, `url.path`, `url.scheme` | method (standard set, else `other`), status, route template (`unmatched` for a 404), scheme |
+| `server.address`, `server.port` | host and port of an outgoing `httpx` call (never the path, query or userinfo) |
+| `error.type`, `code.function`, `code.namespace` | exception class name, function qualname, module |
+| `gen_ai.request.model`, `gen_ai.system`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` | configured model name, provider, token counts |
+| `f2w.job_id`, `f2w.job_kind`, `f2w.stage`, `f2w.status`, `f2w.stage_status` | job id (a hash), job kind, stage name, state |
+| `f2w.llm.label`, `f2w.llm.status`, `f2w.llm.latency_ms`, `f2w.llm.prompt_chars`, `f2w.llm.response_chars` | closed label, `ok`/`error`, latency, sizes |
+| `f2w.http.duration_ms`, `f2w.http.client`, `f2w.process`, `f2w.turn_id`, `f2w.corpus` | server duration, client name, process role, turn id, corpus id |
 
 ## Tracing functions by name
 

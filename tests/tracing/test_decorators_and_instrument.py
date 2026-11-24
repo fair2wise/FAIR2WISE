@@ -15,7 +15,7 @@ import pytest
 
 from app.modules import tracing
 from app.modules.tracing import defaults, instrument, runtime
-from app.modules.tracing.safe import key_allowed, sanitize
+from app.modules.tracing.safe import ALLOWED_KEYS, key_allowed, sanitize
 
 from .conftest import SENTINEL, every_string
 
@@ -68,15 +68,15 @@ def test_exception_is_recorded_by_type_only(exporter) -> None:  # noqa: ANN001
 
 
 def test_extractor_attributes_pass_the_allowlist(exporter) -> None:  # noqa: ANN001
-    @tracing.traced("x", attributes=lambda text, n: {"f2w.paper_count": n, "f2w.prompt_text": text, "document.body": text},
-                    result_attributes=lambda r: {"f2w.result_count": len(r)})
+    @tracing.traced("x", attributes=lambda text, n: {"f2w.stage": n, "f2w.prompt_text": text, "document.body": text, "f2w.paper.name": text},
+                    result_attributes=lambda r: {"f2w.llm.response_chars": len(r)})
     def work(text: str, n: int) -> list[int]:
         return [1] * n
 
     work(SENTINEL, 3)
     attrs = exporter.get_finished_spans()[0].attributes
-    assert attrs["f2w.paper_count"] == 3 and attrs["f2w.result_count"] == 3
-    assert "f2w.prompt_text" not in attrs and "document.body" not in attrs
+    assert attrs["f2w.stage"] == 3 and attrs["f2w.llm.response_chars"] == 3
+    assert "f2w.prompt_text" not in attrs and "document.body" not in attrs and "f2w.paper.name" not in attrs
     assert SENTINEL not in " ".join(every_string(exporter.get_finished_spans()))
 
 
@@ -96,21 +96,28 @@ def test_disabled_wrapper_is_a_direct_call() -> None:
     assert work() == 5 and not runtime.is_enabled()
 
 
-@pytest.mark.parametrize("key,ok", [
-    ("f2w.paper_count", True), ("gen_ai.request.model", True), ("f2w.job_id", True), ("f2w.prompt_chars", True),
-    ("f2w.prompt", False), ("f2w.query_text", False), ("f2w.api_key", False),
-    ("document.text", False), ("f2w.email", False), ("f2w.token_count", True), ("f2w.user_token", False),
+@pytest.mark.parametrize("key", sorted(ALLOWED_KEYS))
+def test_every_allowed_key_passes(key: str) -> None:
+    assert key_allowed(key) is True
+    assert sanitize({key: "ok-1"}) == {key: "ok-1"}
+
+
+@pytest.mark.parametrize("key", [
+    "f2w.paper.name", "f2w.paper_id", "f2w.file.name", "f2w.doi_id", "f2w.user.name", "f2w.model.name", "service.name",
+    "f2w.paper_count", "f2w.prompt_chars", "f2w.token_count", "f2w.some.status", "f2w.x.model", "f2w.x_ms",
+    "f2w.prompt", "f2w.query_text", "f2w.api_key", "document.text", "f2w.email", "f2w.user_token", "F2W.JOB_ID",
 ])
-def test_key_allowlist(key: str, ok: bool) -> None:
-    assert key_allowed(key) is ok
+def test_unlisted_keys_are_dropped_whatever_their_suffix(key: str) -> None:
+    assert key_allowed(key) is False
+    assert sanitize({key: "A Paper Title About Perovskites"}) == {} and sanitize({key: 3}) == {}
 
 
 def test_value_rules(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CBORG_API_KEY", "sk-live-abcdefghijkl")
-    clean = sanitize({"f2w.job_id": "job-1", "f2w.stage": "line1\nline2", "f2w.name": "a@b.example",
-                      "f2w.host_name": "x" * 500, "f2w.kind": "https://h/p?token=abc", "f2w.corpus_id": "sk-live-abcdefghijkl",
-                      "f2w.size": 3, "f2w.flag_count": True, "f2w.list_count": [1]})
-    assert clean == {"f2w.job_id": "job-1", "f2w.size": 3, "f2w.flag_count": True}
+    clean = sanitize({"f2w.job_id": "job-1", "f2w.stage": "line1\nline2", "f2w.corpus": "a@b.example",
+                      "f2w.process": "x" * 500, "f2w.job_kind": "https://h/p?token=abc", "f2w.turn_id": "sk-live-abcdefghijkl",
+                      "f2w.llm.prompt_chars": 3, "f2w.status": True, "f2w.llm.status": [1]})
+    assert clean == {"f2w.job_id": "job-1", "f2w.llm.prompt_chars": 3, "f2w.status": True}
 
 
 # ---------------------------------------------------------------------------- config-driven wrapping
