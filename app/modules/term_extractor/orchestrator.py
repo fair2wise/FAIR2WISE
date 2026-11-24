@@ -211,7 +211,8 @@ class Orchestrator:
             "Initializing Orchestrator: model=%s backend=%s workers=%d output=%s",
             model, backend, max_workers, output_file,
         )
-        self.schema_helper = SchemaHelper(schema_path=schema_path, sanitize_descriptions=sanitize_schema_descriptions)
+        # The flag is passed only when set, so every shipped-schema construction is exactly what it was.
+        self.schema_helper = SchemaHelper(schema_path=schema_path, **({"sanitize_descriptions": True} if sanitize_schema_descriptions else {}))
         self.store = TermStore(output_file)
         self.services = build_services(chebi_obo_path=chebi_obo_path)
         self.merge_index = TermMergeIndex(
