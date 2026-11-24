@@ -478,32 +478,43 @@ def test_an_open_access_paper_whose_locations_give_no_link_is_failed_not_paywall
     assert row["status"] == "failed" and row["detail"] == "open access, but no direct PDF link was found"
 
 
-def test_an_http_link_on_a_blocked_port_is_retried_over_https_and_the_upgrade_is_recorded(tmp_path):
-    paper = cand(GOOD, doi="10.1/u", urls=["http://journal.example:8080/a.pdf"])
+def test_an_http_link_is_tried_over_https_first_and_the_upgrade_is_recorded(tmp_path):
+    paper = cand(GOOD, doi="10.1/u", urls=["http://journal.example/a.pdf"])
     paper.oa = True
-    net = Net({"http://journal.example:8080/a.pdf": "blocked:port@journal.example",
-               "https://journal.example/a.pdf": pdf("upgraded")})
+    net = Net({"https://journal.example/a.pdf": pdf("upgraded"), "http://journal.example/a.pdf": pdf("plain")})
     world = World(tmp_path, {"arxiv": fixed(paper)}, net)
     handle, _ = world.run(sources=["arxiv"])
     row = world.store.candidates(handle.job_id)[0]
-    assert net.calls == ["http://journal.example:8080/a.pdf", "https://journal.example/a.pdf"]
+    assert net.calls == ["https://journal.example/a.pdf"]          # the http link is not even asked when https works
     assert row["status"] == "downloaded" and row["link_rule"] == "arxiv+https_upgrade"
     assert row["detail"] == "found via arxiv+https_upgrade (http upgraded to https)"
 
 
-def test_a_failed_upgrade_reports_the_upgrades_own_failure_and_other_blocks_are_not_retried(tmp_path):
+def test_the_listed_http_link_is_the_fallback_where_https_does_not_work(tmp_path):
+    paper = cand(GOOD, doi="10.1/f", urls=["http://old.example/a.pdf"])
+    paper.oa = True
+    net = Net({"https://old.example/a.pdf": "failed:network", "http://old.example/a.pdf": pdf("plain")})
+    world = World(tmp_path, {"arxiv": fixed(paper)}, net)
+    handle, _ = world.run(sources=["arxiv"])
+    row = world.store.candidates(handle.job_id)[0]
+    assert net.calls == ["https://old.example/a.pdf", "http://old.example/a.pdf"]
+    assert row["status"] == "downloaded" and row["link_rule"] == "arxiv" and "upgraded" not in row["detail"]
+
+
+def test_an_http_link_on_a_blocked_port_is_upgraded_and_what_the_listed_link_gave_is_reported_when_both_fail(tmp_path):
     paper = cand(GOOD, doi="10.1/v", urls=["http://journal.example:8080/a.pdf"])
     paper.oa = True
-    other = cand("Resonant soft X-ray scattering private", doi="10.1/w", urls=["http://internal.example/b.pdf"])
+    other = cand("Resonant soft X-ray scattering private", doi="10.1/w", urls=["https://internal.example/b.pdf"])
     other.oa = True
-    net = Net({"http://journal.example:8080/a.pdf": "blocked:port@journal.example", "https://journal.example/a.pdf": "failed:network",
-               "http://internal.example/b.pdf": "blocked:private_address@internal.example"})
+    net = Net({"https://journal.example/a.pdf": "failed:network", "http://journal.example:8080/a.pdf": "blocked:port@journal.example",
+               "https://internal.example/b.pdf": "blocked:private_address@internal.example"})
     world = World(tmp_path, {"arxiv": fixed(paper, other)}, net)
     handle, _ = world.run(sources=["arxiv"])
     rows = {r["title"]: r for r in world.store.candidates(handle.job_id)}
-    assert rows[GOOD]["status"] == "failed" and "failed:network" in rows[GOOD]["detail"] and "journal.example" in rows[GOOD]["detail"]
-    assert rows[other.title]["status"] == "blocked" and net.calls.count("http://internal.example/b.pdf") == 1
-    assert not any(c.startswith("https://internal.example") for c in net.calls)   # only a port block is upgraded
+    assert net.calls[:2] == ["https://journal.example/a.pdf", "http://journal.example:8080/a.pdf"]
+    assert rows[GOOD]["status"] == "blocked" and rows[GOOD]["detail"] == (
+        "open access, blocked by network policy (port) at journal.example")
+    assert rows[other.title]["status"] == "blocked" and net.calls.count("https://internal.example/b.pdf") == 1   # https links are never "upgraded"
 
 
 def test_https_upgrade_only_changes_plain_http_and_drops_the_port():

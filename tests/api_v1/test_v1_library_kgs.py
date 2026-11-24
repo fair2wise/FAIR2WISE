@@ -143,6 +143,12 @@ def test_bundles_do_not_disturb_settings_and_contract(local, kgs, monkeypatch):
     bundle = next(src for src in listed if src["graph_id"] == "child")
     assert bundle["label"] == "child" and "matkg_child" not in json.dumps(bundle)
     assert all(g["label"] != "matkg_child.json" for g in after.json().get("available_graphs", []))
+    # a KG whose nodes carry no passages shows cleanly: the full record loads, with no snippet fields and no error
+    monkeypatch.setenv("F2W_DISCLOSE_SNIPPETS", "1")
+    node = c.get("/graph/node/matkg:P3HT", params={"source": bundle["id"]})
+    assert node.status_code == 200, node.text
+    papers = node.json()["publications"]
+    assert papers and all("snippets" not in p and "snippet_count" not in p for p in papers)
     assert [g for g in before["available_json_graphs"]] == [g for g in after.json()["available_json_graphs"]
                                                            if not g.startswith("kgs/")] if "available_json_graphs" in before else True
 

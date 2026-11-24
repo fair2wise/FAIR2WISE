@@ -600,8 +600,9 @@ def _host(url: str) -> str:
 def https_upgrade(url: str) -> str | None:
     """The same address over https (any explicit port dropped) for an ``http://`` URL, else ``None``.
 
-    Used when the network policy refused the http URL's port (it allows only 80 and 443): the https attempt goes through
-    the same checks as any download.
+    Every ``http://`` link is tried over https first: a deployment whose egress proxy allows CONNECT on 443 only
+    refuses a plain GET on port 80 after the network check passed it. The https attempt goes through the same checks
+    as any download, and the link as listed is the fallback.
     """
     try:
         parts = urlsplit(url)
@@ -802,17 +803,21 @@ class Harvester:
         downloading()
         first_rule = "arxiv" if cand.source == "arxiv" else "openalex_selector"
         for link in self._links(ctx, cand, first_rule):
-            url, rule = link.url, link.rule
-            data, status = self._fetch(ctx, downloader, url, max_bytes)
-            upgraded = https_upgrade(url) if status.startswith("blocked:port") else None
-            if data is None and upgraded:   # http on a port the policy does not allow: the same address over https
-                ctx.log(f"{cand.title[:70]}: {status.split('@', 1)[0]}; trying the same address over https", level="warning")
-                url, rule = upgraded, f"{link.rule}+https_upgrade"
-                data, status = self._fetch(ctx, downloader, url, max_bytes)
-            if data is None:
-                last, last_url = status, url
-                ctx.log(f"{cand.title[:70]}: {status.split('@', 1)[0]} at {status.split('@', 1)[1] if '@' in status else _host(url)}"
-                        f" ({rule})", level="warning")
+            upgraded = https_upgrade(link.url)   # an http:// link is tried over https first (a proxy may allow only 443)
+            attempts = [(upgraded, f"{link.rule}+https_upgrade"), (link.url, link.rule)] if upgraded else [(link.url, link.rule)]
+            data, url, rule = None, link.url, link.rule
+            for attempt_url, attempt_rule in attempts:
+                data, status = self._fetch(ctx, downloader, attempt_url, max_bytes)
+                url, rule = attempt_url, attempt_rule
+                if data is not None:
+                    break
+                if attempt_url != link.url:   # the https attempt failed: the listed http link is tried as it was given
+                    ctx.log(f"{cand.title[:70]}: https attempt at {_host(attempt_url)} gave {status.split('@', 1)[0]}; "
+                            "trying the link as listed", level="info")
+            if data is None:   # report what the link as listed gave
+                last, last_url = status, link.url
+                ctx.log(f"{cand.title[:70]}: {status.split('@', 1)[0]} at {status.split('@', 1)[1] if '@' in status else _host(link.url)}"
+                        f" ({link.rule})", level="warning")
                 continue
             cand.link_rule = rule
             known = {"year": cand.year, "title": cand.title, "doi": cand.doi, "arxiv_id": cand.arxiv_id,
