@@ -3218,8 +3218,12 @@ class AgentPipelineService:
                 continue
             gid = graph_id_for_path(rel)
             stem = Path(rel).stem
-            files.append(JsonFile(stem[len("matkg_"):] if stem.startswith("matkg_") else stem, gid,
-                                  Path(rel).name, path))
+            from ..library.bundles import resolve_registered_graph
+
+            # An extracted KG (a registered bundle) is shown by its own name everywhere: not by the virtual file name
+            # ``matkg_<name>.json`` that no file of the release folder carries.
+            label = gid if resolve_registered_graph(rel) is not None else Path(rel).name
+            files.append(JsonFile(stem[len("matkg_"):] if stem.startswith("matkg_") else stem, gid, label, path))
         return files
 
     def settings_response(self) -> AgentSettingsResponse:

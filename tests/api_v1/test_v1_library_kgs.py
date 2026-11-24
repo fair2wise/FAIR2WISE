@@ -135,6 +135,12 @@ def test_bundles_do_not_disturb_settings_and_contract(local, kgs, monkeypatch):
     after = c.get("/settings")
     assert after.status_code == 200
     assert "kgs/child/matkg_child.json" in json.dumps(after.json())
+    # one name for the KG everywhere: the source listing, and so the viewer and the node card header, say "child",
+    # never the virtual file name matkg_child.json (no such file exists in the release folder)
+    listed = c.get("/v1/graph/sources").json()["sources"]
+    bundle = next(src for src in listed if src["graph_id"] == "child")
+    assert bundle["label"] == "child" and "matkg_child" not in json.dumps(bundle)
+    assert all(g["label"] != "matkg_child.json" for g in after.json().get("available_graphs", []))
     assert [g for g in before["available_json_graphs"]] == [g for g in after.json()["available_json_graphs"]
                                                            if not g.startswith("kgs/")] if "available_json_graphs" in before else True
 
