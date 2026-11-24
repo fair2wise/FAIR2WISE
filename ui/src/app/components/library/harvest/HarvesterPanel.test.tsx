@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { TabActiveProvider } from '../../tabActivity';
 import { HarvesterPanel } from './HarvesterPanel';
 
 const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() }));
@@ -56,11 +57,13 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function renderPanel() {
+function renderPanel(tabActive = true) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <HarvesterPanel />
+      <TabActiveProvider value={tabActive}>
+        <HarvesterPanel />
+      </TabActiveProvider>
     </QueryClientProvider>,
   );
 }
@@ -168,6 +171,34 @@ describe('HarvesterPanel run', () => {
     expect(await screen.findByRole('heading', { name: /Harvesting/ })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(calls.some(c => c.method === 'POST' && c.path === '/v1/jobs/h1/cancel')).toBe(true));
+  });
+
+  it('follows the log by cursor polling (tail first, then after=seq) and never opens a stream', async () => {
+    routes['GET /v1/jobs'] = { status: 200, body: { jobs: [job('running')] } };
+    const entry = (seq: number) => ({ seq, at: '2026-11-03T10:00:00Z', level: 'info', stage: 'search', message: `line ${seq}` });
+    routes['GET /v1/jobs/h1/logs'] = { status: 200, body: { logs: [entry(1), entry(2)], total: 2 } };
+    renderPanel();
+    expect(await screen.findByText(/line 2/)).toBeInTheDocument();
+    const first = calls.find(c => c.path === '/v1/jobs/h1/logs');
+    expect(first?.search).toContain('tail=true');
+    expect(calls.some(c => c.path.endsWith('/stream'))).toBe(false);
+    expect(screen.getByText(/· polling/)).toBeInTheDocument();
+  });
+
+  it('drops the polling note once the run is terminal (the terminal stop is tested in useJobLogPolling)', async () => {
+    routes['GET /v1/jobs'] = { status: 200, body: { jobs: [job('running')] } };
+    routes['GET /v1/jobs/h1'] = { status: 200, body: job('succeeded') };
+    renderPanel();
+    await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith('Harvest finished.'));
+    await waitFor(() => expect(screen.queryByText(/· polling/)).not.toBeInTheDocument());
+    expect(screen.getByTestId('harvest-state')).toHaveTextContent('succeeded');
+  });
+
+  it('makes no job or log request while the tab is hidden', async () => {
+    routes['GET /v1/jobs'] = { status: 200, body: { jobs: [job('running')] } };
+    renderPanel(false);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    expect(calls.some(c => c.path.startsWith('/v1/jobs'))).toBe(false);
   });
 
   it('toasts and offers the form again when the run ends, keeping its results open', async () => {

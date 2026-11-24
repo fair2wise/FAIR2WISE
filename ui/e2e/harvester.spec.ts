@@ -104,6 +104,11 @@ test.describe('Harvester panel', () => {
   });
 
   test('re-attaches to a running harvest after a reload and reopens a past run', async ({ page }) => {
+    const jobRequests: string[] = [];
+    page.on('request', request => {
+      const { pathname, search } = new URL(request.url());
+      if (pathname.startsWith('/v1/jobs/')) jobRequests.push(pathname + search);
+    });
     await mockAgent(page);
     await mockLibrary(page, {
       papers: PAPERS,
@@ -124,6 +129,9 @@ test.describe('Harvester panel', () => {
     await expect(page.getByTestId('harvest-progress-text')).toContainText('2 of 6 (33%)');
     await expect(page.getByRole('log', { name: 'Harvest log' })).toContainText('searching arxiv');
     await expect(page.getByRole('table', { name: 'Harvest results' }).getByText('Run seven paper')).toBeVisible();
+    // The log is followed by cursor polling (first fetch asks for the tail); no stream is opened.
+    expect(jobRequests.some(entry => /^\/v1\/jobs\/h7\/logs\?.*tail=true/.test(entry))).toBe(true);
+    expect(jobRequests.some(entry => entry.endsWith('/stream'))).toBe(false);
 
     const runs = page.getByRole('list', { name: 'Harvest runs' });
     await runs.getByRole('button', { name: /tomography/ }).click();

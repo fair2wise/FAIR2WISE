@@ -14,7 +14,7 @@ const line = (seq: number, over: Partial<JobLogEntry> = {}): JobLogEntry => ({
 
 function setup(over: Partial<HarvestRunViewProps> = {}) {
   const props: HarvestRunViewProps = {
-    job: job(), topic: 'rsoxs', lines: [], streaming: true, cancelling: false,
+    job: job(), topic: 'rsoxs', lines: [], logTotal: 0, polling: true, logError: null, cancelling: false,
     onCancel: vi.fn(), onClose: vi.fn(), ...over,
   };
   render(<HarvestRunView {...props} />);
@@ -37,11 +37,18 @@ describe('HarvestRunView', () => {
     expect(screen.getByRole('heading', { name: 'Harvest' })).toBeInTheDocument();
   });
 
-  it('renders log lines with their level and notes polling when not streaming', () => {
-    setup({ lines: [line(1), line(2, { level: 'error', message: 'boom' })], streaming: false });
+  it('renders log lines with their level and notes polling while polled', () => {
+    setup({ lines: [line(1), line(2, { level: 'error', message: 'boom' })], logTotal: 2, polling: true });
     expect(screen.getByRole('log', { name: 'Harvest log' })).toHaveTextContent('line 1');
     expect(screen.getByText(/boom/)).toHaveClass('text-destructive');
     expect(screen.getByText(/polling/)).toBeInTheDocument();
+  });
+
+  it('shows the total, a failed poll, and no polling note once paused or ended', () => {
+    setup({ lines: [line(3)], logTotal: 9, polling: false, logError: 'HTTP 502' });
+    expect(screen.getByText(/last 1 of 9 lines/)).toBeInTheDocument();
+    expect(screen.queryByText(/· polling/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('harvest-log-error')).toHaveTextContent('HTTP 502');
   });
 
   it('offers Cancel while running and disables it while cancelling', async () => {

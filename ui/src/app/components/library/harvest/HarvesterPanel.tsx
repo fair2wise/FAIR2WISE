@@ -22,10 +22,11 @@ import {
   useStartHarvest,
 } from '../../harvestHooks';
 import { TERMINAL_JOB_STATES } from '../../extractionApi';
-import { useCancelJob, useJob, useSchemas } from '../../extractionHooks';
-import { useJobLogStream } from '../../extraction/useJobLogStream';
+import { FAST_POLL_MS, useCancelJob, useJob, useSchemas } from '../../extractionHooks';
+import { useJobLogPolling } from '../../extraction/useJobLogPolling';
 import { isValidFolderName } from '../../libraryApi';
 import { libraryKeys, useCreateCategory, useLibraryCategories } from '../../libraryHooks';
+import { useLive } from '../../tabActivity';
 import { Button } from '../../ui/button';
 import { Checkbox } from '../../ui/checkbox';
 import { Input } from '../../ui/input';
@@ -57,6 +58,7 @@ const newNonce = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Mat
  */
 export function HarvesterPanel() {
   const queryClient = useQueryClient();
+  const live = useLive();
   const schemas = useSchemas();
   const { categories: folders } = useLibraryCategories(true);
   const createCategory = useCreateCategory();
@@ -72,7 +74,7 @@ export function HarvesterPanel() {
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [openRunId, setOpenRunId] = useState<string | null>(null);
 
-  const running = useRunningHarvest(true);
+  const running = useRunningHarvest(live);
   useEffect(() => {
     if (!watch && running.data && running.data.id !== dismissed) {
       setWatch({ id: running.data.id, topic: null });
@@ -80,14 +82,14 @@ export function HarvesterPanel() {
     }
   }, [running.data, watch, dismissed]);
 
-  const job = useJob(watch?.id ?? null);
+  const job = useJob(watch?.id ?? null, FAST_POLL_MS, live);
   const terminal = job.data ? TERMINAL_JOB_STATES.has(job.data.state) : false;
   const active = watch !== null && !terminal;
-  const logs = useJobLogStream(watch?.id ?? null, { active });
+  const logs = useJobLogPolling(watch?.id ?? null, { live, terminal });
   const cancel = useCancelJob();
   const start = useStartHarvest();
-  const runs = useHarvestRuns(true, active ? POLL_MS : false);
-  const candidates = useHarvestCandidates(openRunId, active ? POLL_MS : false);
+  const runs = useHarvestRuns(true, live && active ? POLL_MS : false);
+  const candidates = useHarvestCandidates(openRunId, live && active ? POLL_MS : false);
   const fileMutation = useFileHarvestPdf();
   const dismissMutation = useDismissCandidate();
 
@@ -280,7 +282,9 @@ export function HarvesterPanel() {
         job={job.data}
         topic={watch.topic ?? runTopic(watch.id)}
         lines={logs.lines}
-        streaming={logs.streaming}
+        logTotal={logs.total}
+        polling={logs.polling}
+        logError={logs.error}
         cancelling={cancel.isPending}
         onCancel={() =>
           cancel.mutate(watch.id, {

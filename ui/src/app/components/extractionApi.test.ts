@@ -12,26 +12,13 @@ import {
   normalizeJob,
   fetchKgBundles,
   startExtraction,
-  streamJobEvents,
 } from './extractionApi';
-import type { SseBlock } from './data/liveAgent';
 
 function respond(status: number, body: unknown) {
   return vi.fn(async () => new Response(JSON.stringify(body), { status }));
 }
 const asFetch = (mock: unknown) => mock as unknown as typeof fetch;
 const call = (mock: ReturnType<typeof vi.fn>, i = 0) => mock.mock.calls[i] as unknown as [string, RequestInit];
-
-function sseResponse(chunks: string[]): Response {
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
-      controller.close();
-    },
-  });
-  return new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
-}
 
 describe('extractionApi', () => {
   it('lists bundles and models', async () => {
@@ -156,23 +143,5 @@ describe('extractionApi', () => {
   it('surfaces a refused export', async () => {
     const fetcher = respond(400, { detail: 'outside release dir' });
     await expect(exportKgBundle('kg', asFetch(fetcher))).rejects.toMatchObject({ message: 'outside release dir', status: 400 });
-  });
-
-  it('streams job events through the shared SSE reader and sends Last-Event-ID', async () => {
-    const fetcher = vi.fn(async () =>
-      sseResponse([
-        'id: 5\nevent: job_log\ndata: {"seq":5,"message":"he',
-        'llo"}\n\nevent: progress\ndata: {"done":1}\n\n',
-      ]),
-    );
-    const events: SseBlock[] = [];
-    await streamJobEvents('j1', { onEvent: block => events.push(block), lastEventId: '4', fetcher: asFetch(fetcher) });
-    expect(events).toEqual([
-      { event: 'job_log', id: '5', data: { seq: 5, message: 'hello' } },
-      { event: 'progress', data: { done: 1 } },
-    ]);
-    const [url, init] = call(fetcher as unknown as ReturnType<typeof vi.fn>);
-    expect(url).toContain('/v1/jobs/j1/stream');
-    expect((init.headers as Record<string, string>)['Last-Event-ID']).toBe('4');
   });
 });

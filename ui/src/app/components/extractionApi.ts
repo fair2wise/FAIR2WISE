@@ -2,11 +2,10 @@
  * Extraction tab API client (A8, T40). Typed against the T38/T39/T42 contract:
  * `GET /v1/library/kgs|schemas|models`, `POST /v1/library/estimate`, export of a bundle, and the
  * `library_extract` job on the generic `/v1/jobs` routes (`GET /v1/jobs?state=&kind=`,
- * `GET /v1/jobs/{id}/logs?after=`, `GET /v1/jobs/{id}/stream` with `Last-Event-ID` resume).
+ * `GET /v1/jobs/{id}/logs?after=` polled with a cursor; the SSE `/stream` route is not used by the UI).
  * The model chosen here rides in the job inputs; it never goes through `PUT /settings`.
  */
-import { readSseStream, type SseBlock } from './data/liveAgent';
-import { jsonBody, v1Fetch, v1Json, v1Url } from './apiHttp';
+import { jsonBody, v1Json, v1Url } from './apiHttp';
 
 /** Job kind submitted by the Extraction tab. */
 export const EXTRACT_JOB_KIND = 'library_extract';
@@ -375,32 +374,4 @@ export function exportKgBundle(name: string, fetcher: typeof fetch = fetch): Pro
 /** Create a bundle by continuing a bundle or a plain KG file (reverse build via `kg_to_terms`). */
 export function continueKg(request: ContinueKgRequest, fetcher: typeof fetch = fetch): Promise<ContinueKgResponse> {
   return v1Json<ContinueKgResponse>(v1Url('/v1/library/kgs/continue'), jsonBody('POST', request), fetcher);
-}
-
-/** Options of `streamJobEvents`. */
-export interface JobStreamOptions {
-  /** Called for every event (`job_log`, progress, state changes), with the SSE `id` when present. */
-  onEvent: (block: SseBlock) => void;
-  /** Resume point: sent as `Last-Event-ID` so a reconnect does not replay or lose lines. */
-  lastEventId?: string;
-  signal?: AbortSignal;
-  fetcher?: typeof fetch;
-}
-
-/**
- * Follow `GET /v1/jobs/{id}/stream` with the shared SSE reader from `liveAgent.ts`.
- * Resolves when the server closes the stream; the caller reconnects with the last seen id if the
- * job is not terminal. Throws `ApiError` on a non-2xx status.
- */
-export async function streamJobEvents(jobId: string, options: JobStreamOptions): Promise<void> {
-  const headers: Record<string, string> = { Accept: 'text/event-stream' };
-  if (options.lastEventId) headers['Last-Event-ID'] = options.lastEventId;
-  const response = await v1Fetch(
-    v1Url(`/v1/jobs/${encodeURIComponent(jobId)}/stream`),
-    { headers, signal: options.signal },
-    options.fetcher,
-  );
-  await readSseStream(response, block => {
-    options.onEvent(block);
-  });
 }

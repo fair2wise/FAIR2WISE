@@ -13,8 +13,12 @@ export interface HarvestRunViewProps {
   /** Topic of the run when known (unknown right after a reload until the run list loads). */
   topic: string | null;
   lines: JobLogEntry[];
-  /** Whether the log is streamed live (otherwise polled). */
-  streaming: boolean;
+  /** Lines the server wrote in all (0 until the first answer). */
+  logTotal: number;
+  /** Whether the log is being polled now (false while the tab is hidden or the run has ended). */
+  polling: boolean;
+  /** Message of the last failed log poll. */
+  logError: string | null;
   cancelling: boolean;
   onCancel: () => void;
   /** Leave the finished run and return to the form. */
@@ -32,7 +36,7 @@ const LEVEL_CLASS: Record<JobLogEntry['level'], string> = {
  * Running, finished, failed or cancelled view of a harvest job: state badge, progress bar, the bounded
  * live log pane (newest line in view), Cancel while running and "Back to the form" once it has ended.
  */
-export function HarvestRunView({ job, topic, lines, streaming, cancelling, onCancel, onClose }: HarvestRunViewProps) {
+export function HarvestRunView({ job, topic, lines, logTotal, polling, logError, cancelling, onCancel, onClose }: HarvestRunViewProps) {
   const terminal = TERMINAL_JOB_STATES.has(job.state);
   const percent = progressPercent(job.progress);
   const endRef = useRef<HTMLDivElement>(null);
@@ -89,8 +93,13 @@ export function HarvestRunView({ job, topic, lines, streaming, cancelling, onCan
 
       <div className="flex min-h-0 flex-col gap-1">
         <p className="text-xs text-muted-foreground">
-          Log (last {lines.length} lines){!terminal && !streaming ? ' · polling' : ''}
+          Log ({logTotal > lines.length ? `last ${lines.length} of ${logTotal}` : `${lines.length}`} lines){polling ? ' · polling' : ''}
         </p>
+        {logError ? (
+          <p role="status" className="text-xs text-destructive" data-testid="harvest-log-error">
+            Log update failed ({logError}); retrying.
+          </p>
+        ) : null}
         <div
           role="log"
           aria-label="Harvest log"
