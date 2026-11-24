@@ -239,6 +239,53 @@ publication:
   refused with `CONFLICT` until the edit is reconciled or a reviewed resolution
   is attached (the import-time conflict block).
 
+### JSON or Tiled Graph: what the choice means
+
+**Settings > Knowledge graph source** offers **JSON** (the browser default) and
+**Tiled Graph** (stored as `splash_links`, the editable mode). The browser
+applies its own choice to the server on load and when the window regains focus
+(see below), so the choice decides all of this:
+
+| | JSON | Tiled Graph |
+|---|---|---|
+| Chat searches | the JSON graphs ticked in Settings (`storage/kg/*.json`), reloaded at the start of every turn | the live corpora published to Tiled (the editable session graph) |
+| Graph viewer default | the first selected JSON graph | the active publication's corpus |
+| Editing | read-only (Edit hidden, Save answers `400`) | Edit and Save once a first publication exists |
+| Auto-publication after an extraction | unchanged: it follows the server's start-up `--kg-mode splash` (the image default), not the browser choice | the same |
+
+Newly extracted knowledge and the JSON source (verified in
+`tests/api_wiring/test_json_chat_graph_scope.py`, which runs the real chat
+routes with the real graph-loading code and a fake extractor). An extraction
+always rebuilds the session graph, and under JSON the chat does **not** search
+it afterwards:
+
+- During the extraction turn the answer is re-checked against the rebuilt
+  session graph alone, so that one reply can use the new terms.
+- The next chat turn reloads the selected JSON graphs again and the new terms
+  are gone from the chat's search until they are part of one of the selected
+  graphs (for example after **Export** and adopting the file, below).
+- With Tiled Graph selected, the publication that follows the extraction puts
+  them in the live corpus the chat searches.
+
+How the browser applies its choice:
+
+- The server keeps the graph source in process memory and returns to its
+  start-up mode (`splash`, the editable mode) on every restart. The browser
+  sends only `{"graph_source": ...}` (a partial `PUT /settings`, nothing else
+  changes) when the server differs from its own choice: on load and when the tab
+  becomes visible or focused again, at most once every 15 seconds. A restart is
+  therefore repaired on the next focus or load. If `storage/kg` holds no JSON
+  file the server refuses (`400`); the browser ignores that and keeps its choice.
+- The chat request does not carry the source; it is the server's current one.
+- Two tabs of one browser share one server setting and one stored choice per
+  tab only while they agree. If they differ, the last one to apply wins; a tab
+  that lost restores its own choice the next time it is focused. Another
+  browser on the same `:local` image behaves the same way.
+- On an ALS deployment (`GET /v1/capabilities` reports a profile other than
+  `local`, or cannot be read) the browser applies its source only after the
+  user picked it explicitly in Settings; the unchosen default never overrides a
+  saved personal setting.
+
 ### Reconciling edits into a new version
 
 A reconciled edit becomes part of the corpus's JSON, not just of Tiled. Two explicit steps, run in the container

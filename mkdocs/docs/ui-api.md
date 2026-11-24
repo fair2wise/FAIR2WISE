@@ -30,7 +30,7 @@ Vite variables are compiled into browser assets. Changing the variable after
 | Method | Path | Client function | UI consumer |
 |---|---|---|---|
 | `GET` | `/settings` | `fetchAgentSettings` | Settings sheet |
-| `PUT` | `/settings` | `updateAgentSettings` | Application boot and settings save |
+| `PUT` | `/settings` | `updateAgentSettings` | Application boot and window focus (partial `{graph_source}`), settings save |
 | `POST` | `/chat` | `queryLiveAgentWithHistory` | Pre-stream fallback |
 | `POST` | `/chat/stream` | `queryLiveAgentStream` | Normal chat path |
 | `POST` | `/chat/action` | internal action fallback | Pre-stream action fallback |

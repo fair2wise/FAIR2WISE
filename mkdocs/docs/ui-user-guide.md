@@ -138,7 +138,11 @@ Preferences**. Closing without saving restores the last saved values.
 | JSON graph file | Files reported from `storage/kg` | Select the retrieval graph when JSON mode is active |
 
 Saving updates backend runtime settings, saves browser preferences, and reloads
-the graph. Settings are runtime-wide in the agent process; another browser
+the graph. Independently of Save, the browser sends its own KG source to the
+agent on load and when the tab is focused again, so a restarted agent does not
+silently search another graph than the one Settings shows; what JSON versus
+Tiled Graph means for chat, the viewer, editing and publication is described in
+[JSON or Tiled Graph](local-image.md#json-or-tiled-graph-what-the-choice-means). Settings are runtime-wide in the agent process; another browser
 connected to the same agent can change them.
 
 ### Browser defaults
