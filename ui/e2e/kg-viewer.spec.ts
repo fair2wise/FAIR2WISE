@@ -56,6 +56,8 @@ test.describe('KG viewer', () => {
     await waitForTypedAnswer(page);
     await expect(page.getByRole('button', { name: 'View Knowledge Graph' })).toBeVisible();
     await expect(page.getByText('2 nodes')).toBeVisible();
+    // Force-directed (the default) draws on a canvas with no per-node DOM; switch to the fixed SVG layout to count nodes.
+    await page.getByRole('button', { name: 'Fixed Layout' }).click();
     await expect(page.locator(`[data-kg-node-id="${P3HT_NODE.id}"]`)).toHaveCount(1);
   });
 
