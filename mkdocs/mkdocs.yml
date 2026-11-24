@@ -19,6 +19,7 @@ nav:
       - System architecture (legacy stack): architecture.md
       - LinkML schemas: schemas.md
       - "Design: schema generation": design-schema-generation.md
+      - "Design: manual PDF flow": design-manual-pdf-flow.md
       - Core data model: core_model.md
       - Data provenance: provenance.md
       - Agent workflow: agent-workflow.md
