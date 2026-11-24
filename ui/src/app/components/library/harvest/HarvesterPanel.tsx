@@ -32,6 +32,7 @@ import { Checkbox } from '../../ui/checkbox';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { NewCategoryField } from '../NewCategoryField';
+import { RunLog } from '../../extraction/RunLog';
 import { HarvestResults } from './HarvestResults';
 import { HarvestRunsList } from './HarvestRunsList';
 import { HarvestRunView } from './HarvestRunView';
@@ -86,6 +87,8 @@ export function HarvesterPanel() {
   const terminal = job.data ? TERMINAL_JOB_STATES.has(job.data.state) : false;
   const active = watch !== null && !terminal;
   const logs = useJobLogPolling(watch?.id ?? null, { live, terminal });
+  // The log of an opened past run (the watched run shows its own above); a finished job's log is fetched once.
+  const pastLogs = useJobLogPolling(openRunId !== null && openRunId !== watch?.id ? openRunId : null, { live, terminal: true });
   const cancel = useCancelJob();
   const start = useStartHarvest();
   const runs = useHarvestRuns(true, live && active ? POLL_MS : false);
@@ -348,6 +351,15 @@ export function HarvesterPanel() {
               onRejected={names => toast.error(`Only PDF files can be filed. Rejected: ${names.join(', ')}`)}
             />
           )}
+        </section>
+      ) : null}
+
+      {openRunId !== null && openRunId !== watch?.id ? (
+        <section aria-labelledby="harvest-log-title" className="space-y-2">
+          <h3 id="harvest-log-title" className="text-sm font-semibold">
+            Run log{pastLogs.total > 0 ? ` (${pastLogs.total} lines)` : ''}
+          </h3>
+          <RunLog lines={pastLogs.lines} total={pastLogs.total} polling={pastLogs.polling} error={pastLogs.error} />
         </section>
       ) : null}
     </div>

@@ -1,4 +1,4 @@
-import type { HarvestRun } from '../../harvestApi';
+import { HARVEST_SOURCES, type HarvestRun } from '../../harvestApi';
 import { cn } from '../../ui/utils';
 
 /** Props of {@link HarvestRunsList}. */
@@ -19,6 +19,15 @@ export function runSummary(run: HarvestRun): string {
   return `${counts.total} found · ${parts.join(' · ')}`;
 }
 
+const sourceLabel = (id: string) => HARVEST_SOURCES.find(source => source.id === id)?.label ?? id;
+
+/** The sources of a run that could not be searched, with their plain-words reason (empty when all answered). */
+export function sourceProblems(run: HarvestRun): Array<{ source: string; label: string; message: string }> {
+  return Object.entries(run.source_status ?? {})
+    .filter(([, status]) => status.state !== 'ok')
+    .map(([source, status]) => ({ source, label: sourceLabel(source), message: status.message }));
+}
+
 /** Past harvest runs, newest first; choosing one opens its results. */
 export function HarvestRunsList({ runs, selectedId, onSelect }: HarvestRunsListProps) {
   if (runs.length === 0) {
@@ -28,6 +37,7 @@ export function HarvestRunsList({ runs, selectedId, onSelect }: HarvestRunsListP
     <ul aria-label="Harvest runs" className="divide-y divide-border rounded-md border border-border">
       {runs.map(run => {
         const selected = run.id === selectedId;
+        const problems = sourceProblems(run);
         return (
           <li key={run.id}>
             <button
@@ -43,6 +53,15 @@ export function HarvestRunsList({ runs, selectedId, onSelect }: HarvestRunsListP
               <span className="w-full truncate text-xs text-muted-foreground">
                 {run.category} · {run.created_at.slice(0, 10)} · {runSummary(run)}
               </span>
+              {problems.map(problem => (
+                <span
+                  key={problem.source}
+                  data-testid="harvest-source-error"
+                  className="w-full text-xs font-medium text-red-600"
+                >
+                  {problem.label} could not be searched: {problem.message}
+                </span>
+              ))}
             </button>
           </li>
         );

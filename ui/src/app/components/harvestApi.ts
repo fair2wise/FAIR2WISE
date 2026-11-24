@@ -60,6 +60,15 @@ export interface HarvestCounts {
   dismissed?: number;
 }
 
+/** What one source answered for a run; `error` and `rate_limited` mean it could not be searched. */
+export interface HarvestSourceStatus {
+  state: 'ok' | 'error' | 'rate_limited';
+  /** Results the source returned. */
+  returned: number;
+  /** Plain-words reason (a failure) or note (`ok` with "reduced rate, no API key"); never a URL or a key. */
+  message: string;
+}
+
 /** One harvest run (`GET /v1/library/harvest/runs`). */
 export interface HarvestRun {
   /** The `library_harvest` job id. */
@@ -72,6 +81,8 @@ export interface HarvestRun {
   max_downloads: number;
   created_at: string;
   counts: HarvestCounts;
+  /** Per source (`arxiv`, `openalex`); absent on a server from before it was recorded, empty for an old run. */
+  source_status?: Record<string, HarvestSourceStatus>;
 }
 
 /** `GET /v1/library/harvest/runs`. */

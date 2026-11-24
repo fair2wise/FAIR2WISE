@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { HarvestRun } from '../../harvestApi';
-import { HarvestRunsList, runSummary } from './HarvestRunsList';
+import { HarvestRunsList, runSummary, sourceProblems } from './HarvestRunsList';
 
 const run = (id: string, over: Partial<HarvestRun> = {}): HarvestRun => ({
   id, topic: `topic ${id}`, category: 'rsoxs', schema: null, sources: ['arxiv'], max_downloads: 20,
@@ -30,5 +30,27 @@ describe('HarvestRunsList', () => {
     expect(screen.getByRole('button', { name: /topic a/ })).toHaveAttribute('aria-pressed', 'false');
     await userEvent.click(screen.getByRole('button', { name: /topic a/ }));
     expect(onSelect).toHaveBeenCalledWith('a');
+  });
+
+  it('shows a source that could not be searched as an error under the run, not as zero results', () => {
+    const failed = run('x', {
+      sources: ['arxiv', 'openalex'],
+      counts: { total: 0, downloaded: 0, in_library: 0, paywalled: 0, filed: 0, failed: 0, skipped: 0 },
+      source_status: {
+        arxiv: { state: 'ok', returned: 0, message: '' },
+        openalex: { state: 'error', returned: 0, message: 'OpenAlex refused the request (HTTP 401). The API key was not accepted.' },
+      },
+    });
+    expect(sourceProblems(failed)).toEqual([
+      { source: 'openalex', label: 'OpenAlex', message: 'OpenAlex refused the request (HTTP 401). The API key was not accepted.' },
+    ]);
+    render(<HarvestRunsList runs={[failed, run('ok')]} selectedId={null} onSelect={() => undefined} />);
+    const errors = screen.getAllByTestId('harvest-source-error');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toHaveTextContent('OpenAlex could not be searched: OpenAlex refused the request (HTTP 401)');
+  });
+
+  it('shows no source line for a run from a server that does not report them', () => {
+    expect(sourceProblems(run('old'))).toEqual([]);
   });
 });

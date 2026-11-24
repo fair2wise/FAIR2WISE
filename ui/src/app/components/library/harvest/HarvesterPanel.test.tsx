@@ -41,7 +41,8 @@ beforeEach(() => {
     'GET /v1/jobs': { status: 200, body: { jobs: [] } },
     'GET /v1/library/harvest/runs': { status: 200, body: { runs: [] } },
     'GET /v1/library/harvest/runs/h1/candidates': { status: 200, body: { candidates: [] } },
-    'POST /v1/jobs': { status: 200, body: { id: 'h1', kind: 'library_harvest', state: 'queued' } },
+    // the real handle: the id is `job_id` (the mock used `id`, which hid a 'runs/undefined' request)
+    'POST /v1/jobs': { status: 200, body: { job_id: 'h1', kind: 'library_harvest', state: 'queued', submitted_at: '2026-11-03T10:00:00Z', settings_revision: null } },
     'GET /v1/jobs/h1': { status: 200, body: job('running') },
     'GET /v1/jobs/h1/logs': { status: 200, body: { logs: [] } },
     'POST /v1/jobs/h1/cancel': { status: 200, body: job('cancelled') },
@@ -183,6 +184,26 @@ describe('HarvesterPanel run', () => {
     expect(first?.search).toContain('tail=true');
     expect(calls.some(c => c.path.endsWith('/stream'))).toBe(false);
     expect(screen.getByText(/· polling/)).toBeInTheDocument();
+  });
+
+  it('opening a past run shows its log, with the failure of a source marked as an error', async () => {
+    routes['GET /v1/library/harvest/runs'] = {
+      status: 200,
+      body: { runs: [{ ...RUN, id: 'p1', topic: 'plecostomus', sources: ['arxiv', 'openalex'],
+        counts: { total: 0, downloaded: 0, in_library: 0, paywalled: 0, filed: 0, failed: 0, skipped: 0 },
+        source_status: { arxiv: { state: 'ok', returned: 0, message: '' },
+          openalex: { state: 'error', returned: 0, message: 'OpenAlex refused the request (HTTP 401).' } } }] },
+    };
+    routes['GET /v1/library/harvest/runs/p1/candidates'] = { status: 200, body: { candidates: [] } };
+    routes['GET /v1/jobs/p1/logs'] = {
+      status: 200,
+      body: { logs: [{ seq: 1, at: '2026-11-03T10:00:00Z', level: 'error', stage: 'search', message: 'openalex search failed: OpenAlex refused the request (HTTP 401).' }], total: 1 },
+    };
+    renderPanel();
+    expect(await screen.findByTestId('harvest-source-error')).toHaveTextContent('OpenAlex could not be searched');
+    await userEvent.setup().click(await screen.findByRole('button', { name: /plecostomus/ }));
+    expect(await screen.findByText(/openalex search failed/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Run log \(1 lines\)/ })).toBeInTheDocument();
   });
 
   it('drops the polling note once the run is terminal (the terminal stop is tested in useJobLogPolling)', async () => {
