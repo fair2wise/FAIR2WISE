@@ -69,6 +69,7 @@ export function ExtractionTab() {
         live={live}
         cancelling={cancel.isPending}
         exporting={exportKg.isPending}
+        exported={exportKg.isSuccess && exportKg.data.name === (current.summary?.params.bundle ?? name) ? exportKg.data : null}
         publishSlot={<PublishToTiled name={current.summary?.params.bundle ?? name} />}
         onCancel={() => cancel.mutate(selectedId, { onError: error => toast.error(error.message) })}
         onExport={() => {

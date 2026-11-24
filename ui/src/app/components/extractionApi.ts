@@ -270,6 +270,13 @@ export interface ContinueKgResponse extends KgBundleSummary {
 export interface ExportResult {
   name: string;
   file_name: string;
+  /** Size of the exported file on the server; absent from an older server. */
+  size_bytes?: number;
+}
+
+/** URL that streams the exported `matkg_<name>.json` to the browser (404 until the KG has been exported). */
+export function kgDownloadUrl(name: string): string {
+  return v1Url(`/v1/library/kgs/${encodeURIComponent(name)}/download`);
 }
 
 /** List KG bundles. */

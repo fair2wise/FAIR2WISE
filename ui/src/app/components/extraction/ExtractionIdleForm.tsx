@@ -23,6 +23,7 @@ import { Checkbox } from '../ui/checkbox';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { ExportedNotice } from './ExportedNotice';
 import { PaperPicker } from './PaperPicker';
 import { PublishToTiled } from './PublishToTiled';
 
@@ -225,6 +226,9 @@ export function ExtractionIdleForm({ onStarted }: ExtractionIdleFormProps) {
             <PublishToTiled name={parentBundle?.name ?? null} />
           </div>
         )}
+        {continuing && exportKg.isSuccess && exportKg.data.name === parentBundle?.name ? (
+          <ExportedNotice result={exportKg.data} />
+        ) : null}
       </fieldset>
 
       <div className="grid gap-4 sm:grid-cols-2">

@@ -135,4 +135,16 @@ describe('ExtractionRunView', () => {
     setup({ polling: true });
     expect(screen.getByTestId('log-count')).toHaveTextContent('updating');
   });
+
+  it('shows what Export did, with a Download link, once the KG has been exported', () => {
+    setup({ job: job({ state: 'succeeded', summary: summary({ outcome: 'succeeded', state: 'succeeded' }) }),
+      exported: { name: 'kg1', file_name: 'matkg_kg1.json', size_bytes: 1024 } });
+    expect(screen.getByTestId('export-notice')).toHaveTextContent('Exported matkg_kg1.json (1.0 KB)');
+    expect(screen.getByRole('link', { name: /Download matkg_kg1\.json/ })).toBeInTheDocument();
+  });
+
+  it('shows no export notice before an export', () => {
+    setup();
+    expect(screen.queryByTestId('export-notice')).not.toBeInTheDocument();
+  });
 });

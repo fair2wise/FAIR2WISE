@@ -1,8 +1,9 @@
 import { Ban, CheckCircle2, Download, Loader2, TriangleAlert, XCircle } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { TERMINAL_JOB_STATES, type JobInfo, type JobLogEntry } from '../extractionApi';
+import { TERMINAL_JOB_STATES, type ExportResult, type JobInfo, type JobLogEntry } from '../extractionApi';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
+import { ExportedNotice } from './ExportedNotice';
 import { RunLog } from './RunLog';
 import { RunProgress } from './RunProgress';
 import { outcomeLabel } from './runFormat';
@@ -25,6 +26,8 @@ export interface ExtractionRunViewProps {
   live?: boolean;
   cancelling: boolean;
   exporting: boolean;
+  /** The last successful Export of this run's KG (shown with a Download link); `null` before any. */
+  exported?: ExportResult | null;
   onCancel: () => void;
   onExport: () => void;
   /** Optional extra action shown beside Export once the run succeeded (the Publish to Tiled button). */
@@ -47,7 +50,7 @@ export function progressPercent(progress: Record<string, number>): number | null
  */
 export function ExtractionRunView({
   job, kgName, lines, logTotal = 0, polling = false, logError = null, live = true, cancelling, exporting,
-  onCancel, onExport, publishSlot, onNew,
+  onCancel, onExport, publishSlot, onNew, exported = null,
 }: ExtractionRunViewProps) {
   const terminal = TERMINAL_JOB_STATES.has(job.state);
   const summary = job.summary ?? null;
@@ -99,6 +102,8 @@ export function ExtractionRunView({
       </div>
 
       <RunProgress job={job} live={live} />
+
+      <ExportedNotice result={exported} />
 
       {note && (
         <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
