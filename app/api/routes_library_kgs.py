@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import Depends, FastAPI, Query, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..modules.contracts.context import RequestContext
@@ -108,6 +109,13 @@ def install(app: FastAPI, service: KgLibrary) -> FastAPI:
         if body.confirm is not True:
             raise ContractError(ErrorCode.INVALID_INPUT, "exporting writes to the release directory; confirm is required")
         return project(request, kg_library(request).export(name))  # type: ignore[no-any-return]
+
+    @router.get("/kgs/{name}/download")
+    def download_kg(name: str, request: Request, ctx: RequestContext = Depends(context)) -> FileResponse:
+        """Stream the exported ``matkg_<name>.json`` to the browser (it must have been exported; nothing is created)."""
+        path, file_name = kg_library(request).export_file(name)
+        return FileResponse(path, media_type="application/json", filename=file_name,
+                            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
     @router.post("/kgs/{name}/publish")
     def publish_kg(name: str, body: PublishBody, request: Request,

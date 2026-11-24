@@ -152,6 +152,8 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
        note="deterministic cost estimate and local confirmation token; writes nothing"),
     _v("V74", "POST", "/library/kgs/{name}/export", "library.extract", on_als=False,
        note="export a bundle to the configured release directory; explicit confirm in the body"),
+    _v("V95", "GET", "/library/kgs/{name}/download", "library.extract", on_als=False,
+       note="stream an exported KG file (matkg_<name>.json from the release directory) to the browser; 404 until exported"),
     _v("V75", "POST", "/library/kgs/continue", "library.extract", on_als=False,
        note="create a bundle by continuing a bundle or a KG file (kg_to_terms reverse build)"),
     # T45 (A8): the Harvester's runs and paywalled queue under /v1/library/harvest; :local only. V76-V79.

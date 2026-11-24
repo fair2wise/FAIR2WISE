@@ -114,7 +114,9 @@ def test_continue_export_and_listing(local, kgs):
     assert c.post("/v1/library/kgs/child/export", json={}).status_code in (400, 422)
     assert not (release / "matkg_child.json").exists()
     done = c.post("/v1/library/kgs/child/export", json={"confirm": True})
-    assert done.status_code == 200 and done.json() == {"name": "child", "file_name": "matkg_child.json"}
+    on_disk = (release / "matkg_child.json")
+    assert done.status_code == 200 and done.json() == {"name": "child", "file_name": "matkg_child.json",
+                                                      "size_bytes": on_disk.stat().st_size}
     assert json.loads((release / "matkg_child.json").read_text())["metadata"]["schema"] == schema
     assert c.post("/v1/library/kgs/ghost/export", json={"confirm": True}).status_code == 404
     assert c.post("/v1/library/kgs/..%2Fx/export", json={"confirm": True}).status_code in (400, 404, 422)
@@ -184,3 +186,28 @@ def test_models_reports_every_ollama_state_without_a_url(local, kgs):
         out = c.get("/v1/library/models").json()
         assert out["ollama"]["state"] == listing.state and out["ollama"]["models"] == []
         assert out["available"] is True  # CBORG is independent of Ollama
+
+
+def test_an_exported_kg_can_be_downloaded_and_nothing_else(local, kgs):
+    """The Download action streams the exported file; nothing is created and no other file is reachable."""
+    svc, release = kgs
+    c = local.client()
+    schema = _schema(c)
+    assert c.post("/v1/library/kgs/continue", json={"name": "child", "source": "matkg_old.json", "schema": schema}
+                  ).status_code == 200
+    before = sorted(p.name for p in release.iterdir())
+    early = c.get("/v1/library/kgs/child/download")
+    assert early.status_code == 404 and "not been exported" in early.text      # nothing to download yet, nothing created
+    assert sorted(p.name for p in release.iterdir()) == before
+    assert c.post("/v1/library/kgs/child/export", json={"confirm": True}).status_code == 200
+    got = c.get("/v1/library/kgs/child/download")
+    assert got.status_code == 200 and got.content == (release / "matkg_child.json").read_bytes()
+    assert got.headers["content-type"].startswith("application/json")
+    assert 'filename="matkg_child.json"' in got.headers["content-disposition"] and got.headers["cache-control"] == "no-store"
+    assert c.get("/v1/library/kgs/ghost/download").status_code == 404
+    assert c.get("/v1/library/kgs/..%2Fold/download").status_code in (400, 404, 422)
+    # a file in the release folder that is not an export of an existing bundle is not reachable by name
+    assert c.get("/v1/library/kgs/old/download").status_code == 404
+    (release / "matkg_child.json").unlink()
+    (release / "matkg_child.json").symlink_to(release / "matkg_old.json")
+    assert c.get("/v1/library/kgs/child/download").status_code == 404           # a link is never served

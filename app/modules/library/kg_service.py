@@ -116,7 +116,25 @@ class KgLibrary:
         choice = next((s for s in list_schemas(self._registry()) if s["name"] == bundle.schema), None)
         file_name = B.export_bundle(bundle, self.release_dir(),
                                     {"label": choice["label"]} if choice else None)
-        return {"name": name, "file_name": file_name}
+        size = (self.release_dir() / file_name).stat().st_size
+        return {"name": name, "file_name": file_name, "size_bytes": size}
+
+    def export_file(self, name: str) -> tuple[Path, str]:
+        """The exported file of bundle ``name`` for download: ``(path, file name)``.
+
+        The file name is derived from the validated bundle name (never from the client) and the file must be a regular
+        file, not a link, inside the release directory.
+
+        Raises:
+            ContractError: ``NOT_FOUND`` when the bundle does not exist or has not been exported (nothing to download).
+        """
+        bundle = self.store.get(name)   # NOT_FOUND / INVALID_INPUT for a bad or unknown name
+        file_name = B.export_file_name(bundle.name)
+        release = self.release_dir()
+        path = release / file_name
+        if path.is_symlink() or not path.is_file() or path.resolve().parent != release.resolve():
+            raise ContractError(ErrorCode.NOT_FOUND, "this KG has not been exported yet", retryable=False)
+        return path, file_name
 
     def continue_kg(self, name: str, *, source: str | None, parent: str | None, schema: str | None,
                     topic: str | None) -> dict[str, Any]:
