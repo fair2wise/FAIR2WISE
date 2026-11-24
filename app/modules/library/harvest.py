@@ -55,6 +55,7 @@ from ..literature.legacy_download import (
 from ..literature.safe_fetch import BlockedURL, NetworkPolicy
 from .arrange import is_valid_folder_name
 from .bibmeta import cap_abstract, clean_author_list, openalex_authors
+from .oa_links import ResolvedLink, oa_locations, resolve_links
 from .service import LibraryService
 
 logger = logging.getLogger(__name__)
@@ -142,6 +143,10 @@ class Candidate:
     #: Whether the source says the paper is open access (OpenAlex ``is_oa`` or an open-access location; arXiv always
     #: true); ``None`` when unknown. Decides whether a failed download is a paywall or not.
     oa: bool | None = None
+    #: Open-access locations of the work (``pdf_url``, ``landing_page_url``): where more free links are looked for. Not stored.
+    oa_locations: list[dict[str, str]] = field(default_factory=list)
+    #: The rule that found the link that was used (``openalex_selector``, ``arxiv``, or an ``oa_links`` rule).
+    link_rule: str = ""
 
     @property
     def key(self) -> str:
@@ -318,7 +323,7 @@ def openalex_searcher(contact: Callable[[], str] = lambda: "", *, get_json: GetJ
                 abstract=abstract_from_inverted_index(work.get("abstract_inverted_index")) or "",
                 authors=openalex_authors(work),
                 landing_url=f"https://doi.org/{doi}" if doi else (str(primary) or str(work.get("id") or "")),
-                pdf_urls=openalex_work_urls(work), oa=openalex_is_oa(work)))
+                pdf_urls=openalex_work_urls(work), oa=openalex_is_oa(work), oa_locations=oa_locations(work)))
         return found
 
     return search
@@ -392,7 +397,7 @@ def pdf_downloader(http: httpx.Client | None = None, policy: NetworkPolicy | Non
             try:
                 rules.check_url(current)
             except BlockedURL as exc:
-                return None, f"blocked:{exc.reason}"
+                return None, f"blocked:{exc.reason}@{_host(current)}"
             try:
                 with client.stream("GET", current, follow_redirects=False, timeout=timeout,
                                    headers={"Accept": "application/pdf,*/*;q=0.1"}) as response:
@@ -404,7 +409,7 @@ def pdf_downloader(http: httpx.Client | None = None, policy: NetworkPolicy | Non
                         continue
                     if response.status_code == 403 and any(
                             name in response.headers for name in ("x-squid-error", "x-proxy-error")):
-                        return None, "blocked:proxy_refused"   # the proxy's own refusal page, not the publisher's
+                        return None, f"blocked:proxy_refused@{_host(current)}"   # the proxy's own refusal page, not the publisher's
                     if response.status_code != 200:
                         return None, f"failed:http_{response.status_code}"
                     declared = response.headers.get("content-length")
@@ -424,10 +429,10 @@ def pdf_downloader(http: httpx.Client | None = None, policy: NetworkPolicy | Non
             except httpx.TimeoutException:  # reported through the status string
                 return None, "failed:timeout"
             except httpx.ProxyError:  # the egress proxy refused the tunnel (its allowlist): a network policy, not a paywall
-                return None, "blocked:proxy_refused"
+                return None, f"blocked:proxy_refused@{_host(current)}"
             except httpx.HTTPError:  # reported through the status string
                 return None, "failed:network"
-        return None, "blocked:too_many_redirects"
+        return None, f"blocked:too_many_redirects@{_host(current)}"
 
     return download
 
@@ -441,17 +446,17 @@ CREATE TABLE IF NOT EXISTS runs (
 CREATE TABLE IF NOT EXISTS candidates (
   id TEXT PRIMARY KEY, run_id TEXT NOT NULL, key TEXT NOT NULL, title TEXT NOT NULL, year INTEGER, doi TEXT,
   arxiv_id TEXT, source TEXT NOT NULL, tier TEXT NOT NULL, score REAL NOT NULL, status TEXT NOT NULL,
-  landing_url TEXT, pdf_url TEXT, relpath TEXT, detail TEXT, authors TEXT, abstract TEXT, oa INTEGER,
+  landing_url TEXT, pdf_url TEXT, relpath TEXT, detail TEXT, authors TEXT, abstract TEXT, oa INTEGER, link_rule TEXT,
   UNIQUE (run_id, key));
 CREATE INDEX IF NOT EXISTS candidates_run ON candidates (run_id);
 """
 #: Columns added after the first release; an older ``harvest.sqlite`` gets them on open. ``authors`` (JSON list) and
 #: ``abstract`` are kept only to carry the registry's answer to the manifest row, never returned by the API.
-_ADDED_COLUMNS = (("authors", "TEXT"), ("abstract", "TEXT"), ("oa", "INTEGER"))
+_ADDED_COLUMNS = (("authors", "TEXT"), ("abstract", "TEXT"), ("oa", "INTEGER"), ("link_rule", "TEXT"))
 #: The same for the ``runs`` table: what each source answered (``{source: {state, returned, message}}`` as JSON).
 _ADDED_RUN_COLUMNS = (("source_status", "TEXT"),)
 _CANDIDATE_FIELDS = ("id", "title", "year", "doi", "arxiv_id", "source", "tier", "score", "status", "landing_url",
-                     "pdf_url", "relpath", "detail", "oa")
+                     "pdf_url", "relpath", "detail", "oa", "link_rule")
 
 
 def candidate_id(run_id: str, key: str) -> str:
@@ -530,15 +535,15 @@ class HarvestStore:
         with self._lock, self._con:
             self._con.execute(
                 "INSERT INTO candidates (id,run_id,key,title,year,doi,arxiv_id,source,tier,score,status,landing_url,"
-                "pdf_url,relpath,detail,authors,abstract,oa) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+                "pdf_url,relpath,detail,authors,abstract,oa,link_rule) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
                 "ON CONFLICT(run_id,key) DO UPDATE SET status=excluded.status, pdf_url=excluded.pdf_url, "
                 "relpath=excluded.relpath, detail=excluded.detail, "
                 "authors=COALESCE(excluded.authors, authors), abstract=COALESCE(excluded.abstract, abstract), "
-                "oa=COALESCE(excluded.oa, oa)",
+                "oa=COALESCE(excluded.oa, oa), link_rule=COALESCE(excluded.link_rule, link_rule)",
                 (cid, run_id, cand.key, cand.title, cand.year, cand.doi, cand.arxiv_id, cand.source, cand.tier,
                  cand.score, status, cand.landing_url, pdf_url, relpath, detail,
                  json.dumps(cand.authors) if cand.authors else None, cap_abstract(cand.abstract),
-                 None if cand.oa is None else int(cand.oa)))
+                 None if cand.oa is None else int(cand.oa), cand.link_rule or None))
         return cid
 
     def set_status(self, cid: str, status: str, *, relpath: str | None = None, detail: str = "") -> None:
@@ -606,7 +611,8 @@ class Harvester:
 
     def __init__(self, service: LibraryService, store: HarvestStore, *, searchers: Mapping[str, Searcher] | None = None,
                  downloader: Downloader | None = None, delay: float = 1.0,
-                 sleep: Callable[[float], None] = time.sleep) -> None:
+                 sleep: Callable[[float], None] = time.sleep,
+                 link_resolver: Callable[[Candidate], Iterable[ResolvedLink]] | None = None) -> None:
         """Create a harvester.
 
         Args:
@@ -616,7 +622,10 @@ class Harvester:
             downloader: Overrides :func:`pdf_downloader` (tests).
             delay: Seconds between downloads (politeness).
             sleep: Clock for the delay.
+            link_resolver: ``candidate -> further free links`` for open-access papers (default: :func:`resolve_links`
+                over the hardened getters; tests inject a fake).
         """
+        self._link_resolver = link_resolver
         self.service = service
         self.store = store
         self._searchers = dict(searchers) if searchers is not None else None
@@ -770,13 +779,15 @@ class Harvester:
             return "skipped", "below the relevance cut-off", None, None
         if counts["downloaded"] >= args["max_downloads"]:
             return "skipped", "over the download limit", None, None
-        if not cand.pdf_urls:
+        if not cand.pdf_urls and not cand.oa_locations:
             if cand.oa is True:   # open access, but the source lists no direct PDF link: not a paywall
                 return "failed", "open access, but no direct PDF link was found", None, None
             return "paywalled", "not open access: no open-access copy is listed", None, None
         last, last_url = "", ""
         downloading()
-        for url in cand.pdf_urls:
+        first_rule = "arxiv" if cand.source == "arxiv" else "openalex_selector"
+        for link in self._links(ctx, cand, first_rule):
+            url = link.url
             ctx.guard()
             try:
                 data, status = downloader(url, max_bytes)
@@ -786,8 +797,10 @@ class Harvester:
             self._sleep(self.delay)
             if data is None:
                 last, last_url = status, url
-                ctx.log(f"{cand.title[:70]}: {status} at {_host(url)}", level="warning")
+                ctx.log(f"{cand.title[:70]}: {status.split('@', 1)[0]} at {status.split('@', 1)[1] if '@' in status else _host(url)}"
+                        f" ({link.rule})", level="warning")
                 continue
+            cand.link_rule = link.rule
             known = {"year": cand.year, "title": cand.title, "doi": cand.doi, "arxiv_id": cand.arxiv_id,
                      "source": cand.source, "authors": cand.authors, "abstract": cand.abstract}
             try:
@@ -801,12 +814,30 @@ class Harvester:
             relpath = result["paper"]["relpath"]
             if result["duplicate"]:
                 return "in_library", f"identical to {relpath}", relpath, url
-            ctx.log(f"filed {relpath}")
-            return "downloaded", "", relpath, url
-        host = _host(last_url)
-        if last.startswith("blocked:"):   # the network policy refused it: not a paywall, and the fix is the allowlist
-            return "blocked", f"open access, blocked by network policy ({last.split(':', 1)[1]}) at {host}", None, None
-        return "failed", f"open access, but the fetch failed ({last or 'download failed'}) at {host}", None, None
+            ctx.log(f"filed {relpath} (found via {link.rule})")
+            return "downloaded", f"found via {link.rule}", relpath, url
+        if not last:   # the open-access locations were searched and none gave a PDF link
+            return "failed", "open access, but no direct PDF link was found", None, None
+        status_text, _, hop_host = last.partition("@")
+        host = hop_host or _host(last_url)   # a blocked redirect hop names that hop's host, not the first URL's
+        if status_text.startswith("blocked:"):   # the network policy refused it: not a paywall, and the fix is the allowlist
+            return "blocked", f"open access, blocked by network policy ({status_text.split(':', 1)[1]}) at {host}", None, None
+        return "failed", f"open access, but the fetch failed ({status_text or 'download failed'}) at {host}", None, None
+
+    def _links(self, ctx: StageContext, cand: Candidate, first_rule: str) -> Iterable[ResolvedLink]:
+        """The links of a candidate: the ones the source listed, then (open access only) the ``oa_links`` rules, lazily."""
+        for url in cand.pdf_urls:
+            yield ResolvedLink(url, first_rule)
+        if cand.oa is not True or not cand.oa_locations:
+            return
+        if self._link_resolver is not None:
+            yield from self._link_resolver(cand)
+            return
+
+        def failed(rule: str, host: str, exc: Exception) -> None:
+            ctx.log(f"{cand.title[:70]}: {rule} lookup failed at {host} ({type(exc).__name__})", level="warning")
+
+        yield from resolve_links(cand.oa_locations, set(cand.pdf_urls), on_error=failed)
 
     # -- reads and the paywalled queue --------------------------------------------------------------
 

@@ -221,7 +221,8 @@ def old_openalex_searcher(fetch: Callable[..., Any]) -> Callable[[str, int], lis
                 year=work.get("publication_year"), doi=doi,
                 abstract=abstract_from_inverted_index(work.get("abstract_inverted_index")) or "",
                 landing_url=f"https://doi.org/{doi}" if doi else (primary or str(work.get("id") or "")),
-                pdf_urls=openalex_work_urls(work), oa=hv.openalex_is_oa(work)))
+                pdf_urls=openalex_work_urls(work), oa=hv.openalex_is_oa(work),
+                oa_locations=hv.oa_locations(work)))
         return found
 
     return search

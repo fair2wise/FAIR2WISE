@@ -63,6 +63,20 @@ The full route table with capabilities is in `docs/migration/api/README.md`. All
 
 To turn a harvested and extracted KG into a published graph, continue with [The `:local` image, end to end](local-image.md).
 
+## How free links are found
+
+OpenAlex lists some open-access PDF links directly; the Harvester uses those first. For an **open-access** paper whose listed links give nothing (or that has none), it then looks for more free links, lazily, only on the paper's **open-access locations** (`is_oa` true or the best open-access location; a location OpenAlex does not call open access is never followed), and never through a metered route. The rule that found the link that was used is stored on the candidate (`link_rule`, also in its detail: "found via ..."):
+
+| Rule | What it does |
+|---|---|
+| `arxiv`, `openalex_selector` | the links the source listed (as before) |
+| `oa_pdf_url` | any `pdf_url` of an open-access location, whatever its shape (the shared selector kept only URLs that look like PDFs) |
+| `zenodo_record` | a Zenodo record page: the record's own file list (one request to `zenodo.org/api/records/<id>`), the first `.pdf` file |
+| `bhl_part`, `bhl_item` | a Biodiversity Heritage Library part or item page: `/partpdf/<id>` or `/itempdf/<id>` |
+| `landing_citation_pdf_url` | any other landing page of an open-access location (handles, SciELO, DSpace, OJS, a publisher page of an open-access article): the page's `citation_pdf_url` meta tag; at most 2 pages per paper, each at most 1 MiB |
+
+Every request goes through the same network check as a download (scheme, port and public-address check on every redirect hop), downloads keep the `%PDF-` signature and size caps, and a link that is blocked on a redirect hop names that hop's host. Repositories and journals that serve these PDFs from other hosts need those hosts on the deployment's egress allowlist.
+
 ## What the statuses mean
 
 | Status | Meaning |

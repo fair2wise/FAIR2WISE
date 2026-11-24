@@ -100,7 +100,8 @@ class Net:
 
 
 class World:
-    def __init__(self, tmp_path: Path, searchers: dict[str, Any], net: Net, *, clock: Clock | None = None) -> None:
+    def __init__(self, tmp_path: Path, searchers: dict[str, Any], net: Net, *, clock: Clock | None = None,
+                 link_resolver: Any = None) -> None:
         self.tmp = tmp_path
         self.lib = tmp_path / "papers"
         self.lib.mkdir()
@@ -108,7 +109,8 @@ class World:
                                       probe=lambda p: ProbeResult(status="ok", pages=2, page_text="x"))
         self.store = HarvestStore(tmp_path / "state" / "library" / "harvest.sqlite")
         self.net = net
-        self.harvester = Harvester(self.service, self.store, searchers=searchers, downloader=net, delay=0.0)
+        self.harvester = Harvester(self.service, self.store, searchers=searchers, downloader=net, delay=0.0,
+                                   link_resolver=link_resolver)
         settings = local_settings()
         kwargs = {"lease_seconds": 60, "clock": clock} if clock else {}
         self.jobs = JobService(JobStore(tmp_path / "jobs.sqlite3", **kwargs), settings=settings)
@@ -383,7 +385,8 @@ def test_the_downloader_checks_redirect_hops_and_the_pdf_signature():
 
     public = NetworkPolicy(resolver=lambda host: ["93.184.216.34"])
     download = pdf_downloader(httpx.Client(transport=httpx.MockTransport(handler)), public)
-    assert download("http://example.com/go", 1000) == (None, "blocked:private_address")
+    # the redirect hop that was refused is the one named (the first URL's host is example.com, the hop's is 127.0.0.1)
+    assert download("http://example.com/go", 1000) == (None, "blocked:private_address@127.0.0.1")
     assert download("http://example.com/html", 1000) == (None, "refused:not_pdf")
     assert download("http://example.com/big", 1000) == (None, "refused:too_large")
     assert download("http://example.com/ok.pdf", 1000) == (b"%PDF-1.4 ok", "ok")
@@ -419,3 +422,57 @@ def test_an_error_in_one_source_with_results_from_the_other_stays_visible_on_the
     status = world.store.run(handle.job_id)["source_status"]
     assert status["openalex"]["state"] == "error" and "HTTP 503" in status["openalex"]["message"]
     assert status["arxiv"]["state"] == "ok" and status["arxiv"]["returned"] == 1
+
+
+def test_open_access_links_are_resolved_lazily_and_the_rule_is_recorded(tmp_path):
+    from app.modules.library.oa_links import ResolvedLink
+
+    paper = cand(GOOD, doi="10.1/r", urls=[])
+    paper.oa = True
+    paper.oa_locations = [{"pdf_url": "", "landing_page_url": "https://zenodo.org/records/9"}]
+    asked = []
+
+    def resolver(candidate):
+        asked.append(candidate.title)
+        yield ResolvedLink("https://zenodo.org/api/records/9/files/p.pdf/content", "zenodo_record")
+
+    net = Net({"https://zenodo.org/api/records/9/files/p.pdf/content": pdf("resolved")})
+    world = World(tmp_path, {"arxiv": fixed(paper)}, net, link_resolver=resolver)
+    handle, _ = world.run(sources=["arxiv"])
+    assert world.statuses(handle.job_id) == {GOOD: "downloaded"} and asked == [GOOD]
+    row = world.store.candidates(handle.job_id)[0]
+    assert row["link_rule"] == "zenodo_record" and row["detail"] == "found via zenodo_record"
+
+
+def test_a_listed_link_that_works_never_triggers_a_lookup(tmp_path):
+    paper = cand(GOOD, doi="10.1/s", urls=["https://a.example/1.pdf"])
+    paper.oa = True
+    paper.oa_locations = [{"pdf_url": "", "landing_page_url": "https://zenodo.org/records/9"}]
+
+    def resolver(candidate):
+        raise AssertionError("no lookup is needed when the listed link works")
+
+    world = World(tmp_path, {"arxiv": fixed(paper)}, Net({"https://a.example/1.pdf": pdf("s")}), link_resolver=resolver)
+    handle, _ = world.run(sources=["arxiv"])
+    assert world.store.candidates(handle.job_id)[0]["link_rule"] == "arxiv"
+
+
+def test_a_blocked_redirect_hop_names_that_hops_host(tmp_path):
+    paper = cand(GOOD, doi="10.1/h", urls=["https://start.example/x.pdf"])
+    paper.oa = True
+    net = Net({"https://start.example/x.pdf": "blocked:private_address@cdn.hop.example"})
+    world = World(tmp_path, {"arxiv": fixed(paper)}, net)
+    handle, _ = world.run(sources=["arxiv"])
+    row = world.store.candidates(handle.job_id)[0]
+    assert row["status"] == "blocked"
+    assert row["detail"] == "open access, blocked by network policy (private_address) at cdn.hop.example"
+
+
+def test_an_open_access_paper_whose_locations_give_no_link_is_failed_not_paywalled(tmp_path):
+    paper = cand(GOOD, doi="10.1/n", urls=[])
+    paper.oa = True
+    paper.oa_locations = [{"pdf_url": "", "landing_page_url": "https://doi.org/10.1/n"}]
+    world = World(tmp_path, {"arxiv": fixed(paper)}, Net({}), link_resolver=lambda c: iter(()))
+    handle, _ = world.run(sources=["arxiv"])
+    row = world.store.candidates(handle.job_id)[0]
+    assert row["status"] == "failed" and row["detail"] == "open access, but no direct PDF link was found"
