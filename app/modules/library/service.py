@@ -130,6 +130,19 @@ def folder_of(relpath: str) -> str:
     return parts[0] if len(parts) > 1 else ""
 
 
+def library_dir_from(startup: Mapping[str, str]) -> Path | None:
+    """The mounted papers folder named by ``F2W_LIBRARY_DIR`` (no built-in default: ``None`` when unset).
+
+    Raises:
+        StartupConfigError: The value is not an absolute path.
+    """
+    raw = (startup.get(LIBRARY_DIR_ENV) or "").strip()
+    library_dir = Path(raw).expanduser() if raw else None
+    if library_dir is not None and not library_dir.is_absolute():
+        raise StartupConfigError(f"config_rejected: {LIBRARY_DIR_ENV} must be an absolute path")
+    return library_dir
+
+
 class LibraryService:
     """Catalog, upload and verify over one mounted papers folder (see the module docstring).
 
@@ -191,10 +204,7 @@ class LibraryService:
         Raises:
             StartupConfigError: ``F2W_LIBRARY_DIR`` or ``HYBRID_RAG_LITERATURE_INDEX`` is not an absolute path.
         """
-        raw = (startup.get(LIBRARY_DIR_ENV) or "").strip()
-        library_dir = Path(raw).expanduser() if raw else None
-        if library_dir is not None and not library_dir.is_absolute():
-            raise StartupConfigError(f"config_rejected: {LIBRARY_DIR_ENV} must be an absolute path")
+        library_dir = library_dir_from(startup)
         state = Path(workdir) / "library"
         raw_index = (startup.get(INDEX_DIR_ENV) or "").strip()
         index_dir = Path(raw_index).expanduser() if raw_index else None

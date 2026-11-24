@@ -28,6 +28,7 @@ if __name__ == "__main__":
 
 from .. import tracing
 from ..cli_output import output
+from ..workdir import DEFAULT_WORKDIR
 from .coordinator import (
     Coordinator,
     CoordinatorConfig,
@@ -104,7 +105,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--seed-terms", default=None, help="Seed extracted-terms JSON (cumulative base)")
     p.add_argument("--kg-mode", default="json", choices=["json", "splash"], help="KG update/reload mode")
-    p.add_argument("--workdir", default="runs/session", help="Session working directory")
+    p.add_argument("--workdir", default=DEFAULT_WORKDIR, help="Session working directory")
     p.add_argument("--schema", default="storage/schema/matkg_schema.yaml")
     p.add_argument("--chebi", default=None, help="Optional ChEBI .obo path")
     p.add_argument("--max-rounds", type=int, default=3)

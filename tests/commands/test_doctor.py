@@ -172,7 +172,6 @@ def test_ollama_states() -> None:
 
 @pytest.mark.parametrize(("check", "var"), [(doctor.check_library, "F2W_LIBRARY_DIR"), (doctor.check_state, "F2W_WORKDIR")])
 def test_directory_states(check: Callable[[Context], str], var: str, tmp_path: Path) -> None:
-    assert check(_ctx(env={})) == "skipped"
     assert check(_ctx(env={var: str(tmp_path / "nope")})) == "missing"
     assert check(_ctx(env={var: str(tmp_path)})) == "ok"
     assert list(tmp_path.iterdir()) == []  # the probe file is gone
@@ -184,6 +183,42 @@ def test_directory_states(check: Callable[[Context], str], var: str, tmp_path: P
             assert check(_ctx(env={var: str(locked)})) == "not_writable"
         finally:
             locked.chmod(0o700)
+
+
+def test_unset_state_dir_checks_the_apps_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.modules.workdir import DEFAULT_WORKDIR
+
+    monkeypatch.chdir(tmp_path)
+    assert doctor.check_state(_ctx(env={})) == "missing"  # neither the variable nor the default exists
+    (tmp_path / DEFAULT_WORKDIR).mkdir(parents=True)
+    assert doctor.check_state(_ctx(env={})) == "ok"
+    assert doctor.check_state(_ctx(env={"F2W_WORKDIR": "  "})) == "ok"  # blank is unset, as in the app
+    assert doctor.check_state(_ctx(env={"F2W_WORKDIR": str(tmp_path / "nope")})) == "missing"  # the variable wins
+
+
+def test_state_default_is_the_agents_cli_default() -> None:
+    from app.modules.f2w_agent.cli import build_parser
+    from app.modules.workdir import DEFAULT_WORKDIR
+
+    assert build_parser().get_default("workdir") == DEFAULT_WORKDIR
+
+
+def test_library_has_no_app_default_and_relative_is_rejected(tmp_path: Path) -> None:
+    assert doctor.check_library(_ctx(env={})) == "skipped"  # the app mounts nothing without the variable
+    assert doctor.check_library(_ctx(env={"F2W_LIBRARY_DIR": "relative/papers"})) == "error"  # startup refuses it
+
+
+def test_tiled_key_default_location_from_the_apps_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.modules.deployment import tiled_config
+
+    monkeypatch.setattr(tiled_config, "DEFAULT_LOCAL_DATA_DIR", str(tmp_path))
+    env = {"F2W_DEPLOYMENT_PROFILE": "local"}  # no data dir: the app's local default applies
+    assert doctor.check_tiled_key(_ctx(env=env)) == "missing"
+    (tmp_path / "secrets").mkdir()
+    key = tmp_path / "secrets" / "writer.key"
+    key.write_text("x" * 32)
+    key.chmod(0o600)
+    assert doctor.check_tiled_key(_ctx(env=env)) == "ok"
 
 
 def test_tiled_key_states(tmp_path: Path) -> None:

@@ -17,6 +17,7 @@ from typing import Any
 
 from ..cli_output import output
 from ..graph import kg_update
+from ..workdir import DEFAULT_WORKDIR
 from .debate_agent import EvidenceDebateAgent
 from .download_agent import DownloadAgent
 from .extractor_agent import ExtractorAgent
@@ -77,7 +78,7 @@ class CoordinatorConfig:
     kg_query_hops: int = 20
     seed_terms: str | None = None
     kg_mode: str = "json"  # "json" | "splash"
-    workdir: Path = field(default_factory=lambda: Path("runs/session"))
+    workdir: Path = field(default_factory=lambda: Path(DEFAULT_WORKDIR))
     schema_path: str = "storage/schema/matkg_schema.yaml"
     chebi_obo_path: str | None = None
     max_rounds: int = 3

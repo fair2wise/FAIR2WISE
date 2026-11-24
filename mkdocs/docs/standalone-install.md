@@ -219,8 +219,9 @@ proxy: the states come from a fixed vocabulary, never from an error message.
 | `openalex` | `GET /works?per-page=1` through the hardened fetch helper (egress policy); `OPENALEX_API_KEY` from the process environment, in the `Authorization` header only | `ok`, `unreachable`, `timeout`, `blocked_by_proxy` (the proxy refused the tunnel), `blocked_by_policy` (the egress policy refused the URL), `no_key` (401/403 and no key set), `rejected` (401/403 with a key), `rate_limited`, `error` |
 | `arxiv` | one query to `export.arxiv.org`, same helper, no key | as OpenAlex without `no_key`/`rejected` |
 | `ollama` | the model list of `app/modules/ollama_catalog.py` | `ok` (answered, even with zero models), `unreachable`, `timeout`, `error`, `skipped` (`OLLAMA_URL` unset) |
-| `library`, `state` | creates and removes a temporary file in `F2W_LIBRARY_DIR` and `F2W_WORKDIR` | `ok`, `not_writable`, `missing`, `skipped` (variable unset) |
-| `tiled_key` | the managed Tiled writer key file (`F2W_TILED_WRITER_SECRET_FILE`, else `$F2W_TILED_DATA_DIR/secrets/writer.key`) against the AUD-15 rule (mode 0600 or 0400, owned by the running user) | `ok`, `too_open`, `missing`, `error`, `skipped` |
+| `library` | creates and removes a temporary file in the library directory, resolved as the app does (`F2W_LIBRARY_DIR`; the app has no default mount) | `ok`, `not_writable`, `missing`, `error` (relative path, which the app refuses at startup), `skipped` (variable unset: nothing is mounted) |
+| `state` | the same in the state directory, resolved as the app does: `F2W_WORKDIR`, else the agent's default `runs/session` (relative to the working directory) | `ok`, `not_writable`, `missing` (neither the variable nor the default names an existing directory) |
+| `tiled_key` | the Tiled writer key file the app resolves (`load_tiled_settings`: `F2W_TILED_WRITER_SECRET_FILE`, else `secrets/writer.key` under the managed data dir, `/var/lib/fair2wise/tiled` by default on the local profile) against the AUD-15 rule (mode 0600 or 0400, owned by the running user) | `ok`, `too_open`, `missing`, `error`, `skipped` (no key location resolves) |
 
 A keyless CBORG call cannot tell authorized from unauthorized (section 1), so with no key the state is `no_key`,
 never `ok`. `skipped` means the setting is not configured and does not fail the run.

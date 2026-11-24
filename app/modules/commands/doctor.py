@@ -12,9 +12,13 @@ Checks and their states (``skipped`` is the state of a check whose setting is no
   openalex   ok, unreachable, timeout, blocked_by_proxy, blocked_by_policy, no_key, rejected, rate_limited, error
   arxiv      ok, unreachable, timeout, blocked_by_proxy, blocked_by_policy, rate_limited, error
   ollama     ok, unreachable, timeout, error, skipped (``OLLAMA_URL`` unset)
-  library    ok, not_writable, missing, skipped (``F2W_LIBRARY_DIR`` unset)
-  state      ok, not_writable, missing, skipped (``F2W_WORKDIR`` unset)
-  tiled_key  ok, too_open, missing, error, skipped (no managed-Tiled data dir or secret file configured)
+  library    ok, not_writable, missing, error, skipped (``F2W_LIBRARY_DIR`` unset: the app has no default mount)
+  state      ok, not_writable, missing (``F2W_WORKDIR``, else the app's default working directory)
+  tiled_key  ok, too_open, missing, error, skipped (no key location resolves: no Tiled settings, no secret file)
+
+The directories are resolved the way the app resolves them (``resolve_workdir``, ``library_dir_from``), so an unset
+``F2W_WORKDIR`` checks the app's default directory rather than being skipped; ``missing`` means the resolved
+directory does not exist. The Tiled key path comes from the app's ``load_tiled_settings`` (its defaults included).
 
 The CBORG check makes one **keyed** ``GET {CBORG_BASE_URL}/models`` through the client and egress path the app
 uses (address pinning, ``HTTP(S)_PROXY``), because CBORG answers 403 ``ip_not_authorized`` to a call without a key
@@ -55,8 +59,6 @@ PASSING = frozenset({"ok", "skipped"})
 
 OPENALEX_PROBE_URL = "https://api.openalex.org/works?per-page=1&select=id"
 ARXIV_PROBE_URL = "https://export.arxiv.org/api/query?search_query=all:electron&max_results=1"
-STATE_DIR_ENV = "F2W_WORKDIR"
-LIBRARY_DIR_ENV = "F2W_LIBRARY_DIR"
 TILED_DATA_DIR_ENV = "F2W_TILED_DATA_DIR"
 TILED_SECRET_FILE_ENV = "F2W_TILED_WRITER_SECRET_FILE"
 
@@ -211,10 +213,9 @@ def check_ollama(ctx: Context) -> str:
 
 # --------------------------------------------------------------------------------------------- directories
 
-def _directory_state(raw: str) -> str:
-    if not raw:
+def _directory_state(path: Path | None) -> str:
+    if path is None:
         return "skipped"
-    path = Path(raw)
     if not path.is_dir():
         return "missing"
     try:
@@ -226,26 +227,54 @@ def _directory_state(raw: str) -> str:
 
 
 def check_library(ctx: Context) -> str:
-    """The library directory exists and a file can be created in it."""
-    return _directory_state(_env(ctx, LIBRARY_DIR_ENV))
+    """The library directory (as the app resolves it) exists and a file can be created in it.
+
+    The app has no default mount, so an unset ``F2W_LIBRARY_DIR`` is ``skipped``; a relative path (which the app
+    refuses at startup) is ``error``.
+    """
+    from ..library.service import library_dir_from
+    from ..security.authorization import StartupConfigError
+
+    try:
+        return _directory_state(library_dir_from(ctx.environ))
+    except StartupConfigError:
+        return "error"
 
 
 def check_state(ctx: Context) -> str:
-    """The state (working) directory exists and a file can be created in it."""
-    return _directory_state(_env(ctx, STATE_DIR_ENV))
+    """The state (working) directory as the app resolves it (``F2W_WORKDIR`` or its default) is writable."""
+    from ..workdir import resolve_workdir
+
+    return _directory_state(resolve_workdir(ctx.environ))
 
 
-def check_tiled_key(ctx: Context) -> str:
-    """The managed Tiled writer key file passes the AUD-15 permission rule (state only)."""
-    from ..deployment.tiled_config import TiledConfigError, check_private_file
+def _tiled_key_path(ctx: Context) -> Path | None:
+    """The writer key file the app would use, or ``None`` when nothing resolves."""
+    from ..deployment.tiled_config import TiledConfigError, load_tiled_settings
 
+    try:
+        settings = load_tiled_settings(ctx.environ)
+    except TiledConfigError:
+        settings = None  # no resolvable Tiled settings (e.g. no deployment profile): fall back to the key variables
+    if settings is not None:
+        if settings.managed is not None:
+            return settings.managed.effective_writer_secret_file
+        if settings.external is not None:
+            return settings.external.writer_secret_file
+        return None
     explicit = _env(ctx, TILED_SECRET_FILE_ENV)
     data_dir = _env(ctx, TILED_DATA_DIR_ENV)
     if explicit:
-        path = Path(explicit)
-    elif data_dir:
-        path = Path(data_dir) / "secrets" / "writer.key"
-    else:
+        return Path(explicit)
+    return Path(data_dir) / "secrets" / "writer.key" if data_dir else None
+
+
+def check_tiled_key(ctx: Context) -> str:
+    """The Tiled writer key file passes the AUD-15 permission rule (state only)."""
+    from ..deployment.tiled_config import TiledConfigError, check_private_file
+
+    path = _tiled_key_path(ctx)
+    if path is None:
         return "skipped"
     if not path.exists():
         return "missing"
