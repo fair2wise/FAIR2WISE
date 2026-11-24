@@ -234,3 +234,21 @@ def test_categories_when_nothing_is_mounted(monkeypatch, tmp_path):
     c = build_local(monkeypatch, tmp_path, library=service).client()
     assert c.get("/v1/library/categories").json() == {"categories": []}
     assert c.post("/v1/library/categories", json={"name": "x"}).status_code == 501
+
+
+def test_job_submission_answers_the_handle_shape_the_ui_fixture_pins(lib):
+    """``POST /v1/jobs`` names the id ``job_id`` (not ``id``): the UI fixture is the contract the client is tested against.
+
+    Pilot 2026-11-24: ``startHarvest`` read ``id`` from this body, so the Harvester asked for run ``undefined``.
+    """
+    import json
+    from pathlib import Path
+
+    app, service, folder = lib
+    fixture = json.loads((Path(__file__).resolve().parents[2] / "ui" / "src" / "app" / "components" / "__fixtures__"
+                          / "job_handle.json").read_text(encoding="utf-8"))
+    body = app.client().post("/v1/jobs", json={"kind": "library_verify", "inputs": {"params": {}}}).json()
+    assert set(body) == set(fixture), (sorted(body), sorted(fixture))
+    assert "id" not in body and isinstance(body["job_id"], str) and body["job_id"]
+    assert {k: type(v).__name__ for k, v in body.items() if v is not None} == \
+        {k: type(v).__name__ for k, v in fixture.items() if v is not None}

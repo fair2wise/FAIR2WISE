@@ -6,7 +6,7 @@
  * Nothing here touches `PUT /settings` or browser storage.
  */
 import { ApiError, HIDDEN_STATUSES, jsonBody, v1Json, v1Url } from './apiHttp';
-import type { JobRef } from './extractionApi';
+import { normalizeJob, type JobRef } from './extractionApi';
 
 export const LIBRARY_PATH = '/v1/library';
 
@@ -205,18 +205,26 @@ export function verifyLibraryPaper(paperId: string, fetcher: typeof fetch = fetc
   );
 }
 
+/** Submit a library job; the server's handle names the id `job_id`, which `normalizeJob` maps to `id`. */
+function submitJob(kind: string, nonce: string | undefined, fetcher: typeof fetch): Promise<JobRef> {
+  return v1Json<unknown>(v1Url('/v1/jobs'), jsonBody('POST', { kind, inputs: { params: { nonce } } }), fetcher).then(raw => {
+    const { id, kind: jobKind, state } = normalizeJob(raw);
+    return { id, kind: jobKind, state };
+  });
+}
+
 /**
  * Submit the `library_verify` job for every paper. `nonce` makes a deliberate re-run a new job
  * (job identity is idempotent on identical inputs). The nonce rides in `inputs.params`; a top-level
  * `nonce` is rejected with 422.
  */
 export function verifyAllLibraryPapers(nonce?: string, fetcher: typeof fetch = fetch): Promise<JobRef> {
-  return v1Json<JobRef>(v1Url('/v1/jobs'), jsonBody('POST', { kind: 'library_verify', inputs: { params: { nonce } } }), fetcher);
+  return submitJob('library_verify', nonce, fetcher);
 }
 
 /** Submit the `library_index` job (Index for QA). */
 export function indexLibraryPapers(nonce?: string, fetcher: typeof fetch = fetch): Promise<JobRef> {
-  return v1Json<JobRef>(v1Url('/v1/jobs'), jsonBody('POST', { kind: 'library_index', inputs: { params: { nonce } } }), fetcher);
+  return submitJob('library_index', nonce, fetcher);
 }
 
 /** True when the file looks like a PDF by name or MIME type (client-side pre-check only). */

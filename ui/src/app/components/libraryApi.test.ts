@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import jobHandle from './__fixtures__/job_handle.json';
 import { ApiError } from './apiHttp';
 import {
   categoryNameProblem,
@@ -96,6 +97,12 @@ describe('libraryApi', () => {
     expect(first).toEqual({ kind: 'library_verify', inputs: { params: { nonce: 'n1' } } });
     expect(first.nonce).toBeUndefined();
     expect(second.kind).toBe('library_index');
+  });
+
+  it('reads the job id from the real POST /v1/jobs body (job_id), for verify-all and index', async () => {
+    const fetcher = respond(200, jobHandle);
+    expect((await verifyAllLibraryPapers(undefined, asFetch(fetcher))).id).toBe(jobHandle.job_id);
+    expect((await indexLibraryPapers(undefined, asFetch(fetcher))).id).toBe(jobHandle.job_id);
   });
 
   it('detects PDFs by MIME type or extension', () => {

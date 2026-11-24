@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import jobHandle from './__fixtures__/job_handle.json';
 import { ApiError } from './apiHttp';
 import {
   dismissHarvestCandidate,
@@ -25,6 +26,14 @@ describe('harvestApi', () => {
     expect(url).toContain('/v1/jobs');
     expect(init.method).toBe('POST');
     expect(JSON.parse(String(init.body))).toEqual({ kind: 'library_harvest', inputs: { params: request } });
+  });
+
+  it('reads the run id from the real POST /v1/jobs body, whose id is named job_id (pilot 2026-11-24)', async () => {
+    // __fixtures__/job_handle.json is pinned to the real response by tests/api_v1/test_v1_library.py.
+    const fetcher = respond(200, jobHandle);
+    const ref = await startHarvest({ topic: 'x', category: 'c', sources: ['arxiv'], max_downloads: 1 }, asFetch(fetcher));
+    expect(ref).toEqual({ id: jobHandle.job_id, kind: 'library_harvest', state: 'queued' });
+    expect(ref.id).not.toBe('');
   });
 
   it('lists runs and a run\'s candidates', async () => {

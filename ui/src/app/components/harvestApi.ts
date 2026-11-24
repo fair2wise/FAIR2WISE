@@ -6,7 +6,7 @@
  * the routes answer 404 (the Library tab itself is hidden there).
  */
 import { jsonBody, v1Json, v1Url } from './apiHttp';
-import type { JobRef } from './extractionApi';
+import { normalizeJob, type JobRef } from './extractionApi';
 import type { LibraryPaper } from './libraryApi';
 
 /** Job kind of a harvest run. */
@@ -140,11 +140,14 @@ export const PAYWALLED_STATUS: HarvestStatus = 'paywalled';
 
 /** Submit a `library_harvest` job. */
 export function startHarvest(request: StartHarvestRequest, fetcher: typeof fetch = fetch): Promise<JobRef> {
-  return v1Json<JobRef>(
+  return v1Json<unknown>(
     v1Url('/v1/jobs'),
     jsonBody('POST', { kind: HARVEST_JOB_KIND, inputs: { params: request } }),
     fetcher,
-  );
+  ).then(raw => {
+    const { id, kind, state } = normalizeJob(raw);   // the server's handle names the id `job_id`
+    return { id, kind, state };
+  });
 }
 
 /** Past harvest runs, newest first. */
