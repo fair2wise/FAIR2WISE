@@ -19,6 +19,26 @@ const paper = (over: Partial<LibraryPaper> = {}): LibraryPaper => ({
   ...over,
 });
 
+describe('LibraryPapersTable supplied-by-hand badge', () => {
+  it.each([
+    ['user_supplied', 'Supplied by hand'],
+    ['user_supplied_confirmed', 'Supplied by hand'],
+    ['user_supplied_mismatch_confirmed', 'Supplied by hand (mismatch)'],
+  ] as const)('shows a small badge for provenance %s', (provenance, label) => {
+    render(<LibraryPapersTable papers={[paper({ provenance })]} verifyingId={null} onVerify={() => undefined} />);
+    const badge = screen.getByTestId('supplied-badge');
+    expect(badge).toHaveTextContent(label);
+    expect(badge).toHaveAttribute('data-provenance', provenance);
+    expect(badge).toHaveAttribute('title');
+  });
+
+  it.each([undefined, null, 'harvest', 'something_else'])('shows no badge for provenance %s', provenance => {
+    render(<LibraryPapersTable papers={[paper({ provenance: provenance as LibraryPaper['provenance'] })]}
+      verifyingId={null} onVerify={() => undefined} />);
+    expect(screen.queryByTestId('supplied-badge')).not.toBeInTheDocument();
+  });
+});
+
 describe('LibraryPapersTable', () => {
   it('renders file name, title, DOI and status badges, truncating long text', () => {
     render(<LibraryPapersTable papers={[paper()]} verifyingId={null} onVerify={() => undefined} />);

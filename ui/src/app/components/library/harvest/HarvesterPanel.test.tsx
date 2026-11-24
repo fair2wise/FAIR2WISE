@@ -1,7 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import filedFixture from '../../__fixtures__/harvest_filed.json';
+import needsFixture from '../../__fixtures__/harvest_needs_confirmation.json';
+import undoFixture from '../../__fixtures__/harvest_undo.json';
 import { TabActiveProvider } from '../../tabActivity';
 import { HarvesterPanel } from './HarvesterPanel';
 
@@ -256,22 +259,180 @@ describe('HarvesterPanel results', () => {
     const user = userEvent.setup();
     renderPanel();
     await user.click(await screen.findByRole('button', { name: /polymer blends/ }));
-    expect(await screen.findByRole('list', { name: 'Paywalled papers' })).toBeInTheDocument();
+    expect(await screen.findByRole('list', { name: 'Papers needing a PDF' })).toBeInTheDocument();
     expect(screen.getByRole('table', { name: 'Harvest results' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Papers found for “polymer blends”/ })).toBeInTheDocument();
   });
 
-  it('files a PDF for a paywalled candidate and toasts the new path', async () => {
-    routes['POST /v1/library/harvest/candidates/p/pdf'] = {
-      status: 200,
-      body: { candidate: cand('p', { status: 'filed' }), paper: { ...paper('p', 'rsoxs'), relpath: 'rsoxs/2021/saved.pdf' }, duplicate: false },
+  // The real answers of POST .../candidates/{id}/pdf, pinned by tests/coverage_t27/test_manual_pdf_routes.py.
+  const filedFor = (id: string, over: Record<string, unknown> = {}) => ({
+    ...filedFixture,
+    candidate: { ...filedFixture.candidate, id, title: `Paper ${id}`, status: 'filed' },
+    paper: { ...filedFixture.paper, relpath: 'rsoxs/2021/saved.pdf' },
+    ...over,
+  });
+  const needsFor = (id: string, kind: 'weak' | 'mismatch', over: Record<string, unknown> = {}) => ({
+    ...needsFixture,
+    candidate: { id, title: `Paper ${id}`, doi: `10.1/${id}` },
+    verdict: { ...needsFixture.verdict, kind },
+    other_candidate: null,
+    ...over,
+  });
+  const saved = () => new File(['%PDF'], 'saved.pdf', { type: 'application/pdf' });
+  const post = (path: string) => calls.filter(c => c.method === 'POST' && c.path === path);
+
+  it('files a strong match at once, says what was filed against which paper, and offers Undo', async () => {
+    routes['POST /v1/library/harvest/candidates/p/pdf'] = { status: 200, body: filedFor('p') };
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: /polymer blends/ }));
+    await user.upload(await screen.findByTestId('harvest-file-p'), saved());
+    const notice = await screen.findByRole('status');
+    expect(notice).toHaveTextContent('Filed saved.pdf against Paper p (strong match)');
+    expect(within(notice).getByRole('button', { name: 'Undo filing of saved.pdf' })).toBeInTheDocument();
+    expect(screen.queryByTestId('harvest-confirm-dialog')).not.toBeInTheDocument();
+    expect(post('/v1/library/harvest/candidates/p/pdf')[0].search).toBe('');
+  });
+
+  it('Undo calls the undo route, refetches the run and the Papers table, and removes the note', async () => {
+    routes['POST /v1/library/harvest/candidates/p/pdf'] = { status: 200, body: filedFor('p') };
+    routes['POST /v1/library/harvest/candidates/p/undo'] = {
+      status: 200, body: { ...undoFixture, candidate: { ...undoFixture.candidate, id: 'p', title: 'Paper p' } },
     };
     const user = userEvent.setup();
     renderPanel();
     await user.click(await screen.findByRole('button', { name: /polymer blends/ }));
-    await user.upload(await screen.findByTestId('harvest-file-p'), new File(['%PDF'], 'saved.pdf', { type: 'application/pdf' }));
-    await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith('Filed saved.pdf as rsoxs/2021/saved.pdf.'));
-    expect(calls.some(c => c.method === 'POST' && c.path === '/v1/library/harvest/candidates/p/pdf')).toBe(true);
+    await user.upload(await screen.findByTestId('harvest-file-p'), saved());
+    await user.click(await screen.findByRole('button', { name: 'Undo filing of saved.pdf' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Undo filing of saved.pdf' })).not.toBeInTheDocument());
+    expect(post('/v1/library/harvest/candidates/p/undo')).toHaveLength(1);
+    expect(toastMock.success).toHaveBeenCalledWith('Undone: saved.pdf was removed and Paper p is back in the queue.');
+    const candidateReads = calls.filter(c => c.method === 'GET' && c.path === '/v1/library/harvest/runs/h1/candidates').length;
+    expect(candidateReads).toBeGreaterThanOrEqual(3);   // opened, after filing, after undo
+    expect(calls.filter(c => c.method === 'GET' && c.path === '/v1/library/papers').length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('a failed undo says why and drops the stale note', async () => {
+    routes['POST /v1/library/harvest/candidates/p/pdf'] = { status: 200, body: filedFor('p') };
+    routes['POST /v1/library/harvest/candidates/p/undo'] = { status: 409, body: { detail: 'no file supplied by the user is filed for this candidate' } };
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: /polymer blends/ }));
+    await user.upload(await screen.findByTestId('harvest-file-p'), saved());
+    await user.click(await screen.findByRole('button', { name: 'Undo filing of saved.pdf' }));
+    await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith('Could not undo: no file supplied by the user is filed for this candidate'));
+    expect(screen.queryByRole('button', { name: 'Undo filing of saved.pdf' })).not.toBeInTheDocument();
+  });
+
+  it('a file already in the library is reported and offers no Undo', async () => {
+    routes['POST /v1/library/harvest/candidates/p/pdf'] = { status: 200, body: filedFor('p', { duplicate: true }) };
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: /polymer blends/ }));
+    await user.upload(await screen.findByTestId('harvest-file-p'), saved());
+    await waitFor(() => expect(toastMock.info).toHaveBeenCalledWith('saved.pdf is already in the library (rsoxs/2021/saved.pdf).'));
+    expect(screen.queryByRole('button', { name: /Undo filing/ })).not.toBeInTheDocument();
+  });
+
+  it('a weak match stores nothing, asks in a dialog and files only after "File anyway" (confirm=true)', async () => {
+    routes['POST /v1/library/harvest/candidates/p/pdf'] = { status: 200, body: needsFor('p', 'weak', { verdict: { ...needsFixture.verdict, kind: 'weak', reason: 'the PDF has no readable text', found_dois: [], found_title: '' } }) };
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: /polymer blends/ }));
+    await user.upload(await screen.findByTestId('harvest-file-p'), saved());
+    const dialog = await screen.findByTestId('harvest-confirm-dialog');
+    expect(within(dialog).getByText('Check this PDF before it is filed')).toBeInTheDocument();
+    expect(within(within(dialog).getByTestId('confirm-paper')).getByText('Paper p')).toBeInTheDocument();
+    expect(within(within(dialog).getByTestId('confirm-pdf')).getByText('No title found')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Undo filing/ })).not.toBeInTheDocument();
+    routes['POST /v1/library/harvest/candidates/p/pdf'] = { status: 200, body: filedFor('p', { verdict: { ...needsFixture.verdict, kind: 'weak' } }) };
+    await user.click(within(dialog).getByRole('button', { name: 'File anyway' }));
+    await waitFor(() => expect(screen.queryByTestId('harvest-confirm-dialog')).not.toBeInTheDocument());
+    expect(post('/v1/library/harvest/candidates/p/pdf').map(c => c.search)).toEqual(['', '?confirm=true']);
+    expect(await screen.findByRole('status')).toHaveTextContent('Filed saved.pdf against Paper p (confirmed by you)');
+  });
+
+  it('a mismatch shows both DOIs and titles side by side with a warning and needs an explicit tick', async () => {
+    routes['POST /v1/library/harvest/candidates/p/pdf'] = { status: 200, body: needsFor('p', 'mismatch') };
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: /polymer blends/ }));
+    await user.upload(await screen.findByTestId('harvest-file-p'), saved());
+    const dialog = await screen.findByTestId('harvest-confirm-dialog');
+    expect(within(dialog).getByText('This PDF names a different paper')).toBeInTheDocument();
+    const paperSide = within(dialog).getByTestId('confirm-paper');
+    const pdfSide = within(dialog).getByTestId('confirm-pdf');
+    expect(paperSide).toHaveTextContent('Paper p');
+    expect(paperSide).toHaveTextContent('DOI: 10.1/p');
+    expect(pdfSide).toHaveTextContent(needsFixture.verdict.found_title);
+    expect(pdfSide).toHaveTextContent(`DOI: ${needsFixture.verdict.found_dois[0]}`);
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(/not the DOI of the paper in the queue/);
+    const fileAnyway = within(dialog).getByRole('button', { name: 'File anyway' });
+    expect(fileAnyway).toBeDisabled();
+    await user.click(within(dialog).getByRole('checkbox', { name: /I have checked/ }));
+    expect(fileAnyway).toBeEnabled();
+    routes['POST /v1/library/harvest/candidates/p/pdf'] = { status: 200, body: filedFor('p', { verdict: { ...needsFixture.verdict, kind: 'mismatch' } }) };
+    await user.click(fileAnyway);
+    expect(await screen.findByRole('status')).toHaveTextContent('(mismatch confirmed by you)');
+    expect(post('/v1/library/harvest/candidates/p/pdf').map(c => c.search)).toEqual(['', '?confirm=true']);
+  });
+
+  it('cancelling the dialog stores nothing and sends no second request', async () => {
+    routes['POST /v1/library/harvest/candidates/p/pdf'] = { status: 200, body: needsFor('p', 'mismatch') };
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: /polymer blends/ }));
+    await user.upload(await screen.findByTestId('harvest-file-p'), saved());
+    await user.click(within(await screen.findByTestId('harvest-confirm-dialog')).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByTestId('harvest-confirm-dialog')).not.toBeInTheDocument());
+    expect(post('/v1/library/harvest/candidates/p/pdf')).toHaveLength(1);
+  });
+
+  it('offers to file under the other open paper whose DOI the PDF carries, and re-targets with to=', async () => {
+    routes['GET /v1/library/harvest/runs/h1/candidates'].body = {
+      candidates: [cand('p', { status: 'paywalled' }), cand('q', { status: 'blocked', title: 'The other paper' })],
+    };
+    routes['POST /v1/library/harvest/candidates/p/pdf'] = {
+      status: 200,
+      body: needsFor('p', 'mismatch', { other_candidate: { id: 'q', title: 'The other paper', doi: '10.1/q', status: 'blocked' } }),
+    };
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: /polymer blends/ }));
+    await user.upload(await screen.findByTestId('harvest-file-p'), saved());
+    const dialog = await screen.findByTestId('harvest-confirm-dialog');
+    routes['POST /v1/library/harvest/candidates/p/pdf'] = { status: 200, body: filedFor('q', { candidate: { ...filedFixture.candidate, id: 'q', title: 'The other paper', status: 'filed' } }) };
+    await user.click(within(dialog).getByRole('button', { name: 'File it under The other paper instead' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Filed saved.pdf against The other paper (strong match)');
+    expect(post('/v1/library/harvest/candidates/p/pdf').map(c => c.search)).toEqual(['', '?to=q']);
+  });
+
+  it('no button when the PDF names no other open paper', async () => {
+    routes['POST /v1/library/harvest/candidates/p/pdf'] = { status: 200, body: needsFor('p', 'mismatch') };
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: /polymer blends/ }));
+    await user.upload(await screen.findByTestId('harvest-file-p'), saved());
+    const dialog = await screen.findByTestId('harvest-confirm-dialog');
+    expect(within(dialog).queryByRole('button', { name: /instead/ })).not.toBeInTheDocument();
+  });
+
+  it.each(['paywalled', 'blocked', 'failed'])('a %s paper gets Open at publisher, the drop zone and Dismiss', async status => {
+    routes['GET /v1/library/harvest/runs/h1/candidates'].body = {
+      candidates: [cand('x', { status, open_url: 'https://ezproxy.example.edu/login?url=https://doi.org/10.1/x' })],
+    };
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: /polymer blends/ }));
+    const link = await screen.findByRole('link', { name: 'Open at publisher: Paper x' });
+    expect(link).toHaveAttribute('href', 'https://ezproxy.example.edu/login?url=https://doi.org/10.1/x');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.getByTestId('harvest-file-x')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dismiss Paper x' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Needs a PDF (1 left)' })).toBeInTheDocument();
+    expect(screen.getByTestId('harvest-rights-note')).toHaveTextContent(/responsibility to confirm/);
   });
 
   it('shows the server message when filing is refused', async () => {

@@ -3,6 +3,7 @@ import { folderLabel, type LibraryPaper } from '../libraryApi';
 import { Button } from '../ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { IndexStatusBadge, VerifyStatusBadge } from './LibraryStatusBadges';
+import { SuppliedBadge } from './SuppliedBadge';
 import { PaperAbstract, PaperAuthors, PaperYear } from './PaperMetadata';
 
 /** Props of {@link LibraryPapersTable}. */
@@ -50,8 +51,9 @@ export function LibraryPapersTable({ papers, verifyingId, verifyDisabled = false
             <TableCell className="max-w-32 truncate" title={paper.relpath}>
               {paper.folder === '' ? <span className="text-muted-foreground">{folderLabel('')}</span> : paper.folder}
             </TableCell>
-            <TableCell className="max-w-48 truncate" title={paper.file_name}>
-              {paper.file_name}
+            <TableCell className="max-w-48 align-top" title={paper.file_name}>
+              <p className="truncate">{paper.file_name}</p>
+              <SuppliedBadge provenance={paper.provenance} />
             </TableCell>
             <TableCell className="max-w-96 align-top">
               <p className="truncate" title={paper.title ?? undefined}>

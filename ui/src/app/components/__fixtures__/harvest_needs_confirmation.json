@@ -1,0 +1,24 @@
+{
+  "filed": false,
+  "needs_confirmation": true,
+  "candidate": {
+    "id": "93f40ca703f7e777",
+    "title": "Resonant soft X-ray scattering of polymer blend morphology",
+    "doi": "10.1021/acs.macromol.0c01782"
+  },
+  "verdict": {
+    "kind": "mismatch",
+    "reason": "the PDF names a different DOI",
+    "title_similarity": 0.07,
+    "found_dois": [
+      "10.1038/s41563-020-0001-2"
+    ],
+    "found_title": "Grazing incidence scattering of block copolymer thin films"
+  },
+  "other_candidate": {
+    "id": "d7cdeb64c84204a2",
+    "title": "Grazing incidence scattering of block copolymer thin films",
+    "doi": "10.1038/s41563-020-0001-2",
+    "status": "failed"
+  }
+}

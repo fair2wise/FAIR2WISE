@@ -8,6 +8,8 @@ import {
   fetchHarvestCandidates,
   fetchHarvestRuns,
   fileHarvestPdf,
+  undoHarvestPdf,
+  type FileHarvestPdfOptions,
   HARVEST_JOB_KIND,
   startHarvest,
   type HarvestCandidate,
@@ -100,20 +102,33 @@ export function useStartHarvest() {
   });
 }
 
-/** File a PDF for a paywalled candidate; refreshes the harvest data and the Papers table. */
+/** Offer a PDF for a candidate that needs one by hand; a filing refreshes the harvest data and the Papers table. */
 export function useFileHarvestPdf() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ candidate, file }: { candidate: HarvestCandidate; file: File }) =>
-      fileHarvestPdf(candidate.id, file),
-    onSuccess: () => {
+    mutationFn: ({ candidate, file, ...options }: { candidate: HarvestCandidate; file: File } & FileHarvestPdfOptions) =>
+      fileHarvestPdf(candidate.id, file, options),
+    onSuccess: result => {
+      if (!result.filed) return;   // nothing was stored: the user is asked first
       void queryClient.invalidateQueries({ queryKey: harvestKeys.all });
       void queryClient.invalidateQueries({ queryKey: libraryKeys.all });
     },
   });
 }
 
-/** Dismiss a paywalled candidate; refreshes the harvest data. */
+/** Undo a filing made from a supplied PDF; refreshes the harvest data and the Papers table. */
+export function useUndoHarvestPdf() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (candidateId: string) => undoHarvestPdf(candidateId),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: harvestKeys.all });
+      void queryClient.invalidateQueries({ queryKey: libraryKeys.all });
+    },
+  });
+}
+
+/** Dismiss a candidate that needs a PDF; refreshes the harvest data. */
 export function useDismissCandidate() {
   const queryClient = useQueryClient();
   return useMutation({

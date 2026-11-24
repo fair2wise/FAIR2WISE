@@ -24,48 +24,61 @@ describe('HarvestResults', () => {
     expect(screen.getByText('No papers found yet.')).toBeInTheDocument();
   });
 
-  it('puts non-paywalled outcomes in the table and paywalled ones in the queue', () => {
+  it('puts settled outcomes in the table and every paper that needs a PDF in the queue', () => {
     setup([
       cand('d', { relpath: 'rsoxs/2020/d.pdf' }),
+      cand('s', { status: 'skipped' }),
       cand('f', { status: 'failed', detail: 'HTTP 403', year: null, doi: null, arxiv_id: '2101.00001' }),
       cand('p', { status: 'paywalled' }),
     ]);
     const table = screen.getByRole('table', { name: 'Harvest results' });
     expect(within(table).getByText('Paper d')).toHaveAttribute('title', 'rsoxs/2020/d.pdf');
     expect(within(table).getByText('Downloaded')).toBeInTheDocument();
-    expect(within(table).getByText('Failed')).toHaveAttribute('title', 'HTTP 403');
-    expect(within(table).getByText('arXiv:2101.00001')).toBeInTheDocument();
     expect(within(table).queryByText('Paper p')).not.toBeInTheDocument();
-    const queue = screen.getByRole('list', { name: 'Paywalled papers' });
+    expect(within(table).queryByText('Paper f')).not.toBeInTheDocument();
+    const queue = screen.getByRole('list', { name: 'Papers needing a PDF' });
     expect(within(queue).getByText('Paper p')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Paywalled queue (1)' })).toBeInTheDocument();
+    expect(within(queue).getByText('Paper f')).toBeInTheDocument();
+    expect(within(queue).getByText('HTTP 403')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Needs a PDF (2 left)' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Results (2)' })).toBeInTheDocument();
   });
 
-  it('keeps an open-access paper blocked by network policy out of the paywalled queue and names the host', () => {
+  it('lists a paper blocked by network policy in the queue with the host named, and a failed fetch too', () => {
     setup([
       cand('b', { status: 'blocked', detail: 'open access, blocked by network policy (private_address) at europepmc.org' }),
       cand('p', { status: 'paywalled', detail: 'not open access: no open-access copy is listed' }),
+      cand('f', { status: 'failed', detail: 'failed:http_403' }),
     ]);
-    const queue = screen.getByRole('list', { name: 'Paywalled papers' });
-    expect(within(queue).getAllByRole('listitem')).toHaveLength(1);
-    expect(within(queue).getByText('Paper p')).toBeInTheDocument();
-    const table = screen.getByRole('table', { name: 'Harvest results' });
-    expect(within(table).getByText('Blocked by network policy')).toBeInTheDocument();
-    expect(within(table).getByText(/blocked by network policy \(private_address\) at europepmc\.org/)).toBeInTheDocument();
+    const queue = screen.getByRole('list', { name: 'Papers needing a PDF' });
+    expect(within(queue).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(queue).getByText('Blocked by network policy')).toBeInTheDocument();
+    expect(within(queue).getByText(/blocked by network policy \(private_address\) at europepmc\.org/)).toBeInTheDocument();
+    expect(within(queue).getByText('Paywalled')).toBeInTheDocument();
+    expect(within(queue).getByText('Failed')).toBeInTheDocument();
+    for (const id of ['b', 'p', 'f']) expect(screen.getByTestId(`harvest-file-${id}`)).toBeInTheDocument();
+    expect(screen.getByText('No other results.')).toBeInTheDocument();
   });
 
-  it('lists found and downloading papers as they arrive, and a failed one with its short reason', () => {
-    setup([
-      cand('a', { status: 'found' }),
-      cand('b', { status: 'downloading' }),
-      cand('c', { status: 'failed', detail: 'failed:http_403' }),
-    ]);
+  it('shows the rights note on the queue', () => {
+    setup([cand('p', { status: 'paywalled' })]);
+    expect(screen.getByTestId('harvest-rights-note')).toHaveTextContent(
+      'Text-mining rights for subscription content are the operator\u2019s responsibility to confirm',
+    );
+  });
+
+  it('badges a filed paper that a person supplied', () => {
+    setup([cand('s', { status: 'filed', provenance: 'user_supplied_confirmed', supplied_by: 'local-operator' }), cand('d')]);
+    const table = screen.getByRole('table', { name: 'Harvest results' });
+    expect(within(table).getAllByTestId('supplied-badge')).toHaveLength(1);
+  });
+
+  it('lists found and downloading papers as they arrive', () => {
+    setup([cand('a', { status: 'found' }), cand('b', { status: 'downloading' }), cand('c', { status: 'skipped' })]);
     const table = screen.getByRole('table', { name: 'Harvest results' });
     expect(within(table).getByText('Found')).toBeInTheDocument();
     expect(within(table).getByText('Downloading')).toBeInTheDocument();
-    expect(within(table).getByText('Failed')).toBeInTheDocument();
-    expect(within(table).getByText('failed:http_403')).toBeInTheDocument();
+    expect(within(table).getByText('Skipped')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Results (3)' })).toBeInTheDocument();
   });
 
@@ -76,12 +89,24 @@ describe('HarvestResults', () => {
     expect(screen.getByText('No other results.')).toBeInTheDocument();
   });
 
-  it('opens the publisher page in a new tab without leaking the opener', () => {
-    setup([cand('p', { status: 'paywalled' })]);
-    const link = screen.getByRole('link', { name: /Open publisher page for Paper p/ });
+  it.each(['paywalled', 'blocked', 'failed'] as const)('opens a %s paper at the publisher in a new tab without leaking the opener', status => {
+    setup([cand('p', { status })]);
+    const link = screen.getByRole('link', { name: 'Open at publisher: Paper p' });
+    expect(link).toHaveTextContent('Open at publisher');
     expect(link).toHaveAttribute('href', 'https://doi.org/10.1/p');
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('prefers the server\'s open_url (the library proxy form) over the landing page', () => {
+    setup([cand('p', { status: 'paywalled', open_url: 'https://ezproxy.example.edu/login?url=https://doi.org/10.1/p' })]);
+    expect(screen.getByRole('link', { name: 'Open at publisher: Paper p' }))
+      .toHaveAttribute('href', 'https://ezproxy.example.edu/login?url=https://doi.org/10.1/p');
+  });
+
+  it('falls back to the landing page when open_url is absent or unusable', () => {
+    setup([cand('p', { status: 'paywalled', open_url: 'javascript:alert(1)' })]);
+    expect(screen.getByRole('link', { name: 'Open at publisher: Paper p' })).toHaveAttribute('href', 'https://doi.org/10.1/p');
   });
 
   it.each([null, 'javascript:alert(1)'])('shows no link for an unusable landing URL (%s)', landing => {

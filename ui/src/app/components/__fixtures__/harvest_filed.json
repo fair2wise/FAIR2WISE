@@ -1,0 +1,55 @@
+{
+  "filed": true,
+  "candidate": {
+    "id": "d7cdeb64c84204a2",
+    "run_id": "abababababababab",
+    "key": "doi:10.1038/s41563-020-0001-2",
+    "title": "Grazing incidence scattering of block copolymer thin films",
+    "year": 2020,
+    "doi": "10.1038/s41563-020-0001-2",
+    "arxiv_id": null,
+    "source": "openalex",
+    "tier": "C",
+    "score": 0.0,
+    "status": "filed",
+    "landing_url": "",
+    "relpath": "rsoxs/2020/mine.pdf",
+    "detail": "supplied by the user (strong match)",
+    "oa": null,
+    "link_rule": null,
+    "provenance": "user_supplied",
+    "supplied_by": "local-operator",
+    "match": null
+  },
+  "verdict": {
+    "kind": "strong",
+    "reason": "the paper's DOI is in the PDF",
+    "title_similarity": 1.0,
+    "found_dois": [
+      "10.1038/s41563-020-0001-2"
+    ],
+    "found_title": "Grazing incidence scattering of block copolymer thin films"
+  },
+  "paper": {
+    "id": "8e33e95d9956b297",
+    "relpath": "rsoxs/2020/mine.pdf",
+    "file_name": "mine.pdf",
+    "folder": "rsoxs",
+    "sha256": "fe7e7c2bc99a546350b01e139f72a31f6b05f03d3016cfb72bc259d32d177e9c",
+    "size_bytes": 2579,
+    "title": "Grazing incidence scattering of block copolymer thin films",
+    "doi": "10.1038/s41563-020-0001-2",
+    "verify_status": "unverified",
+    "verified_at": null,
+    "index_status": "not_indexed",
+    "pages": 1,
+    "verify_detail": null,
+    "metadata_status": "ok"
+  },
+  "duplicate": false,
+  "manifest": {
+    "updated": true,
+    "path": "rsoxs/manifest.json",
+    "detail": "added to the manifest"
+  }
+}

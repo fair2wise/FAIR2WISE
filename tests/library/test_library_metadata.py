@@ -130,3 +130,29 @@ def test_the_lookup_ignores_links_and_invalid_category_folders(tmp_path):
     (outside / "manifest.json").write_text(json.dumps({"papers": [{"pdf_path": "papers/x.pdf", "abstract": "leak"}]}))
     (lib / "link").symlink_to(outside)
     assert ManifestMetadata().index(lib).describe("x.pdf", "0", None)["abstract"] is None
+
+
+def test_provenance_of_a_supplied_file_is_listed_from_its_own_manifest_row_only(tmp_path):
+    svc, lib = service(tmp_path)
+    put(lib, "rsoxs/2013/a.pdf", "a")
+    put(lib, "rsoxs/2013/b.pdf", "b")
+    put(lib, "rsoxs/2013/c.pdf", "c")
+    manifest(lib, "rsoxs", [
+        {"pdf_path": "papers/rsoxs/2013/a.pdf", "provenance": "user_supplied", "supplied_by": "alice", "doi": "https://doi.org/10.1/x"},
+        {"pdf_path": "papers/rsoxs/2013/b.pdf", "provenance": "something-else"},
+        {"pdf_path": "papers/rsoxs/2013/gone.pdf", "provenance": "user_supplied_confirmed", "doi": "https://doi.org/10.1/y"}])
+    papers = listed(svc)
+    assert papers["rsoxs/2013/a.pdf"]["provenance"] == "user_supplied"
+    assert papers["rsoxs/2013/b.pdf"]["provenance"] is None and papers["rsoxs/2013/c.pdf"]["provenance"] is None
+    assert "supplied_by" not in papers["rsoxs/2013/a.pdf"]   # who supplied it is not part of the list
+
+
+def test_a_hand_supplied_filing_shows_its_provenance_in_the_list_and_undo_removes_it(tmp_path):
+    from tests.library.test_manual_pdf import DOI_P, TITLE_P, World, strong_pdf
+
+    w = World(tmp_path)
+    w.harvester.supply_pdf(w.p, "p.pdf", strong_pdf(w, DOI_P, TITLE_P), supplied_by="alice")
+    (paper,) = w.service.list_papers()["papers"]
+    assert paper["provenance"] == "user_supplied"
+    w.harvester.undo_supplied(w.p)
+    assert w.service.list_papers()["papers"] == []
