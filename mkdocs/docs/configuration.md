@@ -122,6 +122,10 @@ dispatcher. Results report whether the active backend is `semantic` or
 | `EXTRACT_TERMS_BACKEND` | Extraction backend |
 | `EXTRACT_TERMS_MODEL` | Extraction model (CBORG: must be a free LBL-hosted id, see below) |
 
+## User schemas
+
+User-written and model-written LinkML schemas live under `<F2W_WORKDIR>/schemas/<name>/<name>@vN.yaml` (immutable versions, mode 0600; the directory must be on the writable state volume, like `kgs`). Creating, validating, generating and previewing schemas needs the capability `library.author_schema`, which only the `:local` profile grants (it is in the local-only library capabilities; ALS profiles do not have it and answer 404 for the routes). Generation and preview use the backend like extraction (`CBORG_API_KEY` with a free CBORG model, or `OLLAMA_URL` / `F2W_EXTRACT_BACKEND=ollama`); the free-model policy applies. See [Design: schema generation](design-schema-generation.md).
+
 ## Model policy: free CBORG models only
 
 Owner decision 2026-11-09 (`docs/migration/reviews/owner_decisions_2026-11-03.md`, seventeenth
