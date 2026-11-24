@@ -11,7 +11,7 @@ test.describe('settings', () => {
   test('JSON is default with multi-select graphs, hops, max nodes, Tiled, and Source RAG', async ({ page }) => {
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByRole('radio', { name: /JSON/ })).toBeChecked();
-    await expect(dialog.getByRole('radio', { name: /splash_links/ })).not.toBeChecked();
+    await expect(dialog.getByRole('radio', { name: /Tiled Graph/ })).not.toBeChecked();
 
     await expect(dialog.getByRole('checkbox', { name: /matkg_rsoxs_v3\.json/ })).toBeChecked();
     await expect(dialog.getByRole('checkbox', { name: /matkg_bl1101_v9\.json/ })).toBeChecked();
