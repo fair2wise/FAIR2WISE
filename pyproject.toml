@@ -138,6 +138,7 @@ packages = [
   "f2w.modules.curation",
   "f2w.modules.library",
   "f2w.modules.literature",
+  "f2w.modules.metrics",
   "f2w.modules.operations",
   "f2w.modules.provenance",
   "f2w.modules.runtime_bridge",
