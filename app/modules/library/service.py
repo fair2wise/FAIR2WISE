@@ -50,6 +50,7 @@ from ..literature.openalex import (
     ResponseCache,
     default_http_client,
 )
+from ..metrics import counted
 from ..security.authorization import StartupConfigError, local_operator_context
 from .arrange import category_problem, guess_year, is_valid_folder_name, year_folder
 from .bibmeta import openalex_abstract, openalex_authors
@@ -256,6 +257,7 @@ class LibraryService:
         self.catalog.upsert_paper(relpath=relpath, sha256=sha256, size=size, mtime=mtime, title=title, doi=doi,
                                   doi_source=source, meta_status=status, pages=pages)
 
+    @counted("library", "refresh")
     def refresh(self, *, max_probe: int | None = None) -> dict[str, Any]:
         """Bring the catalog in line with the folder: hash new or changed files, probe up to ``max_probe`` of them.
 
@@ -386,6 +388,7 @@ class LibraryService:
             logger.warning("category listing could not read the library folder: %s", exc)
         return {"categories": [{"name": n, "count": counts.get(n, 0)} for n in sorted(names, key=str.lower)]}
 
+    @counted("library", "create_category")
     def create_category(self, raw: object) -> dict[str, Any]:
         """Create the category ``raw`` (an empty top-level folder); an existing one (any case) is returned as is.
 
@@ -413,6 +416,7 @@ class LibraryService:
 
     # -- upload ------------------------------------------------------------------------------------
 
+    @counted("library", "upload")
     def upload(self, filename: str | None, data: bytes, folder: str | None = None, *,
                known: Mapping[str, Any] | None = None) -> dict[str, Any]:
         """Store one PDF in the mounted folder and catalogue it.
@@ -556,6 +560,7 @@ class LibraryService:
         return local_operator_context(self.settings, request_id=request_id, actor_kind=ActorKind.WORKER,
                                       run_id=request_id)
 
+    @counted("library", "verify_paper")
     def verify_paper(self, pid: str, ctx: RequestContext, *, force: bool = False) -> dict[str, Any]:
         """Verify one paper against OpenAlex and cache a settled result by sha256.
 
@@ -620,6 +625,7 @@ class LibraryService:
                           lambda r: r.get("pdf_path") == path or r.get("pdf_sha256") == sha256,
                           authors=openalex_authors(work), abstract=openalex_abstract(work))
 
+    @counted("library", "verify_all")
     def verify_all(self, ctx: RequestContext, *, progress: Callable[..., None] | None = None,
                    log: Callable[..., None] | None = None, guard: Callable[[], None] | None = None) -> dict[str, Any]:
         """Verify every paper with no settled result, stopping when the quota breaker opens.

@@ -22,6 +22,7 @@ from typing import Any, cast
 
 import requests
 
+from ...metrics import counted
 from ..identity_adapter import GRAPH_KEY, LITERATURE_OWNER, OWNER_KEY
 from ..ports import ContractError, ErrorCode, TruncatedGraphRead
 from .tiled_client import TiledCredentialRejected, TiledGraphClient
@@ -57,6 +58,7 @@ class TiledMutationClient(TiledGraphClient):
     nothing here accepts a user token.
     """
 
+    @counted("tiled", "write")
     def mutate(self, document: str, variables: Mapping[str, Any]) -> dict[str, Any]:
         """POST one mutation; never retried (a retry could duplicate a create)."""
         try:

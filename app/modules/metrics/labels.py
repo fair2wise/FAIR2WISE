@@ -18,6 +18,11 @@ JOB_OUTCOMES = ("succeeded", "failed", "cancelled", "paused")
 QUEUE_STATES = ("queued", "running")
 LLM_PROVIDERS = ("cborg", "ollama")
 LLM_OUTCOMES = ("ok", "ip_not_authorized", "auth", "rate_limited", "timeout", "error")
+FETCH_SOURCES = ("arxiv", "openalex", "pdf")
+FETCH_OUTCOMES = ("ok", "failed", "blocked", "refused")
+TILED_OPERATIONS = ("read", "write")
+LIBRARY_OPERATIONS = ("refresh", "upload", "create_category", "verify_paper", "verify_all")
+OPERATION_OUTCOMES = ("ok", "invalid", "denied", "unavailable", "error")
 STATUS_CLASSES = ("1xx", "2xx", "3xx", "4xx", "5xx")
 
 

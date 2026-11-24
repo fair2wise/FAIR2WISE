@@ -36,4 +36,7 @@ SPECS = (
     Spec("queue_depth", "f2w.jobs.queue.depth", "gauge", "{job}", "Jobs queued or running (worker only)"),
     Spec("llm_calls", "f2w.llm.calls", "counter", "{call}", "Model calls"),
     Spec("llm_duration", "f2w.llm.call.duration", "histogram", "s", "Model call duration", LLM_BOUNDS_S),
+    Spec("harvest_fetches", "f2w.harvest.fetches", "counter", "{fetch}", "Harvest searches and PDF downloads"),
+    Spec("tiled_operations", "f2w.tiled.operations", "counter", "{operation}", "Tiled graph requests"),
+    Spec("library_operations", "f2w.library.operations", "counter", "{operation}", "Library service operations"),
 )

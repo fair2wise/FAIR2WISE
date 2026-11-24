@@ -35,6 +35,7 @@ from urllib.parse import urljoin
 
 import httpx
 
+from .. import metrics
 from ..contracts.errors import ContractError, ErrorCode
 from ..jobs.pipeline import StageContext, StageResult
 from ..literature.legacy_download import (
@@ -544,8 +545,10 @@ class Harvester:
             try:
                 found = self._search_functions()[source](args["topic"], args["per_query"])
             except Exception as exc:  # noqa: BLE001 - a source that cannot run must not stop the others
+                metrics.record_harvest_fetch(source=source, outcome="failed")
                 ctx.log(f"{source} search skipped: {exc}", level="warning")
                 continue
+            metrics.record_harvest_fetch(source=source, outcome="ok")
             searched += 1
             ctx.log(f"{source}: {len(found)} results")
             groups.append(found)
@@ -611,6 +614,7 @@ class Harvester:
                 data, status = downloader(url, max_bytes)
             except Exception as exc:  # noqa: BLE001 - one paper's failure must not abort the rest of the run
                 data, status = None, f"failed:{type(exc).__name__}"
+            metrics.record_harvest_fetch(source="pdf", outcome=metrics.fetch_outcome(status))
             self._sleep(self.delay)
             if data is None:
                 last = status

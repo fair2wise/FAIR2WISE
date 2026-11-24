@@ -247,3 +247,24 @@ def record_llm(*, provider: object, outcome: object, seconds: float) -> None:
     attrs = {"provider": labels.enum(provider, labels.LLM_PROVIDERS), "outcome": labels.enum(outcome, labels.LLM_OUTCOMES)}
     _add("llm_calls", attrs)
     _observe("llm_duration", attrs, seconds)
+
+
+def record_harvest_fetch(*, source: object, outcome: object) -> None:
+    """Count one harvest fetch: a source search (``arxiv``, ``openalex``) or a PDF download (``pdf``)."""
+    if _STATE.enabled:
+        _add("harvest_fetches", {"source": labels.enum(source, labels.FETCH_SOURCES),
+                                 "outcome": labels.enum(outcome, labels.FETCH_OUTCOMES)})
+
+
+def record_tiled_operation(*, operation: object, outcome: object) -> None:
+    """Count one Tiled graph request (``read`` or ``write``)."""
+    if _STATE.enabled:
+        _add("tiled_operations", {"operation": labels.enum(operation, labels.TILED_OPERATIONS),
+                                  "outcome": labels.enum(outcome, labels.OPERATION_OUTCOMES)})
+
+
+def record_library_operation(*, operation: object, outcome: object) -> None:
+    """Count one library service operation (a closed set of operation names)."""
+    if _STATE.enabled:
+        _add("library_operations", {"operation": labels.enum(operation, labels.LIBRARY_OPERATIONS),
+                                    "outcome": labels.enum(outcome, labels.OPERATION_OUTCOMES)})

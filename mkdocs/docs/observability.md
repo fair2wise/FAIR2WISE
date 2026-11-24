@@ -309,6 +309,9 @@ The commit is exposed by one metric, `f2w.build.info`, instead.
 | `f2w.jobs.queue.depth` | observable gauge, `{job}` | `kind`, `state` | `f2w_jobs_queue_depth` (worker process only) |
 | `f2w.llm.calls` | counter, `{call}` | `provider`, `outcome` | `f2w_llm_calls_total` |
 | `f2w.llm.call.duration` | histogram, `s` | `provider`, `outcome` | `f2w_llm_call_duration_seconds_bucket`, `_sum`, `_count` |
+| `f2w.harvest.fetches` | counter, `{fetch}` | `source`, `outcome` | `f2w_harvest_fetches_total` |
+| `f2w.tiled.operations` | counter, `{operation}` | `operation`, `outcome` | `f2w_tiled_operations_total` |
+| `f2w.library.operations` | counter, `{operation}` | `operation`, `outcome` | `f2w_library_operations_total` |
 | `f2w.http.requests` | counter, `{request}` | `http_route`, `http_method`, `status_class` | `f2w_http_requests_total` |
 | `f2w.http.request.duration` | histogram, `s` | `http_route`, `http_method`, `status_class` | `f2w_http_request_duration_seconds_bucket`, `_sum`, `_count` |
 
@@ -328,6 +331,13 @@ the CBORG and Ollama chat clients, the Q&A loop and the planning model). `provid
 (`other` if a call site cannot say); `outcome` is `ok`, `ip_not_authorized` (CBORG's HTTP 403 network refusal, as
 classified by `cborg_errors.py`), `auth` (other 401/403), `rate_limited` (429), `timeout` or `error`. LLM duration
 boundaries (seconds): `0.1, 0.25, 0.5, 1, 2.5, 5, 10, 20, 30, 60, 120, 180, 300`. There is no model-name label.
+
+Harvest (in the worker): `source` is `arxiv` or `openalex` (one search each per run) or `pdf` (one per download
+attempt); `outcome` is `ok`, `failed`, `blocked` (network policy) or `refused` (too large, not a PDF). Tiled
+(the graph client's GraphQL requests, one per request, so a paged scan counts every page): `operation` is `read`
+or `write`. Library (`LibraryService`): `operation` is `refresh`, `upload`, `create_category`, `verify_paper` or
+`verify_all`. For Tiled and library, `outcome` is `ok`, `invalid`, `denied`, `unavailable` (from the contract
+error code) or `error`; no error text is read.
 
 **Label safety.** Every label value comes from a closed set (or a route template the application declared);
 anything else becomes `other`. DOIs, URLs, query strings, uuids, file names, node ids, paper titles, user ids

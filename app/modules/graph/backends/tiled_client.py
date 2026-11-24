@@ -35,6 +35,7 @@ from app.modules.deployment.tiled_config import (
     validate_external_url,
 )
 
+from ...metrics import counted
 from ..ports import ContractError, ErrorCode
 
 GRAPHQL_PATH = "/api/graphql"
@@ -118,6 +119,7 @@ class TiledGraphClient:
             raise ContractError(ErrorCode.UNAVAILABLE, f"Tiled graph credential unavailable: {exc}") from None
         return {"Authorization": f"{self._scheme} {cred}"} if cred else {}
 
+    @counted("tiled", "read")
     def query(self, document: str, variables: Mapping[str, Any] | None = None) -> dict[str, Any]:
         """Run a read query and return ``data``.
 
