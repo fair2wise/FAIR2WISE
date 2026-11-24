@@ -1,72 +1,102 @@
 import { FlaskConical, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { TERMINAL_JOB_STATES } from './extractionApi';
-import { extractionKeys, useCancelJob, useExportKg, useJob, useRunningExtraction } from './extractionHooks';
+import { TERMINAL_JOB_STATES, type JobInfo } from './extractionApi';
+import { FAST_POLL_MS, useCancelJob, useExportKg, useExtractionRuns, useJob, useJobSummary } from './extractionHooks';
 import { ExtractionIdleForm } from './extraction/ExtractionIdleForm';
 import { ExtractionRunView } from './extraction/ExtractionRunView';
 import { PublishToTiled } from './extraction/PublishToTiled';
-import { useJobLogStream } from './extraction/useJobLogStream';
-import { useQueryClient } from '@tanstack/react-query';
+import { RunsList } from './extraction/RunsList';
+import { useJobLogPolling } from './extraction/useJobLogPolling';
+import { useLive } from './tabActivity';
+
+/** What the tab shows: a run of the server's list, or the form for a new one. */
+type Choice = { kind: 'auto' } | { kind: 'run'; id: string } | { kind: 'new' };
+
+const isMoving = (state: string) => state === 'running' || state === 'queued';
 
 /**
- * Extraction tab (A8, T42). While a `library_extract` job exists it shows the running view
- * (progress, live log, Cancel); a run already in progress is re-attached after a page reload through
- * `GET /v1/jobs?state=running&kind=library_extract`. When the run ends the finished or failed view
- * stays until "New extraction". Otherwise it shows the idle form. It never changes the Settings model.
+ * Extraction tab (A8, T42). Everything it shows about a run comes from the job store through the API: the runs
+ * list (newest first, bounded), the run's progress summary and its log (polled with a cursor), so a page reload or
+ * a tab switch loses nothing. Opening the tab shows the running job, else the most recent run, else the form;
+ * "New extraction" opens the form. Polling stops while the tab or the page is hidden and resumes on return.
+ * It never changes the Settings model.
  */
 export function ExtractionTab() {
-  const queryClient = useQueryClient();
-  const running = useRunningExtraction(true);
-  const [watch, setWatch] = useState<{ id: string; name: string | null } | null>(null);
+  const live = useLive();
+  const runs = useExtractionRuns(live);
+  const [choice, setChoice] = useState<Choice>({ kind: 'auto' });
+  // A just-started run is shown at once, before the list has caught up.
+  const [started, setStarted] = useState<{ id: string; name: string } | null>(null);
 
-  // Re-attach to a run found on the server (page reload, or started elsewhere).
-  const [dismissed, setDismissed] = useState<string | null>(null);
+  const list = runs.data ?? [];
+  const autoId = (list.find(run => isMoving(run.state)) ?? list[0])?.id ?? null;
+  const selectedId = choice.kind === 'run' ? choice.id : choice.kind === 'auto' ? autoId : null;
+  const name = started && started.id === selectedId ? started.name : null;
+
   useEffect(() => {
-    if (!watch && running.data && running.data.id !== dismissed) setWatch({ id: running.data.id, name: null });
-  }, [running.data, watch, dismissed]);
+    // Once the list shows the started run, forget the shortcut.
+    if (started && list.some(run => run.id === started.id)) setStarted(null);
+  }, [list, started]);
 
-  const job = useJob(watch?.id ?? null);
-  const terminal = job.data ? TERMINAL_JOB_STATES.has(job.data.state) : false;
-  const logs = useJobLogStream(watch?.id ?? null, { active: watch !== null && !terminal });
+  const job = useJob(selectedId, FAST_POLL_MS, live);
+  const summary = useJobSummary(selectedId, FAST_POLL_MS, live);
+  const listed = list.find(run => run.id === selectedId);
+  const state = job.data?.state ?? listed?.state;
+  const terminal = state ? TERMINAL_JOB_STATES.has(state) : false;
+  const logs = useJobLogPolling(selectedId, { live, terminal });
   const cancel = useCancelJob();
   const exportKg = useExportKg();
 
+  const current: JobInfo | null = selectedId && (job.data || listed)
+    ? { ...(job.data ?? (listed as JobInfo)), summary: summary.data ?? listed?.summary ?? undefined,
+        ...(summary.data || listed?.summary ? {
+          progress: { done: (summary.data ?? listed?.summary)!.papers.done, total: (summary.data ?? listed?.summary)!.papers.total },
+          error: job.data?.error ?? (summary.data ?? listed?.summary)!.error,
+        } : {}) }
+    : null;
+
   let body;
-  if (watch && job.data) {
+  if (selectedId && current) {
     body = (
       <ExtractionRunView
-        job={job.data}
-        kgName={watch.name}
+        job={current}
+        kgName={name}
         lines={logs.lines}
-        streaming={logs.streaming}
+        logTotal={logs.total}
+        polling={logs.polling}
+        logError={logs.error}
+        live={live}
         cancelling={cancel.isPending}
         exporting={exportKg.isPending}
-        publishSlot={<PublishToTiled name={watch.name} />}
-        onCancel={() => cancel.mutate(watch.id, { onError: error => toast.error(error.message) })}
+        publishSlot={<PublishToTiled name={current.summary?.params.bundle ?? name} />}
+        onCancel={() => cancel.mutate(selectedId, { onError: error => toast.error(error.message) })}
         onExport={() => {
-          if (!watch.name) return;
-          exportKg.mutate(watch.name, {
+          const bundle = current.summary?.params.bundle ?? name;
+          if (!bundle) return;
+          exportKg.mutate(bundle, {
             onSuccess: result => toast.success(`Exported ${result.file_name}`),
             onError: error => toast.error(error.message),
           });
         }}
-        onNew={() => {
-          setDismissed(watch.id);
-          setWatch(null);
-          void queryClient.invalidateQueries({ queryKey: extractionKeys.running });
-          void queryClient.invalidateQueries({ queryKey: extractionKeys.bundles });
-        }}
+        onNew={() => setChoice({ kind: 'new' })}
       />
     );
-  } else if ((watch && job.isPending) || running.isPending) {
+  } else if (selectedId || (choice.kind === 'auto' && runs.isPending)) {
     body = (
       <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
         <Loader2 aria-hidden="true" className="animate-spin" /> Loading…
       </p>
     );
   } else {
-    body = <ExtractionIdleForm onStarted={(id, name) => setWatch({ id, name })} />;
+    body = (
+      <ExtractionIdleForm
+        onStarted={(id, bundle) => {
+          setStarted({ id, name: bundle });
+          setChoice({ kind: 'run', id });
+        }}
+      />
+    );
   }
 
   return (
@@ -81,6 +111,7 @@ export function ExtractionTab() {
         </h2>
       </div>
       <p className="text-sm text-muted-foreground">Build or continue a knowledge graph from library papers.</p>
+      <RunsList runs={list} selectedId={selectedId} onSelect={id => setChoice({ kind: 'run', id })} />
       {body}
     </section>
   );

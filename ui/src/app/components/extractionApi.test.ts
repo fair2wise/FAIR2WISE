@@ -8,6 +8,8 @@ import {
   fetchExtractionModels,
   fetchJobLogs,
   fetchJobs,
+  fetchJobSummary,
+  normalizeJob,
   fetchKgBundles,
   startExtraction,
   streamJobEvents,
@@ -50,8 +52,8 @@ describe('extractionApi', () => {
   });
 
   it('starts a library_extract job with the model in the inputs, never PUT /settings', async () => {
-    const fetcher = respond(200, { id: 'j', kind: 'library_extract', state: 'queued' });
-    await startExtraction(
+    const fetcher = respond(200, { job_id: 'j', kind: 'library_extract', state: 'queued', submitted_at: '2026-11-23T10:00:00+00:00' });
+    const started = await startExtraction(
       {
         bundle: 'kg1', topic: 't', schema: 's', model: 'm',
         papers: ['a'], confirmation: 'c', nonce: 'n',
@@ -70,6 +72,43 @@ describe('extractionApi', () => {
         },
       },
     });
+    expect(started).toEqual({ id: 'j', kind: 'library_extract', state: 'queued' }); // the server's job_id becomes id
+  });
+
+  it('normalizes the server handle (job_id, submitted_at, optional summary) and the older id shape', () => {
+    const summary = { papers: { total: 4, done: 3, failed: 1, skipped: 0 }, error: 'incomplete coverage' };
+    expect(normalizeJob({ job_id: 'a', kind: 'k', state: 'failed', submitted_at: 'T', summary })).toEqual({
+      id: 'a', kind: 'k', state: 'failed', progress: { done: 3, total: 4 }, error: 'incomplete coverage',
+      created_at: 'T', updated_at: 'T', summary,
+    });
+    expect(normalizeJob({ id: 'b', kind: 'k', state: 'running', progress: { done: 1, total: 2 }, error: null, created_at: 'c', updated_at: 'u' }))
+      .toMatchObject({ id: 'b', progress: { done: 1, total: 2 }, created_at: 'c', updated_at: 'u' });
+    expect(normalizeJob({ job_id: 'c', kind: 'k', state: 'queued' }).progress).toEqual({});
+  });
+
+  it('asks for the runs list with the compact summary, newest first, bounded', async () => {
+    const fetcher = respond(200, { jobs: [{ job_id: 'j1', kind: 'library_extract', state: 'running' }] });
+    const { jobs } = await fetchJobs({ kind: 'library_extract', detail: 'summary', limit: 20 }, asFetch(fetcher));
+    const url = new URL(call(fetcher)[0], 'http://x');
+    expect(url.searchParams.get('detail')).toBe('summary');
+    expect(url.searchParams.get('limit')).toBe('20');
+    expect(jobs[0].id).toBe('j1');
+  });
+
+  it('reads the live summary from the progress route, null when the server sends none', async () => {
+    const withSummary = respond(200, { job_id: 'j1', summary: { outcome: 'running' } });
+    expect(await fetchJobSummary('j 1', asFetch(withSummary))).toEqual({ outcome: 'running' });
+    expect(call(withSummary)[0]).toContain('/v1/jobs/j%201/progress');
+    expect(await fetchJobSummary('j1', asFetch(respond(200, { job_id: 'j1', phases: {} })))).toBeNull();
+  });
+
+  it('fetches the log tail with a limit, and from the start with after=-1 (the first line has seq 0)', async () => {
+    const logs = respond(200, { logs: [], kept: 0, total: 0 });
+    await fetchJobLogs('j1', undefined, asFetch(logs), { limit: 1000, tail: true });
+    const url = new URL(call(logs)[0], 'http://x');
+    expect(url.searchParams.get('after')).toBe('-1');
+    expect(url.searchParams.get('limit')).toBe('1000');
+    expect(url.searchParams.get('tail')).toBe('true');
   });
 
   it('filters running jobs by state and kind (reload re-attach)', async () => {

@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExtractionTab } from './ExtractionTab';
+import { TabActiveProvider } from './tabActivity';
 
 const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() }));
 vi.mock('sonner', () => ({ toast: toastMock }));
@@ -11,9 +12,19 @@ const paper = (id: string) => ({
   id, relpath: `${id}.pdf`, folder: '', file_name: `${id}.pdf`, sha256: id, size_bytes: 1, title: `Title ${id}`, doi: null,
   verify_status: 'unverified', verified_at: null, index_status: null,
 });
+// The job handle as the server sends it (`job_id`, no counters) ...
 const job = (state: string, extra: Record<string, unknown> = {}) => ({
-  id: 'j1', kind: 'library_extract', state, progress: { done: 2, total: 4 }, error: null,
-  created_at: '', updated_at: '', ...extra,
+  job_id: 'j1', kind: 'library_extract', state, submitted_at: '2026-11-23T10:00:00+00:00', settings_revision: null, ...extra,
+});
+// ... and its live summary from GET /v1/jobs/{id}/progress.
+const summary = (over: Record<string, unknown> = {}) => ({
+  outcome: 'running', state: 'running', started_at: '2026-11-23T10:00:00+00:00', finished_at: null, elapsed_seconds: 61,
+  stage: { name: 'run', status: 'running', phase: 'extracting' }, current_paper: 'a.pdf',
+  papers: { total: 4, done: 2, failed: 0, skipped: 0 },
+  growth: { entities_new: 9, entities_merged: 3, relations_new: 4, relations_merged: 1, entities_total: 12, relations_total: 5 },
+  counters: { paper_pages_done: 1, paper_pages_total: 6 },
+  params: { bundle: 'kg-live', model: 'm1', backend: 'cborg' }, error: null,
+  logs: { kept: 1, total: 1, cap: 2000 }, ...over,
 });
 
 interface Route { status: number; body: unknown }
@@ -47,8 +58,9 @@ beforeEach(() => {
       status: 200,
       body: { pages: 20, paper_count: 1, unknown_pages: 0, model: 'm1', estimated_tokens: 100, estimated_cost_usd: 1.5, confirmation: 'tok' },
     },
-    'POST /v1/jobs': { status: 200, body: { id: 'j1', kind: 'library_extract', state: 'queued' } },
+    'POST /v1/jobs': { status: 200, body: job('queued') },
     'GET /v1/jobs/j1': { status: 200, body: job('running') },
+    'GET /v1/jobs/j1/progress': { status: 200, body: { job_id: 'j1', summary: summary() } },
     'GET /v1/jobs/j1/logs': { status: 200, body: { logs: [] } },
     'POST /v1/jobs/j1/cancel': { status: 200, body: job('cancelled') },
   };
@@ -87,7 +99,7 @@ describe('ExtractionTab idle', () => {
     renderTab();
     expect(await screen.findByTestId('extraction-idle')).toBeInTheDocument();
     expect(startButton()).toBeDisabled();
-    expect(calls.some(c => c.path === '/v1/jobs' && c.search.includes('state=running') && c.search.includes('kind=library_extract'))).toBe(true);
+    expect(calls.some(c => c.path === '/v1/jobs' && c.search.includes('kind=library_extract') && c.search.includes('detail=summary'))).toBe(true);
   });
 
   it('keeps Start disabled until name, paper and confirmed cost are all present, then submits params', async () => {
@@ -278,18 +290,75 @@ describe('ExtractionTab idle', () => {
 });
 
 describe('ExtractionTab run', () => {
-  it('re-attaches to a running job after a reload and shows progress', async () => {
-    routes['GET /v1/jobs'].body = { jobs: [job('running')] };
+  const listed = (state: string, over: Record<string, unknown> = {}) => ({
+    ...job(state), summary: summary({ state, outcome: state, ...over }),
+  });
+
+  it('re-attaches to a running job after a reload and shows its progress, growth and current paper from the server', async () => {
+    routes['GET /v1/jobs'].body = { jobs: [listed('running')] };
     renderTab();
     expect(await screen.findByTestId('extraction-run')).toBeInTheDocument();
-    expect(await screen.findByTestId('run-progress-text')).toHaveTextContent('2 of 4 papers (50%)');
+    await waitFor(() => expect(screen.getByTestId('run-progress-text')).toHaveTextContent('2 of 4 papers done (50%)'));
+    expect(screen.getByTestId('run-current-paper')).toHaveTextContent('Now: a.pdf (page 1 of 6)');
+    expect(screen.getByTestId('run-growth')).toHaveTextContent('9 new · 3 merged');
+    expect(screen.getByRole('heading', { name: 'Extracting kg-live' })).toBeInTheDocument();
     expect(screen.queryByTestId('extraction-idle')).not.toBeInTheDocument();
   });
 
-  it('streams log lines and cancels', async () => {
-    routes['GET /v1/jobs'].body = { jobs: [job('running')] };
+  it('shows the most recent finished run when none is running, with its history, and lists the runs newest first', async () => {
+    routes['GET /v1/jobs'].body = {
+      jobs: [
+        { ...job('succeeded'), summary: summary({ state: 'succeeded', outcome: 'succeeded', current_paper: null }) },
+        { ...job('failed', { job_id: 'j0' }), summary: summary({ state: 'failed', outcome: 'failed', params: { bundle: 'old-run' } }) },
+      ],
+    };
+    routes['GET /v1/jobs/j1'].body = job('succeeded');
+    routes['GET /v1/jobs/j1/progress'].body = {
+      job_id: 'j1', summary: summary({ state: 'succeeded', outcome: 'succeeded', current_paper: null, logs: { kept: 2, total: 2, cap: 2000 } }),
+    };
     routes['GET /v1/jobs/j1/logs'].body = {
-      logs: [{ seq: 1, at: '2026-11-02T10:00:00Z', level: 'info', stage: 'extract', message: 'reading p1' }],
+      logs: [
+        { seq: 0, at: '2026-11-23T10:00:01Z', level: 'info', stage: 'run', message: 'paper 1 of 4: extracting a.pdf' },
+        { seq: 1, at: '2026-11-23T10:00:09Z', level: 'warning', stage: 'run', message: 'b.pdf: the PDF could not be read' },
+      ],
+      kept: 2, total: 2,
+    };
+    renderTab();
+    expect(await screen.findByText(/paper 1 of 4: extracting a.pdf/)).toBeInTheDocument(); // history from the store
+    expect(screen.getByTestId('run-state')).toHaveTextContent('Succeeded');
+    const list = screen.getByRole('navigation', { name: 'Extraction runs' });
+    expect(within(list).getAllByRole('button').map(b => b.textContent)).toEqual([
+      expect.stringContaining('kg-live'), expect.stringContaining('old-run'),
+    ]);
+    // the log was fetched as a tail (cursor derived from the store), not from component state
+    const logCall = calls.find(c => c.path === '/v1/jobs/j1/logs');
+    expect(logCall?.search).toContain('tail=true');
+  });
+
+  it('opens another run from the list', async () => {
+    const user = userEvent.setup();
+    routes['GET /v1/jobs'].body = {
+      jobs: [
+        listed('running'),
+        { ...job('failed', { job_id: 'j0' }), summary: summary({ state: 'failed', outcome: 'failed', params: { bundle: 'old-run' } }) },
+      ],
+    };
+    routes['GET /v1/jobs/j0'] = { status: 200, body: job('failed', { job_id: 'j0' }) };
+    routes['GET /v1/jobs/j0/progress'] = {
+      status: 200, body: { job_id: 'j0', summary: summary({ state: 'failed', outcome: 'failed', params: { bundle: 'old-run' }, error: 'incomplete coverage', papers: { total: 3, done: 0, failed: 3, skipped: 0, failed_list: [] } }) },
+    };
+    routes['GET /v1/jobs/j0/logs'] = { status: 200, body: { logs: [], kept: 0, total: 0 } };
+    renderTab();
+    await screen.findByRole('heading', { name: 'Extracting kg-live' });
+    await user.click(within(screen.getByRole('navigation', { name: 'Extraction runs' })).getByRole('button', { name: /old-run/ }));
+    expect(await screen.findByRole('heading', { name: 'Extraction old-run' })).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('incomplete coverage');
+  });
+
+  it('shows log lines and cancels', async () => {
+    routes['GET /v1/jobs'].body = { jobs: [listed('running')] };
+    routes['GET /v1/jobs/j1/logs'].body = {
+      logs: [{ seq: 0, at: '2026-11-02T10:00:00Z', level: 'info', stage: 'extract', message: 'reading p1' }], kept: 1, total: 1,
     };
     const user = userEvent.setup();
     renderTab();
@@ -299,21 +368,67 @@ describe('ExtractionTab run', () => {
   });
 
   it('shows the failed state with the error, and New extraction returns to the idle form', async () => {
-    routes['GET /v1/jobs'].body = { jobs: [job('running')] };
-    routes['GET /v1/jobs/j1'].body = job('failed', { error: 'worker crashed' });
+    routes['GET /v1/jobs'].body = { jobs: [listed('running')] };
+    routes['GET /v1/jobs/j1'].body = job('failed');
+    routes['GET /v1/jobs/j1/progress'].body = {
+      job_id: 'j1', summary: summary({ state: 'failed', outcome: 'failed', error: 'worker crashed', current_paper: null }),
+    };
     const user = userEvent.setup();
     renderTab();
     expect(await screen.findByRole('alert')).toHaveTextContent('worker crashed');
-    routes['GET /v1/jobs'].body = { jobs: [] };
     await user.click(screen.getByRole('button', { name: /new extraction/i }));
     expect(await screen.findByTestId('extraction-idle')).toBeInTheDocument();
   });
 
-  it('shows the finished state', async () => {
-    routes['GET /v1/jobs'].body = { jobs: [job('running')] };
-    routes['GET /v1/jobs/j1'].body = job('succeeded');
+  it('shows the partially failed state with the failed papers', async () => {
+    const papers = { total: 3, done: 2, failed: 1, skipped: 0, failed_list: [{ name: 'b.pdf', reason: 'the PDF could not be read' }] };
+    routes['GET /v1/jobs'].body = { jobs: [listed('failed', { outcome: 'partially_failed', papers })] };
+    routes['GET /v1/jobs/j1'].body = job('failed');
+    routes['GET /v1/jobs/j1/progress'].body = {
+      job_id: 'j1', summary: summary({ state: 'failed', outcome: 'partially_failed', papers, current_paper: null }),
+    };
     renderTab();
-    await waitFor(() => expect(screen.getByTestId('run-state')).toHaveTextContent('succeeded'));
+    await waitFor(() => expect(screen.getByTestId('run-state')).toHaveTextContent('Partially failed (1 of 3 papers failed)'));
+    expect(screen.getByTestId('failed-papers')).toHaveTextContent('b.pdf: the PDF could not be read');
+  });
+
+  it('shows the finished state', async () => {
+    routes['GET /v1/jobs'].body = { jobs: [listed('running')] };
+    routes['GET /v1/jobs/j1'].body = job('succeeded');
+    routes['GET /v1/jobs/j1/progress'].body = {
+      job_id: 'j1', summary: summary({ state: 'succeeded', outcome: 'succeeded', current_paper: null }),
+    };
+    renderTab();
+    await waitFor(() => expect(screen.getByTestId('run-state')).toHaveTextContent('Succeeded'));
     expect(screen.queryByRole('button', { name: /cancel/i })).not.toBeInTheDocument();
+  });
+
+  it('still works against a server that sends no summary yet (job state and plain progress only)', async () => {
+    routes['GET /v1/jobs'].body = { jobs: [job('running')] };
+    routes['GET /v1/jobs/j1/progress'] = { status: 200, body: { job_id: 'j1', phases: {} } };
+    renderTab();
+    expect(await screen.findByTestId('extraction-run')).toBeInTheDocument();
+    expect(screen.getByTestId('run-state')).toHaveTextContent('running');
+    expect(screen.getByTestId('run-progress-text')).toHaveTextContent('Waiting for progress');
+  });
+});
+
+describe('ExtractionTab hidden', () => {
+  it('makes no request while its tab is not the one on screen, and fetches when shown', async () => {
+    routes['GET /v1/jobs'].body = { jobs: [{ ...job('running'), summary: summary() }] };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const tree = (active: boolean) => (
+      <QueryClientProvider client={client}>
+        <TabActiveProvider value={active}>
+          <ExtractionTab />
+        </TabActiveProvider>
+      </QueryClientProvider>
+    );
+    const { rerender } = render(tree(false));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(calls.filter(c => c.path === '/v1/jobs' || c.path.startsWith('/v1/jobs/'))).toEqual([]);
+    rerender(tree(true));
+    expect(await screen.findByTestId('extraction-run')).toBeInTheDocument();
+    expect(calls.some(c => c.path === '/v1/jobs')).toBe(true);
   });
 });

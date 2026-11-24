@@ -12,7 +12,15 @@ import { jsonBody, v1Fetch, v1Json, v1Url } from './apiHttp';
 export const EXTRACT_JOB_KIND = 'library_extract';
 
 /** Lifecycle state of a `/v1` job. */
-export type JobState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+export type JobState =
+  | 'queued'
+  | 'running'
+  | 'paused_budget'
+  | 'paused_provider'
+  | 'awaiting_review'
+  | 'succeeded'
+  | 'failed'
+  | 'cancelled';
 
 /** Terminal states: no further progress or logs arrive. */
 export const TERMINAL_JOB_STATES: ReadonlySet<JobState> = new Set(['succeeded', 'failed', 'cancelled']);
@@ -24,17 +32,93 @@ export interface JobRef {
   state: JobState;
 }
 
-/** A job record. `progress` is `dict[str, int]` (e.g. `{done: 3, total: 10}`). */
+/** Final word of a run: the job state, except a failed job with some papers done is `partially_failed`. */
+export type RunOutcome = JobState | 'partially_failed';
+
+/** Papers of a run (counts are exact; `failed_list` is bounded and only in the detailed form). */
+export interface RunPapers {
+  total: number;
+  done: number;
+  failed: number;
+  skipped: number;
+  failed_list?: { name: string; reason: string }[];
+}
+
+/** KG growth counters of a run (absent keys mean "not reported yet"). */
+export interface RunGrowth {
+  entities_new?: number;
+  entities_merged?: number;
+  relations_new?: number;
+  relations_merged?: number;
+  entities_total?: number;
+  relations_total?: number;
+}
+
+/**
+ * Live status of a job from `GET /v1/jobs/{id}/progress` (key `summary`) or the rows of
+ * `GET /v1/jobs?detail=summary`. Everything is read from the job store on the server.
+ */
+export interface JobRunSummary {
+  outcome: RunOutcome;
+  state: JobState;
+  started_at: string | null;
+  finished_at: string | null;
+  elapsed_seconds: number;
+  /** `phase` is `parsing`, `chunking`, `extracting`, `merging into the KG` or `finished` while the run is live. */
+  stage: { name: string | null; status: string | null; phase: string | null };
+  /** Display name of the paper being processed (never a path); only while running. */
+  current_paper: string | null;
+  papers: RunPapers;
+  growth: RunGrowth;
+  /** Other stage counters, e.g. `paper_pages_done` and `paper_pages_total` of the current paper. */
+  counters: Record<string, number>;
+  params: { bundle?: string; model?: string; backend?: string; schema?: string; topic?: string };
+  error: string | null;
+  /** `kept` lines are in the store of `total` written; `cap` is the per-job row cap. */
+  logs: { kept: number; total: number; cap: number };
+}
+
+/**
+ * A job as the UI uses it. The server's handle names the id `job_id` and has no counters; `normalizeJob`
+ * fills `id`, `progress` (`{done, total}` papers), `error` and the dates from the handle and its `summary`.
+ */
 export interface JobInfo extends JobRef {
   progress: Record<string, number>;
   error: string | null;
   created_at: string;
   updated_at: string;
+  summary?: JobRunSummary;
+}
+
+/** Normalize a job body from the server (the handle's `job_id` or an `id`, with an optional `summary`). */
+export function normalizeJob(raw: unknown): JobInfo {
+  const body = (raw ?? {}) as Record<string, unknown>;
+  const summary = (body.summary ?? undefined) as JobRunSummary | undefined;
+  const progress =
+    (body.progress as Record<string, number> | undefined)
+    ?? (summary ? { done: summary.papers.done, total: summary.papers.total } : {});
+  const stamp = (value: unknown) => (typeof value === 'string' ? value : '');
+  return {
+    id: String(body.id ?? body.job_id ?? ''),
+    kind: String(body.kind ?? ''),
+    state: (body.state as JobState) ?? 'queued',
+    progress,
+    error: (body.error as string | null | undefined) ?? summary?.error ?? null,
+    created_at: stamp(body.created_at) || stamp(body.submitted_at),
+    updated_at: stamp(body.updated_at) || stamp(body.submitted_at),
+    ...(summary ? { summary } : {}),
+  };
 }
 
 /** `GET /v1/jobs`. */
 export interface JobListResponse {
   jobs: JobInfo[];
+}
+
+/** `GET /v1/jobs/{id}/progress`: the per-phase telemetry plus the additive `summary`. */
+export interface JobProgressResponse {
+  job_id: string;
+  summary?: JobRunSummary;
 }
 
 /** One log line of a job (T33). `seq` is the SSE event id used to resume. */
@@ -49,6 +133,10 @@ export interface JobLogEntry {
 /** `GET /v1/jobs/{id}/logs?after=`. */
 export interface JobLogsResponse {
   logs: JobLogEntry[];
+  /** Lines the store holds for the job. Absent on an older server. */
+  kept?: number;
+  /** Lines ever written for the job (`total - kept` fell off the per-job cap). Absent on an older server. */
+  total?: number;
 }
 
 /** Summary of one KG bundle (`<F2W_WORKDIR>/kgs/<name>/`). */
@@ -207,34 +295,72 @@ export function estimateExtraction(request: EstimateRequest, fetcher: typeof fet
 
 /** Submit a `library_extract` job. */
 export function startExtraction(request: StartExtractionRequest, fetcher: typeof fetch = fetch): Promise<JobRef> {
-  return v1Json<JobRef>(
+  return v1Json<unknown>(
     v1Url('/v1/jobs'),
     jsonBody('POST', { kind: EXTRACT_JOB_KIND, inputs: { params: request } }),
     fetcher,
-  );
+  ).then(raw => {
+    const { id, kind, state } = normalizeJob(raw);
+    return { id, kind, state };
+  });
 }
 
 /** Fetch one job. */
 export function fetchJob(jobId: string, fetcher: typeof fetch = fetch): Promise<JobInfo> {
-  return v1Json<JobInfo>(v1Url(`/v1/jobs/${encodeURIComponent(jobId)}`), {}, fetcher);
+  return v1Json<unknown>(v1Url(`/v1/jobs/${encodeURIComponent(jobId)}`), {}, fetcher).then(normalizeJob);
 }
 
-/** Jobs of a kind in a state (re-attach after a reload: `state=running`, `kind=library_extract`). */
+/**
+ * Jobs of a kind, newest first. `detail: 'summary'` adds each job's live `summary` (a runs list; the server keeps
+ * it to 50 rows).
+ */
 export function fetchJobs(
-  filter: { state?: JobState; kind?: string },
+  filter: { state?: JobState; kind?: string; limit?: number; detail?: 'summary' },
   fetcher: typeof fetch = fetch,
 ): Promise<JobListResponse> {
-  return v1Json<JobListResponse>(v1Url('/v1/jobs', filter), {}, fetcher);
+  return v1Json<{ jobs: unknown[] }>(v1Url('/v1/jobs', filter), {}, fetcher).then(body => ({
+    jobs: (body.jobs ?? []).map(normalizeJob),
+  }));
 }
 
-/** Log lines after `seq` (0 for all); the server bounds the buffer. */
-export function fetchJobLogs(jobId: string, after = 0, fetcher: typeof fetch = fetch): Promise<JobLogsResponse> {
-  return v1Json<JobLogsResponse>(v1Url(`/v1/jobs/${encodeURIComponent(jobId)}/logs`, { after }), {}, fetcher);
+/** The live summary of one job (`GET /v1/jobs/{id}/progress`); `null` from a server that does not send it yet. */
+export function fetchJobSummary(jobId: string, fetcher: typeof fetch = fetch): Promise<JobRunSummary | null> {
+  return v1Json<JobProgressResponse>(v1Url(`/v1/jobs/${encodeURIComponent(jobId)}/progress`), {}, fetcher).then(
+    body => body.summary ?? null,
+  );
+}
+
+/** Options of `fetchJobLogs`. */
+export interface JobLogsOptions {
+  /** Most lines to return (the server allows 1 to 1000). */
+  limit?: number;
+  /** Ignore `after` and return the newest `limit` lines: how a reloaded page finds its cursor. */
+  tail?: boolean;
+}
+
+/** Log lines after `seq` (`-1` for all kept lines, since the first line has seq 0), or the newest with `tail`. */
+export function fetchJobLogs(
+  jobId: string,
+  after = -1,
+  fetcher: typeof fetch = fetch,
+  options: JobLogsOptions = {},
+): Promise<JobLogsResponse> {
+  return v1Json<JobLogsResponse>(
+    v1Url(`/v1/jobs/${encodeURIComponent(jobId)}/logs`, {
+      after,
+      ...(options.limit !== undefined ? { limit: options.limit } : {}),
+      ...(options.tail ? { tail: 'true' } : {}),
+    }),
+    {},
+    fetcher,
+  );
 }
 
 /** Request cancellation (the job stops between PDFs). */
 export function cancelJob(jobId: string, fetcher: typeof fetch = fetch): Promise<JobInfo> {
-  return v1Json<JobInfo>(v1Url(`/v1/jobs/${encodeURIComponent(jobId)}/cancel`), { method: 'POST' }, fetcher);
+  return v1Json<unknown>(v1Url(`/v1/jobs/${encodeURIComponent(jobId)}/cancel`), { method: 'POST' }, fetcher).then(
+    normalizeJob,
+  );
 }
 
 /** Export a bundle to the configured release directory as `matkg_<name>.json` (sends `{confirm: true}`). */

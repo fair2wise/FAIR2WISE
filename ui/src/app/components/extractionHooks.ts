@@ -1,6 +1,7 @@
 /**
- * TanStack Query hooks for the Extraction tab (A8, T40). Server state only; the log stream and form
- * state are owned by the T42 components.
+ * TanStack Query hooks for the Extraction tab (A8, T40). Server state only; the log poller and form
+ * state are owned by the T42 components. Polling hooks take `live` (tab on screen and page visible) and stop
+ * their timers while it is false.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -12,6 +13,7 @@ import {
   fetchExtractionModels,
   fetchJob,
   fetchJobs,
+  fetchJobSummary,
   fetchKgBundles,
   fetchSchemas,
   startExtraction,
@@ -19,6 +21,7 @@ import {
   type ContinueKgRequest,
   type EstimateRequest,
   type JobInfo,
+  type JobRunSummary,
   type StartExtractionRequest,
 } from './extractionApi';
 
@@ -28,7 +31,9 @@ export const extractionKeys = {
   schemas: ['extraction', 'schemas'] as const,
   models: ['extraction', 'models'] as const,
   running: ['extraction', 'running'] as const,
+  runs: ['extraction', 'runs'] as const,
   job: (jobId: string) => ['extraction', 'job', jobId] as const,
+  summary: (jobId: string) => ['extraction', 'summary', jobId] as const,
 };
 
 /** KG bundles for the continue-or-new picker. */
@@ -46,31 +51,68 @@ export function useExtractionModels(enabled = true) {
   return useQuery({ queryKey: extractionKeys.models, queryFn: () => fetchExtractionModels(), enabled });
 }
 
+/** Most runs the list shows (the server keeps `detail=summary` pages to 50). */
+export const MAX_RUNS = 20;
+
+/** Poll period of a moving run, a settled list, and a run that waits for a person or after errors. */
+export const FAST_POLL_MS = 2000;
+export const SLOW_POLL_MS = 10_000;
+
+const isMoving = (state: string | undefined) => state === 'running' || state === 'queued';
+
 /**
- * The running extraction job, if any: after a page reload this re-attaches the tab to the run.
- * Polls while enabled; `data` is the job or `null` when none is running.
+ * Recent `library_extract` runs, newest first, each with its live summary (outcome, papers, KG growth): the
+ * runs list, and how a reloaded page finds the running job (or the latest one). Polls every 2 s while a run is
+ * moving and every 10 s otherwise (also after errors); not at all while the tab or the page is hidden, and it
+ * fetches again as soon as it is shown. State lives on the server, not in this component.
+ *
+ * @param live - Tab on screen and page visible (`useLive`).
  */
-export function useRunningExtraction(enabled = true, pollMs = 5000) {
-  return useQuery<JobInfo | null>({
-    queryKey: extractionKeys.running,
-    queryFn: async () => {
-      const { jobs } = await fetchJobs({ state: 'running', kind: EXTRACT_JOB_KIND });
-      return jobs[0] ?? null;
+export function useExtractionRuns(live: boolean, limit = MAX_RUNS) {
+  return useQuery<JobInfo[]>({
+    queryKey: [...extractionKeys.runs, limit],
+    queryFn: async () => (await fetchJobs({ kind: EXTRACT_JOB_KIND, detail: 'summary', limit })).jobs,
+    enabled: live,
+    refetchInterval: query => {
+      if (query.state.status === 'error') return SLOW_POLL_MS;
+      return query.state.data?.some(job => isMoving(job.state)) ? FAST_POLL_MS : SLOW_POLL_MS;
     },
-    enabled,
-    refetchInterval: pollMs,
   });
 }
 
-/** One job, polled until it reaches a terminal state. */
-export function useJob(jobId: string | null, pollMs = 2000) {
+/**
+ * One job's state, polled every 2 s while it moves, every 10 s while paused or after errors, and never once
+ * it is terminal or while `live` is false.
+ */
+export function useJob(jobId: string | null, pollMs = FAST_POLL_MS, live = true) {
   return useQuery({
     queryKey: extractionKeys.job(jobId ?? ''),
     queryFn: () => fetchJob(jobId as string),
-    enabled: jobId !== null,
+    enabled: jobId !== null && live,
     refetchInterval: query => {
       const state = query.state.data?.state;
-      return state && TERMINAL_JOB_STATES.has(state) ? false : pollMs;
+      if (state && TERMINAL_JOB_STATES.has(state)) return false;
+      if (query.state.status === 'error') return SLOW_POLL_MS;
+      return state && !isMoving(state) ? SLOW_POLL_MS : pollMs;
+    },
+  });
+}
+
+/**
+ * The live summary of one job (`GET /v1/jobs/{id}/progress`): stage, papers, current paper, KG growth, outcome. Same
+ * schedule as {@link useJob}; `null` data from a server that has no summary. A job seen terminal is fetched once more
+ * (the poll that saw the state) and then left alone.
+ */
+export function useJobSummary(jobId: string | null, pollMs = FAST_POLL_MS, live = true) {
+  return useQuery<JobRunSummary | null>({
+    queryKey: extractionKeys.summary(jobId ?? ''),
+    queryFn: () => fetchJobSummary(jobId as string),
+    enabled: jobId !== null && live,
+    refetchInterval: query => {
+      const state = query.state.data?.state;
+      if (state && TERMINAL_JOB_STATES.has(state)) return false;
+      if (query.state.status === 'error') return SLOW_POLL_MS;
+      return state && !isMoving(state) ? SLOW_POLL_MS : pollMs;
     },
   });
 }
@@ -86,7 +128,7 @@ export function useStartExtraction() {
   return useMutation({
     mutationFn: (request: StartExtractionRequest) => startExtraction(request),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: extractionKeys.running });
+      void queryClient.invalidateQueries({ queryKey: extractionKeys.runs });
       void queryClient.invalidateQueries({ queryKey: extractionKeys.bundles });
     },
   });
@@ -99,7 +141,8 @@ export function useCancelJob() {
     mutationFn: (jobId: string) => cancelJob(jobId),
     onSuccess: (_job, jobId) => {
       void queryClient.invalidateQueries({ queryKey: extractionKeys.job(jobId) });
-      void queryClient.invalidateQueries({ queryKey: extractionKeys.running });
+      void queryClient.invalidateQueries({ queryKey: extractionKeys.summary(jobId) });
+      void queryClient.invalidateQueries({ queryKey: extractionKeys.runs });
     },
   });
 }

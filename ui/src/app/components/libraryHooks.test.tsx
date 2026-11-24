@@ -2,7 +2,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { useRunningExtraction } from './extractionHooks';
 import { libraryKeys, useCreateCategory, useLibraryCategories, useLibraryProbe, useUploadPaper } from './libraryHooks';
 
 function wrapper() {
@@ -57,25 +56,6 @@ describe('useUploadPaper', () => {
     result.current.mutate({ file: new File(['x'], 'a.pdf', { type: 'application/pdf' }) });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(spy).toHaveBeenCalledWith({ queryKey: ['library'] });
-  });
-});
-
-describe('useRunningExtraction', () => {
-  it('returns the running library_extract job, or null', async () => {
-    const mock = stubFetch({
-      '/v1/jobs': { status: 200, body: { jobs: [{ id: 'j1', kind: 'library_extract', state: 'running', progress: {} }] } },
-    });
-    const { Wrapper } = wrapper();
-    const { result } = renderHook(() => useRunningExtraction(true, 60_000), { wrapper: Wrapper });
-    await waitFor(() => expect(result.current.data?.id).toBe('j1'));
-    expect(String(mock.mock.calls[0][0])).toContain('kind=library_extract');
-  });
-
-  it('returns null when none is running', async () => {
-    stubFetch({ '/v1/jobs': { status: 200, body: { jobs: [] } } });
-    const { Wrapper } = wrapper();
-    const { result } = renderHook(() => useRunningExtraction(true, 60_000), { wrapper: Wrapper });
-    await waitFor(() => expect(result.current.data).toBeNull());
   });
 });
 

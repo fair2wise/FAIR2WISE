@@ -81,4 +81,44 @@ test.describe('Extraction tab', () => {
     await expect(page.getByRole('button', { name: 'Start extraction' })).toBeDisabled();
     await expect(page.getByRole('checkbox', { name: 'I confirm this cost estimate' })).toBeDisabled();
   });
+
+  test('shows live progress, KG growth and filterable warnings for a running extraction', async ({ page }) => {
+    await mockAgent(page);
+    await mockLibrary(page, {
+      papers: PAPERS,
+      jobs: [{
+        id: 'job7', state: 'running', progress: { done: 2, total: 5 },
+        summary: {
+          outcome: 'running', state: 'running', started_at: '2026-11-03T12:00:00Z', finished_at: null, elapsed_seconds: 95,
+          stage: { name: 'run', status: 'running', phase: 'extracting' }, current_paper: 'tomo-b.pdf',
+          papers: { total: 5, done: 2, failed: 1, skipped: 0, failed_list: [{ name: 'tomo-a.pdf', reason: 'the PDF could not be read' }] },
+          growth: { entities_new: 30, entities_merged: 8, relations_new: 11, relations_merged: 3, entities_total: 38, relations_total: 14 },
+          counters: { paper_pages_done: 3, paper_pages_total: 9 },
+          params: { bundle: 'tomo_kg', model: 'cheap-model', backend: 'cborg' }, error: null,
+          logs: { kept: 3, total: 3, cap: 2000 },
+        },
+        logs: [
+          'paper 1 of 5: extracting tomo-a.pdf',
+          { message: 'tomo-a.pdf: the PDF could not be read', level: 'warning' },
+          { message: "CBORG refused this machine's address; check network egress", level: 'error' },
+        ],
+      }],
+    });
+    await page.goto('/');
+    await page.getByRole('link', { name: 'Extract' }).click();
+
+    await expect(page.getByTestId('run-progress-text')).toContainText('2 of 5 papers done, 1 failed');
+    await expect(page.getByTestId('run-current-paper')).toContainText('Now: tomo-b.pdf (page 3 of 9)');
+    await expect(page.getByTestId('run-growth')).toContainText('30 new · 8 merged');
+    await expect(page.getByRole('list', { name: 'Stage of the current paper' }).getByText('extracting', { exact: true }))
+      .toHaveAttribute('aria-current', 'step');
+
+    const log = page.getByRole('log', { name: 'Extraction log' });
+    await expect(log).toContainText('paper 1 of 5: extracting tomo-a.pdf');
+    await page.getByRole('button', { name: /Warnings and errors/ }).click();
+    await expect(log).not.toContainText('paper 1 of 5');
+    await expect(log).toContainText('the PDF could not be read');
+    await expect(log).toContainText('check network egress');
+    await expect(page.getByTestId('log-count')).toContainText('Showing all 3 lines');
+  });
 });

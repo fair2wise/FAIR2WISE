@@ -18,7 +18,10 @@ export interface MockJob {
   kind?: string;
   state: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
   progress?: Record<string, number>;
-  logs?: string[];
+  /** Log lines; an object sets the level (default `info`). */
+  logs?: Array<string | { message: string; level: 'info' | 'warning' | 'error' }>;
+  /** The live `summary` of `GET /v1/jobs/{id}/progress` and of the runs list (`?detail=summary`). */
+  summary?: Record<string, unknown>;
 }
 
 /** A harvest candidate as `GET /v1/library/harvest/runs/{id}/candidates` returns it (A8, T45). */
@@ -106,6 +109,7 @@ const json = (data: unknown, status = 200) => ({
 const jobRecord = (job: MockJob) => ({
   id: job.id, kind: job.kind ?? 'library_extract', state: job.state, progress: job.progress ?? {}, error: null,
   created_at: '2026-11-03T00:00:00Z', updated_at: '2026-11-03T00:00:00Z',
+  ...(job.summary ? { summary: job.summary } : {}),
 });
 
 /**
@@ -259,10 +263,15 @@ export async function mockLibrary(page: Page, options: MockLibraryOptions = {}) 
     } else if (/^\/v1\/jobs\/[^/]+\/logs$/.test(path)) {
       const job = jobs.get(path.split('/')[3]);
       const after = Number(url.searchParams.get('after') ?? 0);
-      const logs = (job?.logs ?? []).map((message, index) => ({
-        seq: index + 1, at: '2026-11-03T12:00:00Z', level: 'info', stage: 'extract', message,
-      })).filter(entry => entry.seq > after);
-      await route.fulfill(json({ logs }));
+      const all = (job?.logs ?? []).map((line, index) => ({
+        seq: index + 1, at: '2026-11-03T12:00:00Z', level: typeof line === 'string' ? 'info' : line.level, stage: 'extract',
+        message: typeof line === 'string' ? line : line.message,
+      }));
+      const logs = all.filter(entry => entry.seq > after);
+      await route.fulfill(json({ logs, kept: all.length, total: all.length }));
+    } else if (/^\/v1\/jobs\/[^/]+\/progress$/.test(path)) {
+      const job = jobs.get(path.split('/')[3]);
+      await route.fulfill(json({ job_id: job?.id ?? 'none', ...(job?.summary ? { summary: job.summary } : {}) }));
     } else if (/^\/v1\/jobs\/[^/]+\/stream$/.test(path)) {
       await route.fulfill({ status: 404, body: 'no stream in the mock; the tab polls the logs' });
     } else if (/^\/v1\/library\/kgs\/[^/]+\/publish$/.test(path) && method === 'POST' && options.publish) {

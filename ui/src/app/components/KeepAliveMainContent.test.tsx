@@ -6,6 +6,7 @@ import { Link, MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { ExtractionTab } from './ExtractionTab';
 import { KeepAliveMainContent } from './KeepAliveMainContent';
+import { useTabActive } from './tabActivity';
 import { LibraryTab } from './LibraryTab';
 
 /** Stand-in for the chat panel: local draft state plus a counter that lives in the component. */
@@ -74,5 +75,33 @@ describe('KeepAliveMainContent', () => {
     renderTabs({ library: false });
     await user.click(screen.getByText('library'));
     expect(screen.queryByRole('heading', { name: 'Library' })).not.toBeInTheDocument();
+  });
+});
+
+describe('KeepAliveMainContent tab activity', () => {
+  it('tells a tab whether it is on screen, so a hidden tab can stop polling', async () => {
+    const user = userEvent.setup();
+    function Probe({ name }: { name: string }) {
+      return <p data-testid={`probe-${name}`}>{useTabActive() ? 'active' : 'hidden'}</p>;
+    }
+    render(
+      <MemoryRouter initialEntries={['/a']}>
+        <nav>
+          <Link to="/a">to a</Link>
+          <Link to="/b">to b</Link>
+        </nav>
+        <KeepAliveMainContent routes={[
+          { path: '/a', element: <Probe name="a" /> },
+          { path: '/b', element: <Probe name="b" /> },
+        ]} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('probe-a')).toHaveTextContent('active');
+    await user.click(screen.getByText('to b'));
+    expect(screen.getByTestId('probe-a')).toHaveTextContent('hidden');
+    expect(screen.getByTestId('probe-b')).toHaveTextContent('active');
+    await user.click(screen.getByText('to a'));
+    expect(screen.getByTestId('probe-a')).toHaveTextContent('active');
+    expect(screen.getByTestId('probe-b')).toHaveTextContent('hidden');
   });
 });

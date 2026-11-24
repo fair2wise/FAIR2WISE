@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router';
+import { TabActiveProvider } from './tabActivity';
 
 /** One tab of `KeepAliveMainContent` (the subset of a Finch route it needs). */
 export interface KeepAliveRoute {
@@ -15,7 +16,8 @@ export interface KeepAliveRoute {
  * Finch renders `<Routes>`, which unmounts the previous route's element, so switching to Library or
  * Extract would discard the chat panel's local state (draft, an in-flight stream, panel selection).
  * Here each route is mounted on first visit and then only hidden (`hidden`), so nothing is lost.
- * Markup and classes match `HubMainContent`.
+ * Markup and classes match `HubMainContent`. Each tab learns whether it is on screen through `useTabActive`, so a
+ * hidden tab can pause its polling.
  *
  * @param props.routes - Tabs, matched by exact `path` against the router location.
  * @param props.className - Extra classes for the `<main>` element.
@@ -41,7 +43,7 @@ export function KeepAliveMainContent({ routes, className }: { routes: KeepAliveR
             data-testid={`tab-${route.path}`}
             className={`${route.isBackgroundTransparent ? 'bg-transparent text-white' : 'bg-white'} w-full h-full rounded-md`}
           >
-            {route.element}
+            <TabActiveProvider value={active}>{route.element}</TabActiveProvider>
           </section>
         );
       })}
