@@ -71,7 +71,8 @@ Checklist for anyone (person or agent) pushing a change under `app/`, `tests/`, 
 
 What the script does not cover: the frozen-UI hash guard and changed-path filter, the `[ci full]` jobs (Tiled
 suites, Playwright, Docling, coverage, slow tests), the import check of the legacy entrypoints, and any
-macOS-versus-Linux difference. Tiled-backed tests skip locally unless `F2W_TILED_PYTHON` is set.
+macOS-versus-Linux difference. Run it with the pixi `dev` environment (the default when `.pixi/envs/dev` exists):
+a venv without the OTLP exporter package makes mypy report two `import-not-found` errors that CI does not see. Tiled-backed tests skip locally unless `F2W_TILED_PYTHON` is set.
 
 ## Known flaky tests
 
