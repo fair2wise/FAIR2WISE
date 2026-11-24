@@ -252,3 +252,38 @@ def _can_write(directory: Path) -> bool:
         return False
     probe.unlink()
     return True
+
+
+# --- pilot 2026-11-24: an extracted KG is usable in chat, the viewer and Operations under its own name ----------------
+
+
+def _bundle_with_cloud_tomography(tmp_path, monkeypatch):
+    workdir = tmp_path / "state"
+    monkeypatch.setenv(B.WORKDIR_ENV, str(workdir))
+    terms = [{"term": "cloud tomography", "definition": "Imaging of clouds.", "category": "Method",
+              "source_papers": ["a.pdf"], "pages": [1]}]
+    store = B.BundleStore(workdir / "kgs", clock=lambda: "2026-11-24T00:00:00Z")
+    bundle = store.create("tomo_test", schema=SCHEMA, topic="tomo", kg=build_graph_isolated(terms, []))
+    return workdir, bundle
+
+
+def test_a_bundles_kg_file_is_the_graph_named_by_its_bundle(tmp_path, monkeypatch):
+    from app.modules.f2w_agent.multi_kg import graph_id_for_path
+    from app.modules.graph.snapshots import graph_id_for_snapshot
+
+    _, bundle = _bundle_with_cloud_tomography(tmp_path, monkeypatch)
+    real = bundle.directory / B.KG_FILE
+    assert graph_id_for_path(str(real)) == "tomo_test" == graph_id_for_snapshot(real)   # was "kg"
+    assert graph_id_for_path("kgs/tomo_test/matkg_tomo_test.json") == "tomo_test"
+    assert graph_id_for_path("runs/session/kg.json") == "kg"    # the session graph keeps its name
+
+
+def test_chat_node_lookup_finds_the_extracted_entity_by_its_graph(tmp_path, monkeypatch):
+    from app.modules.f2w_agent.api import resolve_graph_node
+
+    _, bundle = _bundle_with_cloud_tomography(tmp_path, monkeypatch)
+    real = bundle.directory / B.KG_FILE
+    node = resolve_graph_node("matkg:cloudtomography", fallback_path=tmp_path / "missing.json",
+                              graph_paths_by_id={"tomo_test": real})
+    assert node is not None and node.graph_id == "tomo_test" and node.label == "cloud tomography"
+    assert node.graph_label != "kg"

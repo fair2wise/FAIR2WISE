@@ -100,7 +100,10 @@ def is_xray_demo_graph(path: str) -> bool:
 
 
 def graph_id_for_path(path: str) -> str:
-    """Stable graph_id from filename: rsoxs_vN, bl1101, xray_demo, or stem."""
+    """Stable graph_id from filename: rsoxs_vN, bl1101, xray_demo, the bundle name of ``kgs/<name>/kg.json``, or stem."""
+    bundle = Path(normalize_graph_path(path))
+    if bundle.name == "kg.json" and bundle.parent.parent.name == "kgs" and bundle.parent.name:
+        return bundle.parent.name   # a KG bundle's file (<workdir>/kgs/<name>/kg.json) is the graph <name>, not "kg"
     name = graph_filename(path)
     if name in _GRAPH_ID_BY_NAME:
         return _GRAPH_ID_BY_NAME[name]
