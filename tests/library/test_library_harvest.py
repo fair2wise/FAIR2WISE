@@ -361,21 +361,22 @@ def test_the_downloader_checks_redirect_hops_and_the_pdf_signature():
     assert download("http://example.com/ok.pdf", 1000) == (b"%PDF-1.4 ok", "ok")
 
 
-def _refused_by_openalex(status: int):
+def _refused_by_openalex(status: int, detail: str | None = None):
     def search(topic: str, per_query: int):
-        raise JSONFetchError(f"HTTP {status}", status=status)
+        raise JSONFetchError(f"HTTP {status}", status=status, detail=detail)
 
     return search
 
 
 def test_a_rejected_openalex_key_is_an_error_in_the_run_and_the_log_not_zero_results(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENALEX_API_KEY", "not-a-real-key")
-    world = World(tmp_path, {"arxiv": fixed(), "openalex": _refused_by_openalex(401)}, Net({}))
+    said = "API key not found. Get a free key at https://openalex.org/settings/api-key."
+    world = World(tmp_path, {"arxiv": fixed(), "openalex": _refused_by_openalex(401, said)}, Net({}))
     handle, state = world.run(topic="plecostomus")
     assert state is JobState.FAILED
     entries = world.jobs.store.logs(handle.job_id)
     failed = next(e for e in entries if e.message.startswith("openalex search failed"))
-    assert failed.level == "error" and "HTTP 401" in failed.message and "API key was not accepted" in failed.message
+    assert failed.level == "error" and "HTTP 401" in failed.message and said in failed.message   # OpenAlex's own words
     assert "not-a-real-key" not in " ".join(e.message for e in entries)
     run = world.store.run(handle.job_id)
     assert run["counts"]["total"] == 0

@@ -219,9 +219,10 @@ def source_error_message(source: str, exc: Exception) -> str:
     label = {"openalex": "OpenAlex", "arxiv": "arXiv"}.get(source, source)
     status = getattr(exc, "status", None)
     if isinstance(exc, JSONFetchError) and status in (401, 403):
-        extra = (" The API key was not accepted: it may be wrong, not yet activated (OpenAlex emails an activation link), "
-                 "or not sent in the way OpenAlex expects." if source == "openalex" else "")
-        return f"{label} refused the request (HTTP {status}).{extra}"
+        detail = getattr(exc, "detail", None)
+        if detail:   # the server's own words (OpenAlex: "API key not found. Get a free key at ...")
+            return f"{label} refused the request (HTTP {status}): {detail}"
+        return f"{label} refused the request (HTTP {status})."
     if isinstance(exc, JSONFetchError) and status:
         return f"{label} answered HTTP {status}."
     if isinstance(exc, BlockedURL):

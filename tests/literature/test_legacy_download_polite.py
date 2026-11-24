@@ -279,3 +279,25 @@ def test_shared_limiter_defaults_are_the_real_clock_and_sleep(monkeypatch: pytes
     limiter.mark()
     limiter.wait()
     assert len(slept) == 1 and 0.0 < slept[0] <= 3.0
+
+
+def test_a_401_carries_the_servers_own_message_as_one_clean_line():
+    said = '{"error":"Invalid or missing API key","message":"API key not found.\\nGet a free key at https://openalex.org/settings/api-key.\\u0007"}'
+    seq = Sequence((401, said.encode(), {}))
+    with pytest.raises(JSONFetchError, match="^HTTP 401$") as info:
+        seq.getter(hardened_get_json)("https://api.openalex.org/works?search=x")
+    assert info.value.status == 401
+    assert info.value.detail == "API key not found. Get a free key at https://openalex.org/settings/api-key."
+
+
+def test_the_401_detail_is_bounded_and_only_a_json_message_counts():
+    long = ('{"message":"' + "x" * 5000 + '"}').encode()
+    with pytest.raises(JSONFetchError) as info:
+        Sequence((403, long[:2048], {})).getter(hardened_get_json)("https://api.openalex.org/works")
+    assert info.value.detail is None or len(info.value.detail) <= ld.AUTH_DETAIL_MAX_CHARS   # truncated body: not JSON
+    full = ('{"message":"' + "y" * 5000 + '"}').encode()
+    assert len(ld.auth_detail(full) or "") == 0 or len(ld.auth_detail(full)) <= ld.AUTH_DETAIL_MAX_CHARS
+    assert ld.auth_detail(b"<html>nope</html>") is None and ld.auth_detail(b'{"message": 5}') is None
+    with pytest.raises(JSONFetchError) as info:
+        Sequence((500, b'{"message":"internal detail"}', {})).getter(hardened_get_json)("https://api.openalex.org/works")
+    assert info.value.detail is None   # only a 401/403 body is read

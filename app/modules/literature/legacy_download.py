@@ -110,13 +110,16 @@ class JSONFetchError(Exception):
 
     ``status`` is the final HTTP status when the failure was a non-200 answer (``None`` otherwise) and
     ``retry_after`` the parsed ``Retry-After`` header of that answer in seconds (``None`` when absent or
-    unparseable). The message is unchanged (``"HTTP 429"``), so callers keying on the text still work.
+    unparseable). ``detail`` is the server's own explanation of a 401/403 (the ``message`` of a JSON error body,
+    one line, at most :data:`AUTH_DETAIL_MAX_CHARS`), else ``None``. The message is unchanged (``"HTTP 429"``), so callers keying on the text still work.
     """
 
-    def __init__(self, message: str, *, status: int | None = None, retry_after: float | None = None) -> None:
+    def __init__(self, message: str, *, status: int | None = None, retry_after: float | None = None,
+                 detail: str | None = None) -> None:
         super().__init__(message)
         self.status = status
         self.retry_after = retry_after
+        self.detail = detail
 
 
 #: Statuses :func:`retry_after_wait` honours: a rate limit, or an overload that names when to come back.
@@ -127,7 +130,7 @@ RETRY_AFTER_CAP_SECONDS = 60.0
 
 @dataclass(frozen=True)
 class HardenedResponse:
-    """The final answer of :func:`hardened_get_response`: body (2xx only), status and response headers.
+    """The final answer of :func:`hardened_get_response`: body (2xx, or the first 2 KiB of a 401/403), status and response headers.
 
     ``repr`` shows the status and sizes only: response headers may carry cookies or other credentials and
     must never reach a log line.
@@ -160,6 +163,24 @@ def _retry_after_seconds(value: str | None, now: Callable[[], float]) -> float |
     return max(0.0, when.timestamp() - now())
 
 
+#: Bytes of a 401/403 body that are read to find the server's explanation, and the longest explanation kept.
+AUTH_BODY_MAX_BYTES = 2048
+AUTH_DETAIL_MAX_CHARS = 300
+
+
+def auth_detail(body: bytes) -> str | None:
+    """The ``message`` of a JSON error body as one clean line (at most :data:`AUTH_DETAIL_MAX_CHARS`), else ``None``."""
+    try:
+        parsed = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return None
+    message = parsed.get("message") if isinstance(parsed, dict) else None
+    if not isinstance(message, str):
+        return None
+    line = " ".join("".join(ch if ch.isprintable() else " " for ch in message).split())
+    return line[:AUTH_DETAIL_MAX_CHARS] or None
+
+
 def hardened_get_response(url: str, *, headers: dict[str, str] | None = None, timeout: float = 30.0,
                           policy: NetworkPolicy | None = None, client: httpx.Client | None = None,
                           max_bytes: int = JSON_MAX_BYTES) -> HardenedResponse:
@@ -169,7 +190,8 @@ def hardened_get_response(url: str, *, headers: dict[str, str] | None = None, ti
     with :meth:`NetworkPolicy.check_url` (http/https only, ports 80/443, no credentials, public addresses),
     redirects are followed manually up to the policy limit, and the body is capped at ``max_bytes``. Unlike the
     two wrappers it does not turn a non-200 answer into an error: the caller sees the status and the response
-    headers (``Retry-After`` for a 429/503) and decides. The body of a non-2xx answer is not read.
+    headers (``Retry-After`` for a 429/503) and decides. The body of a non-2xx answer is not read, except the first
+    :data:`AUTH_BODY_MAX_BYTES` of a 401/403 (the server's explanation, see :func:`auth_detail`).
 
     Raises:
         JSONFetchError: blocked URL or redirect target, oversized body, transport error or too many redirects.
@@ -199,6 +221,11 @@ def hardened_get_response(url: str, *, headers: dict[str, str] | None = None, ti
                             body.extend(chunk)
                             if len(body) > max_bytes:
                                 raise JSONFetchError("response too large")
+                    elif response.status_code in (401, 403):
+                        for chunk in response.iter_bytes(1024):
+                            body.extend(chunk)
+                            if len(body) >= AUTH_BODY_MAX_BYTES:
+                                break
                     answer_headers = {key: response.headers[key] for key in response.headers.keys()}
             except httpx.HTTPError as exc:
                 raise JSONFetchError(f"network error ({type(exc).__name__})") from exc
@@ -225,7 +252,8 @@ def hardened_get_bytes(url: str, *, headers: dict[str, str] | None = None, timeo
     answer = hardened_get_response(url, headers=headers, timeout=timeout, policy=policy, client=client,
                                    max_bytes=max_bytes)
     if answer.status != 200:
-        raise JSONFetchError(f"HTTP {answer.status}", status=answer.status, retry_after=answer.retry_after_seconds())
+        raise JSONFetchError(f"HTTP {answer.status}", status=answer.status, retry_after=answer.retry_after_seconds(),
+                             detail=auth_detail(answer.body) if answer.status in (401, 403) else None)
     return answer.body
 
 
