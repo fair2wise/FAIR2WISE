@@ -208,6 +208,23 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
        note="confirm=false previews (corpus, next free vN, problems; writes nothing); confirm=true submits the "
             "library_publish job (export, adopt in process with the image's commit label, stage via "
             "submit_publication to the managed local Tiled); needs library.extract too; never approves"),
+    # Schema generation (owner decisions 2026-11-24): author, validate, save and manage user LinkML schemas; :local only.
+    # The separate capability `library.author_schema` is in LOCAL_ONLY_CAPABILITIES, so no ALS principal holds it.
+    _v("V89", "POST", "/library/schemas/validate", "library.author_schema", on_als=False,
+       note="check schema text: problems with line numbers and what was checked; body capped at 256 KiB before parsing; "
+            "nothing stored"),
+    _v("V90", "POST", "/library/schemas/insert-core", "library.author_schema", on_als=False,
+       note="the text with the missing required core (Thing, CodeSnippet, name, description, related_to) added"),
+    _v("V91", "POST", "/library/schemas", "library.author_schema", on_als=False,
+       note="validate and save {name, text} as the next immutable version user/<name>@vN; invalid text is 422 with the report"),
+    _v("V92", "GET", "/library/schemas/user", "library.read", on_als=False,
+       note="user schemas: latest version (no text) and every version number"),
+    _v("V93", "GET", "/library/schemas/user/{ref}", "library.read", on_als=False,
+       note="one stored version (<name>@vN): text, sha256, version, created_at"),
+    _v("V94", "GET", "/library/schemas/user/{name}/diff", "library.read", on_als=False,
+       note="unified diff between two versions (?from=&to=)"),
+    _v("V95", "DELETE", "/library/schemas/user/{ref}", "library.author_schema", on_als=False,
+       note="delete one version only when no KG bundle manifest references it (409 otherwise)"),
 )
 
 #: ``(METHOD, path) -> RoutePolicy`` for the ``/v1`` routes.

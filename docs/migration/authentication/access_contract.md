@@ -145,7 +145,7 @@ resolve_access_context(transport_request, policy) -> RequestContext | Unauthenti
 | Public | `health.read` (reduced projection), `auth.session` | yes (`auth.session` unused) | yes | yes | yes |
 | Chat | `chat.ask`, `chat.read_support` (graph read, node detail, node search, neighborhood, publication search, bounded read-only Tools, citations), `session.own`, `trace.read_own`, `settings.personal`, `telemetry.write`, `annotation.write`, `chat.decline_pending` | yes | no | yes | yes |
 | Admin | `settings.global`, `session.any`, `trace.read_any`, `ingest.acquire`, `ingest.extract`, `figures.process`, `ops.run`, `graph.edit`, `graph.upload`, `curation.approve`, `json.build`, `graph.publish`, `jobs.admin` | yes | no | no | yes |
-| Library (A8/T34) | `library.read`, `library.upload`, `library.index`, `library.extract` | yes | no | no | **no** (local operator only; ALS-admin support is T44, deferred) |
+| Library (A8/T34) | `library.read`, `library.upload`, `library.index`, `library.extract`, `library.author_schema` (create and generate user LinkML schemas) | yes | no | no | **no** (local operator only; ALS-admin support is T44, deferred) |
 
 Rules:
 

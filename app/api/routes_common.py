@@ -47,6 +47,10 @@ class Prefixed:
         """``app.put(prefix + path)``."""
         return self.app.put(self.prefix + path, **kw)
 
+    def delete(self, path: str, **kw: Any) -> Callable[[Any], Any]:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
+        """``app.delete(prefix + path)``."""
+        return self.app.delete(self.prefix + path, **kw)
+
 
 def operations(request: Request) -> F2WOperations:
     """The app's operations service, or fail closed."""
