@@ -120,3 +120,14 @@ def test_resource_carries_no_secret_even_with_secret_headers(monkeypatch: pytest
     with tracing.span("x"):
         pass
     assert SECRET not in " ".join(every_string(memory.get_finished_spans()))
+
+
+def test_http_span_names_use_a_closed_method_set(exporter, secret_env) -> None:  # noqa: ANN001
+    """A non-standard method token is named ``HTTP other`` (as the metrics label), never ``HTTP <token>``."""
+    with httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200))) as client:
+        client.request("get", "https://api.example.org/a")  # httpx upper-cases the verb
+        client.request("PROPFIND", "https://api.example.org/b")
+        client.request("X-" + SENTINEL, "https://api.example.org/c")
+    names = [s.name for s in exporter.get_finished_spans()]
+    assert names == ["HTTP GET", "HTTP other", "HTTP other"]
+    assert SENTINEL.upper() not in " ".join(names).upper()

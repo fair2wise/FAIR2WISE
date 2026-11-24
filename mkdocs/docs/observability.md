@@ -49,7 +49,10 @@ Resource attributes on every span: `service.name`, `service.version`, `f2w.code_
 `f2w.code_commit` (spelled with an underscore) and the `commit` label of the `f2w.build.info` metric read the same source,
 `tracing.runtime.code_commit()`: `F2W_CODE_COMMIT`, else `GIT_COMMIT`, else `git rev-parse HEAD` of a checkout. An image
 has no `.git`, so with neither variable set the trace resource omits `f2w.code_commit` and the metric reports
-`commit="unknown"`; set one of the two variables at build time.
+`commit="unknown"`; set one of the two variables at build time. Both apply the same normalisation: only 7 to 40 lower-case
+hex digits count as a commit. A value that is not (a branch name, upper-case hex, a typo) is treated as no commit: the
+trace omits `f2w.code_commit` and the metric reports `commit="unknown"`, so the two never disagree (a non-empty variable
+is authoritative; an invalid one does not fall back to git).
 
 ## What is traced
 
@@ -78,7 +81,8 @@ The label is one of a closed set in `app/modules/tracing/runtime.py` (`LLM_LABEL
 name never holds user or model text and the number of distinct names stays bounded. A new call site adds its label
 to the set (a test scans the code for literal labels).
 
-**HTTP calls.** `httpx` clients (model API, OpenAlex, downloads, identity) produce `HTTP <METHOD>` spans with
+**HTTP calls.** `httpx` clients (model API, OpenAlex, downloads, identity) produce `HTTP <METHOD>` spans (a method outside GET, POST, PUT, PATCH, DELETE, HEAD and OPTIONS is named `HTTP other`, the
+same closed set as the metrics `http.request.method` label) with
 `server.address`, `server.port`, `url.scheme`, `http.response.status_code`. `requests`-based clients (the Tiled
 GraphQL client) have no HTTP span; their Tiled functions are on the function list instead.
 

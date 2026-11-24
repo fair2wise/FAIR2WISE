@@ -85,3 +85,24 @@ def test_no_commit_variable_and_no_git_directory_is_unknown_and_omitted(
 def test_a_checkout_falls_back_to_git_head(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(turn_trace, "git_sha", lambda: COMMIT)
     assert runtime.code_commit() == COMMIT and labels.build_commit(runtime.code_commit()) == COMMIT
+
+
+@pytest.mark.parametrize("bad", ["main", "ABCDEF0123456789", "abc12", "0123456789abcdef0123456789abcdef012345678", "v1.2.3", "dead beef"])
+@pytest.mark.parametrize("variable", ["F2W_CODE_COMMIT", "GIT_COMMIT"])
+def test_a_non_hex_value_is_unknown_in_the_metric_and_omitted_from_the_trace(
+        monkeypatch: pytest.MonkeyPatch, variable: str, bad: str) -> None:
+    """Trace and metric share one normalisation (7 to 40 lower-case hex): both treat anything else as no commit."""
+    monkeypatch.setattr(turn_trace, "git_sha", lambda: COMMIT)  # an invalid variable does not fall back to git
+    monkeypatch.setenv(variable, bad)
+    assert runtime.code_commit() is None
+    spans, reader = _both(monkeypatch)
+    (probe,) = spans.get_finished_spans()
+    assert "f2w.code_commit" not in probe.resource.attributes
+    assert _build_info(reader)["commit"] == "unknown"
+
+
+def test_a_short_valid_hex_is_kept_by_both(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GIT_COMMIT", "  abc1234  ")
+    spans, reader = _both(monkeypatch)
+    (probe,) = spans.get_finished_spans()
+    assert probe.resource.attributes["f2w.code_commit"] == "abc1234" == _build_info(reader)["commit"]

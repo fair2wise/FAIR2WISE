@@ -59,9 +59,14 @@ _COMMIT = re.compile(r"[0-9a-f]{7,40}")
 _PROFILE = re.compile(r"[a-z0-9][a-z0-9_.-]{0,39}")
 
 
+def valid_commit(value: object) -> str | None:
+    """The value when it is a lower-case hex commit id (7 to 40 digits), else ``None``."""
+    return value if isinstance(value, str) and _COMMIT.fullmatch(value) else None
+
+
 def build_commit(value: object) -> str:
     """A lower-case hex commit id (7 to 40 digits), else ``"unknown"``."""
-    return value if isinstance(value, str) and _COMMIT.fullmatch(value) else "unknown"
+    return valid_commit(value) or "unknown"
 
 
 def build_profile(value: object) -> str:

@@ -144,15 +144,22 @@ def current_config() -> cfg.TracingConfig:
 
 
 def code_commit() -> str | None:
-    """The code commit: ``F2W_CODE_COMMIT``/``GIT_COMMIT`` (images), else the checkout's ``git_sha`` helper."""
+    """The code commit: ``F2W_CODE_COMMIT``/``GIT_COMMIT`` (images), else the checkout's ``git_sha`` helper.
+
+    Normalised like the ``commit`` label of ``f2w.build.info`` (:func:`..metrics.labels.valid_commit`: 7 to 40
+    lower-case hex digits): anything else yields ``None``, so the trace omits ``f2w.code_commit`` exactly where the
+    metric says ``unknown``. A non-empty variable is authoritative (an invalid one does not fall back to git).
+    """
+    from ..metrics.labels import valid_commit
+
     for name in cfg.COMMIT_VARS:
         value = (os.environ.get(name) or "").strip()
         if value:
-            return value
+            return valid_commit(value)
     try:
         from ..f2w_agent.trace import git_sha
 
-        return git_sha()
+        return valid_commit(git_sha())
     except Exception:
         return None
 
