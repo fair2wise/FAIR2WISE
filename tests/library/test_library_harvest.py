@@ -238,13 +238,41 @@ def test_every_source_failing_fails_the_job(tmp_path):
     assert state is JobState.FAILED
 
 
-def test_open_links_that_are_not_pdfs_become_paywalled_and_network_errors_fail(tmp_path):
+def test_an_open_access_paper_that_cannot_be_fetched_is_never_called_paywalled(tmp_path):
+    """Pilot 2026-11-24: 45 of 50 were 'paywalled'. A failed fetch of an open-access link is blocked or failed."""
     papers = (cand(GOOD, doi="10.1/n", urls=["https://pub.example/login"]),
-              cand("Resonant soft X-ray scattering again", doi="10.1/m", urls=["https://down.example/x.pdf"]))
-    net = Net({"https://pub.example/login": "refused:not_pdf", "https://down.example/x.pdf": "failed:network"})
+              cand("Resonant soft X-ray scattering again", doi="10.1/m", urls=["https://down.example/x.pdf"]),
+              cand("Resonant soft X-ray scattering blocked", doi="10.1/b", urls=["https://walled.example/y.pdf"]),
+              cand("Resonant soft X-ray scattering no link", doi="10.1/l", urls=[]),
+              cand("Resonant soft X-ray scattering closed", doi="10.1/c", urls=[]))
+    papers[3].oa = True       # OpenAlex says open access but lists no direct PDF link
+    papers[4].oa = False      # genuinely not open access
+    net = Net({"https://pub.example/login": "refused:not_pdf", "https://down.example/x.pdf": "failed:network",
+               "https://walled.example/y.pdf": "blocked:private_address"})
     world = World(tmp_path, {"arxiv": fixed(*papers)}, net)
     handle, _ = world.run(sources=["arxiv"])
-    assert world.statuses(handle.job_id) == {GOOD: "paywalled", "Resonant soft X-ray scattering again": "failed"}
+    assert world.statuses(handle.job_id) == {
+        GOOD: "failed", "Resonant soft X-ray scattering again": "failed",
+        "Resonant soft X-ray scattering blocked": "blocked", "Resonant soft X-ray scattering no link": "failed",
+        "Resonant soft X-ray scattering closed": "paywalled"}
+    details = {r["title"]: r["detail"] for r in world.store.candidates(handle.job_id)}
+    assert details["Resonant soft X-ray scattering blocked"] == (
+        "open access, blocked by network policy (private_address) at walled.example")
+    assert details[GOOD] == "open access, but the fetch failed (refused:not_pdf) at pub.example"
+    assert details["Resonant soft X-ray scattering no link"] == "open access, but no direct PDF link was found"
+    assert details["Resonant soft X-ray scattering closed"].startswith("not open access")
+    counts = world.store.run(handle.job_id)["counts"]
+    assert counts["blocked"] == 1 and counts["paywalled"] == 1 and counts["failed"] == 3
+
+
+def test_openalex_is_oa_reads_the_flag_and_the_locations():
+    from app.modules.library.harvest import openalex_is_oa
+
+    assert openalex_is_oa({"open_access": {"is_oa": True}}) is True
+    assert openalex_is_oa({"open_access": {"is_oa": False}, "locations": [{"is_oa": True}]}) is True
+    assert openalex_is_oa({"open_access": {"is_oa": False}, "locations": [{"is_oa": False}]}) is False
+    assert openalex_is_oa({"best_oa_location": {"is_oa": True}}) is True
+    assert openalex_is_oa({"id": "W1"}) is None
 
 
 def test_the_second_link_is_tried_when_the_first_fails(tmp_path):

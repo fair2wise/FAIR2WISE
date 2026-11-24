@@ -14,6 +14,7 @@ export function runSummary(run: HarvestRun): string {
   const { counts } = run;
   const parts = [`${counts.downloaded + counts.filed} filed`];
   if (counts.paywalled > 0) parts.push(`${counts.paywalled} paywalled`);
+  if ((counts.blocked ?? 0) > 0) parts.push(`${counts.blocked} blocked by network policy`);
   if (counts.in_library > 0) parts.push(`${counts.in_library} already in library`);
   if (counts.failed > 0) parts.push(`${counts.failed} failed`);
   return `${counts.total} found · ${parts.join(' · ')}`;

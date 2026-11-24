@@ -17,6 +17,11 @@ describe('HarvestRunsList', () => {
       .toBe('0 found · 0 filed');
   });
 
+  it('counts papers blocked by network policy apart from the paywalled ones', () => {
+    const counts = { total: 5, downloaded: 0, in_library: 0, paywalled: 2, blocked: 3, filed: 0, failed: 0, skipped: 0 };
+    expect(runSummary(run('b', { counts }))).toBe('5 found · 0 filed · 2 paywalled · 3 blocked by network policy');
+  });
+
   it('shows an empty state', () => {
     render(<HarvestRunsList runs={[]} selectedId={null} onSelect={() => undefined} />);
     expect(screen.getByText('No harvest runs yet.')).toBeInTheDocument();

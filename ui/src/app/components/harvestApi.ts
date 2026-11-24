@@ -36,6 +36,7 @@ export type HarvestStatus =
   | 'downloaded'
   | 'in_library'
   | 'paywalled'
+  | 'blocked'
   | 'filed'
   | 'failed'
   | 'skipped'
@@ -52,7 +53,10 @@ export interface HarvestCounts {
   downloading?: number;
   downloaded: number;
   in_library: number;
+  /** Genuinely not open access (OpenAlex lists no open-access copy). */
   paywalled: number;
+  /** Open access, but the deployment's network policy refused the host (the candidate's detail names it). Absent on an older server. */
+  blocked?: number;
   filed: number;
   failed: number;
   skipped: number;
@@ -109,8 +113,10 @@ export interface HarvestCandidate {
   pdf_url: string | null;
   /** Library path once the PDF is filed. */
   relpath: string | null;
-  /** Short reason (why it failed, was skipped, ...). */
+  /** Short reason (why it failed, was skipped, which host was blocked, ...). */
   detail: string | null;
+  /** Whether the source calls the paper open access; `null`/absent when unknown. */
+  oa?: boolean | null;
 }
 
 /** `GET /v1/library/harvest/runs/{run_id}/candidates`. */

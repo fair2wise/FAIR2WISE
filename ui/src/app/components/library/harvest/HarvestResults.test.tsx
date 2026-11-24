@@ -42,6 +42,19 @@ describe('HarvestResults', () => {
     expect(screen.getByRole('heading', { name: 'Results (2)' })).toBeInTheDocument();
   });
 
+  it('keeps an open-access paper blocked by network policy out of the paywalled queue and names the host', () => {
+    setup([
+      cand('b', { status: 'blocked', detail: 'open access, blocked by network policy (private_address) at europepmc.org' }),
+      cand('p', { status: 'paywalled', detail: 'not open access: no open-access copy is listed' }),
+    ]);
+    const queue = screen.getByRole('list', { name: 'Paywalled papers' });
+    expect(within(queue).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(queue).getByText('Paper p')).toBeInTheDocument();
+    const table = screen.getByRole('table', { name: 'Harvest results' });
+    expect(within(table).getByText('Blocked by network policy')).toBeInTheDocument();
+    expect(within(table).getByText(/blocked by network policy \(private_address\) at europepmc\.org/)).toBeInTheDocument();
+  });
+
   it('lists found and downloading papers as they arrive, and a failed one with its short reason', () => {
     setup([
       cand('a', { status: 'found' }),

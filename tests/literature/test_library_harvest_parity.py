@@ -102,7 +102,7 @@ def old_arxiv_searcher(client: Any) -> Callable[[str, int], list[Candidate]]:
                     title=" ".join(str(result.title).split()), source="arxiv", year=result.published.year,
                     doi=clean_doi(result.doi), arxiv_id=arxiv_id, abstract=" ".join(str(result.summary).split()),
                     authors=[" ".join(str(a.name).split()) for a in result.authors],
-                    landing_url=str(result.entry_id), pdf_urls=[f"https://arxiv.org/pdf/{arxiv_id}"]))
+                    landing_url=str(result.entry_id), pdf_urls=[f"https://arxiv.org/pdf/{arxiv_id}"], oa=True))
         return found
 
     return search
@@ -221,7 +221,7 @@ def old_openalex_searcher(fetch: Callable[..., Any]) -> Callable[[str, int], lis
                 year=work.get("publication_year"), doi=doi,
                 abstract=abstract_from_inverted_index(work.get("abstract_inverted_index")) or "",
                 landing_url=f"https://doi.org/{doi}" if doi else (primary or str(work.get("id") or "")),
-                pdf_urls=openalex_work_urls(work)))
+                pdf_urls=openalex_work_urls(work), oa=hv.openalex_is_oa(work)))
         return found
 
     return search

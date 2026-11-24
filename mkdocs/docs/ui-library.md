@@ -63,6 +63,21 @@ The full route table with capabilities is in `docs/migration/api/README.md`. All
 
 To turn a harvested and extracted KG into a published graph, continue with [The `:local` image, end to end](local-image.md).
 
+## What the statuses mean
+
+| Status | Meaning |
+|---|---|
+| Paywalled | genuinely not open access: OpenAlex lists no open-access copy (`is_oa` false, no open-access location). A person completes it: open the publisher in their own browser, save the PDF, drop it on the row |
+| Blocked by network policy | the paper is open access, but this deployment's network policy refused the host (the detail names it, for example `blocked by network policy (private_address) at example.org`, or `proxy_refused` when the egress proxy's allowlist said no). Fix the allowlist or supply the PDF by hand; it is never counted as paywalled |
+| Failed | open access, but the fetch failed for another reason (timeout, network error, an HTTP 401/403/5xx from the host, a link that is not a PDF, no direct PDF link); the detail gives the reason and the host |
+| Downloaded / Filed / In library / Skipped / Dismissed | as before |
+
+The detail never holds a URL path, query or key, only the host and the reason.
+
+## Not used: content.openalex.org
+
+OpenAlex offers cached full-text PDFs for about 60 million open-access works at `https://content.openalex.org/works/<id>.pdf`. It is **metered**: a key is required (a keyless request answers HTTP 401) and each download costs about $0.01 (OpenAlex's example-costs page lists the cached PDF at $10 per 1,000 calls; a free key's $1/day budget covers about 100). The PDFs keep their original copyright. **This is deliberately not used** (owner decision 2026-11-24): the Harvester does not request `content_urls`, does not use it as a candidate URL and has no pay-per-fetch route. Open-access papers are fetched only from the free links OpenAlex lists (repository and publisher open-access locations). Do not propose it again without a new decision.
+
 ## Planned: bioRxiv
 
 bioRxiv is not searched yet. The plan is to search it through OpenAlex with `filter=primary_location.source.id:<bioRxiv source id>`; the source id is to be looked up first with `/sources?search=biorxiv` (not yet done). Nothing is built for this now. bioRxiv's own API has no keyword search, so it cannot be used as a source directly.

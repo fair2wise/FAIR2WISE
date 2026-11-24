@@ -194,8 +194,8 @@ export function HarvestResults({ candidates, busyId, onFile, onDismiss, onReject
                   </TableCell>
                   <TableCell>
                     <HarvestStatusBadge status={candidate.status} detail={candidate.detail} />
-                    {candidate.status === 'failed' && candidate.detail ? (
-                      <span className="mt-1 block max-w-48 truncate text-xs text-muted-foreground"
+                    {(candidate.status === 'failed' || candidate.status === 'blocked') && candidate.detail ? (
+                      <span className="mt-1 block max-w-64 truncate text-xs text-muted-foreground"
                         title={candidate.detail}>
                         {candidate.detail}
                       </span>

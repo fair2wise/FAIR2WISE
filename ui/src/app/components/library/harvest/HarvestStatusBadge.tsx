@@ -8,6 +8,7 @@ const LABELS: Record<HarvestStatus, string> = {
   downloaded: 'Downloaded',
   in_library: 'In library',
   paywalled: 'Paywalled',
+  blocked: 'Blocked by network policy',
   filed: 'Filed',
   failed: 'Failed',
   skipped: 'Skipped',
@@ -18,7 +19,7 @@ const LABELS: Record<HarvestStatus, string> = {
 export function HarvestStatusBadge({ status, detail }: { status: HarvestStatus; detail?: string | null }) {
   const variant = status === 'downloaded' || status === 'filed' ? 'default'
     : status === 'failed' ? 'destructive'
-    : status === 'paywalled' ? 'outline'
+    : status === 'paywalled' || status === 'blocked' ? 'outline'
     : 'secondary';
   return (
     <Badge variant={variant} title={detail ?? undefined}>
