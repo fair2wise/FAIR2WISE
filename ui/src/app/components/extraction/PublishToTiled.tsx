@@ -104,7 +104,7 @@ export function PublishToTiled({ name }: PublishToTiledProps) {
         Publish to Tiled
       </Button>
       <Dialog open={open} onOpenChange={next => { if (!running) setOpen(next); }}>
-        <DialogContent data-testid="publish-dialog">
+        <DialogContent data-testid="publish-dialog" className="top-[12%] right-0 left-0 mx-auto translate-x-0 translate-y-0">
           <DialogHeader>
             <DialogTitle>Publish {name} to Tiled</DialogTitle>
             <DialogDescription>
@@ -115,12 +115,12 @@ export function PublishToTiled({ name }: PublishToTiledProps) {
           {!showResult && (
             <div className="space-y-3 text-sm">
               {preview.isPending && (
-                <p className="flex items-center gap-2 text-muted-foreground" role="status">
+                <p className="flex items-center gap-2 text-slate-500" role="status">
                   <Loader2 aria-hidden="true" className="animate-spin" /> Checking…
                 </p>
               )}
               {preview.isError && (
-                <p role="alert" className="text-destructive">{errorText(preview.error)}</p>
+                <p role="alert" className="text-red-600">{errorText(preview.error)}</p>
               )}
               {data && (
                 <ol className="list-decimal space-y-1 pl-5" data-testid="publish-steps">
@@ -137,7 +137,7 @@ export function PublishToTiled({ name }: PublishToTiledProps) {
                 </ol>
               )}
               {data?.previous && (
-                <div className="space-y-1 rounded-md border border-border bg-muted/30 p-3">
+                <div className="space-y-1 rounded-md border border-slate-200 bg-slate-50 p-3">
                   <p>
                     This exact KG was already published (job {data.previous.job_id}, {data.previous.state}). Confirming
                     without a new version shows that run again.
@@ -156,11 +156,11 @@ export function PublishToTiled({ name }: PublishToTiledProps) {
                 </div>
               )}
               {problems.map(problem => (
-                <p key={problem.reason} role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive">
+                <p key={problem.reason} role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-red-700">
                   {publishReasonText(problem.reason, problem.message)}
                 </p>
               ))}
-              {startError && <p role="alert" className="text-destructive">{startError}</p>}
+              {startError && <p role="alert" className="text-red-600">{startError}</p>}
             </div>
           )}
 
@@ -172,20 +172,20 @@ export function PublishToTiled({ name }: PublishToTiledProps) {
                   return (
                     <li key={stage} className="flex items-center gap-2" data-testid={`publish-stage-${stage}`}>
                       {status === 'completed' ? <CheckCircle2 aria-hidden="true" className="text-green-600" size={16} />
-                        : status === 'failed' || status === 'quarantined' ? <XCircle aria-hidden="true" className="text-destructive" size={16} />
+                        : status === 'failed' || status === 'quarantined' ? <XCircle aria-hidden="true" className="text-red-600" size={16} />
                         : running ? <Loader2 aria-hidden="true" className="animate-spin" size={16} /> : <span className="w-4" />}
-                      {label} <span className="text-muted-foreground">({status})</span>
+                      {label} <span className="text-slate-500">({status})</span>
                     </li>
                   );
                 })}
               </ul>
               {failure && (
-                <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive">
+                <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-red-700">
                   {publishReasonText(failure.reason, failure.message)}
                 </p>
               )}
               {planned && detail && (
-                <div role="status" className="space-y-2 rounded-md border border-border bg-muted/30 p-3" data-testid="publish-success">
+                <div role="status" className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3" data-testid="publish-success">
                   <p>
                     Plan staged: <code>{detail.snapshot_ref}</code>, hash <code>{planned.slice(0, 12)}…</code>
                     {detail.plan?.creates !== null && detail.plan?.creates !== undefined
@@ -198,7 +198,7 @@ export function PublishToTiled({ name }: PublishToTiledProps) {
                 </div>
               )}
               {!failure && !planned && jobState === 'succeeded' && (
-                <p role="status" className="text-muted-foreground">
+                <p role="status" className="text-slate-500">
                   The plan is being prepared; it will appear on Pending Approvals.{' '}
                   <Link to="/approvals" className="font-medium underline" onClick={() => setOpen(false)}>Open Pending Approvals</Link>
                 </p>
@@ -212,6 +212,7 @@ export function PublishToTiled({ name }: PublishToTiledProps) {
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
                 <Button
                   type="button"
+                  className="bg-slate-900! text-white hover:bg-slate-800! disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={!data || problems.length > 0 || start.isPending || preview.isPending}
                   onClick={confirm}
                 >
