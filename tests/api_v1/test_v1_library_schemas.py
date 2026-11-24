@@ -18,8 +18,8 @@ BASE = "/v1/library/schemas"
 
 def test_the_capability_is_local_only_and_the_rows_declare_it(local, als):
     assert "library.author_schema" in CAPABILITIES and "library.author_schema" in LOCAL_ONLY_CAPABILITIES
-    rows = {p.route_id: p for p in API_ROUTE_POLICIES if p.route_id in {f"V{n}" for n in range(89, 96)}}
-    assert set(rows) == {f"V{n}" for n in range(89, 96)} and all(not p.on_als for p in rows.values())
+    rows = {p.route_id: p for p in API_ROUTE_POLICIES if p.route_id in {f"V{n}" for n in range(89, 97)}}
+    assert set(rows) == {f"V{n}" for n in range(89, 97)} and all(not p.on_als for p in rows.values())
     assert {r.capabilities == frozenset({"library.author_schema"}) for k, r in rows.items() if k in ("V89", "V90", "V91", "V95")} == {True}
     assert undeclared_routes(local.app) == []
     assert local.client().get("/v1/library/schemas/user").status_code == 200   # the local operator holds the library caps
@@ -31,6 +31,7 @@ def test_als_answers_404_for_every_route_and_no_als_principal_holds_the_capabili
         assert c.post(f"{BASE}/validate", json={"text": GOOD}).status_code == 404
         assert c.post(f"{BASE}/insert-core", json={"text": GOOD}).status_code == 404
         assert c.post(BASE, json={"name": "catfish", "text": GOOD}).status_code == 404
+        assert c.post(f"{BASE}/generate", json={"description": "catfish"}).status_code == 404
         assert c.get(f"{BASE}/user").status_code == 404
         assert c.get(f"{BASE}/user/catfish@v1").status_code == 404
         assert c.get(f"{BASE}/user/catfish/diff?from=1&to=2").status_code == 404
@@ -140,3 +141,65 @@ def test_bodies_over_the_cap_are_refused_before_parsing(local):
 def test_the_store_lives_under_the_workdir_schemas_directory(local):
     store = local.app.state.f2w_kg_library.user_schemas
     assert isinstance(store, UserSchemaStore) and store.root.name == "schemas" and store.root.parent.name != "kgs"
+
+
+# ------------------------------------------------------------------------------ generate
+
+
+class FakeChat:
+    def __init__(self, replies):
+        self.replies, self.calls = list(replies), []
+
+    def factory(self, **kwargs):
+        self.calls.append(kwargs)
+        return self
+
+    def chat(self, prompt, **kw):
+        reply = self.replies.pop(0)
+        if isinstance(reply, BaseException):
+            raise reply
+        return reply
+
+
+def _install(local, tmp_path, replies, env=None):
+    from app.modules.library.schema_generate import SchemaGenerator
+
+    path = tmp_path / "shipped.yaml"
+    path.write_text(GOOD, encoding="utf-8")
+    fake = FakeChat(replies)
+    local.app.state.f2w_schema_generator = SchemaGenerator(
+        {"CBORG_API_KEY": "sk-test-key"} if env is None else env, client_factory=fake.factory, schema_paths=(str(path),))
+    return fake
+
+
+def test_generate_route_returns_every_attempt_and_stores_nothing(local, tmp_path):
+    bad = GOOD.replace("    domain: Species\n", "    domain: Nope\n")
+    _install(local, tmp_path, [bad, GOOD])
+    out = local.client().post(f"{BASE}/generate", json={"description": "armoured catfish", "model": "lbl/cborg-chat"})
+    assert out.status_code == 200, out.text
+    body = out.json()
+    assert body["ok"] is True and body["repairs"] == 1 and len(body["attempts"]) == 2 and body["text"] == GOOD
+    assert body["attempts"][0]["report"]["ok"] is False and body["backend"] == "cborg"
+    assert not local.app.state.f2w_kg_library.user_schemas.root.exists()
+
+
+def test_generate_route_typed_errors_have_no_key_or_url(local, tmp_path):
+    import requests
+
+    c = local.client()
+    _install(local, tmp_path, [GOOD], env={})
+    out = c.post(f"{BASE}/generate", json={"description": "x", "model": "m"})
+    assert out.status_code == 501 and "schema generation" in out.text
+    _install(local, tmp_path, [GOOD])
+    paid = c.post(f"{BASE}/generate", json={"description": "x", "model": "anthropic/claude-opus"})
+    assert paid.status_code == 403 and "sk-test-key" not in paid.text
+    _install(local, tmp_path, [requests.ConnectionError("http://secret-host.internal:11434 refused")],
+             env={"F2W_EXTRACT_BACKEND": "ollama", "OLLAMA_URL": "http://secret-host.internal:11434"})
+    down = c.post(f"{BASE}/generate", json={"description": "x", "backend": "ollama", "model": "llama3"})
+    assert down.status_code == 503 and down.json()["reason"] == "ollama_unreachable"
+    assert "secret-host" not in down.text and "11434" not in down.text
+    assert c.post(f"{BASE}/generate", json={"description": ""}).status_code == 422
+    assert c.post(f"{BASE}/generate", json={"description": "x" * 2001}).status_code == 422
+    assert c.post(f"{BASE}/generate", json={"description": "x", "backend": "openai"}).status_code == 422
+    assert c.post(f"{BASE}/generate", content=json.dumps({"description": "x" * 20000}),
+                  headers={"content-type": "application/json"}).json()["reason"] == "body_too_large"

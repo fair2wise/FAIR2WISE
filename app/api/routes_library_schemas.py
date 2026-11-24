@@ -11,15 +11,19 @@ Writing and checking need the separate capability ``library.author_schema``; rea
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import json
 from typing import Any
 
 from fastapi import Depends, FastAPI, Query, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 
 from ..modules.contracts.context import RequestContext
 from ..modules.contracts.errors import ContractError, ErrorCode
 from ..modules.library.kg_service import KgLibrary
+from ..modules.library.schema_generate import SchemaGenerator
+from ..modules.library.schema_prompt import MAX_DESCRIPTION
 from ..modules.library.user_schema_validation import MAX_BYTES, insert_required_core, validate_schema_text
 from ..modules.library.user_schemas import SchemaInvalid, UserSchemaStore, validate_schema_name
 from .routes_common import Prefixed, context
@@ -76,9 +80,22 @@ def user_store(request: Request) -> UserSchemaStore:
     return service.user_schemas
 
 
-def install(app: FastAPI) -> FastAPI:
-    """Mount the routes on ``app`` (``:local`` only)."""
+#: Body cap of the generate route (a description of at most 2,000 characters plus a backend and a model name).
+MAX_GENERATE_BODY_BYTES = 16 * 1024
+
+
+def schema_generator(request: Request) -> SchemaGenerator:
+    """The app's schema generator, or fail closed."""
+    generator = getattr(request.app.state, "f2w_schema_generator", None)
+    if not isinstance(generator, SchemaGenerator):
+        raise ContractError(ErrorCode.INTERNAL, "the schema generator is not installed")
+    return generator
+
+
+def install(app: FastAPI, env: Mapping[str, str] | None = None) -> FastAPI:
+    """Mount the routes on ``app`` (``:local`` only); ``env`` is the startup environment of the generate route."""
     router = Prefixed(app, "/v1/library")
+    app.state.f2w_schema_generator = SchemaGenerator(env)
 
     @router.post("/schemas/validate")
     async def validate(request: Request, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
@@ -131,7 +148,19 @@ def install(app: FastAPI) -> FastAPI:
         user_store(request).delete(f"user/{ref}")
         return {"deleted": f"user/{ref}"}
 
+    @router.post("/schemas/generate")
+    async def generate(request: Request, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
+        """Ask the chosen model (free CBORG or Ollama) to draft a schema; validated, repaired at most twice, every attempt returned."""
+        body = await read_json_body(request, limit=MAX_GENERATE_BODY_BYTES)
+        description = text_field(body, "description", limit=MAX_DESCRIPTION) or ""
+        backend = text_field(body, "backend", limit=20, required=False)
+        if backend is not None and backend not in ("cborg", "ollama"):
+            raise ContractError(ErrorCode.INVALID_INPUT, "backend must be cborg or ollama", retryable=False)
+        model = text_field(body, "model", limit=200, required=False)
+        generator = schema_generator(request)
+        return await run_in_threadpool(lambda: generator.generate(description, backend=backend, model=model))
+
     return app
 
 
-__all__ = ("MAX_BODY_BYTES", "install", "read_json_body", "text_field", "user_store")
+__all__ = ("MAX_BODY_BYTES", "install", "read_json_body", "schema_generator", "text_field", "user_store")

@@ -109,6 +109,22 @@ def resolve_backend(env: Mapping[str, str], requested: str | None = None) -> dic
     return None
 
 
+def require_backend(env: Mapping[str, str], requested: str | None = None, *, purpose: str = "extraction") -> dict[str, str]:
+    """:func:`resolve_backend`, or a fail-closed ``unsupported_capability`` error naming what is missing (nothing is contacted)."""
+    backend = resolve_backend(env, requested)
+    if backend is None and requested == "ollama":
+        raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
+                            f"Ollama is not configured for {purpose} ({OLLAMA_URL_ENV} is not set on the server)")
+    if backend is None and requested == "cborg":
+        raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
+                            f"CBORG is not configured for {purpose} (CBORG_API_KEY is not set on the server)")
+    if backend is None:
+        raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
+                            f"no LLM backend is configured for {purpose} (set CBORG_API_KEY, or "
+                            f"{BACKEND_ENV}=ollama)")
+    return backend
+
+
 #: ``factory(model=, output_file=, schema_path=, backend=<resolve_backend dict>) -> Orchestrator``.
 OrchestratorFactory = Callable[..., Any]
 
@@ -336,18 +352,7 @@ class LibraryExtractor:
 
         ``requested`` is the job's own choice (``params.backend``); without it the startup environment decides.
         """
-        backend = resolve_backend(self.env, requested)
-        if backend is None and requested == "ollama":
-            raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
-                                f"Ollama is not configured for extraction ({OLLAMA_URL_ENV} is not set on the server)")
-        if backend is None and requested == "cborg":
-            raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
-                                "CBORG is not configured for extraction (CBORG_API_KEY is not set on the server)")
-        if backend is None:
-            raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
-                                "no LLM backend is configured for extraction (set CBORG_API_KEY, or "
-                                f"{BACKEND_ENV}=ollama)")
-        return backend
+        return require_backend(self.env, requested)
 
     # -- the bundle -------------------------------------------------------------------------------
 

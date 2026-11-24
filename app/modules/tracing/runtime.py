@@ -371,7 +371,7 @@ LLM_LABELS = frozenset({
     "baseline", "KG-RAG", "KG-RAG-judge", "KG-RAG-leeway", "chat", "evidence-debate", "session-memory-compress",
     "legacy-route", "direct-response", "domain-knowledge-fallback", "rewrite-question", "general-answer",
     "json-graph-leeway", "pending-download-intent", "pdf-validate", "paper-evidence", "vision.orientation",
-    "vision.classify", "orchestrator-classify", "supervisor-plan", "other",
+    "vision.classify", "orchestrator-classify", "supervisor-plan", "schema-generate", "other",
 })
 
 

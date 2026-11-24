@@ -225,6 +225,9 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
        note="unified diff between two versions (?from=&to=)"),
     _v("V95", "DELETE", "/library/schemas/user/{ref}", "library.author_schema", on_als=False,
        note="delete one version only when no KG bundle manifest references it (409 otherwise)"),
+    _v("V96", "POST", "/library/schemas/generate", "library.author_schema", on_als=False,
+       note="draft a schema from {description (<=2000 chars), backend?, model?} with free CBORG or Ollama (label "
+            "schema-generate; 180 s deadline, 64 KiB reply cap); validated, repaired at most twice, every attempt returned"),
 )
 
 #: ``(METHOD, path) -> RoutePolicy`` for the ``/v1`` routes.

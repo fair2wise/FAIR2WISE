@@ -41,11 +41,16 @@ class FakeSyncChatClient:
         temperature: float = 0.0,
         timeout: int = 240,
         trace_label: str | None = None,
+        system: str | None = None,
+        max_tokens: int | None = None,
+        num_ctx: int | None = None,
     ) -> str:
         """Record the call and return the next scripted reply."""
         self.calls.append(
             {"prompt": prompt, "temperature": temperature, "timeout": timeout, "trace_label": trace_label}
         )
+        if system is not None or max_tokens is not None or num_ctx is not None:  # recorded only when given
+            self.calls[-1].update({"system": system, "max_tokens": max_tokens, "num_ctx": num_ctx})
         return self._replies.pop(0) if self._replies else self._default
 
 

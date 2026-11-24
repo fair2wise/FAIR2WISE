@@ -383,7 +383,7 @@ def create_api_app(
         library_routes.install(app)  # T35 (A8): library catalog/upload/verify, local profile only
         routes_library_harvest.install(app)  # T45 (A8): Harvester runs and the paywalled queue
         _install_kg_library(app, cfg, judge_settings)
-        routes_library_schemas.install(app)  # schema generation: author, validate, save user schemas
+        routes_library_schemas.install(app, startup_env)  # schema generation: author, validate, save user schemas
     elif folder_roots is not None or (startup.get(FOLDER_ROOTS_ENV) or "").strip():
         logger.warning("%s is ignored on %s: folder browsing is a local-profile feature (owner decision B4)",
                        FOLDER_ROOTS_ENV, settings.profile)
