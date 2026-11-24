@@ -52,6 +52,27 @@ cache would cost more than the install). npm is cached by `actions/setup-node`.
 `publish-image.yml` is unchanged: its gate (`O06_APPROVED`, protected ref, the `ghcr-publish` and
 `ghcr-als-prod` environments) still decides every publication.
 
+## Before you push
+
+`scripts/ci/push_gate.sh` runs the push-path jobs against the committed tree (`git archive HEAD`, a clean
+environment, like CI): `tests/contracts`, the quality gate (ruff, isort, mypy, docstring style), the flake8
+baselines and the three unit shards with the known-failure comparison. `--ui` adds the Vitest suite and both vite
+builds, `--docs` the strict MkDocs build, `--only contracts|quality|lint|shards` runs one group. Uncommitted
+changes are not tested.
+
+Checklist for anyone (person or agent) pushing a change under `app/`, `tests/`, `ui/` or `scripts/`:
+
+1. Commit, then run `scripts/ci/push_gate.sh` (at least `--only contracts` and `--only quality`; the full run
+   before the last push of a series). A file under `ui/` or `tests/` that only mentions "Splash" in a comment or a
+   fixture still has to be listed in `docs/migration/reviews/H8/splash_retirement.md`
+   (`tests/contracts/legacy_ui/test_splash_retirement.py`); a UI change also needs `--ui`.
+2. A change under `ui/` re-pins `FROZEN_UI_TREE` (workflow) and the short pin in `docs/migration/demo/GITHUB_READINESS.md`.
+3. Playwright is not on the push path: run the specs you touched with `cd ui && npx playwright test <files>`.
+
+What the script does not cover: the frozen-UI hash guard and changed-path filter, the `[ci full]` jobs (Tiled
+suites, Playwright, Docling, coverage, slow tests), the import check of the legacy entrypoints, and any
+macOS-versus-Linux difference. Tiled-backed tests skip locally unless `F2W_TILED_PYTHON` is set.
+
 ## Known flaky tests
 
 | Test | Symptom | Seen on | Status |
