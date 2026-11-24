@@ -5,7 +5,7 @@ A library job runs code that logs through the standard library (for example the 
 therefore never filters by the calling thread. Instead exactly one capture may be active per process
 (a module-level guard) and every record of the named loggers belongs to that one job.
 
-Records are scrubbed and bounded by :meth:`JobStore.append_log`. A line that cannot be stored (lease
+Records have absolute file system paths reduced to their last component (:func:`redact_paths`), then are scrubbed and bounded by :meth:`JobStore.append_log`. A line that cannot be stored (lease
 lost, stop requested, shutdown) is dropped and counted, never raised into the caller's logging call.
 """
 
@@ -14,6 +14,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 import logging
+import re
 import threading
 
 from .pipeline import StageContext
@@ -32,6 +33,15 @@ class CaptureBusy(RuntimeError):
     def __init__(self, job_id: str | None) -> None:
         super().__init__(f"job logs of {job_id} are already being captured in this process")
         self.job_id = job_id
+
+
+#: An absolute POSIX path of two or more segments that is not part of a URL, a date or a word.
+_PATH = re.compile(r"(?<![\w:/.])/(?:[\w.@+~-]+/)+[\w.@+~-]*")
+
+
+def redact_paths(text: str) -> str:
+    """Replace every absolute file system path in ``text`` by its last component (a display name, never a location)."""
+    return _PATH.sub(lambda match: match.group(0).rstrip("/").rsplit("/", 1)[-1] or "[path]", text)
 
 
 def _level_name(levelno: int) -> str:
@@ -65,7 +75,7 @@ class JobLogHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         """Store one record; never raise into the logging caller."""
         try:
-            self.sc.log(record.getMessage(), _level_name(record.levelno))
+            self.sc.log(redact_paths(record.getMessage()), _level_name(record.levelno))
         except Exception:  # noqa: BLE001 - lease lost, stop requested or a bad format must not break the caller
             self.dropped += 1
 
@@ -118,4 +128,4 @@ def capture_job_logs(
         _ACTIVE_LOCK.release()
 
 
-__all__ = ("CaptureBusy", "JobLogHandler", "capture_job_logs")
+__all__ = ("CaptureBusy", "JobLogHandler", "capture_job_logs", "redact_paths")

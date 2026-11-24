@@ -42,6 +42,8 @@ class TermStore:
         self._state_lock = threading.Lock()
         self._save_lock = threading.Lock()
         self._tl = threading.local()
+        #: Running tally of what :meth:`upsert` did since this store was opened (a job's live KG growth counters).
+        self._growth = {"entities_new": 0, "entities_merged": 0, "relations_new": 0, "relations_merged": 0}
         #: Returns ``True`` once the run owning this store was fenced out (another owner took its job over).
         #: From then on every write is ignored and the answer is latched: the stale run's page threads may
         #: still be mid-call, but nothing they produce may reach memory or the shared terms file.
@@ -183,11 +185,14 @@ class TermStore:
             if key not in self._records:
                 self._records[key] = record
                 self._display_to_key[record.term] = key
+                self._growth["entities_new"] += 1
+                self._growth["relations_new"] += len(record.relations)
                 self._tl.updated = True
                 return key, True
 
             existing = self._records[key]
             modified = False
+            self._growth["entities_merged"] += 1
 
             for page in record.pages:
                 if page not in existing.pages:
@@ -221,7 +226,10 @@ class TermStore:
                 if (rel.relation, rel.related_term) not in existing_rel_keys:
                     existing.relations.append(rel)
                     existing_rel_keys.add((rel.relation, rel.related_term))
+                    self._growth["relations_new"] += 1
                     modified = True
+                else:
+                    self._growth["relations_merged"] += 1
 
             for attr in ("formula", "formula_validation", "chebi", "smiles", "charge", "inchi", "inchikey", "mass"):
                 if getattr(record, attr) is not None and getattr(existing, attr) is None:
@@ -246,6 +254,18 @@ class TermStore:
             if modified:
                 self._tl.updated = True
             return key, modified
+
+    def growth(self) -> dict[str, int]:
+        """Snapshot of the KG growth counters of this run.
+
+        Returns:
+            ``entities_new`` / ``entities_merged`` (a mention that created a term versus one folded into an existing
+            term, including terms loaded from an earlier bundle), ``relations_new`` / ``relations_merged`` (the same
+            for relations), and ``entities_total`` / ``relations_total`` (what the store holds now).
+        """
+        with self._state_lock:
+            return {**self._growth, "entities_total": len(self._records),
+                    "relations_total": sum(len(r.relations) for r in self._records.values())}
 
     def attach_property(self, key: str, prop: PropertyRecord) -> bool:
         """Append a property to an existing term if not already present. Returns True if added."""

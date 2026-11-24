@@ -24,8 +24,28 @@ TAIL_BYTES = 64 * 1024
 TAIL_LINE_CHARS = 400
 #: The only module a worker process may run.
 WORKER_MODULE = "app.modules.workers"
-_SECRET = re.compile(
-    r"(?i)(api[_-]?key|token|secret|passw(or)?d|authorization)\s*[=:]\s*\S+|Bearer\s+\S+|sk-[A-Za-z0-9]{12,}"
+#: Credential-like text, applied in order by :func:`scrub`. Each pattern keeps the surrounding text readable and
+#: replaces only the secret (or the whole ``name=value`` pair where the value is the secret).
+_REDACTED = "[redacted]"
+_KEY_NAME = (
+    r"(?:[A-Za-z0-9]+[_-])*(?:api[_-]?key|access[_-]?key|private[_-]?key|token|secret|passw(?:or)?d|credentials?)"
+    r"|(?:[A-Za-z0-9]+[_-])+key"
+)
+_SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
+    # JSON Web Tokens (three base64url parts, header starts with ``eyJ``).
+    re.compile(r"\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}(?:\.[A-Za-z0-9_-]*)?"),
+    # ``Authorization: Bearer abc`` / ``Basic abc`` / ``"Authorization": "abc"``: the whole header value.
+    re.compile(r"(?i)authorization[\"']?\s*[=:]\s*[\"']?(?:(?:bearer|basic|token|digest)\s+)?[^\s,;\"'&]+"),
+    re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+"),
+    # ``CBORG_API_KEY=v``, ``OPENALEX_API_KEY: v``, ``*_KEY=v``, ``*_TOKEN=v``, ``"api_key": "v"``, ``?token=v``.
+    re.compile(rf"(?i)(?:{_KEY_NAME})[\"']?\s*[=:]\s*(?:\"[^\"]*\"|'[^']*'|[^\s&,;\"']+)"),
+    # Query parameters named like a credential in a URL (``?key=...&sig=...``).
+    re.compile(r"(?i)(?<=[?&])(?:key|auth|signature|sig|apikey|access_token|id_token)=[^&\s#]+"),
+    # Vendor-shaped keys: ``sk-...`` (also ``sk-proj-...``), GitHub and Slack tokens.
+    re.compile(r"\bsk-[A-Za-z0-9_-]{12,}"),
+    re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abprs]-[A-Za-z0-9-]{10,})"),
+    # Credentials in a URL (``https://user:pass@host``).
+    re.compile(r"(?<=://)[^/\s:@]+:[^/\s@]+(?=@)"),
 )
 
 
@@ -79,8 +99,16 @@ def is_our_worker(pid: object, marker: str = WORKER_MODULE) -> bool:
 
 
 def scrub(line: str) -> str:
-    """Remove credential-like text from a log line."""
-    return _SECRET.sub("[redacted]", line)
+    """Remove credential-like text from a log line.
+
+    Covers Bearer tokens and ``Authorization`` headers, JWTs, ``sk-...`` and other vendor-shaped keys,
+    ``*_KEY=value`` / ``*_TOKEN=value`` / ``api_key`` / ``secret`` / ``password`` pairs (also quoted, JSON style and
+    in URL query strings), credential-named URL query parameters and ``user:pass@`` URL credentials. Pure and
+    idempotent; applied when a line is stored and again when it is read.
+    """
+    for pattern in _SECRET_PATTERNS:
+        line = pattern.sub(_REDACTED, line)
+    return line
 
 
 def tail_lines(

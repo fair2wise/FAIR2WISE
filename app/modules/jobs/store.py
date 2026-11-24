@@ -22,6 +22,9 @@ from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
+import os
+from pathlib import Path
+import re
 import sqlite3
 import time
 from typing import Any, cast
@@ -59,6 +62,10 @@ SCHEMA = (
     # children. A side table, not a column: an existing database gets it from this script, no migration.
     "CREATE TABLE IF NOT EXISTS job_trace_context (job_id TEXT PRIMARY KEY, traceparent TEXT NOT NULL, "
     "created_at REAL NOT NULL);\n",
+    # Additive (live run feedback): what a running stage is doing right now (phase and the one item it works on).
+    # A side table so the integer-only progress counters stay as they are; created by this script on an existing database.
+    "CREATE TABLE IF NOT EXISTS job_status (job_id TEXT PRIMARY KEY, stage TEXT NOT NULL DEFAULT '', "
+    "phase TEXT NOT NULL DEFAULT '', item TEXT NOT NULL DEFAULT '', updated_at REAL NOT NULL);\n",
 )
 
 #: Longest stored log message (characters, after scrubbing).
@@ -66,6 +73,12 @@ LOG_MESSAGE_CHARS = 400
 #: Most log rows kept per job; the oldest are dropped first.
 LOG_ROWS_PER_JOB = 2000
 #: Accepted log levels.
+#: Largest append-only log file kept per job beside the database (bytes); one marker line is written when it is full.
+LOG_FILE_BYTES = 5 * 1024 * 1024
+#: Longest ``item`` (display name) :meth:`JobStore.set_status` keeps.
+STATUS_ITEM_CHARS = 200
+#: Directory (beside the database file) holding the per-job full log files.
+LOG_DIRNAME = "job-logs"
 LOG_LEVELS = frozenset({"debug", "info", "warning", "error"})
 
 #: Allowed lifecycle transitions. Terminal states have none except an explicit operator retry.
@@ -208,6 +221,8 @@ class JobStore:
         self.db = db or OperationalDB(path)
         self.lease_seconds = lease_seconds
         self.clock = clock
+        #: Where the full, append-only log of each job is kept (``<job_id>.log``); ``None`` for an in-memory database.
+        self.log_dir: Path | None = None if str(self.db.path) == ":memory:" else Path(self.db.path).parent / LOG_DIRNAME
         with self.db.tx() as con:
             for statement in SCHEMA:
                 con.execute(statement.rstrip(";\n"))
@@ -885,7 +900,87 @@ class JobStore:
             seq = con.execute("SELECT COALESCE(MAX(seq), -1) + 1 FROM job_logs WHERE job_id=?", (job_id,)).fetchone()[0]
             con.execute("INSERT INTO job_logs VALUES (?, ?, ?, ?, ?, ?)", (job_id, seq, now, level, stage, text))
             con.execute("DELETE FROM job_logs WHERE job_id=? AND seq<=?", (job_id, seq - LOG_ROWS_PER_JOB))
+        self._append_log_file(job_id, seq, now, level, stage, text)
         return JobLog(job_id, seq, now, level, stage, text)
+
+    def _append_log_file(self, job_id: str, seq: int, at: float, level: str, stage: str, text: str) -> None:
+        """Best effort: append the stored (already scrubbed) line to ``<log_dir>/<job_id>.log`` up to ``LOG_FILE_BYTES``.
+
+        The table keeps only the last ``LOG_ROWS_PER_JOB`` rows; this file keeps the whole run (until it is full). It
+        never raises: a log line must not fail a job. Files are created ``0600``; nothing but scrubbed text is written.
+        """
+        if self.log_dir is None or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", job_id):
+            return
+        try:
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+            path = self.log_dir / f"{job_id}.log"
+            flat = " ".join(text.split())  # one line per record: no embedded newline or tab
+            line = f"{seq}\t{datetime.fromtimestamp(at, UTC).isoformat()}\t{level}\t{stage}\t{flat}\n"
+            fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+            try:
+                size = os.fstat(fd).st_size
+                if size >= LOG_FILE_BYTES:
+                    return
+                if size + len(line.encode()) > LOG_FILE_BYTES:
+                    line = f"{seq}\t{datetime.fromtimestamp(at, UTC).isoformat()}\twarning\t\tlog file full; later lines are only in the job log table\n"
+                os.write(fd, line.encode())
+            finally:
+                os.close(fd)
+        except OSError:
+            return
+
+    def log_file(self, job_id: str) -> Path | None:
+        """Path of the job's full log file when one exists (operators only; the API never serves it)."""
+        if self.log_dir is None or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", job_id):
+            return None
+        path = self.log_dir / f"{job_id}.log"
+        return path if path.is_file() else None
+
+    def log_stats(self, job_id: str) -> dict[str, int]:
+        """``{"kept": rows in the table, "total": lines ever written, "cap": LOG_ROWS_PER_JOB}`` for one job.
+
+        ``total`` is the highest ``seq`` plus one (``seq`` rises by one per line and starts at 0), so
+        ``total - kept`` lines were dropped from the table by the per-job cap.
+        """
+        row = self.db.one("SELECT COUNT(*) AS kept, COALESCE(MAX(seq), -1) + 1 AS total FROM job_logs WHERE job_id=?",
+                          (job_id,))
+        return {"kept": int(row["kept"]), "total": int(row["total"]), "cap": LOG_ROWS_PER_JOB}
+
+    def log_tail(self, job_id: str, limit: int = 500) -> list[JobLog]:
+        """The newest ``limit`` kept lines in ``seq`` order (a reloaded page derives its cursor from the last one)."""
+        rows = self.db.query(
+            "SELECT job_id, seq, at, level, stage, message FROM job_logs WHERE job_id=? ORDER BY seq DESC LIMIT ?",
+            (job_id, max(1, min(limit, 5000))),
+        )
+        return [JobLog(r["job_id"], r["seq"], r["at"], r["level"], r["stage"], r["message"]) for r in reversed(rows)]
+
+    # --- live status ------------------------------------------------------------------
+
+    def set_status(self, lease: Lease, job_id: str, stage: str, phase: str, item: str = "") -> None:
+        """Record what the stage is doing now: ``phase`` (for example ``parsing``) and the ``item`` (a display name).
+
+        Under the lease like every write. ``item`` is a display name only (cut to ``STATUS_ITEM_CHARS``, scrubbed).
+        """
+        with self.db.tx() as con:
+            self._check_lease(con, lease)
+            con.execute(
+                "INSERT INTO job_status VALUES (?, ?, ?, ?, ?) ON CONFLICT(job_id) DO UPDATE SET stage=excluded.stage, "
+                "phase=excluded.phase, item=excluded.item, updated_at=excluded.updated_at",
+                (job_id, stage, phase[:40], scrub(item)[:STATUS_ITEM_CHARS], self.clock()),
+            )
+
+    def status(self, job_id: str) -> dict[str, Any] | None:
+        """``{"stage", "phase", "item", "updated_at"}`` last recorded by :meth:`set_status`, or ``None``."""
+        row = self.db.one("SELECT stage, phase, item, updated_at FROM job_status WHERE job_id=?", (job_id,))
+        return None if row is None else {k: row[k] for k in ("stage", "phase", "item", "updated_at")}
+
+    def unit_rows(self, job_id: str, stage: str, *, limit: int = 500) -> list[dict[str, Any]]:
+        """Settled and failed units of a stage, oldest first: ``{unit_id, status, result, error, updated_at}``."""
+        rows = self.db.query(
+            "SELECT unit_id, status, result, error, updated_at FROM job_units WHERE job_id=? AND stage=? "
+            "ORDER BY updated_at, unit_id LIMIT ?", (job_id, stage, max(1, min(limit, 5000))))
+        return [{"unit_id": r["unit_id"], "status": r["status"], "error": r["error"], "updated_at": r["updated_at"],
+                 "result": json.loads(r["result"]) if r["result"] else None} for r in rows]
 
     def logs(self, job_id: str, *, after: int = -1, limit: int = 500) -> list[JobLog]:
         """Log lines with ``seq > after`` in ``seq`` order (at most ``limit``, clamped to 1..5000)."""
@@ -906,6 +1001,8 @@ __all__ = (
     "JobLog",
     "JobRecord",
     "JobStore",
+    "LOG_DIRNAME",
+    "LOG_FILE_BYTES",
     "LOG_LEVELS",
     "LOG_MESSAGE_CHARS",
     "LOG_ROWS_PER_JOB",

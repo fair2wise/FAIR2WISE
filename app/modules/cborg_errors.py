@@ -26,6 +26,9 @@ IP_NOT_AUTHORIZED_MESSAGE = (
     "CBORG refused this network address; connect via LBLnet/VPN or authorize the address"
 )
 
+#: The line a job log shows for the same refusal (plain words for a person reading the run; no address).
+IP_NOT_AUTHORIZED_LOG_TEXT = "CBORG refused this machine's address; check network egress"
+
 _TOKEN = re.compile(r"ip[_-]?not[_-]?authori[sz]ed", re.IGNORECASE)
 
 
@@ -93,5 +96,5 @@ def as_ip_not_authorized(exc: BaseException) -> CborgIpNotAuthorized | None:
     return CborgIpNotAuthorized() if is_ip_not_authorized(exc) else None
 
 
-__all__ = ("CborgIpNotAuthorized", "IP_NOT_AUTHORIZED", "IP_NOT_AUTHORIZED_MESSAGE", "IP_NOT_AUTHORIZED_REASON",
+__all__ = ("CborgIpNotAuthorized", "IP_NOT_AUTHORIZED", "IP_NOT_AUTHORIZED_LOG_TEXT", "IP_NOT_AUTHORIZED_MESSAGE", "IP_NOT_AUTHORIZED_REASON",
            "as_ip_not_authorized", "is_ip_not_authorized")

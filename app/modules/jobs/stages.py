@@ -109,8 +109,9 @@ def chunked_stage(
                 missing.append(unit.unit_id)
                 continue
             except Exception as exc:  # noqa: BLE001 - one bad chunk must not lose the others
-                logger.warning("unit %s failed: %s", unit.unit_id, type(exc).__name__)
-                sc.fail_unit(unit.unit_id, unit.unit_key, type(exc).__name__)
+                reason = str(getattr(exc, "unit_error", "") or type(exc).__name__)  # a processor may name the unit in plain words
+                logger.warning("unit %s failed: %s", unit.unit_id, reason)
+                sc.fail_unit(unit.unit_id, unit.unit_key, reason)
                 missing.append(unit.unit_id)
                 continue
             sc.save_unit(unit.unit_id, unit.unit_key, outcome)

@@ -14,6 +14,7 @@ import openai
 import pytest
 
 from app.modules.cborg_errors import (
+    IP_NOT_AUTHORIZED_LOG_TEXT,
     IP_NOT_AUTHORIZED_MESSAGE,
     IP_NOT_AUTHORIZED_REASON,
     CborgIpNotAuthorized,
@@ -174,7 +175,9 @@ def test_orchestrator_stops_at_the_first_refusal(monkeypatch, caplog):
         assert orch.process_page(text, "a.pdf", 1) is False
     assert calls == {"graph": 1, "fallback": 0}  # no fallback call, no second page
     assert isinstance(orch.refusal, CborgIpNotAuthorized)
-    assert caplog.text.count(IP_NOT_AUTHORIZED_MESSAGE) == 1
+    # the job log says it in plain words (T-run-feedback): the fixed sentence, once, and no address
+    assert caplog.text.count(IP_NOT_AUTHORIZED_LOG_TEXT) == 1
+    assert IP_NOT_AUTHORIZED_MESSAGE not in caplog.text
 
 
 def test_job_stage_ends_at_the_first_refusal_instead_of_failing_every_unit():

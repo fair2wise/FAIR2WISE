@@ -16,7 +16,7 @@ from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
 
 from . import provenance, source_repos
-from ..cborg_errors import CborgIpNotAuthorized, as_ip_not_authorized
+from ..cborg_errors import IP_NOT_AUTHORIZED_LOG_TEXT, CborgIpNotAuthorized, as_ip_not_authorized
 from ..cborg_http import (
     LLM_MAX_RETRIES,
     call_with_deadline,
@@ -27,6 +27,7 @@ from ..cborg_http import (
 from ..cborg_limiter import sync_slot
 from ..literature.pdf_reader import open_pdf
 from ..llm_admission import shared_admission_enabled
+from ..llm_failures import plain_call_failure, provider_label
 from ..model_policy import require_free_cborg_model
 from .agent import build_graph
 from .clients import make_chat_client
@@ -174,6 +175,10 @@ class Orchestrator:
     #: Set by the first CBORG ``ip_not_authorized`` refusal; once set no further LLM call is made (it is terminal
     #: for this orchestrator: another page, retry or fallback call would be refused the same way).
     refusal: CborgIpNotAuthorized | None = None
+    #: Optional progress sink ``events(kind, **info)`` for a job's live view. Kinds: ``paper_opened`` (``name``,
+    #: ``pages``), ``page_done`` (``name``, ``done``, ``total``), ``paper_merging`` (``name``). Called from page
+    #: threads; an exception it raises is swallowed (progress must never fail an extraction).
+    events: Callable[..., None] | None = None
 
     def __init__(
         self,
@@ -291,6 +296,25 @@ class Orchestrator:
     # Processing pipeline
     # ------------------------------------------------------------------
 
+    def _emit(self, kind: str, **info: Any) -> None:  # noqa: ANN401  # Any: small JSON-like event fields
+        """Pass one progress event to :attr:`events`; never raises."""
+        sink = self.events
+        if sink is None:
+            return
+        try:
+            sink(kind, **info)
+        except Exception:  # noqa: BLE001 - a progress sink (lease lost, stop requested) must not break extraction
+            return
+
+    def _describe(self, exc: BaseException) -> str:
+        """Plain-words text of a failed model call (provider, model id, reason; nothing from the provider's message)."""
+        provider, model = self._provider_model()
+        return plain_call_failure(exc, provider=provider, model=model)
+
+    def _provider_model(self) -> tuple[str, str]:
+        """``(cborg|ollama, model id)`` this orchestrator calls (for log lines)."""
+        return provider_label(getattr(self, "backend", "cborg")), str(getattr(self, "model", "?"))
+
     def _note_refusal(self, exc: BaseException) -> bool:
         """Record CBORG's address refusal (once, with the fixed text only); True when ``exc`` is that refusal."""
         refusal = as_ip_not_authorized(exc)
@@ -298,7 +322,7 @@ class Orchestrator:
             return False
         if self.refusal is None:
             self.refusal = refusal
-            logger.error("Extraction stopped: %s", refusal)
+            logger.error("Extraction stopped: %s", IP_NOT_AUTHORIZED_LOG_TEXT)
         return True
 
     def process_page(self, text: str, filename: str, page_num: int) -> bool:
@@ -310,7 +334,8 @@ class Orchestrator:
         if not text or len(text.split()) < 20:
             logger.info("Skipping page %d of %s (insufficient text).", page_num + 1, filename)
             return False
-        logger.debug("process_page: %s page %d", filename, page_num + 1)
+        provider, model = self._provider_model()
+        logger.info("%s page %d: asking %s model %s", filename, page_num + 1, provider, model)
         schema_ctx = self.schema_helper.get_schema_context_for_llm()
         prompt = build_page_prompt(schema_ctx, filename, page_num, text)
         terms_before = len(self.store)
@@ -324,7 +349,7 @@ class Orchestrator:
             except Exception as e:
                 if self._note_refusal(e):
                     return False  # terminal: no fallback call, nothing that could echo the refused address
-                logger.error("Agent failed on %s page %d: %s", filename, page_num + 1, _short_error(e))
+                logger.error("%s page %d: %s", filename, page_num + 1, self._describe(e))
                 added = self._fallback_json_extract(text, filename, page_num, schema_ctx)
                 if added:
                     self.store.save()
@@ -364,12 +389,8 @@ class Orchestrator:
                 timeout=240,
             )
         except Exception as exc:
-            logger.warning(
-                "JSON fallback failed on %s page %d: %s",
-                filename,
-                page_num + 1,
-                _short_error(exc),
-            )
+            if not self._note_refusal(exc):
+                logger.warning("%s page %d: JSON fallback failed: %s", filename, page_num + 1, self._describe(exc))
             return False
         result = {"messages": [SimpleNamespace(content=content)]}
         added = self._register_json_terms_from_result(result, filename, page_num, text)
@@ -426,10 +447,11 @@ class Orchestrator:
         try:
             doc = open_pdf(pdf_path)
         except Exception as e:
-            logger.error("Cannot open PDF %s: %s", pdf_path, e)
+            logger.error("Cannot open PDF %s: %s", Path(pdf_path).name, type(e).__name__)
             return 0
         filename = Path(pdf_path).name
         total_pages = doc.page_count
+        self._emit("paper_opened", name=filename, pages=total_pages)
         self.store.increment("processed_pages_total", total_pages)
         pages_with_terms = 0
         tool_state = getattr(self, "_tool_state", None)
@@ -445,6 +467,8 @@ class Orchestrator:
 
         logger.debug("Processing '%s' (%d pages) with %d workers", filename, total_pages, self.max_workers)
         page_texts = [doc.load_page(i).get_text() for i in range(total_pages)]
+        self._emit("paper_chunked", name=filename, pages=total_pages)
+        pages_done = 0
 
         def _process(page_num: int) -> bool:
             text = page_texts[page_num]
@@ -463,7 +487,7 @@ class Orchestrator:
                 snips_added = self.store.add_code_snippets(snips, pub_meta=pub_meta)
             except Exception as e:
                 if not self._note_refusal(e):
-                    logger.warning("Code-snippet pass failed on %s page %d: %s", filename, page_num + 1, e)
+                    logger.warning("%s page %d: code-snippet pass failed: %s", filename, page_num + 1, self._describe(e))
                 snips_added = False
             return bool(added or snips_added)
 
@@ -471,6 +495,8 @@ class Orchestrator:
             futures = {exe.submit(_process, i): i for i in range(total_pages)}
             for fut in as_completed(futures):
                 page_i = futures[fut]
+                pages_done += 1
+                self._emit("page_done", name=filename, done=pages_done, total=total_pages)
                 try:
                     if fut.result():
                         pages_with_terms += 1
@@ -478,8 +504,9 @@ class Orchestrator:
                     else:
                         logger.debug("Page %d/%d of %s: no new terms", page_i + 1, total_pages, filename)
                 except Exception as e:
-                    logger.error("Error on page %d of %s: %s", page_i + 1, filename, e)
+                    logger.error("%s page %d: unexpected %s", filename, page_i + 1, type(e).__name__)
 
+        self._emit("paper_merging", name=filename)
         try:
             repo_snips = source_repos.extract_github_code_snippets(
                 "\n\n".join(page_texts),

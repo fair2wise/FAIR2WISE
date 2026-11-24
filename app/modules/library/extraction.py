@@ -27,14 +27,26 @@ from datetime import UTC, datetime
 import logging
 import os
 from pathlib import Path
+import threading
+import time
 from typing import TYPE_CHECKING, Any
 
 from . import bundles as B
 from ..cborg_errors import CborgIpNotAuthorized
 from ..contracts.errors import ContractError, ErrorCode
 from ..jobs.log_capture import CaptureBusy, capture_job_logs
-from ..jobs.pipeline import JobInterrupted, JobStopped, StageBusy, StageContext, StageResult
+from ..jobs.pipeline import (
+    JobInterrupted,
+    JobStopped,
+    QuarantineStage,
+    RestartStages,
+    StageBusy,
+    StageContext,
+    StagePause,
+    StageResult,
+)
 from ..jobs.stages import WorkUnit, chunked_stage
+from ..jobs.store import LeaseLost
 from .catalog import sha256_file
 from .kg_service import KgLibrary
 from .schemas import manifest_block, resolve_schema
@@ -53,6 +65,21 @@ OLLAMA_URL_ENV = "OLLAMA_URL"
 CAPTURED_LOGGERS = ("app.modules.term_extractor", "app.modules.library.extraction", "f2w.output")
 MAX_PAPERS = 5000
 LOCK_DIRNAME = ".locks"
+
+
+#: Seconds between two progress writes triggered by page completions (a paper can have hundreds of pages).
+PROGRESS_INTERVAL = 1.0
+
+
+class PaperFailed(Exception):
+    """One paper could not be extracted; ``unit_error`` (``"<name>: <reason>"``) is what the job records for it.
+
+    The reason is plain words written by this module, never text taken from a provider or from the paper.
+    """
+
+    def __init__(self, name: str, reason: str) -> None:
+        super().__init__(f"{name}: {reason}")
+        self.unit_error = f"{name}: {reason}"
 
 
 class BackendUnavailable(Exception):
@@ -151,6 +178,82 @@ def bundle_lock(store: B.BundleStore, name: str, holder: str | None = None) -> I
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
     finally:
         handle.close()
+
+
+class _LiveCounters:
+    """What a run publishes while it works: phase and current paper (``job_status``) and KG growth (progress counters).
+
+    Everything goes through the job store (the API process reads the same database), none of it stays in this
+    object but the throttle clock. Page events arrive from the extractor's page threads, hence the lock.
+    """
+
+    def __init__(self, ctx: StageContext, orch: Any, total: int) -> None:  # noqa: ANN401  # Any: Orchestrator or a test fake
+        self.ctx, self.orch, self.total = ctx, orch, total
+        self._lock = threading.Lock()
+        self._last = 0.0
+        self._papers = 0
+        self._name = ""
+        self._pages_total = 0
+        self._pages_done = 0
+
+    def growth(self) -> dict[str, int]:
+        """The store's KG growth counters (empty for a store without them)."""
+        getter = getattr(self.orch.store, "growth", None)
+        try:
+            return {k: int(v) for k, v in getter().items()} if callable(getter) else {}
+        except Exception:  # noqa: BLE001 - counters are informative only
+            return {}
+
+    def phase(self, phase: str, item: str) -> None:
+        """Record the phase and the item (a display name) the stage works on now; never raises."""
+        try:
+            self.ctx.store.set_status(self.ctx.lease, self.ctx.job.job_id, self.ctx.stage, phase, item)
+        except Exception:  # noqa: BLE001 - lease lost or shutdown: the run is stopping anyway
+            return
+
+    def push(self, *, force: bool = False) -> None:
+        """Write the counters (KG growth, pages of the current paper), at most once per ``PROGRESS_INTERVAL``."""
+        now = time.monotonic()
+        with self._lock:
+            if not force and now - self._last < PROGRESS_INTERVAL:
+                return
+            self._last = now
+            counters = {**self.growth(), "paper_pages_done": self._pages_done, "paper_pages_total": self._pages_total}
+        try:
+            self.ctx.store.update_progress(self.ctx.lease, self.ctx.job.job_id, self.ctx.stage, counters)
+        except Exception:  # noqa: BLE001 - lease lost or shutdown: the run is stopping anyway
+            return
+
+    def begin_paper(self, name: str) -> int:
+        """Start the next paper: log its number, record it as the current one; returns its 1-based number."""
+        with self._lock:
+            self._papers += 1
+            index = self._papers
+            self._name, self._pages_total, self._pages_done = name, 0, 0
+        logger.info("paper %d of %d: extracting %s", index, self.total, name)
+        self.phase("parsing", name)
+        self.push(force=True)
+        return index
+
+    def end_paper(self) -> dict[str, int]:
+        """Publish the counters after a finished paper; returns them."""
+        self.push(force=True)
+        return self.growth()
+
+    def on_event(self, kind: str, **info: Any) -> None:  # noqa: ANN401  # Any: event fields of Orchestrator.events
+        """``Orchestrator.events`` sink: phase changes and page completions of the paper being processed."""
+        if kind == "paper_opened":
+            self._pages_total = int(info.get("pages", 0))
+        elif kind == "paper_chunked":
+            self.phase("chunking", self._name)
+            logger.info("%s: %d pages split for extraction", self._name, self._pages_total)
+            self.phase("extracting", self._name)
+        elif kind == "page_done":
+            self._pages_done = int(info.get("done", 0))
+            self.push()
+        elif kind == "paper_merging":
+            self.phase("merging into the KG", self._name)
+            self.push(force=True)
 
 
 class LibraryExtractor:
@@ -356,12 +459,35 @@ class LibraryExtractor:
         orch.cancel_check = lost  # a stale or stopped run must not keep spending LLM calls on its pages
         by_id = {r["id"]: r for r in todo}
         counts = {"extracted": 0, "pages": 0, "pages_with_terms": 0}
+        live = _LiveCounters(ctx, orch, len(todo))
+        orch.events = live.on_event  # per-page progress and phase from the extractor's page threads
 
         def units(_sc: StageContext) -> list[WorkUnit]:
             return [WorkUnit(unit_id=r["id"], unit_key=self.unit_key(r, schema_block, model), payload=r["id"])
                     for r in todo]
 
         def process(_sc: StageContext, unit: WorkUnit) -> Mapping[str, Any]:
+            """One paper with a numbered log line, live phase and counters, and a plain-words failure."""
+            name = Path(str(by_id[unit.payload]["relpath"])).name
+            index = live.begin_paper(name)
+            try:
+                outcome = process_paper(_sc, unit, name)
+            except (JobStopped, JobInterrupted, LeaseLost, StagePause, RestartStages, QuarantineStage, PaperFailed):
+                raise
+            except ContractError as exc:
+                if exc.code in (ErrorCode.BUDGET_EXHAUSTED, ErrorCode.DENIED) or isinstance(exc, CborgIpNotAuthorized):
+                    raise
+                logger.warning("paper %d of %d: %s failed: %s: %s", index, len(todo), name, exc.code.value, exc)
+                raise PaperFailed(name, f"{exc.code.value}: {exc}") from exc
+            except Exception as exc:  # noqa: BLE001 - one bad paper must not stop the others
+                logger.warning("paper %d of %d: %s failed (%s)", index, len(todo), name, type(exc).__name__)
+                raise PaperFailed(name, type(exc).__name__) from exc
+            growth = live.end_paper()
+            logger.info("paper %d of %d done: %s, %d pages, %d new and %d merged entities so far", index, len(todo), name,
+                        outcome["pages"], growth.get("entities_new", 0), growth.get("entities_merged", 0))
+            return outcome
+
+        def process_paper(_sc: StageContext, unit: WorkUnit, name: str) -> Mapping[str, Any]:
             refused = getattr(orch, "refusal", None)
             if refused is not None:  # CBORG refused this network address: terminal, the next paper would be refused too
                 raise refused
@@ -370,7 +496,6 @@ class LibraryExtractor:
             path = self.service.roots.policy("library").require_allowed(root / rel)
             sha = sha256_file(path)  # the bytes read now, not the catalog's earlier hash
             before = dict(orch.store.metadata)
-            logger.info("extracting %s", rel)  # a log line (captured); ctx.log here would turn a cancel into a failure
             with_terms = int(orch.process_pdf(str(path)) or 0)
             refused = getattr(orch, "refusal", None)
             if refused is not None:  # the pages were not read by the model: say why, do not call the PDF unreadable
@@ -378,7 +503,8 @@ class LibraryExtractor:
             pages = int(orch.store.metadata.get("processed_pages_total", 0)) - int(before.get("processed_pages_total", 0))
             _sc.store.check_lease(_sc.lease)  # a run that lost its lease while the PDF was in flight must not record it as done
             if pages <= 0:
-                raise RuntimeError("the PDF could not be read")
+                logger.warning("%s: the PDF could not be read", name)
+                raise PaperFailed(name, "the PDF could not be read")
             self.record_pdf(bundle, Path(rel).name, sha, pages, with_terms)
             # Per-PDF manifest entry now, not only at the end: a failed, hung or fenced-out run keeps its finished papers.
             self.store.record_extraction(
@@ -391,6 +517,8 @@ class LibraryExtractor:
 
         def finalize() -> int:
             """Importance, terms, KG and manifest for what is finished (also after a cancel)."""
+            live.phase("merging into the KG", bundle.name)
+            logger.info("merging the extracted terms into the KG of bundle %s", bundle.name)
             orch.store.assign_importance()
             orch.store.save()
             kg_update.rebuild_kg(str(terms_path), str(bundle.file(B.KG_FILE)))
@@ -410,10 +538,12 @@ class LibraryExtractor:
             finalized = finalize()
         ctx.log(f"extraction finished: {len(rows) - len(result.incomplete)} of {len(rows)} papers in bundle "
                 f"{bundle.name}, {len(result.incomplete)} failed")
-        return StageResult(progress={**dict(result.progress), **counts, "skipped": skipped, "papers_in_bundle": finalized},
+        live.phase("finished", "")
+        return StageResult(progress={**dict(result.progress), **counts, **live.growth(), "skipped": skipped,
+                                     "papers_in_bundle": finalized},
                            data={"bundle": bundle.name, "model": model, "failed": len(result.incomplete)},
                            incomplete=result.incomplete)
 
 
-__all__ = ("BACKEND_ENV", "CAPTURED_LOGGERS", "BundleBusy", "EXTRACTOR_REVISION", "LibraryExtractor", "bundle_lock",
+__all__ = ("BACKEND_ENV", "CAPTURED_LOGGERS", "BundleBusy", "EXTRACTOR_REVISION", "LibraryExtractor", "PaperFailed", "bundle_lock",
            "default_orchestrator_factory", "resolve_backend")
