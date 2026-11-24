@@ -97,6 +97,11 @@ export interface MockLibraryOptions {
   harvestFiles?: Array<{ id: string; name: string; confirm?: boolean; to?: string }>;
   /** How the mock matcher judges a dropped file name (default: strong). A weak or mismatch answer stores nothing until `confirm=true`. */
   harvestMatches?: Record<string, MockMatch>;
+  /**
+   * How the mock matcher answers the batch route `POST .../harvest/runs/{id}/pdf` per file name: the candidate it
+   * belongs to and strong or weak; a file name not listed is unmatched (nothing stored).
+   */
+  harvestRunMatches?: Record<string, MockMatch & { candidate: string }>;
   /** Captures `POST .../harvest/candidates/{id}/undo` candidate ids. */
   harvestUndos?: string[];
   /** Captures `POST .../harvest/candidates/{id}/dismiss` candidate ids. */
@@ -151,6 +156,30 @@ export async function mockLibrary(page: Page, options: MockLibraryOptions = {}) 
     return null;
   };
   const previous = new Map<string, string>();   // status before a supplied PDF was filed (for undo)
+  /** File a supplied PDF against a candidate in the mock server's state; the body of the 200 `filed: true` answer. */
+  const fileInto = (target: { run: MockHarvestRun; candidate: MockHarvestCandidate }, name: string,
+    kind: MockMatch['kind'], match: MockMatch) => {
+    const chosen = target.candidate;
+    previous.set(chosen.id, chosen.status);
+    chosen.status = 'filed';
+    chosen.relpath = `${target.run.category}/${chosen.year ?? 'unknown'}/${name}`;
+    chosen.provenance = kind === 'strong' ? 'user_supplied'
+      : kind === 'weak' ? 'user_supplied_confirmed' : 'user_supplied_mismatch_confirmed';
+    chosen.supplied_by = 'local-operator';
+    const paper = mockPaper(name.replace(/\.pdf$/, ''), target.run.category,
+      { relpath: chosen.relpath, provenance: chosen.provenance });
+    papers.push(paper);
+    return {
+      filed: true,
+      candidate: chosen,
+      paper: { ...paper, sha256: paper.id, size_bytes: 1000, verify_status: 'unverified', verified_at: null,
+        index_status: 'not_indexed' },
+      duplicate: false,
+      manifest: { updated: true, path: `${target.run.category}/manifest.json`, detail: 'added to the manifest' },
+      verdict: { kind, reason: 'the paper\'s DOI is in the PDF', title_similarity: 1, found_dois: match.found_dois ?? [],
+        found_title: match.found_title ?? chosen.title },
+    };
+  };
   let nextJob = 1;
 
   const handle = async (route: Route) => {
@@ -291,26 +320,30 @@ export async function mockLibrary(page: Page, options: MockLibraryOptions = {}) 
         }));
         return;
       }
-      const chosen = target.candidate;
-      previous.set(chosen.id, chosen.status);
-      chosen.status = 'filed';
-      chosen.relpath = `${target.run.category}/${chosen.year ?? 'unknown'}/${name}`;
-      chosen.provenance = kind === 'strong' ? 'user_supplied'
-        : kind === 'weak' ? 'user_supplied_confirmed' : 'user_supplied_mismatch_confirmed';
-      chosen.supplied_by = 'local-operator';
-      const paper = mockPaper(name.replace(/\.pdf$/, ''), target.run.category,
-        { relpath: chosen.relpath, provenance: chosen.provenance });
-      papers.push(paper);
-      await route.fulfill(json({
-        filed: true,
-        candidate: chosen,
-        paper: { ...paper, sha256: paper.id, size_bytes: 1000, verify_status: 'unverified', verified_at: null,
-          index_status: 'not_indexed' },
-        duplicate: false,
-        manifest: { updated: true, path: `${target.run.category}/manifest.json`, detail: 'added to the manifest' },
-        verdict: { kind, reason: 'the paper\'s DOI is in the PDF', title_similarity: 1, found_dois: match.found_dois ?? [],
-          found_title: match.found_title ?? chosen.title },
-      }));
+      await route.fulfill(json(fileInto(target, name, kind, match)));
+    } else if (/^\/v1\/library\/harvest\/runs\/[^/]+\/pdf$/.test(path) && method === 'POST') {
+      const run = runs.get(path.split('/')[5]);
+      const name = /filename="([^"]+)"/.exec(request.postData() ?? '')?.[1] ?? 'saved.pdf';
+      if (!run) {
+        await route.fulfill(json({ detail: 'run not found' }, 404));
+        return;
+      }
+      options.harvestFiles?.push({ id: `run:${run.id}`, name });
+      const hit = options.harvestRunMatches?.[name];
+      const target = hit ? find(hit.candidate) : null;
+      if (!hit || !target || !['paywalled', 'blocked', 'failed'].includes(target.candidate.status)) {
+        await route.fulfill(json({ filed: false, unmatched: true }));
+      } else if (hit.kind === 'strong') {
+        await route.fulfill(json(fileInto(target, name, 'strong', hit)));
+      } else {
+        await route.fulfill(json({
+          filed: false, needs_confirmation: true,
+          candidate: { id: target.candidate.id, title: target.candidate.title, doi: target.candidate.doi },
+          verdict: { kind: 'weak', reason: 'the titles are similar but the DOI could not be confirmed', title_similarity: 0.7,
+            found_dois: [], found_title: hit.found_title ?? '' },
+          other_candidate: null,
+        }));
+      }
     } else if (/^\/v1\/library\/harvest\/candidates\/[^/]+\/undo$/.test(path) && method === 'POST') {
       const hit = find(path.split('/')[5]);
       if (!hit || hit.candidate.status !== 'filed' || !hit.candidate.provenance) {

@@ -36,6 +36,7 @@ import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { NewCategoryField } from '../NewCategoryField';
 import { RunLog } from '../../extraction/RunLog';
+import { HarvestBatchDrop } from './HarvestBatchDrop';
 import { HarvestConfirmDialog, type PendingConfirmation } from './HarvestConfirmDialog';
 import { HarvestFiledNotices, type FiledNotice } from './HarvestFiledNotices';
 import { HarvestResults } from './HarvestResults';
@@ -399,6 +400,7 @@ export function HarvesterPanel() {
               onDismiss={candidate =>
                 dismissMutation.mutate(candidate, { onError: error => toast.error(error.message) })}
               onRejected={names => toast.error(`Only PDF files can be filed. Rejected: ${names.join(', ')}`)}
+              batch={openRunId !== null ? <HarvestBatchDrop key={openRunId} runId={openRunId} onFiled={announce} /> : null}
             />
             </>
           )}

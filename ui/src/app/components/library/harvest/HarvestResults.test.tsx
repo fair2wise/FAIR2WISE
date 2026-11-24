@@ -146,4 +146,46 @@ describe('HarvestResults', () => {
     fireEvent.drop(screen.getByText('Paper p').closest('li') as HTMLElement, { dataTransfer: { files: [pdf()] } });
     expect(props.onFile).not.toHaveBeenCalled();
   });
+
+  it('orders the queue by tier, then score, whatever order it arrives in', () => {
+    setup([
+      cand('c', { status: 'paywalled', tier: 'B', score: 0.9 }),
+      cand('b', { status: 'blocked', tier: 'A', score: 0.5 }),
+      cand('a', { status: 'failed', tier: 'A', score: 0.8 }),
+    ]);
+    const items = within(screen.getByRole('list', { name: 'Papers needing a PDF' })).getAllByRole('listitem');
+    expect(items.map(item => within(item).getByText(/^Paper /).textContent)).toEqual(['Paper a', 'Paper b', 'Paper c']);
+  });
+
+  it('shows the batch drop slot above the queue', () => {
+    setup([cand('p', { status: 'paywalled' })], { batch: <div data-testid="slot">drop here</div> });
+    expect(screen.getByTestId('slot')).toBeInTheDocument();
+  });
+
+  it('moves focus to the next paper after the focused one leaves the queue', () => {
+    const three = [cand('a', { status: 'paywalled' }), cand('b', { status: 'paywalled' }), cand('c', { status: 'paywalled' })];
+    const props: HarvestResultsProps = { candidates: three, busyId: null, onFile: vi.fn(), onDismiss: vi.fn(), onRejected: vi.fn() };
+    const view = render(<HarvestResults {...props} />);
+    const choose = screen.getByTestId('harvest-choose-b');
+    choose.focus();
+    expect(choose).toHaveFocus();
+    view.rerender(<HarvestResults {...props} candidates={[three[0], { ...three[1], status: 'filed' }, three[2]]} />);
+    expect(screen.getByTestId('harvest-choose-c')).toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'Needs a PDF (2 left)' })).toBeInTheDocument();
+  });
+
+  it('falls back to the last paper when the last one leaves, and leaves focus alone when it was elsewhere', () => {
+    const two = [cand('a', { status: 'paywalled' }), cand('b', { status: 'paywalled' })];
+    const props: HarvestResultsProps = { candidates: two, busyId: null, onFile: vi.fn(), onDismiss: vi.fn(), onRejected: vi.fn() };
+    const view = render(<HarvestResults {...props} />);
+    screen.getByTestId('harvest-choose-b').focus();
+    view.rerender(<HarvestResults {...props} candidates={[two[0], { ...two[1], status: 'filed' }]} />);
+    expect(screen.getByTestId('harvest-choose-a')).toHaveFocus();
+    // focus on a row, then an unrelated row leaves: no jump
+    const three = [...two, cand('c', { status: 'paywalled' })];
+    view.rerender(<HarvestResults {...props} candidates={three} />);
+    screen.getByTestId('harvest-choose-a').focus();
+    view.rerender(<HarvestResults {...props} candidates={[three[0], three[1]]} />);
+    expect(screen.getByTestId('harvest-choose-a')).toHaveFocus();
+  });
 });

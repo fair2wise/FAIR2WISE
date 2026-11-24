@@ -1,5 +1,5 @@
 import { ExternalLink, Upload } from 'lucide-react';
-import { useRef, useState, type DragEvent } from 'react';
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { isOpenableUrl, needsPdf, type HarvestCandidate } from '../../harvestApi';
 import { isPdfFile } from '../../libraryApi';
 import { Button } from '../../ui/button';
@@ -18,6 +18,13 @@ export interface HarvestResultsProps {
   onDismiss: (candidate: HarvestCandidate) => void;
   /** Called with the names of files rejected client-side because they are not PDFs. */
   onRejected: (names: string[]) => void;
+  /** Shown at the top of the queue: the multi-file drop area. */
+  batch?: ReactNode;
+}
+
+/** The queue in working order: best tier first, then highest score, then title (the server's own order). */
+export function sortQueue(candidates: readonly HarvestCandidate[]): HarvestCandidate[] {
+  return [...candidates].sort((a, b) => a.tier.localeCompare(b.tier) || b.score - a.score || a.title.localeCompare(b.title));
 }
 
 /** DOI or arXiv id of a candidate, for display. */
@@ -62,6 +69,7 @@ function NeedsPdfItem({ candidate, busy, onFile, onDismiss, onRejected }: {
     <li
       aria-busy={busy}
       data-dragging={dragging}
+      data-candidate-id={candidate.id}
       onDragOver={event => {
         event.preventDefault();
         if (!busy) setDragging(true);
@@ -102,6 +110,7 @@ function NeedsPdfItem({ candidate, busy, onFile, onDismiss, onRejected }: {
         size="sm"
         disabled={busy}
         aria-label={`Choose PDF for ${candidate.title}`}
+        data-testid={`harvest-choose-${candidate.id}`}
         onClick={() => inputRef.current?.click()}
         className="disabled:cursor-not-allowed disabled:opacity-50"
       >
@@ -136,6 +145,36 @@ function NeedsPdfItem({ candidate, busy, onFile, onDismiss, onRejected }: {
   );
 }
 
+/**
+ * When the row that last held focus leaves the queue (filed, or dismissed), move focus to the next row's "Choose PDF"
+ * button so a person can go down the list without hunting for the mouse. Nothing moves when focus was elsewhere.
+ */
+export function useFocusNextAfterRemoval(listRef: { current: HTMLElement | null }, ids: readonly string[]) {
+  const previous = useRef<readonly string[]>(ids);
+  const focusedId = useRef<string | null>(null);
+  useEffect(() => {
+    const list = listRef.current;
+    const onFocusIn = (event: FocusEvent) => {
+      const row = (event.target as HTMLElement | null)?.closest?.('[data-candidate-id]');
+      focusedId.current = row ? row.getAttribute('data-candidate-id') : null;
+    };
+    list?.addEventListener('focusin', onFocusIn);
+    return () => list?.removeEventListener('focusin', onFocusIn);
+  });
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = ids;
+    const held = focusedId.current;
+    if (held === null || ids.includes(held) || !before.includes(held)) return;
+    const active = document.activeElement;
+    if (active && active !== document.body && listRef.current?.contains(active)) return;   // focus is already on a live row
+    const after = before.slice(before.indexOf(held) + 1).find(id => ids.includes(id)) ?? ids[ids.length - 1];
+    focusedId.current = null;
+    if (!after) return;
+    listRef.current?.querySelector<HTMLElement>(`[data-testid="harvest-choose-${after}"]`)?.focus();
+  }, [ids, listRef]);
+}
+
 /** The rights note shown on the queue (and in the docs). */
 export const RIGHTS_NOTE = 'Text-mining rights for subscription content are the operator\u2019s responsibility to confirm; '
   + 'this tool only files what a person with access supplies.';
@@ -145,8 +184,10 @@ export const RIGHTS_NOTE = 'Text-mining rights for subscription content are the 
  * fetch; people finish these: open the publisher in their own browser, save the PDF, drop it here) and a table of
  * every other candidate with its outcome.
  */
-export function HarvestResults({ candidates, busyId, onFile, onDismiss, onRejected }: HarvestResultsProps) {
-  const queue = candidates.filter(needsPdf);
+export function HarvestResults({ candidates, busyId, onFile, onDismiss, onRejected, batch }: HarvestResultsProps) {
+  const queue = sortQueue(candidates.filter(needsPdf));
+  const listRef = useRef<HTMLUListElement>(null);
+  useFocusNextAfterRemoval(listRef, queue.map(candidate => candidate.id));
   const rest = candidates.filter(candidate => !needsPdf(candidate));
   if (candidates.length === 0) {
     return <p className="text-sm text-muted-foreground">No papers found yet.</p>;
@@ -166,7 +207,8 @@ export function HarvestResults({ candidates, busyId, onFile, onDismiss, onReject
               drop it here. It is checked against the paper and filed in the run&apos;s category by year.
             </p>
             <p className="text-xs text-muted-foreground" data-testid="harvest-rights-note">{RIGHTS_NOTE}</p>
-            <ul aria-label="Papers needing a PDF" className="divide-y divide-border rounded-md border border-border">
+            {batch}
+            <ul ref={listRef} aria-label="Papers needing a PDF" className="divide-y divide-border rounded-md border border-border">
               {queue.map(candidate => (
                 <NeedsPdfItem
                   key={candidate.id}

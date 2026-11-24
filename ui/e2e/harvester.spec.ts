@@ -180,6 +180,81 @@ test.describe('Harvester panel', () => {
     expect(harvestFiles.at(-1)).toEqual({ id: 'two', name: 'other.pdf', to: 'two' });
   });
 
+  test('the Needs a PDF list: batch drop (one request per file, strong files, weak waits, unmatched never stored)', async ({ page }) => {
+    const harvestFiles: Array<{ id: string; name: string; confirm?: boolean }> = [];
+    await mockAgent(page);
+    await mockLibrary(page, {
+      papers: PAPERS, harvestFiles,
+      harvestMatches: { 'weak.pdf': { kind: 'weak' } },
+      harvestRunMatches: {
+        'strong.pdf': { kind: 'strong', candidate: 'q1' },
+        'weak.pdf': { kind: 'weak', candidate: 'q2', found_title: 'Paper two, revised' },
+      },
+      harvestRuns: [{
+        id: 'h9', topic: 'queue', category: 'rsoxs',
+        candidates: [
+          mockCandidate('q1', { title: 'Queue one', status: 'paywalled', tier: 'A', score: 0.9 }),
+          mockCandidate('q2', { title: 'Queue two', status: 'blocked', tier: 'A', score: 0.8 }),
+          mockCandidate('q3', { title: 'Queue three', status: 'failed', tier: 'B', score: 0.7 }),
+        ],
+      }],
+    });
+    await page.goto('/');
+    await page.getByRole('link', { name: 'Library' }).click();
+    await page.getByRole('tab', { name: 'Harvester' }).click();
+    await page.getByRole('button', { name: /queue/ }).click();
+    const pdf = (name: string) => ({ name, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n') });
+    const queue = page.getByRole('list', { name: 'Papers needing a PDF' });
+
+    await expect(page.getByRole('heading', { name: 'Needs a PDF (3 left)' })).toBeVisible();
+    await expect(queue.getByRole('listitem').getByText(/^Queue /)).toHaveText(['Queue one', 'Queue two', 'Queue three']);
+
+    // more than 20 files: refused whole, nothing sent
+    await page.getByTestId('harvest-batch-input').setInputFiles(Array.from({ length: 21 }, (_, i) => pdf(`bulk-${i}.pdf`)));
+    await expect(page.getByTestId('harvest-batch-refused')).toContainText('at most 20 can be dropped at once. Nothing was sent.');
+    expect(harvestFiles).toEqual([]);
+
+    // three files: each is its own request
+    await page.getByTestId('harvest-batch-input').setInputFiles([pdf('strong.pdf'), pdf('weak.pdf'), pdf('stranger.pdf')]);
+    const table = page.getByRole('table', { name: 'Dropped files' });
+    await expect(table.getByRole('row', { name: /strong\.pdf/ })).toContainText('Queue one');
+    await expect(table.getByRole('row', { name: /strong\.pdf/ })).toContainText('Strong match: filed');
+    await expect(table.getByRole('row', { name: /weak\.pdf/ })).toContainText('Weak match: not filed');
+    await expect(table.getByRole('row', { name: /stranger\.pdf/ })).toContainText('No match: not stored');
+    expect(harvestFiles.map(item => item.id).sort()).toEqual(['run:h9', 'run:h9', 'run:h9']);
+    await expect(page.getByRole('heading', { name: 'Needs a PDF (2 left)' })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Filed strong.pdf against Queue one (strong match)' })).toBeVisible();
+
+    // the weak one files only after Confirm (the candidate route with confirm=true)
+    await table.getByRole('button', { name: 'Confirm weak.pdf' }).click();
+    await expect(table.getByRole('row', { name: /weak\.pdf/ })).toContainText('Filed (confirmed by you)');
+    expect(harvestFiles.at(-1)).toEqual({ id: 'q2', name: 'weak.pdf', confirm: true });
+    await expect(page.getByRole('heading', { name: 'Needs a PDF (1 left)' })).toBeVisible();
+    expect(harvestFiles.some(item => item.name === 'stranger.pdf' && item.id !== 'run:h9')).toBe(false);
+  });
+
+  test('after a row is filed, focus moves to the next paper in the queue', async ({ page }) => {
+    await mockAgent(page);
+    await mockLibrary(page, {
+      papers: PAPERS,
+      harvestRuns: [{
+        id: 'h9', topic: 'queue', category: 'rsoxs',
+        candidates: [
+          mockCandidate('f1', { title: 'First', status: 'paywalled', tier: 'A', score: 0.9 }),
+          mockCandidate('f2', { title: 'Second', status: 'paywalled', tier: 'A', score: 0.8 }),
+        ],
+      }],
+    });
+    await page.goto('/');
+    await page.getByRole('link', { name: 'Library' }).click();
+    await page.getByRole('tab', { name: 'Harvester' }).click();
+    await page.getByRole('button', { name: /queue/ }).click();
+    await page.getByTestId('harvest-choose-f1').focus();
+    await page.getByTestId('harvest-file-f1').setInputFiles({ name: 'first.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n') });
+    await expect(page.getByRole('heading', { name: 'Needs a PDF (1 left)' })).toBeVisible();
+    await expect(page.getByTestId('harvest-choose-f2')).toBeFocused();
+  });
+
   test('a new category needs a valid name', async ({ page }) => {
     const jobPosts: Array<Record<string, unknown>> = [];
     await mockAgent(page);
