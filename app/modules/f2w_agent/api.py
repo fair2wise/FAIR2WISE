@@ -1167,6 +1167,61 @@ def _publications_for_graph_node(raw: dict[str, Any]) -> list[dict[str, Any]]:
     )
 
 
+#: Supporting text passages (``context_snippets``) delivered per paper on the single-node record: at most this many
+#: per paper, each cut to ``EVIDENCE_SNIPPET_MAX_CHARS`` characters, and ``EVIDENCE_NODE_MAX_SNIPPETS`` per node, so the
+#: additive ``publications[].snippets`` field stays bounded (``snippet_count`` carries the uncapped number).
+EVIDENCE_SNIPPETS_PER_PAPER = 20
+EVIDENCE_SNIPPET_MAX_CHARS = 1200
+EVIDENCE_NODE_MAX_SNIPPETS = 100
+
+
+def _attach_evidence_snippets(publications: list[dict[str, Any]], raw: dict[str, Any]) -> list[dict[str, Any]]:
+    """Add ``snippets`` (``[{text, page?}]``) and ``snippet_count`` to the publication each snippet comes from.
+
+    Reads only what the node stores (``context_snippets`` entries with ``text`` and ``source_paper``); a snippet whose
+    paper has no publication on the node, an empty one, or a repeated one is skipped, and a paper without snippets
+    gets neither field. Nothing is invented.
+    """
+    snippets = raw.get("context_snippets")
+    if not isinstance(snippets, list) or not snippets:
+        return publications
+    by_source: dict[str, dict[str, Any]] = {}
+    by_key: dict[str, dict[str, Any]] = {}
+    for publication in publications:
+        source = str(publication.get("source_paper") or "").strip().lower()
+        if source:
+            by_source.setdefault(source, publication)
+        by_key.setdefault(_publication_key(publication), publication)
+    seen: set[tuple[int, str]] = set()
+    kept = 0
+    for snippet in snippets:
+        if not isinstance(snippet, dict):
+            continue
+        text = str(snippet.get("text") or "").strip()
+        source = str(snippet.get("source_paper") or "").strip()
+        if not text or not source:
+            continue
+        target = by_source.get(source.lower()) or by_key.get(_publication_key(_publication_from_source_identifier(source)))
+        if target is None:
+            continue
+        marker = (id(target), text)
+        if marker in seen:
+            continue
+        seen.add(marker)
+        target["snippet_count"] = int(target.get("snippet_count") or 0) + 1
+        current = target.setdefault("snippets", [])
+        if len(current) >= EVIDENCE_SNIPPETS_PER_PAPER or kept >= EVIDENCE_NODE_MAX_SNIPPETS:
+            continue
+        entry: dict[str, Any] = {"text": text if len(text) <= EVIDENCE_SNIPPET_MAX_CHARS
+                                 else text[:EVIDENCE_SNIPPET_MAX_CHARS - 1].rstrip() + "\u2026"}
+        page = snippet.get("page")
+        if isinstance(page, int) and not isinstance(page, bool) and page >= 0:
+            entry["page"] = page
+        current.append(entry)
+        kept += 1
+    return publications
+
+
 def _is_code_snippet_raw(raw: dict[str, Any]) -> bool:
     """Return True if a raw node looks like a code-snippet entity."""
     category = _string_value(raw.get("category") or raw.get("type")).lower()
@@ -1225,8 +1280,13 @@ def _graph_node_from_raw(
     include_code: bool = False,
     include_linked_code: bool = False,
     graph_data: dict[str, Any] | None = None,
+    include_evidence: bool = False,
 ) -> GraphNode:
-    """Build a GraphNode from a raw KG thing dict."""
+    """Build a GraphNode from a raw KG thing dict.
+
+    ``include_evidence`` (single-node record only, never the whole-graph payload) adds the per-paper supporting text
+    passages, bounded (:func:`_attach_evidence_snippets`).
+    """
     node_id = _string_value(raw.get("id"))
     label = _string_value(raw.get("name") or raw.get("label"), node_id)
     node_type = _string_value(
@@ -1262,7 +1322,8 @@ def _graph_node_from_raw(
         description=description,
         graph_id=_string_value(raw.get("graph_id")) or None,
         graph_label=_string_value(raw.get("graph_label")) or None,
-        publications=_publications_for_graph_node(raw),
+        publications=(_attach_evidence_snippets(_publications_for_graph_node(raw), raw)
+                      if include_evidence else _publications_for_graph_node(raw)),
         code_snippet=code_snippet,
         code_language=code_language,
         function_name=function_name,
@@ -1326,6 +1387,7 @@ def graph_node_from_file(
                     include_code=True,
                     include_linked_code=include_linked_code,
                     graph_data=data,
+                    include_evidence=True,
                 ),
                 graph_path,
             )
@@ -7448,7 +7510,7 @@ def create_app(
     def _source_graph_node(raw: dict[str, Any], graph: SourceGraph, *, detail: bool = False) -> GraphNode:
         """Wire node of a source graph: the JSON converter over the raw node, tagged with the source's graph."""
         node = _graph_node_from_raw(raw, include_code=detail, include_linked_code=detail,
-                                    graph_data=graph.data if detail else None)
+                                    graph_data=graph.data if detail else None, include_evidence=detail)
         node.graph_id = node.graph_id or graph.graph_id
         node.graph_label = node.graph_label or graph.graph_label
         return node
@@ -7554,7 +7616,7 @@ def create_app(
         payload.setdefault("id", raw.get("id") or resolved or node_id)
         payload.setdefault("graph_id", TILED_GRAPH_ID)
         payload.setdefault("graph_label", TILED_GRAPH_LABEL)
-        node = _graph_node_from_raw(payload)
+        node = _graph_node_from_raw(payload, include_evidence=True)
         node.graph_id = node.graph_id or TILED_GRAPH_ID
         node.graph_label = node.graph_label or TILED_GRAPH_LABEL
         return node

@@ -29,6 +29,7 @@ import { useCapabilities } from './capabilitiesHooks';
 import {
   fetchGraphNeighborhoodResult,
   fetchGraphNodeDetail,
+  withoutSnippets,
   fetchLiveGraph,
   GraphPayload,
   GraphRelationshipUpdate,
@@ -815,7 +816,7 @@ function NodeDetailPanel({
     setDraftDescription(display.description || '');
     setDraftCode(display.code_snippet || '');
     setDraftPublications(
-      (display.publications ?? []).map(pub => ({
+      (display.publications ?? []).map(withoutSnippets).map(pub => ({
         ...pub,
         authors: Array.isArray(pub.authors) ? [...pub.authors] : [],
       })),
@@ -1427,6 +1428,7 @@ function NodeDetailPanel({
                         publications={literature}
                         intro={null}
                         collapseLimit={3}
+                        showSnippets
                         className="mt-0"
                       />
                     </div>

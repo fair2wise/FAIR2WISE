@@ -105,6 +105,25 @@ export interface PublicationInfo {
   abstract_text?: string;
   keywords?: string[];
   supporting_nodes?: PublicationNodeRef[];
+  /** Text passages from this paper that support the entity (single-node record only; bounded by the server). */
+  snippets?: PublicationSnippet[];
+  /** Passages recorded for this paper on the node, including any the server did not send. */
+  snippet_count?: number;
+}
+
+export interface PublicationSnippet {
+  text: string;
+  page?: number;
+}
+
+/**
+ * The bibliographic part of a publication: the read-only supporting text (`snippets`, `snippet_count`) removed.
+ * Used wherever a publication is stored or sent back (bookmarks, node edits) so passages are never copied into
+ * browser storage or written into the graph by an edit.
+ */
+export function withoutSnippets<T extends PublicationInfo>(publication: T): T {
+  const { snippets: _snippets, snippet_count: _count, ...rest } = publication;
+  return rest as T;
 }
 
 export interface PendingCandidate {

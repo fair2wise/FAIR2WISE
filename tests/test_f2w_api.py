@@ -2680,6 +2680,77 @@ def test_resolve_graph_node_reads_back_a_cited_graph_tag(tmp_path):
     assert api_mod.strip_cited_graph_tag("kg: A: B") == "A: B"
 
 
+_EVIDENCE_RAW = {
+    "id": "matkg:cdw",
+    "name": "CDW",
+    "category": "Phenomenon",
+    "description": "charge density wave",
+    "publications": [{"source_paper": "10.1039_C8TC00875B.pdf", "paper_title": "Paper A"}],
+    "source_papers": ["10.1039_C8TC00875B.pdf", "other.pdf"],
+    "context_snippets": [
+        {"text": "  CDW order peaks at 283 eV.  ", "source_paper": "10.1039_C8TC00875B.pdf", "page": 4},
+        {"text": "CDW order peaks at 283 eV.", "source_paper": "10.1039_C8TC00875B.pdf", "page": 4},  # repeat
+        {"text": "Second passage", "source_paper": "10.1039_C8TC00875B.pdf"},
+        {"text": "", "source_paper": "other.pdf"},                                                    # empty
+        {"text": "From another paper", "source_paper": "other.pdf", "page": 9},
+        {"text": "No paper", "source_paper": ""},                                                     # no paper
+        "not a dict",
+    ],
+}
+
+
+def test_evidence_snippets_are_attached_per_paper_on_the_single_node_record_only():
+    node = api_mod._graph_node_from_raw(dict(_EVIDENCE_RAW), include_evidence=True)
+    by_source = {p["source_paper"]: p for p in node.publications}
+    paper_a = by_source["10.1039_C8TC00875B.pdf"]
+    assert paper_a["snippets"] == [{"text": "CDW order peaks at 283 eV.", "page": 4}, {"text": "Second passage"}]
+    assert paper_a["snippet_count"] == 2
+    assert by_source["other.pdf"]["snippets"] == [{"text": "From another paper", "page": 9}]
+    # The whole-graph payload and a node without snippets carry no such field (nothing invented).
+    assert all("snippets" not in p for p in api_mod._graph_node_from_raw(dict(_EVIDENCE_RAW)).publications)
+    bare = api_mod._graph_node_from_raw({"id": "n", "name": "N", "publications": [{"source_paper": "a.pdf"}]},
+                                        include_evidence=True)
+    assert "snippets" not in bare.publications[0] and "snippet_count" not in bare.publications[0]
+
+
+def test_evidence_snippets_are_bounded():
+    many = [{"text": f"passage {i} " + "x" * 3000, "source_paper": "a.pdf", "page": i} for i in range(80)]
+    raw = {"id": "n", "name": "N", "publications": [{"source_paper": "a.pdf"}], "context_snippets": many}
+    pub = api_mod._graph_node_from_raw(raw, include_evidence=True).publications[0]
+    assert len(pub["snippets"]) == api_mod.EVIDENCE_SNIPPETS_PER_PAPER
+    assert pub["snippet_count"] == 80
+    assert all(len(item["text"]) <= api_mod.EVIDENCE_SNIPPET_MAX_CHARS for item in pub["snippets"])
+    assert pub["snippets"][0]["text"].endswith("\u2026")
+
+
+def test_node_route_builds_the_record_with_evidence_from_a_json_source(tmp_path):
+    graph = tmp_path / "kg.json"
+    graph.write_text(json.dumps({"things": [dict(_EVIDENCE_RAW)], "associations": []}), encoding="utf-8")
+    node = api_mod.graph_node_from_file(graph, "matkg:cdw")
+    assert node is not None
+    paper_a = next(p for p in node.publications if p["source_paper"] == "10.1039_C8TC00875B.pdf")
+    assert paper_a["snippets"][0]["text"] == "CDW order peaks at 283 eV."
+
+
+def test_node_route_response_withholds_snippet_text_under_the_disclosure_policy(tmp_path, monkeypatch):
+    """OWNER GATE: ``snippets`` is a private evidence key (disclosure ``_PRIVATE_KEY_RE``, ADR section 5), so the
+    projected ``GET /graph/node`` body keeps the bounded per-paper count but not the passages. Releasing the text to
+    the node card is a disclosure-policy decision; when the owner makes it, this test changes with that rule."""
+    monkeypatch.setattr(api_mod, "RetrievalAgent", FakeRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", FakeDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", FakeExtractor)
+    graph = tmp_path / "kg.json"
+    graph.write_text(json.dumps({"things": [dict(_EVIDENCE_RAW)], "associations": []}), encoding="utf-8")
+    app = api_mod.create_app(CoordinatorConfig(graph=str(graph), workdir=tmp_path / "run", kg_mode="json"))
+    response = TestClient(app).get("/graph/node/matkg:cdw")
+    assert response.status_code == 200
+    papers = {p["source_paper"]: p for p in response.json()["publications"]}
+    paper_a = papers["10.1039_C8TC00875B.pdf"]
+    assert paper_a["snippet_count"] == 2
+    assert "snippets" not in paper_a
+    assert "CDW order peaks" not in response.text
+
+
 def test_node_publications_derives_identifiers_from_pdf_filenames():
     arxiv = api_mod._node_publications({"source_papers": ["2111.01897v1.pdf"]})
     assert arxiv == [{"source_paper": "2111.01897v1.pdf", "doi": "arXiv:2111.01897v1"}]

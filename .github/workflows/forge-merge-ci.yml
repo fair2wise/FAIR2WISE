@@ -47,7 +47,7 @@ env:
   # Re-pinned 2026-11-23 (owner bug list, task 7): chat citation click loads the full entity record (GraphMockup NodeDetailPanel, nodeDetailSource, liveAgent type); previous f780e527.
   # Re-pinned 2026-11-23 (owner bug list, task 3): Extract tab model list: CBORG address-refusal reason and Ollama models in a grouped picker (modelChoices, ExtractionIdleForm, extractionApi); previous e1a6fec0.
   # Re-pinned 2026-11-23 (owner bug list, task 4): Ollama model dropdown in Settings (OllamaModelSetting, ollamaApi) fed by GET /v1/ollama/models; previous a21f0906.
-  FROZEN_UI_TREE: 8ed249b26ebad96d0e600b3e687ee4a3f9060523
+  FROZEN_UI_TREE: b34dce759557313422299ea34981f62b3c3a5d4e
   KG_RAG_RETRIEVAL_BACKEND: lexical
   KG_RAG_FORCE_CPU: "1"
   F2W_SOURCE_RAG: "0"

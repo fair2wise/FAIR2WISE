@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { PublicationInfo } from './data/liveAgent';
+import { withoutSnippets, type PublicationInfo } from './data/liveAgent';
 
 const STORAGE_KEY = 'fair2wise-publication-favorites-v1';
 const FAVORITES_CHANGED = 'fair2wise-favorites-changed';
@@ -77,7 +77,7 @@ export function togglePublicationFavorite(publication: PublicationInfo): boolean
   favorites.unshift({
     key,
     savedAt: Date.now(),
-    publication,
+    publication: withoutSnippets(publication),
   });
   writeStoredFavorites(favorites);
   emitFavoritesChanged();

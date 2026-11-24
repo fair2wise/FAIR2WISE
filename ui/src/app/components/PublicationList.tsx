@@ -46,10 +46,90 @@ function PublicationAnchor({
   );
 }
 
+/** Most snippets a paper's list shows before "Show more". */
+export const SNIPPETS_COLLAPSED = 3;
+/** Longest snippet drawn (the server already cuts them; this keeps a hostile payload from flooding the card). */
+const SNIPPET_MAX_CHARS = 1500;
+
+/** Plain, bounded snippets of one paper: malformed entries are dropped. */
+export function paperSnippets(publication: PublicationInfo): Array<{ text: string; page?: number }> {
+  const raw = Array.isArray(publication.snippets) ? publication.snippets : [];
+  const out: Array<{ text: string; page?: number }> = [];
+  for (const item of raw) {
+    const text = item && typeof item.text === 'string' ? item.text.trim() : '';
+    if (!text) continue;
+    out.push({
+      text: text.length > SNIPPET_MAX_CHARS ? `${text.slice(0, SNIPPET_MAX_CHARS - 1)}\u2026` : text,
+      page: typeof item.page === 'number' && Number.isFinite(item.page) ? item.page : undefined,
+    });
+  }
+  return out;
+}
+
+/**
+ * The text snippets of one paper that support the entity: a collapsed list (plain text only, never HTML), the
+ * first few shown, the rest behind "Show more". Nothing is drawn for a paper with no snippets; when only a count
+ * arrived (the server withholds the text) the count is stated and no text is invented.
+ */
+function PaperSnippets({ publication }: { publication: PublicationInfo }) {
+  const [open, setOpen] = useState(false);
+  const [all, setAll] = useState(false);
+  const snippets = paperSnippets(publication);
+  const recorded = typeof publication.snippet_count === 'number' ? publication.snippet_count : snippets.length;
+  if (snippets.length === 0) {
+    return recorded > 0 ? (
+      <p className="mt-1 text-[11px] text-slate-500" data-testid="paper-snippets-withheld">
+        {recorded} supporting passage{recorded === 1 ? '' : 's'} recorded; the text is not provided to this view.
+      </p>
+    ) : null;
+  }
+  const shown = all ? snippets : snippets.slice(0, SNIPPETS_COLLAPSED);
+  const hidden = snippets.length - shown.length;
+  return (
+    <div className="mt-1" data-testid="paper-snippets">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(value => !value)}
+        className="text-[11px] font-medium text-sky-700 hover:text-sky-800 hover:underline"
+      >
+        {open ? 'Hide' : 'Show'} supporting text ({recorded})
+      </button>
+      {open && (
+        <>
+          <ul className="mt-1 space-y-1.5 border-l-2 border-slate-200 pl-2.5">
+            {shown.map((snippet, index) => (
+              <li key={index} className="whitespace-pre-wrap break-words text-[11px] leading-relaxed text-slate-600">
+                {snippet.text}
+                {snippet.page !== undefined && <span className="ml-1 text-slate-400">(p. {snippet.page})</span>}
+              </li>
+            ))}
+          </ul>
+          {hidden > 0 && (
+            <button
+              type="button"
+              onClick={() => setAll(true)}
+              className="mt-1 text-[11px] font-medium text-sky-700 hover:text-sky-800 hover:underline"
+            >
+              Show {hidden} more
+            </button>
+          )}
+          {recorded > snippets.length && (
+            <p className="mt-1 text-[11px] text-slate-400">
+              {recorded - snippets.length} more recorded, not shown.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function PublicationList({
   publications,
   intro = 'Here are a list of relevant publications:',
   showSupportingNodes = false,
+  showSnippets = false,
   showFavorite = true,
   collapseLimit,
   className = '',
@@ -60,6 +140,8 @@ export function PublicationList({
   publications: PublicationInfo[];
   intro?: string | null;
   showSupportingNodes?: boolean;
+  /** List each paper's supporting text snippets (the node card). */
+  showSnippets?: boolean;
   showFavorite?: boolean;
   /** When set, show this many publications until expanded. */
   collapseLimit?: number;
@@ -155,6 +237,7 @@ export function PublicationList({
                   )}
                 </div>
               )}
+              {showSnippets && <PaperSnippets publication={publication} />}
               {showSupportingNodes && supportingNodes.length > 0 && (
                 <div className="mt-1 text-slate-500">
                   Supports: {supportingNodes.slice(0, 5).map(node => node.name || node.id).join(', ')}

@@ -3,7 +3,7 @@
  * the KG viewer (description and paper provenance), read from the corpus the answer took the node from.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GraphMockup } from './GraphMockup';
 import { resetGraphSourceStore } from './graphSourceStore';
@@ -118,5 +118,24 @@ describe('chat citation opens the full entity record', () => {
     renderChatGraph({ nodes: [CHAT_NODE], edges: [], source_path: 'chat' });
     await screen.findByText(/Regioregular poly/);
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Edit properties' })).toBeNull());
+  });
+
+  it('lists the supporting snippets of each paper in the node card when the record carries them', async () => {
+    const withSnippets = {
+      ...FULL_NODE,
+      publications: [{ ...FULL_NODE.publications[0], snippets: [{ text: 'P3HT forms edge-on stacks.', page: 3 }], snippet_count: 1 }],
+    };
+    stubFetch(() => new Response(JSON.stringify(withSnippets), { status: 200 }));
+    renderChatGraph({ nodes: [CHAT_NODE], edges: [], source_path: 'chat' });
+    await screen.findByText('Edge-on packing in P3HT');
+    fireEvent.click(await screen.findByRole('button', { name: 'Show supporting text (1)' }));
+    expect(screen.getByText('P3HT forms edge-on stacks.')).toBeInTheDocument();
+  });
+
+  it('shows no snippet control for a record without any', async () => {
+    stubFetch(() => new Response(JSON.stringify(FULL_NODE), { status: 200 }));
+    renderChatGraph({ nodes: [CHAT_NODE], edges: [], source_path: 'chat' });
+    await screen.findByText('Edge-on packing in P3HT');
+    expect(screen.queryByTestId('paper-snippets')).toBeNull();
   });
 });
