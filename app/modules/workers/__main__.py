@@ -18,6 +18,7 @@ from typing import Any, cast
 
 from .. import metrics, tracing
 from ..jobs.log_retention import JobLogRetention
+from ..jobs.store import JobStore
 from .executor import WorkerExecutor
 
 _FACTORY = re.compile(r"^app\.modules(\.[A-Za-z_][A-Za-z0-9_]*)+:[A-Za-z_][A-Za-z0-9_]*$")
@@ -47,7 +48,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         metrics.set_queue_depth_source(depth)
     store = getattr(service, "store", None)
     retention = None
-    if getattr(store, "log_dir", None) is not None:  # the worker alone prunes the job log files (never an API request)
+    if isinstance(store, JobStore) and store.log_dir is not None:  # the worker alone prunes the job log files (never an API request)
         retention = JobLogRetention.from_env(store).start()  # sweeps once now, then every 15 minutes
     executor = WorkerExecutor(service, max_concurrency=args.concurrency).start()
     stop = threading.Event()
