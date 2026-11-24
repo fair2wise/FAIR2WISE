@@ -94,6 +94,23 @@ RULE_R2_FORMAT = "R2-format"
 RULE_R2_SCHEMA = "R2-schema"
 RULE_R2_VALIDATION = "R2-validation"
 RULE_TARGET_EXISTS = "target-exists"
+RULE_USER_SCHEMA = "user-schema"
+
+#: Why a KG built on a user schema is not published (the KG itself is unaffected); shared by adoption, the release
+#: binding and the library publish preview.
+USER_SCHEMA_NOT_PUBLISHABLE = ("this KG is built on a user schema; the KG itself is unaffected (it works in chat, the viewer "
+                               "and Operations) and only publication is not enabled for user schemas yet: the schema is "
+                               "not registered for publication, so it cannot be bound to a release")
+
+
+def is_user_schema_graph(graph: Mapping[str, Any]) -> bool:
+    """True when the exported KG's metadata names a user schema (``user/<name>@vN``)."""
+    meta = graph.get("metadata") if isinstance(graph, Mapping) else None
+    if not isinstance(meta, Mapping):
+        return False
+    info = meta.get("schema_info")
+    ids = [meta.get("schema"), info.get("id") if isinstance(info, Mapping) else None]
+    return any(isinstance(i, str) and i.startswith("user/") for i in ids)
 
 
 class AdoptionRefused(SnapshotError):
@@ -221,6 +238,8 @@ def adopt_legacy_flat_file(
     kg_dir = (Path(storage_kg) if storage_kg is not None else flat.parent).resolve()
     blob = _check_flat_source(flat)
     graph = _parse_legacy_graph(blob)
+    if is_user_schema_graph(graph):
+        raise AdoptionRefused(RULE_USER_SCHEMA, USER_SCHEMA_NOT_PUBLISHABLE)
     corpus, snapshot_id = derive_identity(flat.name)
     if not SNAPSHOT_ID_RE.match(snapshot_id):
         raise SnapshotError("snapshot_id must be v<N>")

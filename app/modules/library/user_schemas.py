@@ -302,10 +302,20 @@ class UserSchemaStore:
             pass
 
 
+def schema_origin(schema_block: dict[str, Any]) -> dict[str, Any]:
+    """``schema_origin`` (``user`` or ``shipped``), ``schema_name`` and ``schema_version`` for a manifest's schema block."""
+    ident = str(schema_block.get("id") or "")
+    if is_user_schema_id(ident):
+        name, version = parse_schema_id(ident)
+        return {"schema_origin": "user", "schema_name": name, "schema_version": version}
+    return {"schema_origin": "shipped", "schema_name": ident.split("@", 1)[0],
+            "schema_version": schema_block.get("version")}
+
+
 def default_store(workdir: Path | str) -> UserSchemaStore:
     """The store of a work directory."""
     return UserSchemaStore(Path(workdir) / SCHEMAS_DIRNAME, bundles_root=Path(workdir) / "kgs")
 
 
 __all__ = ("ID_PREFIX", "NAME_RE", "SCHEMAS_DIRNAME", "SchemaInvalid", "UserSchema", "UserSchemaStore", "default_store",
-           "is_user_schema_id", "parse_schema_id", "schema_id", "validate_schema_name")
+           "is_user_schema_id", "parse_schema_id", "schema_id", "schema_origin", "validate_schema_name")

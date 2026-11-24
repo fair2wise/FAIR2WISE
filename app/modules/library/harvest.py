@@ -73,7 +73,8 @@ PDF_MAGIC = b"%PDF-"
 _STOPWORDS = frozenset({"a", "an", "and", "the", "of", "in", "on", "for", "with", "by", "to", "from", "using", "via"})
 _TOKEN = re.compile(r"[a-z0-9][a-z0-9+\-]*")
 _PHRASE = re.compile(r'"([^"]+)"')
-_SCHEMA_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.@-]{0,80}$")
+#: A registry id (``matkg_schema@0.3.1``) or a user schema id (``user/<name>@vN``).
+_SCHEMA_ID = re.compile(r"^(?:user/[a-z][a-z0-9_-]{0,63}@v[1-9][0-9]{0,5}|[A-Za-z0-9][A-Za-z0-9_.@-]{0,80})$")
 
 
 # -- scoring ------------------------------------------------------------------------------------------------

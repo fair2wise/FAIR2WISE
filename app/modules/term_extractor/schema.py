@@ -10,6 +10,16 @@ from rapidfuzz import fuzz, process
 logger = logging.getLogger(__name__)
 
 
+#: Longest description that reaches a prompt when ``sanitize_descriptions`` is on (the user schema validator's cap).
+MAX_PROMPT_DESCRIPTION_CHARS = 400
+_PROMPT_UNSAFE = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029\u202a-\u202e\u2066-\u2069]+")
+
+
+def sanitize_description(text: str, limit: int = MAX_PROMPT_DESCRIPTION_CHARS) -> str:
+    """One line of plain text for a prompt: control characters (and line breaks) become one space, length capped."""
+    return " ".join(_PROMPT_UNSAFE.sub(" ", str(text)).split())[:limit]
+
+
 def _label_key(label: str) -> str:
     return re.sub(r"[^a-z0-9]", "", label.lower())
 
@@ -116,9 +126,20 @@ class SchemaHelper:
       - Relation filtering (drop 'description'/'category')
     """
 
-    def __init__(self, schema_path: str = "matkg_schema.yaml", fuzzy_cutoff: int = 80):
+    def __init__(self, schema_path: str = "matkg_schema.yaml", fuzzy_cutoff: int = 80, *,
+                 sanitize_descriptions: bool = False):
+        """Load ``schema_path``.
+
+        Args:
+            schema_path: Schema file (resolved against the resource root when relative).
+            fuzzy_cutoff: RapidFuzz score cutoff.
+            sanitize_descriptions: Opt in for schemas whose text is not ours (user and model-written ones): every class
+                and slot description is reduced to one line, stripped of control characters and capped before it can
+                become prompt text. Shipped schemas leave this off and render exactly as before.
+        """
         from ..resources import resolve_resource
 
+        self.sanitize_descriptions = sanitize_descriptions
         self.schema_path = schema_path
         self.fuzzy_cutoff = fuzzy_cutoff
         self.schema_view = SchemaView(str(resolve_resource(schema_path)))
@@ -130,12 +151,16 @@ class SchemaHelper:
         self.class_parents: dict[str, str | None] = {}
         for name, cls in self.schema_view.all_classes().items():
             desc = cls.description or f"A {name} entity"
+            if self.sanitize_descriptions:
+                desc = sanitize_description(desc) or f"A {name} entity"
             self.classes[name] = {"description": desc, "slots": []}
             self.class_parents[name] = cls.is_a or None
 
         self.slots: dict[str, dict[str, Any]] = {}
         for slot_name, slot_def in self.schema_view.all_slots().items():
             desc = slot_def.description or f"Relationship: {slot_name}"
+            if self.sanitize_descriptions:
+                desc = sanitize_description(desc) or f"Relationship: {slot_name}"
             domain = slot_def.domain or None
             rng = slot_def.range or None
             mv = bool(slot_def.multivalued)

@@ -39,7 +39,8 @@ def test_create_collision_and_files(store):
     b = store.create("alpha", schema=SCHEMA, topic="rsoxs", papers=[B.PaperRef("a.pdf", "h1", 3)])
     assert sorted(p.name for p in b.directory.iterdir()) == sorted(B.BUNDLE_FILES)
     assert store.get("alpha").summary() == {
-        "name": "alpha", "topic": "rsoxs", "schema": "matkg_schema@0.3.1", "model": None, "backend": None,
+        "name": "alpha", "topic": "rsoxs", "schema": "matkg_schema@0.3.1", "schema_origin": "shipped",
+        "schema_name": "matkg_schema", "schema_version": "0.3.1", "model": None, "backend": None,
         "paper_count": 1, "parent": None, "reconstructed": False, "updated_at": "2026-11-02T00:00:00Z"}
     with pytest.raises(ContractError) as err:
         store.create("alpha", schema=SCHEMA)

@@ -3218,8 +3218,10 @@ class AgentPipelineService:
                 continue
             gid = graph_id_for_path(rel)
             stem = Path(rel).stem
+            from ..library.bundles import graph_source_label  # a KG built on a user schema says so in its label
+
             files.append(JsonFile(stem[len("matkg_"):] if stem.startswith("matkg_") else stem, gid,
-                                  Path(rel).name, path))
+                                  graph_source_label(rel) or Path(rel).name, path))
         return files
 
     def settings_response(self) -> AgentSettingsResponse:

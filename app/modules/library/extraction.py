@@ -49,7 +49,8 @@ from ..jobs.stages import WorkUnit, chunked_stage
 from ..jobs.store import LeaseLost
 from .catalog import sha256_file
 from .kg_service import KgLibrary
-from .schemas import manifest_block, resolve_schema
+from .schemas import manifest_block
+from .user_schemas import is_user_schema_id
 
 if TYPE_CHECKING:
     from .service import LibraryService
@@ -112,8 +113,13 @@ def resolve_backend(env: Mapping[str, str], requested: str | None = None) -> dic
 OrchestratorFactory = Callable[..., Any]
 
 
-def default_orchestrator_factory(*, model: str, output_file: str, schema_path: str, backend: Mapping[str, str]) -> Any:  # noqa: ANN401  # Any: term_extractor Orchestrator (untyped donor class)
-    """Build the real :class:`~app.modules.term_extractor.Orchestrator` (the only place a client is made)."""
+def default_orchestrator_factory(*, model: str, output_file: str, schema_path: str, backend: Mapping[str, str],
+                                 user_schema: bool = False) -> Any:  # noqa: ANN401  # Any: term_extractor Orchestrator (untyped donor class)
+    """Build the real :class:`~app.modules.term_extractor.Orchestrator` (the only place a client is made).
+
+    ``user_schema`` is passed (as ``True``) only for a user-written schema: its descriptions are then sanitized
+    before they become prompt text.
+    """
     from ..f2w_agent.coordinator import default_workers
     from ..term_extractor import Orchestrator
 
@@ -121,6 +127,8 @@ def default_orchestrator_factory(*, model: str, output_file: str, schema_path: s
     for key in ("cborg_base", "cborg_api_key", "ollama_url"):
         if backend.get(key):
             kwargs[key] = backend[key]
+    if user_schema:
+        kwargs["sanitize_schema_descriptions"] = True
     return Orchestrator(model=model, output_file=output_file, schema_path=schema_path, **kwargs)
 
 
@@ -354,6 +362,19 @@ class LibraryExtractor:
             return self.store.fork(args["continue_from"], name, schema_id=schema_id, topic=args["topic"])
         return self.store.create(name, schema=manifest_block(dict(schema_choice)), topic=args["topic"])
 
+    def _schema_file(self, schema_block: Mapping[str, Any], choice: Mapping[str, Any]) -> str:
+        """The schema file to extract with: the repository path of a shipped schema, the stored file of a user schema.
+
+        A user schema's file must still hold the bytes the bundle locked (versions are immutable; this proves it).
+        """
+        if not is_user_schema_id(schema_block.get("id")):
+            return str(schema_block.get("path") or choice["path"])
+        stored = self.kg.user_schemas.get(str(schema_block["id"]))
+        if schema_block.get("sha256") and schema_block["sha256"] != stored.sha256:
+            raise ContractError(ErrorCode.CONFLICT, "the stored schema file no longer matches the one this KG locked",
+                                retryable=False)
+        return str(self.kg.user_schemas.path_for(stored.id))
+
     # -- bookkeeping (the shape the coordinator writes) ----------------------------------------------
 
     @staticmethod
@@ -413,7 +434,7 @@ class LibraryExtractor:
         root = self.service._require_root()  # noqa: SLF001 - one trusted package
         self.service.refresh(max_probe=0)  # hash new and changed files; no probe, no network
         rows = self.resolve_papers(args["papers"])
-        choice = resolve_schema(args["schema"], self.kg._registry())  # noqa: SLF001 - same-package access to the registry of the KG owned by this service
+        choice = self.kg.resolve(args["schema"])
         schema_block = manifest_block(choice)
         self.kg.check_confirmation(args["confirmation"], [r["id"] for r in rows], args["model"], args["schema"])
         try:
@@ -436,14 +457,15 @@ class LibraryExtractor:
         model = args["model"]
         bundle = self.ensure_bundle(args, choice)
         schema_block = dict(bundle.manifest["schema"])  # the locked block of an existing bundle wins
-        schema_path = str(schema_block.get("path") or choice["path"])
+        schema_path = self._schema_file(schema_block, choice)
         terms_path = bundle.file(B.TERMS_FILE)
         # A paper already extracted into this bundle with the same bytes and model is not redone.
         same_model = bundle.manifest.get("model") == model
         todo = [r for r in rows if not (same_model and self._is_recorded(bundle, r))]
         skipped = len(rows) - len(todo)
         ctx.log(f"extracting {len(todo)} papers into bundle {bundle.name} with {model} ({skipped} already done)")
-        orch = self.factory(model=model, output_file=str(terms_path), schema_path=schema_path, backend=backend)
+        extra: dict[str, Any] = {"user_schema": True} if is_user_schema_id(schema_block.get("id")) else {}
+        orch = self.factory(model=model, output_file=str(terms_path), schema_path=schema_path, backend=backend, **extra)
 
         def lost() -> bool:
             """Whether this run no longer owns the job (lease lost, stop requested, shutdown): stop calling the LLM."""

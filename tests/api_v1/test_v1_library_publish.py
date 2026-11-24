@@ -295,3 +295,24 @@ def test_no_approval_call_exists_in_the_publish_module():
     for forbidden in ("create_approval", "submit_approval", "approve_publication", "record_approval"):
         assert forbidden not in source
     assert B.NAME_RE.pattern  # the bundle name rule feeds the corpus rule
+
+
+def _user_schema_bundle(w, name: str = "fish") -> None:
+    from tests.library.test_user_schema_validation import GOOD
+
+    saved = w.library.user_schemas.save("catfish", GOOD)
+    doc = json.loads(w._legacy)
+    w.library.store.create(name, schema=manifest_block(w.library.resolve(saved.id)), kg=doc)
+
+
+def test_a_kg_on_a_user_schema_is_not_publishable_and_says_the_kg_is_unaffected(w):
+    _user_schema_bundle(w)
+    preview = w.client.post("/v1/library/kgs/fish/publish", json={})
+    assert preview.status_code == 200, preview.text
+    problems = preview.json()["problems"]
+    assert [p["reason"] for p in problems] == [P.REASON_USER_SCHEMA]
+    assert "the KG itself is unaffected" in problems[0]["message"] and "not registered for publication" in problems[0]["message"]
+    out = w.publish("fish")
+    assert out.status_code == 501, out.text
+    assert P.REASON_USER_SCHEMA in out.text
+    assert w.jobs.store.list_jobs() == [] and list(w.release.iterdir()) == []   # nothing exported, nothing queued

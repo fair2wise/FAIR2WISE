@@ -856,12 +856,16 @@ def check_schema_binding(repo: Path, manifest: KGManifest, validation_doc: Mappi
     Refusals: ``schema_fingerprint_missing``, ``schema_unregistered``, ``schema_mismatch`` (path or file hash),
     ``schema_fingerprint_mismatch`` (closure fingerprint, including a pre-S4 fingerprint),
     ``schema_pending_review`` (a schema set such as 0.3.0 that binds only with explicit selection),
-    ``schema_unselectable``, ``validation_mismatch`` (validation.json records another fingerprint or a failure).
+    ``schema_unselectable``, ``schema_user_unsupported`` (a user schema, not enabled for release binding), ``validation_mismatch`` (validation.json records another fingerprint or a failure).
     """
     from app.modules.schema.loading import SchemaLoadError, closure_fingerprint  # lazy import
     from app.modules.schema.registry import RegistryError, SchemaRegistry
 
     block = manifest.schema_block
+    if str(block.name).startswith("user/"):
+        from app.modules.graph.adoption import USER_SCHEMA_NOT_PUBLISHABLE
+
+        raise ReleaseRefused("schema_user_unsupported", USER_SCHEMA_NOT_PUBLISHABLE)
     if not block.import_fingerprint:
         raise ReleaseRefused("schema_fingerprint_missing",
                              "manifest schema.import_fingerprint is missing; the importer cannot bind the schema")

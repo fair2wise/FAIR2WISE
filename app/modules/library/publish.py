@@ -67,7 +67,8 @@ REASON_ADOPTION = "adoption_refused"
 REASON_PENDING = "plan_pending"
 REASON_IN_PROGRESS = "publish_in_progress"
 REASON_FAILED = "publication_failed"
-REASONS = frozenset({REASON_UNAVAILABLE, REASON_NO_COMMIT, REASON_NOTHING, REASON_DISCLOSURE, REASON_ADOPTION,
+REASON_USER_SCHEMA = "user_schema_not_publishable"
+REASONS = frozenset({REASON_USER_SCHEMA, REASON_UNAVAILABLE, REASON_NO_COMMIT, REASON_NOTHING, REASON_DISCLOSURE, REASON_ADOPTION,
                      REASON_PENDING, REASON_IN_PROGRESS, REASON_FAILED})
 REVIEW_PAGE = "Pending Approvals"
 
@@ -163,6 +164,8 @@ def _refusal(exc: adoption.AdoptionRefused) -> PublishRefused:
     """Map an adoption refusal to the typed error, naming the rule exactly as the CLI report does."""
     rules = {part for part in exc.rule.split(",") if part}
     detail = str(exc).split(": ", 1)[1] if ": " in str(exc) else str(exc)
+    if rules == {adoption.RULE_USER_SCHEMA}:
+        return PublishRefused(ErrorCode.UNSUPPORTED_CAPABILITY, REASON_USER_SCHEMA, adoption.USER_SCHEMA_NOT_PUBLISHABLE)
     if rules == {adoption.RULE_PLACEHOLDER}:
         return PublishRefused(ErrorCode.INVALID_INPUT, REASON_NOTHING,
                               "the exported KG is an empty placeholder (0 nodes, 0 edges); nothing was adopted or staged")
@@ -277,6 +280,9 @@ class LibraryPublisher:
                                     "GIT_COMMIT build argument); the release manifest needs the code commit and none "
                                     "is invented. Rebuild with --build-arg GIT_COMMIT=$(git rev-parse HEAD) or start "
                                     "the container with -e F2W_CODE_COMMIT=<40-hex>"))
+        if self._user_schema(name):
+            problems.append(Problem(REASON_USER_SCHEMA, ErrorCode.UNSUPPORTED_CAPABILITY,
+                                    adoption.USER_SCHEMA_NOT_PUBLISHABLE))
         if not has_content:
             problems.append(Problem(REASON_NOTHING, ErrorCode.INVALID_INPUT,
                                     "the bundle's KG has no nodes and no edges; run an extraction first"))
@@ -304,6 +310,10 @@ class LibraryPublisher:
                 "snapshot_ref": f"{corpus}/v{number}", "target": target, "release_file": B.export_file_name(name),
                 "previous": previous, "review_page": REVIEW_PAGE, "problems": [p.to_dict() for p in problems],
                 "_problems": problems, "_inputs": (commit, kg_sha)}
+
+    def _user_schema(self, name: str) -> bool:
+        """True when bundle ``name`` is locked to a user schema (such a KG is never published, see ``adoption``)."""
+        return str(self.library().store.get(name).schema).startswith("user/")
 
     def submit(self, ctx: RequestContext, name: str, *, again: bool = False) -> dict[str, Any]:
         """Check and submit the ``library_publish`` job; the first problem is raised as a typed error.
@@ -363,6 +373,8 @@ class LibraryPublisher:
         params = self._params(sc)
         name = str(params["bundle"])
         corpus = corpus_for_bundle(name)
+        if self._user_schema(name):  # fail closed for a job that was queued before the check existed
+            raise Problem(REASON_USER_SCHEMA, ErrorCode.UNSUPPORTED_CAPABILITY, adoption.USER_SCHEMA_NOT_PUBLISHABLE).error()
         commit = str(params.get("code_commit") or "")
         if not _COMMIT_RE.fullmatch(commit):
             raise Problem(REASON_NO_COMMIT, ErrorCode.UNSUPPORTED_CAPABILITY,
