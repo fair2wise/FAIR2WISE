@@ -119,11 +119,18 @@ def test_an_existing_database_without_the_table_opens_and_gains_it(tmp_path) -> 
 
 
 def test_the_table_inventory_is_additive_only() -> None:
-    """The persistence inventory: the original seven job tables are unchanged, one table was added."""
+    """The persistence inventory: the original seven job tables are unchanged; two side tables were added.
+
+    Additions so far: ``job_trace_context`` (OpenTelemetry traceparent) and ``job_status`` (live run feedback, Extract).
+    Each is documented beside its ``CREATE`` in ``app/modules/jobs/store.py``; a new table is appended here, never reordered.
+    """
     names = [stmt.split("EXISTS ")[1].split(" ")[0] for stmt in SCHEMA]
     assert names == ["leases", "jobs", "job_stages", "job_units", "job_effects", "job_events", "job_logs",
-                     "job_trace_context"]
+                     "job_trace_context", "job_status"]
+    original = {"leases", "jobs", "job_stages", "job_units", "job_effects", "job_events", "job_logs"}
+    assert original <= set(names) and len(names) == len(set(names))  # nothing dropped, nothing duplicated
     assert "traceparent" not in next(s for s in SCHEMA if " jobs (" in s)  # the jobs table itself is untouched
+    assert "phase" not in next(s for s in SCHEMA if " jobs (" in s)
 
 
 @pytest.mark.parametrize("value,ok", [
