@@ -18,9 +18,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..modules.contracts.context import RequestContext
 from ..modules.contracts.errors import ContractError, ErrorCode
 from ..modules.contracts.jobs import JobState
-from ..modules.library.jobs import LIBRARY_PASSAGES_KIND
+from ..modules.library.jobs import LIBRARY_PASSAGES_KIND, LIBRARY_RELATIONS_KIND
 from ..modules.library.kg_service import MAX_PAPER_IDS, KgLibrary
 from ..modules.library.passages_job import LibraryPassages
+from ..modules.library.relations_job import LibraryRelations
 from ..modules.library.publish import LibraryPublisher
 from ..modules.security.authorization import require
 from .routes_common import Prefixed, context, dump, fresh_context, operations, project, project_dict
@@ -163,6 +164,28 @@ def install(app: FastAPI, service: KgLibrary) -> FastAPI:
                      if job.inputs.params.get("bundle") == name]
         recovery.check_startable(name, open_jobs=open_jobs)
         handle = ops.submit_job(ctx, LIBRARY_PASSAGES_KIND, recovery.inputs(name, nonce=body.nonce or os.urandom(8).hex()))
+        return project_dict(request, dump(handle))
+
+    @router.post("/kgs/{name}/relations")
+    def repair_relations(name: str, body: PassagesBody, request: Request,
+                         ctx: RequestContext = Depends(fresh_context)) -> dict[str, Any]:
+        """Start ``library_relations``: repair the relations of a bundle on a user schema (no model is used); answers the job handle.
+
+        Refused with a typed error when the bundle does not exist (404), is on a shipped schema (422 ``not_user_schema``),
+        is held by a running job (409 ``bundle_busy``) or is already being repaired (409 ``relations_in_progress``).
+        One previous generation of ``terms.json`` and ``kg.json`` is kept in the bundle. Status, progress and cancel are
+        the ordinary job routes.
+        """
+        require(ctx, "library.extract")
+        repair = getattr(request.app.state, "f2w_library_relations", None)
+        if not isinstance(repair, LibraryRelations):
+            raise ContractError(ErrorCode.INTERNAL, "the relation repair job is not installed")
+        ops = operations(request)
+        open_jobs = [(job.kind, job.job_id) for state in (JobState.QUEUED, JobState.RUNNING)
+                     for job in ops.jobs.store.list_jobs_scoped(kind=LIBRARY_RELATIONS_KIND, state=state, limit=1000)
+                     if job.inputs.params.get("bundle") == name]
+        repair.check_startable(name, open_jobs=open_jobs)
+        handle = ops.submit_job(ctx, LIBRARY_RELATIONS_KIND, repair.inputs(name, nonce=body.nonce or os.urandom(8).hex()))
         return project_dict(request, dump(handle))
 
     return app

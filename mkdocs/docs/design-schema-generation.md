@@ -103,6 +103,10 @@ behaviour and its pinned prompt):
 - **Generation.** The instructions tell the model the subject is the term being registered, to write predicates that read
   naturally from it (`measurement_of`, `feature_of`, `collected_at`) or give `inverse:`, and that a slot with a value type is
   an attribute, never a link.
+- **Existing bundles.** `library_relations` (`POST /v1/library/kgs/{name}/relations`, V100, Repair relations on the Extract page)
+  applies the same two functions to the stored terms of a bundle on a user schema, with no model: swapped relations move to
+  the right term with their evidence, value-slot relations become properties, counts per pattern go to the log and the run
+  summary, `terms.json` and `kg.json` are copied to `previous/` first (one generation back) and the KG is rebuilt. Idempotent.
 - **Schema panel.** The validator adds non-blocking `warnings`: `attribute_slot` for each value-type slot and
   `relation_direction` for a `has_...` slot between two classes with no `inverse`. They are listed under the problems with
   their lines; the schema can still be saved.

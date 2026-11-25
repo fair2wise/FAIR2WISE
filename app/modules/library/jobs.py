@@ -34,6 +34,7 @@ LIBRARY_EXTRACT_KIND = "library_extract"
 LIBRARY_HARVEST_KIND = "library_harvest"
 LIBRARY_PUBLISH_KIND = "library_publish"
 LIBRARY_PASSAGES_KIND = "library_passages"
+LIBRARY_RELATIONS_KIND = "library_relations"
 
 #: Job kind to the capability that submits it (all local-operator only, ``LOCAL_ONLY_CAPABILITIES``).
 LIBRARY_KIND_CAPABILITIES: Mapping[str, str] = {
@@ -44,6 +45,7 @@ LIBRARY_KIND_CAPABILITIES: Mapping[str, str] = {
     LIBRARY_HARVEST_KIND: "library.harvest",
     LIBRARY_PUBLISH_KIND: "graph.publish",  # export, adopt and stage a publication plan (never approves)
     LIBRARY_PASSAGES_KIND: "library.extract",  # find supporting text for an existing KG bundle (no model call)
+    LIBRARY_RELATIONS_KIND: "library.extract",  # repair the relations of a bundle on a user schema (no model call)
 }
 
 #: Name of the ``params`` entry that makes an otherwise identical submission a new job.
@@ -56,7 +58,8 @@ StageHandler = Callable[[StageContext], StageResult]
 _OWNER_TASK: Mapping[str, str] = {LIBRARY_VERIFY_KIND: "T35", LIBRARY_INDEX_KIND: "T36",
                                   LIBRARY_EXTRACT_KIND: "T39", LIBRARY_HARVEST_KIND: "T45",
                                   LIBRARY_PUBLISH_KIND: "the publish wiring",
-                                  LIBRARY_PASSAGES_KIND: "the passages wiring"}
+                                  LIBRARY_PASSAGES_KIND: "the passages wiring",
+                                  LIBRARY_RELATIONS_KIND: "the relations wiring"}
 
 
 def not_implemented(kind: str) -> StageHandler:
@@ -134,6 +137,6 @@ def register_library_jobs(job_service: JobService, settings: DeploymentSettings,
     return tuple(registered)
 
 
-__all__ = ("LIBRARY_EXTRACT_KIND", "LIBRARY_HARVEST_KIND", "LIBRARY_INDEX_KIND", "LIBRARY_KIND_CAPABILITIES", "LIBRARY_PASSAGES_KIND", "LIBRARY_PROBE_KIND",
+__all__ = ("LIBRARY_EXTRACT_KIND", "LIBRARY_HARVEST_KIND", "LIBRARY_INDEX_KIND", "LIBRARY_KIND_CAPABILITIES", "LIBRARY_PASSAGES_KIND", "LIBRARY_PROBE_KIND", "LIBRARY_RELATIONS_KIND",
            "LIBRARY_PUBLISH_KIND", "LIBRARY_VERIFY_KIND", "NONCE_PARAM", "StageHandler", "library_inputs", "not_implemented",
            "register_library_jobs")

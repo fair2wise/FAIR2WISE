@@ -12,6 +12,13 @@ export const EXTRACT_JOB_KIND = 'library_extract';
 
 /** Job kind of "Find supporting text" (the recovery of passages for an existing KG; no model is used). */
 export const PASSAGES_JOB_KIND = 'library_passages';
+/** Job kind of "Repair relations" (a KG on a user schema; no model). */
+export const RELATIONS_JOB_KIND = 'library_relations';
+
+/** Whether a schema id names a stored user schema (`user/<name>@vN`), the only kind the relation repair accepts. */
+export function isUserSchemaId(schema: string | null | undefined): boolean {
+  return typeof schema === 'string' && /^user\/[a-z][a-z0-9_-]{0,63}@v[1-9]\d*$/.test(schema);
+}
 
 /** Lifecycle state of a `/v1` job. */
 export type JobState =
@@ -524,6 +531,31 @@ export function passagesReasonText(reason: string | null | undefined, fallback: 
     case 'no_source_papers': return 'This KG does not record which papers its terms came from, so there is nothing to search.';
     case 'bundle_busy': return 'Another job is working on this KG now. Try again when it ends.';
     case 'passages_in_progress': return 'Supporting text is already being searched for this KG.';
+    default: return fallback;
+  }
+}
+
+/**
+ * Start "Repair relations" for a KG bundle on a user schema: `POST /v1/library/kgs/{name}/relations` answers the job handle.
+ * A new `nonce` makes every click a new job (the server refuses a second run while one is queued or running).
+ */
+export function startRelationsRepair(name: string, nonce: string, fetcher: typeof fetch = fetch): Promise<JobRef> {
+  return v1Json<unknown>(
+    v1Url(`/v1/library/kgs/${encodeURIComponent(name)}/relations`),
+    jsonBody('POST', { nonce }),
+    fetcher,
+  ).then(raw => {
+    const { id, kind, state } = normalizeJob(raw);
+    return { id, kind, state };
+  });
+}
+
+/** Plain words for the typed refusals of `startRelationsRepair` (`reason` of the error body), else the server's message. */
+export function relationsReasonText(reason: string | null | undefined, fallback: string): string {
+  switch (reason) {
+    case 'not_user_schema': return 'This KG is on a shipped schema; its relations are already judged the way that schema defines them.';
+    case 'bundle_busy': return 'Another job is working on this KG now. Try again when it ends.';
+    case 'relations_in_progress': return 'The relations of this KG are already being repaired.';
     default: return fallback;
   }
 }

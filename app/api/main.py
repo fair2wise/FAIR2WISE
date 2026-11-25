@@ -346,9 +346,15 @@ def create_api_app(
         from ..modules.library.passages_job import LibraryPassages
 
         app.state.f2w_library_passages = LibraryPassages(library_service, BundleStore(Path(cfg.workdir) / BUNDLES_DIRNAME))
+        from ..modules.library.relations_job import LibraryRelations, locked_user_schema_file
+
+        app.state.f2w_library_relations = LibraryRelations(
+            library_service, BundleStore(Path(cfg.workdir) / BUNDLES_DIRNAME),
+            schema_file_for=lambda bundle: locked_user_schema_file(app.state.f2w_kg_library.user_schemas, bundle))
         library_handlers_ = library_handlers(library_service, extractor=LibraryExtractor(
             library_service, BundleStore(Path(cfg.workdir) / BUNDLES_DIRNAME), env=startup_env),
-            harvester=app.state.f2w_harvest, passages=app.state.f2w_library_passages)
+            harvester=app.state.f2w_harvest, passages=app.state.f2w_library_passages,
+            relations=app.state.f2w_library_relations)
         # Publish to Tiled (owner decision 2026-11-10): export, adopt and stage a plan; the route and the job share it.
         from ..modules.library.jobs import LIBRARY_PUBLISH_KIND
         from ..modules.library.publish import LibraryPublisher

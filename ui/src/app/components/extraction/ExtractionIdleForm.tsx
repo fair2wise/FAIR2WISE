@@ -27,6 +27,7 @@ import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { ExportedNotice } from './ExportedNotice';
 import { FindSupportingText } from './FindSupportingText';
+import { RepairRelations } from './RepairRelations';
 import { PaperPicker } from './PaperPicker';
 import { PublishToTiled } from './PublishToTiled';
 import { SchemaPanelButton } from '../schema/SchemaPanelButton';
@@ -234,6 +235,7 @@ export function ExtractionIdleForm({ onStarted }: ExtractionIdleFormProps) {
             </Button>
             <PublishToTiled name={parentBundle?.name ?? null} />
             <FindSupportingText name={parentBundle?.name ?? null} />
+            <RepairRelations name={parentBundle?.name ?? null} schema={parentBundle?.schema ?? null} />
           </div>
         )}
         {continuing && exportKg.isSuccess && exportKg.data.name === parentBundle?.name ? (

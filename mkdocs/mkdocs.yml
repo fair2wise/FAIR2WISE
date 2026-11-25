@@ -48,6 +48,7 @@ nav:
       - Scripts and entry points: scripts.md
       - Testing: testing.md
       - CI: ci.md
+      - Break log (2026-11): break-log.md
       - Repository reference: repository-reference.md
       - Legacy code: legacy.md
   - Operations:

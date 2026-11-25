@@ -1,0 +1,42 @@
+{
+  "outcome": "succeeded",
+  "state": "succeeded",
+  "started_at": "2026-10-15T12:00:00+00:00",
+  "finished_at": "2026-10-15T12:00:00+00:00",
+  "elapsed_seconds": 0.0,
+  "stage": {
+    "name": "run",
+    "status": "completed",
+    "phase": null
+  },
+  "current_paper": null,
+  "papers": {
+    "total": 0,
+    "done": 0,
+    "failed": 0,
+    "skipped": 0,
+    "failed_list": []
+  },
+  "growth": {},
+  "counters": {
+    "done": 1,
+    "repair_attributes": 2,
+    "repair_invalid": 1,
+    "repair_relations": 6,
+    "repair_swapped": 1,
+    "repair_terms_changed": 3,
+    "repair_unchanged": 0,
+    "repair_unknown_object": 1,
+    "total": 1
+  },
+  "schema_prompt_condensed": null,
+  "params": {
+    "bundle": "kg1"
+  },
+  "error": null,
+  "logs": {
+    "kept": 7,
+    "total": 7,
+    "cap": 2000
+  }
+}

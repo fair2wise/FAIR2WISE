@@ -18,6 +18,7 @@ import {
   fetchSchemas,
   startExtraction,
   startPassages,
+  startRelationsRepair,
   TERMINAL_JOB_STATES,
   type ContinueKgRequest,
   type EstimateRequest,
@@ -140,6 +141,17 @@ export function useStartPassages() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ name, nonce }: { name: string; nonce: string }) => startPassages(name, nonce),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: extractionKeys.bundles });
+    },
+  });
+}
+
+/** Start "Repair relations" for a bundle on a user schema (`POST /v1/library/kgs/{name}/relations`). */
+export function useStartRelationsRepair() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, nonce }: { name: string; nonce: string }) => startRelationsRepair(name, nonce),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: extractionKeys.bundles });
     },

@@ -157,6 +157,10 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
     _v("V99", "POST", "/library/kgs/{name}/passages", "library.extract", on_als=False,
        note="start library_passages: find supporting text for the terms of a bundle from its source papers, no model; "
             "answers the job handle; refused for an unknown bundle, no source papers, a held bundle or a run in progress"),
+    _v("V100", "POST", "/library/kgs/{name}/relations", "library.extract", on_als=False,
+       note="start library_relations: repair the relations of a bundle on a user schema (swap reversed ones, value slots to "
+            "properties), no model; answers the job handle; refused for an unknown bundle, a shipped schema, a held bundle "
+            "or a run in progress"),
     _v("V75", "POST", "/library/kgs/continue", "library.extract", on_als=False,
        note="create a bundle by continuing a bundle or a KG file (kg_to_terms reverse build)"),
     # T45 (A8): the Harvester's runs and paywalled queue under /v1/library/harvest; :local only. V76-V79.

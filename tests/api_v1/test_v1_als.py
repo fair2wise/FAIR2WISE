@@ -71,13 +71,13 @@ def test_anonymous_gets_sign_in_required_on_every_v1_route(als):
             continue
         assert resp.status_code == 401, (policy.route_id, resp.status_code, resp.text)
         assert resp.json()["code"] == "sign_in_required"
-    assert local_only == 33 and {p.path for p in API_ROUTE_POLICIES if not p.on_als} == {
+    assert local_only == 34 and {p.path for p in API_ROUTE_POLICIES if not p.on_als} == {
         "/v1/folders/roots", "/v1/folders/list", "/v1/folders/index",
         # T35 (A8): library status, papers (list and upload) and verify
         "/v1/library", "/v1/library/papers", "/v1/library/papers/{paper_id}/verify",
         # T38 (A8): KG bundles, schemas, models, estimate, continue and export
         "/v1/library/kgs", "/v1/library/schemas", "/v1/library/models", "/v1/library/estimate",
-        "/v1/library/kgs/{name}/export", "/v1/library/kgs/{name}/download", "/v1/library/kgs/continue", "/v1/library/kgs/{name}/publish", "/v1/library/kgs/{name}/passages",
+        "/v1/library/kgs/{name}/export", "/v1/library/kgs/{name}/download", "/v1/library/kgs/continue", "/v1/library/kgs/{name}/publish", "/v1/library/kgs/{name}/passages", "/v1/library/kgs/{name}/relations",
         # T45 (A8): Harvester runs, candidates, the paywalled queue
         "/v1/library/harvest/runs", "/v1/library/harvest/runs/{run_id}/candidates",
         "/v1/library/harvest/candidates/{candidate_id}/pdf", "/v1/library/harvest/candidates/{candidate_id}/dismiss",
