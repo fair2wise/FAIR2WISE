@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "problems": [],
+  "stats": {
+    "bytes": 812,
+    "classes": 4,
+    "slots": 4
+  },
+  "checked": [
+    "size and encoding",
+    "parses as YAML (no tags, anchors or duplicate keys)",
+    "structural rules (closed set of keys, names, caps, imports)",
+    "required core (Thing, CodeSnippet, name, description, related_to)",
+    "loads in SchemaView and SchemaHelper"
+  ],
+  "note": "Not full LinkML conformance: the linkml linter and validator are not used.",
+  "fixable": false
+}

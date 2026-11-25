@@ -1,0 +1,11 @@
+{
+  "name": "user/catfish@v1",
+  "label": "Loricariid catfish (user schema, v1)",
+  "description": "User schema catfish, version 1, created 2026-11-24T21:11:41Z",
+  "version": "v1",
+  "review_status": "user_generated",
+  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "origin": "user",
+  "schema_name": "catfish",
+  "schema_version": 1
+}

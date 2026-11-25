@@ -1,0 +1,18 @@
+{
+  "confirmed": false,
+  "schema": "text",
+  "schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "paper": "a.pdf",
+  "backend": "cborg",
+  "model": "lbl/cborg-chat",
+  "max_pages": 3,
+  "pages": 3,
+  "estimated_tokens": 4800,
+  "estimated_cost_usd": null,
+  "confirmation": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "limits": {
+    "page_chars": 8000,
+    "call_seconds": 60,
+    "overall_seconds": 120
+  }
+}

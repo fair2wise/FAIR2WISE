@@ -1,0 +1,7 @@
+{
+  "full_chars": 14200,
+  "budgets": {
+    "ollama": 6000,
+    "cborg": 12000
+  }
+}

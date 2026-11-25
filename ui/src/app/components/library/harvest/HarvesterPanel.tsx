@@ -24,7 +24,8 @@ import {
   useStartHarvest,
   useUndoHarvestPdf,
 } from '../../harvestHooks';
-import { TERMINAL_JOB_STATES } from '../../extractionApi';
+import { isUserSchemaChoice, TERMINAL_JOB_STATES } from '../../extractionApi';
+import { SchemaPanelButton } from '../../schema/SchemaPanelButton';
 import { FAST_POLL_MS, useCancelJob, useJob, useSchemas } from '../../extractionHooks';
 import { useJobLogPolling } from '../../extraction/useJobLogPolling';
 import { isValidFolderName } from '../../libraryApi';
@@ -263,15 +264,23 @@ export function HarvesterPanel() {
             className={SELECT_CLASS}
           >
             <option value="">None</option>
-            {schemaList.map(entry => (
+            {schemaList.filter(entry => !isUserSchemaChoice(entry)).map(entry => (
               <option key={entry.name} value={entry.name}>
                 {entry.label}{entry.version ? ` (${entry.version})` : ''}
               </option>
             ))}
+            {schemaList.some(isUserSchemaChoice) && (
+              <optgroup label="Your schemas (user schema)">
+                {schemaList.filter(isUserSchemaChoice).map(entry => (
+                  <option key={entry.name} value={entry.name}>{entry.label}</option>
+                ))}
+              </optgroup>
+            )}
           </select>
           <p className="text-xs text-muted-foreground">
             Recorded with the run so Extraction can default to it; it does not change the search.
           </p>
+          <SchemaPanelButton onSaved={id => setSchema(id)} />
         </div>
         <div className="space-y-1">
           <Label htmlFor={id('max')}>Max downloads</Label>

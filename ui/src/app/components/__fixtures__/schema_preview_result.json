@@ -1,0 +1,69 @@
+{
+  "confirmed": true,
+  "schema": "text",
+  "schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "paper": "a.pdf",
+  "backend": "cborg",
+  "model": "lbl/cborg-chat",
+  "max_pages": 3,
+  "pages": 3,
+  "estimated_tokens": 4800,
+  "estimated_cost_usd": null,
+  "confirmation": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "limits": {
+    "page_chars": 8000,
+    "call_seconds": 60,
+    "overall_seconds": 120
+  },
+  "pages_used": [
+    1
+  ],
+  "page_results": [
+    {
+      "page": 1,
+      "terms": 2
+    }
+  ],
+  "terms": [
+    {
+      "term": "Ancistrus",
+      "category": "Species",
+      "raw_category": null,
+      "definition": "A genus.",
+      "page": 1,
+      "relations": [
+        {
+          "relation": "lives_in",
+          "related_term": "Rio Negro",
+          "verified": true
+        }
+      ]
+    },
+    {
+      "term": "Rio Negro",
+      "category": "Thing",
+      "raw_category": "Waterbody",
+      "definition": "A river.",
+      "page": 1,
+      "relations": [
+        {
+          "relation": "related_to",
+          "related_term": "Brazil",
+          "verified": true
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "terms": 2,
+    "categories_exact": 1,
+    "categories_mapped": 0,
+    "categories_fell_back_to_thing": 1,
+    "relations": 2,
+    "relations_mapped": 0,
+    "relations_became_related_to": 1,
+    "relations_unverified": 0
+  },
+  "stopped": null,
+  "note": "One plain-JSON model call per page with the schema's prompt text and the extractor's own class and relation matching; the real extraction runs the agent and merges terms. Nothing was stored."
+}

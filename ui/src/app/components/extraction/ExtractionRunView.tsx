@@ -103,6 +103,15 @@ export function ExtractionRunView({
 
       <RunProgress job={job} live={live} />
 
+      {summary?.schema_prompt_condensed && (
+        <p role="status" className="rounded-md border border-border bg-muted p-3 text-sm" data-testid="schema-prompt-condensed">
+          The schema prompt was condensed: {summary.schema_prompt_condensed.full_chars.toLocaleString('en-US')} characters in full,{' '}
+          {summary.schema_prompt_condensed.used_chars.toLocaleString('en-US')} sent (budget{' '}
+          {summary.schema_prompt_condensed.budget.toLocaleString('en-US')}). The model saw class names with their first sentence
+          and relation domains only, so a long schema may be matched less precisely.
+        </p>
+      )}
+
       <ExportedNotice result={exported} />
 
       {note && (

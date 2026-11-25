@@ -2,6 +2,8 @@ import { Calculator, Download, Loader2, Play } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
+  condensedSchemaNote,
+  isUserSchemaChoice,
   isValidKgName,
   type EstimateResponse,
   type KgBundleSummary,
@@ -26,6 +28,7 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { ExportedNotice } from './ExportedNotice';
 import { PaperPicker } from './PaperPicker';
 import { PublishToTiled } from './PublishToTiled';
+import { SchemaPanelButton } from '../schema/SchemaPanelButton';
 
 /** Props of {@link ExtractionIdleForm}. */
 export interface ExtractionIdleFormProps {
@@ -84,12 +87,17 @@ export function ExtractionIdleForm({ onStarted }: ExtractionIdleFormProps) {
   const schemaList = schemas.data?.schemas ?? [];
   const schema = schemaLocked ? parentBundle.schema : schemaChoice || schemaList[0]?.name || '';
 
+  const shippedSchemas = schemaList.filter(s => !isUserSchemaChoice(s));
+  const userSchemas = schemaList.filter(isUserSchemaChoice);
+  const schemaIsUser = schema.startsWith('user/');
+
   const choices = useMemo(() => buildModelChoices(models.data), [models.data]);
   const choice = choices.find(c => c.value === model) ?? choices[0];
   const selectedModel = choice?.model ?? '';
   const selectedBackend = choice?.backend;
   const noBackend = models.isSuccess ? choices.length === 0 : models.isError;
 
+  const promptNote = schemaIsUser ? condensedSchemaNote(estimated?.result.schema_prompt, selectedBackend ?? 'cborg') : null;
   const nameValid = isValidKgName(name);
   const nameTaken = bundleList.some(b => b.name === name);
   const parentReady = !continuing || parentValue !== '';
@@ -268,11 +276,19 @@ export function ExtractionIdleForm({ onStarted }: ExtractionIdleFormProps) {
             className={SELECT_CLASS}
           >
             {schemaLocked && !schemaList.some(s => s.name === schema) && <option value={schema}>{schema}</option>}
-            {schemaList.map(s => (
+            {shippedSchemas.map(s => (
               <option key={s.name} value={s.name}>{s.label}{s.version ? ` (${s.version})` : ''}</option>
             ))}
+            {userSchemas.length > 0 && (
+              <optgroup label="Your schemas (user schema)">
+                {userSchemas.map(s => <option key={s.name} value={s.name}>{s.label}</option>)}
+              </optgroup>
+            )}
           </select>
           {schemaLocked && <p className="text-xs text-muted-foreground">Locked to the schema of the KG being continued.</p>}
+          {schemaIsUser && <p className="text-xs text-muted-foreground" data-testid="user-schema-note">This is a user schema: written here, not reviewed, and it cannot be published yet.</p>}
+          {promptNote && estimateCurrent && <p role="status" className="text-xs" data-testid="schema-prompt-note">{promptNote}</p>}
+          {!schemaLocked && <SchemaPanelButton modelValue={choice?.value} onSaved={id => { setSchemaChoice(id); reset(); }} />}
         </div>
         <div className="space-y-1">
           <Label htmlFor="kg-model">Model</Label>

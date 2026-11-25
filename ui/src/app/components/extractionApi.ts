@@ -72,6 +72,8 @@ export interface JobRunSummary {
   /** Other stage counters, e.g. `paper_pages_done` and `paper_pages_total` of the current paper. */
   counters: Record<string, number>;
   params: { bundle?: string; model?: string; backend?: string; schema?: string; topic?: string };
+  /** Set when a user schema's prompt text was condensed for this run (sizes in characters); `null`/absent otherwise. */
+  schema_prompt_condensed?: SchemaPromptCondensed | null;
   error: string | null;
   /** `kept` lines are in the store of `total` written; `cap` is the per-job row cap. */
   logs: { kept: number; total: number; cap: number };
@@ -176,6 +178,15 @@ export interface SchemaChoice {
   version?: string;
   review_status?: string;
   sha256?: string;
+  /** `user` for a schema written in the schema panel (id `user/<name>@vN`); absent or `shipped` for the registry sets. */
+  origin?: 'shipped' | 'user';
+  schema_name?: string;
+  schema_version?: number;
+}
+
+/** True for a user schema choice (id `user/<name>@vN`). */
+export function isUserSchemaChoice(choice: Pick<SchemaChoice, 'name' | 'origin'>): boolean {
+  return choice.origin === 'user' || choice.name.startsWith('user/');
 }
 
 /** `GET /v1/library/schemas`. */
@@ -226,6 +237,31 @@ export interface EstimateResponse {
   estimated_tokens: number | null;
   estimated_cost_usd: number | null;
   confirmation: string;
+  /** Only for a user schema: the full size of its prompt text and the budgets extraction bounds it to. */
+  schema_prompt?: SchemaPromptSizes;
+}
+
+/** `estimate.schema_prompt`: characters of the full schema prompt text and the per-backend budgets. */
+export interface SchemaPromptSizes {
+  full_chars: number;
+  budgets: { ollama: number; cborg: number };
+}
+
+/** `summary.schema_prompt_condensed`: a user schema's prompt text was condensed for this run. */
+export interface SchemaPromptCondensed {
+  full_chars: number;
+  used_chars: number;
+  budget: number;
+}
+
+/** The sentence that says a user schema's prompt is condensed, or `null` when it fits (or is not a user schema). */
+export function condensedSchemaNote(sizes: SchemaPromptSizes | undefined, backend: 'ollama' | 'cborg'): string | null {
+  if (!sizes) return null;
+  const budget = sizes.budgets[backend];
+  if (sizes.full_chars <= budget) return null;
+  return `This schema's prompt text is ${sizes.full_chars.toLocaleString('en-US')} characters, over the ${budget.toLocaleString('en-US')} `
+    + `allowed for ${backend === 'ollama' ? 'Ollama' : 'CBORG'}. Extraction will send a condensed view (class names with their first `
+    + 'sentence, relations with domain and range) instead of the full text.';
 }
 
 /**

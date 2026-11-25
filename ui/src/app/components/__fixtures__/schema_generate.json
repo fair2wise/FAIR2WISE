@@ -1,0 +1,87 @@
+{
+  "ok": true,
+  "text": "id: https://example.org/user/catfish\nname: catfish\n",
+  "report": {
+    "ok": true,
+    "problems": [],
+    "stats": {
+      "bytes": 812,
+      "classes": 4,
+      "slots": 4
+    },
+    "checked": [
+      "size and encoding",
+      "parses as YAML (no tags, anchors or duplicate keys)",
+      "structural rules (closed set of keys, names, caps, imports)",
+      "required core (Thing, CodeSnippet, name, description, related_to)",
+      "loads in SchemaView and SchemaHelper"
+    ],
+    "note": "Not full LinkML conformance: the linkml linter and validator are not used.",
+    "fixable": false
+  },
+  "attempts": [
+    {
+      "round": 0,
+      "text": "id: https://example.org/user/catfish\nname: catfish\n",
+      "report": {
+        "ok": false,
+        "problems": [
+          {
+            "line": 2,
+            "message": "the schema's name 'eels' must equal the name it is saved under ('catfish')",
+            "code": "name_mismatch",
+            "column": 7,
+            "fixable": false
+          },
+          {
+            "line": 43,
+            "message": "slot 'lives_in': domain 'Nope' is not a class",
+            "code": "unknown_reference",
+            "column": null,
+            "fixable": false
+          }
+        ],
+        "stats": {
+          "bytes": 812,
+          "classes": 4,
+          "slots": 4
+        },
+        "checked": [
+          "size and encoding",
+          "parses as YAML (no tags, anchors or duplicate keys)",
+          "structural rules (closed set of keys, names, caps, imports)",
+          "required core (Thing, CodeSnippet, name, description, related_to)",
+          "loads in SchemaView and SchemaHelper"
+        ],
+        "note": "Not full LinkML conformance: the linkml linter and validator are not used.",
+        "fixable": false
+      }
+    },
+    {
+      "round": 1,
+      "text": "id: https://example.org/user/catfish\nname: catfish\n",
+      "report": {
+        "ok": true,
+        "problems": [],
+        "stats": {
+          "bytes": 812,
+          "classes": 4,
+          "slots": 4
+        },
+        "checked": [
+          "size and encoding",
+          "parses as YAML (no tags, anchors or duplicate keys)",
+          "structural rules (closed set of keys, names, caps, imports)",
+          "required core (Thing, CodeSnippet, name, description, related_to)",
+          "loads in SchemaView and SchemaHelper"
+        ],
+        "note": "Not full LinkML conformance: the linkml linter and validator are not used.",
+        "fixable": false
+      }
+    }
+  ],
+  "repairs": 1,
+  "model": "lbl/cborg-chat",
+  "backend": "cborg",
+  "stopped": null
+}

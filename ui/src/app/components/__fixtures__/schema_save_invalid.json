@@ -1,0 +1,39 @@
+{
+  "code": "invalid_input",
+  "message": "the schema does not validate",
+  "retryable": false,
+  "reason": "schema_invalid",
+  "report": {
+    "ok": false,
+    "problems": [
+      {
+        "line": 2,
+        "message": "the schema's name 'eels' must equal the name it is saved under ('catfish')",
+        "code": "name_mismatch",
+        "column": 7,
+        "fixable": false
+      },
+      {
+        "line": 43,
+        "message": "slot 'lives_in': domain 'Nope' is not a class",
+        "code": "unknown_reference",
+        "column": null,
+        "fixable": false
+      }
+    ],
+    "stats": {
+      "bytes": 812,
+      "classes": 4,
+      "slots": 4
+    },
+    "checked": [
+      "size and encoding",
+      "parses as YAML (no tags, anchors or duplicate keys)",
+      "structural rules (closed set of keys, names, caps, imports)",
+      "required core (Thing, CodeSnippet, name, description, related_to)",
+      "loads in SchemaView and SchemaHelper"
+    ],
+    "note": "Not full LinkML conformance: the linkml linter and validator are not used.",
+    "fixable": false
+  }
+}

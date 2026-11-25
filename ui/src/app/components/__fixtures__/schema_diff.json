@@ -1,0 +1,6 @@
+{
+  "name": "catfish",
+  "from": 1,
+  "to": 2,
+  "diff": "--- user/catfish@v1\n+++ user/catfish@v2\n@@ -26,3 +26,3 @@\n     is_a: Thing\n-    description: A species of catfish.\n+    description: An armoured catfish.\n"
+}
