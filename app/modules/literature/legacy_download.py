@@ -112,14 +112,27 @@ class JSONFetchError(Exception):
     ``retry_after`` the parsed ``Retry-After`` header of that answer in seconds (``None`` when absent or
     unparseable). ``detail`` is the server's own explanation of a 401/403 (the ``message`` of a JSON error body,
     one line, at most :data:`AUTH_DETAIL_MAX_CHARS`), else ``None``. The message is unchanged (``"HTTP 429"``), so callers keying on the text still work.
+    ``blocked`` is set when the egress policy or proxy refused the request itself rather than the site: the policy's reason
+    (``port``, ``private_address`` ...) or ``proxy_refused`` (the proxy's own 403 page or a refused tunnel); ``host`` names
+    the host that was refused.
     """
 
     def __init__(self, message: str, *, status: int | None = None, retry_after: float | None = None,
-                 detail: str | None = None) -> None:
+                 detail: str | None = None, blocked: str | None = None, host: str | None = None) -> None:
         super().__init__(message)
         self.status = status
         self.retry_after = retry_after
         self.detail = detail
+        self.blocked = blocked
+        self.host = host
+
+
+#: Response headers only the egress proxy adds to its own refusal page (the site never sends them).
+PROXY_REFUSAL_HEADERS = ("x-squid-error", "x-proxy-error")
+
+
+def _url_host(url: str) -> str:
+    return urlsplit(url).hostname or ""
 
 
 #: Statuses :func:`retry_after_wait` honours: a rate limit, or an overload that names when to come back.
@@ -139,6 +152,7 @@ class HardenedResponse:
     body: bytes
     status: int
     headers: Mapping[str, str]
+    host: str = ""
 
     def __repr__(self) -> str:
         return f"HardenedResponse(status={self.status}, bytes={len(self.body)}, headers={len(self.headers)})"
@@ -205,7 +219,7 @@ def hardened_get_response(url: str, *, headers: dict[str, str] | None = None, ti
             try:
                 active_policy.check_url(current)
             except BlockedURL as exc:
-                raise JSONFetchError(f"blocked URL ({exc.reason})") from exc
+                raise JSONFetchError(f"blocked URL ({exc.reason})", blocked=str(exc.reason), host=_url_host(current)) from exc
             try:
                 with http.stream("GET", current, headers=headers, follow_redirects=False,
                                  timeout=timeout) as response:
@@ -227,9 +241,11 @@ def hardened_get_response(url: str, *, headers: dict[str, str] | None = None, ti
                             if len(body) >= AUTH_BODY_MAX_BYTES:
                                 break
                     answer_headers = {key: response.headers[key] for key in response.headers.keys()}
+            except httpx.ProxyError as exc:   # the egress proxy refused the tunnel: its allowlist, not the site
+                raise JSONFetchError(f"network error ({type(exc).__name__})", blocked="proxy_refused", host=_url_host(current)) from exc
             except httpx.HTTPError as exc:
                 raise JSONFetchError(f"network error ({type(exc).__name__})") from exc
-            return HardenedResponse(bytes(body), response.status_code, answer_headers)
+            return HardenedResponse(bytes(body), response.status_code, answer_headers, host=_url_host(current))
         raise JSONFetchError("too many redirects")
     finally:
         if own:
@@ -252,8 +268,10 @@ def hardened_get_bytes(url: str, *, headers: dict[str, str] | None = None, timeo
     answer = hardened_get_response(url, headers=headers, timeout=timeout, policy=policy, client=client,
                                    max_bytes=max_bytes)
     if answer.status != 200:
+        refused = answer.status == 403 and any(name in answer.headers for name in PROXY_REFUSAL_HEADERS)
         raise JSONFetchError(f"HTTP {answer.status}", status=answer.status, retry_after=answer.retry_after_seconds(),
-                             detail=auth_detail(answer.body) if answer.status in (401, 403) else None)
+                             detail=auth_detail(answer.body) if answer.status in (401, 403) else None,
+                             blocked="proxy_refused" if refused else None, host=answer.host or None)
     return answer.body
 
 

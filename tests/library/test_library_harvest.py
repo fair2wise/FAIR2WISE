@@ -528,3 +528,80 @@ def test_https_upgrade_only_changes_plain_http_and_drops_the_port():
     assert https_upgrade("https://host.example:8443/a.pdf") is None
     assert https_upgrade("http://user:pw@host.example/a.pdf") is None
     assert https_upgrade("ftp://host.example/a.pdf") is None
+
+
+# -- proxy refusals (pilot 2026-11-25: about twenty identical warning lines for one refused host) -------------
+
+
+def _logs(world: World, job_id: str) -> list[str]:
+    return [e.message for e in world.jobs.store.logs(job_id)]
+
+
+def test_a_host_the_proxy_refused_is_logged_once_and_not_asked_again_for_every_paper(tmp_path):
+    papers = []
+    for i in range(5):
+        paper = cand(f"Resonant soft X-ray scattering number {i}", doi=f"10.1/p{i}", urls=[f"https://walled.example/{i}.pdf"])
+        paper.oa = True
+        papers.append(paper)
+    net = Net({f"https://walled.example/{i}.pdf": "blocked:proxy_refused@walled.example" for i in range(5)})
+    world = World(tmp_path, {"arxiv": fixed(*papers)}, net)
+    handle, _ = world.run(sources=["arxiv"])
+    assert net.calls == ["https://walled.example/0.pdf"]   # one request; the other four papers were not tried
+    assert set(world.statuses(handle.job_id).values()) == {"blocked"}
+    logs = _logs(world, handle.job_id)
+    refusal = [m for m in logs if "refused by the proxy" in m]
+    assert len([m for m in refusal if "not tried again in this run" in m]) == 1 and "walled.example" in refusal[0]
+    assert any(m == "walled.example: refused by the proxy once; 4 later requests to it were not made in this run" for m in logs)
+    assert not any("blocked:proxy_refused" in m for m in logs)   # plain words, not the status code
+    assert world.store.run(handle.job_id) is not None
+
+
+def test_both_forms_blocked_is_said_plainly_and_each_form_is_tried_once(tmp_path):
+    paper = cand(GOOD, doi="10.1/b", urls=["http://repo.example:8080/a.pdf"])
+    paper.oa = True
+    net = Net({"https://repo.example/a.pdf": "blocked:proxy_refused@repo.example", "http://repo.example:8080/a.pdf": "blocked:port@repo.example"})
+    world = World(tmp_path, {"arxiv": fixed(paper)}, net)
+    handle, _ = world.run(sources=["arxiv"])
+    logs = _logs(world, handle.job_id)
+    assert any("both the https form and the link as listed were blocked at repo.example "
+               "(https: refused by the proxy; as listed: port not allowed)" in m for m in logs)
+
+
+def test_landing_page_lookups_refused_by_the_proxy_are_named_once_with_the_host_and_counted(tmp_path, monkeypatch):
+    from app.modules.library import harvest as H
+
+    calls: list[str] = []
+
+    def refused(url: str, **kwargs: Any) -> bytes:
+        calls.append(url)
+        raise JSONFetchError("HTTP 403", status=403, blocked="proxy_refused", host="doi.org")
+
+    monkeypatch.setattr(H, "hardened_get_bytes", refused)
+    papers = []
+    for i in range(4):
+        paper = cand(f"Resonant soft X-ray scattering landing {i}", doi=f"10.1/l{i}", urls=[])
+        paper.oa = True
+        paper.oa_locations = [{"pdf_url": "", "landing_page_url": f"https://doi.org/10.1/l{i}"}]
+        papers.append(paper)
+    world = World(tmp_path, {"arxiv": fixed(*papers)}, Net({}))
+    handle, _ = world.run(sources=["arxiv"])
+    logs = _logs(world, handle.job_id)
+    assert len(calls) == 1   # the other three landing pages were not requested
+    assert not any("JSONFetchError" in m for m in logs)
+    assert len([m for m in logs if m.startswith("doi.org: refused by the proxy (")]) == 1
+    assert "doi.org: refused by the proxy once; 3 later requests to it were not made in this run" in logs
+
+
+def test_a_failed_lookup_that_is_not_a_refusal_keeps_its_own_line_with_the_reason(tmp_path, monkeypatch):
+    from app.modules.library import harvest as H
+
+    def broken(url: str, **kwargs: Any) -> bytes:
+        raise JSONFetchError("HTTP 404", status=404)
+
+    monkeypatch.setattr(H, "hardened_get_bytes", broken)
+    paper = cand(GOOD, doi="10.1/m", urls=[])
+    paper.oa = True
+    paper.oa_locations = [{"pdf_url": "", "landing_page_url": "https://journal.example/x"}]
+    world = World(tmp_path, {"arxiv": fixed(paper)}, Net({}))
+    handle, _ = world.run(sources=["arxiv"])
+    assert any(m.endswith("landing_citation_pdf_url lookup failed at journal.example (HTTP 404)") for m in _logs(world, handle.job_id))

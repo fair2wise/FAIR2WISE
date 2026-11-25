@@ -670,6 +670,58 @@ def file_stem(cand: Candidate) -> str:
     return "_".join(_TOKEN.findall(cand.title.lower()))[:80] or "paper"
 
 
+_PLAIN_BLOCKS = {"proxy_refused": "refused by the proxy", "port": "port not allowed", "private_address": "private address",
+                 "scheme": "scheme not allowed", "credentials": "credentials in the address", "redirect_target": "redirect target blocked",
+                 "too_many_redirects": "too many redirects"}
+
+
+def plain_block(status: str) -> str:
+    """A ``blocked:<reason>[@host]`` status in plain words (``refused by the proxy``, ``port not allowed`` ...)."""
+    reason = status.split("@", 1)[0].removeprefix("blocked:")
+    return _PLAIN_BLOCKS.get(reason, f"blocked by network policy ({reason})")
+
+
+class RefusedHosts:
+    """The hosts (per scheme) the egress proxy refused during one run.
+
+    A proxy allowlist refuses a host for every paper, so a refusal is logged once with the host, later requests to it are
+    not made, and the count of skipped requests is reported at the end of the run instead of one line per paper.
+    """
+
+    def __init__(self) -> None:
+        self._skipped: dict[str, int] = {}
+
+    @staticmethod
+    def label(url: str) -> str:
+        """``host`` for https, ``host over http`` for a plain-http address."""
+        try:
+            parts = urlsplit(url)
+        except ValueError:
+            return "?"
+        host = parts.hostname or "?"
+        return host if parts.scheme == "https" else f"{host} over {parts.scheme or '?'}"
+
+    def refused(self, url: str) -> bool:
+        """Whether ``url``'s host (and scheme) was already refused in this run."""
+        return self.label(url) in self._skipped
+
+    def record(self, url: str) -> bool:
+        """Remember a refusal; ``True`` the first time (the caller logs it then)."""
+        label = self.label(url)
+        new = label not in self._skipped
+        self._skipped.setdefault(label, 0)
+        return new
+
+    def skip(self, url: str) -> None:
+        """Count one request that was not made because the host was refused before."""
+        label = self.label(url)
+        self._skipped[label] = self._skipped.get(label, 0) + 1
+
+    def skipped(self) -> dict[str, int]:
+        """``{host: requests skipped}`` of the hosts that were refused."""
+        return dict(self._skipped)
+
+
 class Harvester:
     """Runs harvests and serves their results (the worker runs :meth:`run`; the API reads the store)."""
 
@@ -693,6 +745,7 @@ class Harvester:
                 ``open_url`` links the candidates response carries, never requested.
         """
         self.proxy_prefix = proxy_prefix
+        self._refusals: dict[str, RefusedHosts] = {}
         self._link_resolver = link_resolver
         self.service = service
         self.store = store
@@ -806,11 +859,20 @@ class Harvester:
         ctx.progress(done=0, total=len(candidates))
         ctx.log(f"{len(candidates)} distinct papers; tier A {sum(c.tier == 'A' for c in candidates)}, "
                 f"B {sum(c.tier == 'B' for c in candidates)}, C {sum(c.tier == 'C' for c in candidates)}")
-        counts = self._process(ctx, run_id, args, candidates)
+        refusals = self._refusals[run_id] = RefusedHosts()
+        try:
+            counts = self._process(ctx, run_id, args, candidates)
+        finally:
+            self._refusals.pop(run_id, None)
+        skipped = refusals.skipped()
+        for host, count in skipped.items():
+            if count:
+                ctx.log(f"{host}: refused by the proxy once; {count} later request{'s' if count != 1 else ''} to it "
+                        "were not made in this run", level="warning")
         ctx.log("done: " + ", ".join(f"{k} {v}" for k, v in counts.items()))
         return StageResult(progress={"done": len(candidates), "total": len(candidates), **counts},
                            data={"run": run_id, "category": args["category"], "summary": summary,
-                                 "sources": per_source, "openalex_mode": openalex_mode})
+                                 "sources": per_source, "openalex_mode": openalex_mode, "refused_hosts": skipped})
 
     def _process(self, ctx: StageContext, run_id: str, args: Mapping[str, Any], candidates: list[Candidate]) -> dict[str, int]:
         counts = {"downloaded": 0, "in_library": 0, "paywalled": 0, "blocked": 0, "failed": 0, "skipped": 0}
@@ -858,18 +920,37 @@ class Harvester:
             upgraded = https_upgrade(link.url)   # an http:// link is tried over https first (a proxy may allow only 443)
             attempts = [(upgraded, f"{link.rule}+https_upgrade"), (link.url, link.rule)] if upgraded else [(link.url, link.rule)]
             data, url, rule = None, link.url, link.rule
+            refused = self._refused_for(ctx)
+            tried: list[tuple[str, str, bool]] = []   # (url, status, skipped because the host was refused earlier)
             for attempt_url, attempt_rule in attempts:
-                data, status = self._fetch(ctx, downloader, attempt_url, max_bytes)
+                skipped = refused.refused(attempt_url)
+                if skipped:
+                    refused.skip(attempt_url)
+                    data, status = None, f"blocked:proxy_refused@{_host(attempt_url)}"
+                else:
+                    data, status = self._fetch(ctx, downloader, attempt_url, max_bytes)
+                    if status.startswith("blocked:proxy_refused@") and refused.record(attempt_url):
+                        ctx.log(f"{refused.label(attempt_url)}: refused by the proxy ({cand.title[:50]}); not tried again in "
+                                "this run", level="warning")
+                tried.append((attempt_url, status, skipped))
                 url, rule = attempt_url, attempt_rule
                 if data is not None:
                     break
                 if attempt_url != link.url:   # the https attempt failed: the listed http link is tried as it was given
-                    ctx.log(f"{cand.title[:70]}: https attempt at {_host(attempt_url)} gave {status.split('@', 1)[0]}; "
+                    ctx.log(f"{cand.title[:70]}: https attempt at {_host(attempt_url)} gave "
+                            f"{plain_block(status) if status.startswith('blocked:') else status.split('@', 1)[0]}; "
                             "trying the link as listed", level="info")
             if data is None:   # report what the link as listed gave
                 last, last_url = status, link.url
-                ctx.log(f"{cand.title[:70]}: {status.split('@', 1)[0]} at {status.split('@', 1)[1] if '@' in status else _host(link.url)}"
-                        f" ({link.rule})", level="warning")
+                host_of = status.split("@", 1)[1] if "@" in status else _host(link.url)
+                if all(skipped for _, _, skipped in tried):
+                    pass   # the host was refused earlier in this run: counted in the closing line, not logged per paper
+                elif len(tried) == 2 and all(st.startswith("blocked:") for _, st, _ in tried):
+                    ctx.log(f"{cand.title[:70]}: both the https form and the link as listed were blocked at {host_of} "
+                            f"(https: {plain_block(tried[0][1])}; as listed: {plain_block(tried[1][1])})", level="warning")
+                else:
+                    ctx.log(f"{cand.title[:70]}: {plain_block(status) if status.startswith('blocked:') else status.split('@', 1)[0]}"
+                            f" at {host_of} ({link.rule})", level="warning")
                 continue
             cand.link_rule = rule
             known = {"year": cand.year, "title": cand.title, "doi": cand.doi, "arxiv_id": cand.arxiv_id,
@@ -916,10 +997,40 @@ class Harvester:
             yield from self._link_resolver(cand)
             return
 
-        def failed(rule: str, host: str, exc: Exception) -> None:
-            ctx.log(f"{cand.title[:70]}: {rule} lookup failed at {host} ({type(exc).__name__})", level="warning")
+        refused = self._refused_for(ctx)
 
-        yield from resolve_links(cand.oa_locations, set(cand.pdf_urls), on_error=failed)
+        def guarded(getter: Callable[..., Any]) -> Callable[..., Any]:
+            """The getter, except that a host the proxy refused earlier in this run is not asked again."""
+            def call(url: str, **kwargs: Any) -> Any:
+                if refused.refused(url):
+                    refused.skip(url)
+                    raise JSONFetchError("skipped: refused by the proxy earlier in this run", blocked="proxy_refused", host=_host(url))
+                try:
+                    return getter(url, **kwargs)
+                except JSONFetchError as exc:
+                    if exc.blocked == "proxy_refused" and refused.record(url):
+                        ctx.log(f"{refused.label(url)}: refused by the proxy ({cand.title[:50]}); not tried again in this run",
+                                level="warning")
+                    raise
+            return call
+
+        def failed(rule: str, host: str, exc: Exception) -> None:
+            blocked = getattr(exc, "blocked", None)
+            if blocked == "proxy_refused":
+                return   # logged once when the host was first refused; later ones are counted in the closing line
+            if blocked:
+                ctx.log(f"{cand.title[:70]}: {rule} lookup was blocked at {host} ({plain_block('blocked:' + blocked)})", level="warning")
+                return
+            reason = str(exc) if isinstance(exc, JSONFetchError) else type(exc).__name__
+            ctx.log(f"{cand.title[:70]}: {rule} lookup failed at {host} ({reason})", level="warning")
+
+        yield from resolve_links(cand.oa_locations, set(cand.pdf_urls), on_error=failed,
+                                 get_json=guarded(hardened_get_json), get_bytes=guarded(hardened_get_bytes))
+
+    def _refused_for(self, ctx: StageContext) -> RefusedHosts:
+        """The refused-host record of this run (a fresh one when the stage is driven outside :meth:`run`)."""
+        job = getattr(ctx, "job", None)
+        return self._refusals.setdefault(str(getattr(job, "job_id", "")), RefusedHosts())
 
     # -- reads and the paywalled queue --------------------------------------------------------------
 

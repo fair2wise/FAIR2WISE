@@ -301,3 +301,30 @@ def test_the_401_detail_is_bounded_and_only_a_json_message_counts():
     with pytest.raises(JSONFetchError) as info:
         Sequence((500, b'{"message":"internal detail"}', {})).getter(hardened_get_json)("https://api.openalex.org/works")
     assert info.value.detail is None   # only a 401/403 body is read
+
+
+def test_a_proxy_refusal_page_and_a_refused_tunnel_are_marked_blocked_with_the_host():
+    import httpx
+
+    from app.modules.literature.legacy_download import JSONFetchError, hardened_get_bytes
+
+    def refuse_page(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403, headers={"x-squid-error": "ERR_ACCESS_DENIED 0"}, content=b"denied")
+
+    with pytest.raises(JSONFetchError) as page:
+        hardened_get_bytes("https://93.184.216.34/x", client=httpx.Client(transport=httpx.MockTransport(refuse_page)))
+    assert page.value.blocked == "proxy_refused" and page.value.status == 403 and page.value.host == "93.184.216.34"
+
+    def forbidden(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403, content=b"no")
+
+    with pytest.raises(JSONFetchError) as site:
+        hardened_get_bytes("https://93.184.216.34/x", client=httpx.Client(transport=httpx.MockTransport(forbidden)))
+    assert site.value.blocked is None   # the site's own 403 is not a proxy refusal
+
+    def tunnel(request: httpx.Request) -> httpx.Response:
+        raise httpx.ProxyError("tunnel refused")
+
+    with pytest.raises(JSONFetchError) as refused:
+        hardened_get_bytes("https://93.184.216.34/x", client=httpx.Client(transport=httpx.MockTransport(tunnel)))
+    assert refused.value.blocked == "proxy_refused" and "ProxyError" in str(refused.value)
