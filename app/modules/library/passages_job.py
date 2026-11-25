@@ -318,7 +318,7 @@ class LibraryPassages:
                 if key in seen:
                     continue
                 seen.add(key)
-                snippets.append({"text": passage.text, "source_paper": paper, "page": passage.page, "kind": "located",
+                snippets.append({"text": passage.text, "source_paper": paper, "page": passage.page, "kind": passage.kind,
                                  "verified": True})
                 hit += 1
             if hit:
@@ -326,13 +326,13 @@ class LibraryPassages:
                 newly += 1
         rel_total, rel_before, rel_newly, rel_added, rel_sentences_now = self._recover_relations(sc, terms, paper, pages)
         pub_fixed = self._correct_publication(terms, paper)
-        quoted_now = located_now = 0
-        for term in terms:
         aliases_added = self._recover_aliases(terms, pages)
         pages_without_text = sum(1 for text in pages if len(text.split()) < MIN_PAGE_WORDS)
+        quoted_now = located_now = 0
+        for term in terms:
             for s in term.get("context_snippets") or []:
                 if isinstance(s, dict) and s.get("source_paper") == paper:
-                    if s.get("kind") == "located":
+                    if s.get("kind") in ("located", P.KIND_TABLE_ROW):
                         located_now += 1
                     else:
                         quoted_now += 1

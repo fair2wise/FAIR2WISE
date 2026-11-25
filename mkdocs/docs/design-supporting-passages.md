@@ -285,6 +285,19 @@ clause window, not the full sentence.
 Started from the Extract page: a **Find supporting text** button on the existing-KG picker, with progress per paper, cancel
 and the coverage block at the end.
 
+## Aliases (other names a paper gives a term)
+
+No common-name map exists in the app (owner decision 2026-11-25: the `pleco -> Loricariidae` table was removed). A term's
+other names come from the text, by shape only: `term (X)` and `X (term)` (an abbreviation, a common name, a synonym in
+brackets), `term, also known as X`, `X, also called term`, `term (hereafter X)`; a bracketed year, a citation, a figure or
+table reference, a URL and a one- or two-letter token are never aliases (`passages.aliases_in_text`). The extractor's
+`register_term` also takes an optional `aliases` list from the model. Aliases are unioned per term (case-insensitive, never
+the term itself) at extraction and by **Find supporting text** over the whole paper (`aliases_added` per paper), the KG node
+carries `aliases` only when it has any (the frozen default output is unchanged), `kg_to_terms` keeps them, and retrieval
+resolves an alias like a name (exact canonical lookup and the lexical text). When a question still finds nothing, the chat
+asks the model once for up to five other names the subject may appear under (shown the KG's own most frequent words, not a
+word list) and asks the KG again before any paper is offered (`retrieval_retry` event, `alternatives_tried` on the verdict).
+
 ## Per-paper note for older KGs
 
 A KG extracted before supporting text was recorded would show nothing on its cards. For a registered bundle the node record
@@ -351,23 +364,27 @@ What this says:
 - Relation coverage follows: a relation needs one sentence (or two adjacent ones) naming both ends, and a row or a telegraphic
   clause rarely names two terms in a sentence the rules accept.
 
-Proposals (nothing is built):
+What was built (owner approval 2026-11-25, in this order):
 
-1. **A `table_row` evidence kind.** For a paper where the text of a page looks like a table (many numeric cells, coordinates,
-   repeated column pattern), a located passage may be the row, shown with its column header, with `kind: table_row` and
-   `verified: true`. The unit is the row, split on its line in the extracted text; the header is the nearest preceding line
-   with the table's column words, and the running page header is cut off. A relation between two entities of one row (species and
-   locality, species and 2n) is evidenced by that row. The card labels it **table row** (not a sentence). This is the honest
-   evidence for a karyotype review. Estimated effort: about 3 days with real-paper tests on this review.
-2. **Accept short factual clauses.** Allow a sentence of fewer than five words when it carries a number and a unit or an anatomical
-   count (`Total length 50 mm.`, `32-34 scutes ...`) and is not a name list. About half a day; it needs the pass over the six
-   measured papers to show nothing worse gets in.
-3. **Tolerate OCR when matching the model's sentence.** A quoted sentence whose words are at least 90% in order on one page is
-   accepted as `quoted` with the page's own text stored (not the model's), so OCR slips do not reject a true quote. About 1 day.
-4. **Scanned text.** A page with under 50 words is a plate or a scan: today it contributes nothing. Options are an OCR pass with
-   the Docling OCR already in the image for those pages (cost: seconds per page on CPU, a larger image only if its OCR models are
-   not already present, which was not checked) or leaving them out and saying so per paper, which the recovery already does for
-   a paper with no text at all. Recommendation: say so per page count for now, OCR later if scans matter.
+1. **Short factual clauses** (`passages.factual_clause`): a sentence of fewer than five words stands as a passage when it has
+   at least two words, a number followed by a unit-shaped token (`50 mm`, `2n`, `150 °C`) or a numeric range before a noun
+   (`32-34 scutes`), at most one comma, no dotted leader or dash run, and is not a citation or header. There is no list of
+   units or nouns, only the shape. `Total length 50 mm.` and `32-34 scutes in a longitudinal series.` are accepted;
+   `Plecostomus affinis Steind.` and `255 -- anomalus ....` are not. Such a passage is also exempt from the 120-character
+   minimum.
+2. **OCR-tolerant quote matching** (`passages.find_sentence_tolerant`): when the exact (squash) match of a model sentence
+   fails, the sentence's words of three letters or more must appear in order on one page, at least 90% of them, each within
+   three words of the previous; the stored passage is then the **page's own text** from the first matched word to the last,
+   kind `quoted`, verified. A sentence with fewer than six such words is never matched this way.
+3. **`table_row` evidence** (`passages.table_like_page`, `table_row_passage`): on a page where at least 30% of the lines with
+   three tokens or more are mostly numeric cells, a mention whose sentence the rules reject as a fragment, header or
+   unterminated line yields the physical line of the mention with the running page header cut off, prefixed by the nearest
+   preceding header line (three or more tokens, at most 10% numeric, after the nearest `Table n` line): `header | row`, kind
+   `table_row`, verified. A sentence still ranks above a row. The coverage counts a row as located; the card labels it
+   **table row**. Relation evidence over rows is not built (the relation rules are unchanged).
+4. **Pages with no text layer** are reported per paper by Find supporting text (`pages`, `pages_without_text` in the recovery
+   result and the per-paper table) and in the extraction log; a page with fewer than ten words counts. No OCR pass is run
+   (it would need the Docling OCR models in the image, which was not checked; decision deferred to the owner).
 
 Instrumentation added with this section (diagnostic, changes nothing stored): each rejected model sentence is classified as
 `near_match` (the words are on a page; paraphrase, OCR slip or reordering), `table_row`, `partial_overlap` (words from several

@@ -181,7 +181,8 @@ export function RecoveryResult({ recovery }: { recovery: RecoveryBlock }) {
               <th scope="col" className="pr-2 font-normal">Had text</th>
               <th scope="col" className="pr-2 font-normal">Added</th>
               <th scope="col" className="pr-2 font-normal">Still without</th>
-              <th scope="col" className="font-normal">Relation sentences added</th>
+              <th scope="col" className="pr-2 font-normal">Relation sentences added</th>
+              <th scope="col" className="font-normal">Pages without text</th>
             </tr>
           </thead>
           <tbody>
@@ -192,7 +193,8 @@ export function RecoveryResult({ recovery }: { recovery: RecoveryBlock }) {
                 <td className="pr-2">{n(result.with_passage_before)}</td>
                 <td className="pr-2">{n(result.located_added)}</td>
                 <td className="pr-2">{n(result.still_uncovered)}</td>
-                <td>{n(result.evidence_added)}</td>
+                <td className="pr-2">{n(result.evidence_added)}</td>
+                <td>{(result.pages_without_text ?? 0) > 0 ? `${n(result.pages_without_text)} of ${n(result.pages)}` : '0'}</td>
               </tr>
             ))}
           </tbody>

@@ -1,6 +1,6 @@
 """Thread-safe in-memory store of extracted terms and code snippets, persisted to JSON."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 import datetime
 import json
 import logging
@@ -404,9 +404,9 @@ class TermStore:
         with self._state_lock:
             row = self._run_row(paper)
             row["terms"].add(term_key)
-            if kind in ("quoted", "located"):
+            if kind in ("quoted", "located", "table_row"):
                 row["covered"].add(term_key)
-                row[kind] += 1
+                row["located" if kind == "table_row" else kind] += 1
             row["rejected"] += rejected
 
     def _run_row(self, paper: str) -> dict[str, Any]:

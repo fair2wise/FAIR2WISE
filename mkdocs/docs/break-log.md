@@ -15,3 +15,27 @@ run 45713088709). Model calls used so far: **0 of the 400 allowed**.
     is written and the bundle listing ignores it.
   - Decision taken: a relation whose object is not a term of the bundle is left as it was and counted `unknown_object`
     (it cannot be judged without the object's class).
+- **Tier 1 A, items 1 and 2 (in progress at this entry): aliases and the KG retry; paper-search order.** The hard-coded
+  `pleco -> Loricariidae` map is removed. Terms gain `aliases` (from the model's register_term call and from the text by shape:
+  `term (X)`, `X (term)`, `also known as`), at extraction and in Find supporting text; the KG node carries them and retrieval
+  resolves them like names. A question the KG cannot answer is retried once with up to five alternative terms the model
+  proposes (one model call per such turn, shown the KG's own words). The candidate search asks the registries the selected
+  KG's own papers came from first, else OpenAlex first (arXiv is no longer first by default).
+  - Decision taken: the retry runs for every graph source (JSON and live), once per turn, only after an insufficient first
+    verdict; a failed or non-JSON helper answer is ignored and the turn goes on as before.
+  - Decision taken: other domain word lists found and **left in place, listed for the owner**: `GENERAL_CATEGORY_ALIASES`
+    and `GENERAL_RELATION_ALIASES` in `app/modules/term_extractor/schema.py` (materials-science class and relation aliases
+    used to map a model's category onto the shipped MatKG schema; inert for a user schema without those classes, and part of
+    the frozen shipped-schema behaviour); the RSoXS/ops wording in the chat judge prompts (`prompts.py`, `retrieval_agent.py`:
+    NRSS, CyRSoXS, Nika, P-RSoXS, 11.0.1.2, YBCO) which belongs to the shipped RSoXS corpus and its frozen prompt hashes;
+    `_prefer_pdf_urls` host ranking in `download_agent.py` (repositories, not a domain). Removing any of these changes pinned
+    behaviour and is the owner's call.
+- **Tier 1 A, item 5 (in progress at this entry): passage coverage.** Built in the approved order: short factual clauses,
+  OCR-tolerant matching of quoted sentences (the page's own text is stored), the `table_row` evidence kind (row plus column
+  header, page header stripped, shown as **table row** on the card), and pages with no text layer per paper in the recovery
+  result and the extraction log.
+  - Decision taken: a table row counts as `located` in the coverage counts (no new counter, so the frozen counter shapes do
+    not move); the snippet itself carries `kind: table_row`.
+  - Decision taken: no OCR pass for scanned pages (it would need the Docling OCR models in the image and that was not checked);
+    the count is reported instead.
+  - Decision taken: relation evidence over table rows is not built; the relation rules are unchanged.

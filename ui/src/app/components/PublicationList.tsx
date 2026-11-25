@@ -86,7 +86,7 @@ export function paperSnippets(publication: PublicationInfo): Array<{ text: strin
     out.push({
       text: text.length > SNIPPET_MAX_CHARS ? `${text.slice(0, SNIPPET_MAX_CHARS - 1)}\u2026` : text,
       page: typeof item.page === 'number' && Number.isFinite(item.page) ? item.page : undefined,
-      kind: item.kind === 'located' ? 'located' : 'quoted',
+      kind: item.kind === 'located' || item.kind === 'table_row' ? item.kind : 'quoted',
     });
   }
   return out;
@@ -141,9 +141,11 @@ function PaperSnippets({ publication, disclosed }: { publication: PublicationInf
                   data-testid="passage-kind"
                   title={snippet.kind === 'located'
                     ? 'Found by searching the paper for this term.'
-                    : 'A sentence the extraction quoted, checked against the paper.'}
+                    : snippet.kind === 'table_row'
+                      ? 'A row of a table in the paper, shown with its column header.'
+                      : 'A sentence the extraction quoted, checked against the paper.'}
                 >
-                  [{snippet.kind}]
+                  [{snippet.kind === 'table_row' ? 'table row' : snippet.kind}]
                 </span>
               </li>
             ))}

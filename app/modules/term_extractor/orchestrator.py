@@ -602,6 +602,10 @@ class Orchestrator:
 
         logger.debug("Processing '%s' (%d pages) with %d workers", filename, total_pages, self.max_workers)
         page_texts = passages.page_texts_from_doc(doc)
+        blank = sum(1 for text in page_texts if len(text.split()) < 10)
+        if blank:
+            logger.warning("%s: %d of %d pages have no text layer (a plate or a scan); nothing can be found on them",
+                           filename, blank, len(page_texts))
         self._set_paper_pages(filename, page_texts)
         self._emit("paper_chunked", name=filename, pages=total_pages)
         pages_done = 0
@@ -722,6 +726,10 @@ class Orchestrator:
         pub_meta = self._publication_metadata(filename, pub_meta)
 
         page_texts = passages.page_texts_from_doc(doc)
+        blank = sum(1 for text in page_texts if len(text.split()) < 10)
+        if blank:
+            logger.warning("%s: %d of %d pages have no text layer (a plate or a scan); nothing can be found on them",
+                           filename, blank, len(page_texts))
         self._set_paper_pages(filename, page_texts)
         selected_pages = self.select_relevant_pages(
             page_texts,

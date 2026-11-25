@@ -475,6 +475,25 @@ def _fragment_like(text: str) -> bool:
     return len(words) < 5 or letters / max(1, len(text)) < 0.55 or len(_MATH.findall(text)) > 6
 
 
+#: A number followed by a unit-shaped token (``50 mm``, ``2n``, ``150 °C``, ``12 %``) or a numeric range before a noun
+#: (``32-34 scutes``): the shape of a measurement, with no list of units or nouns.
+_MEASURE = re.compile(r"\d[\d.,]*\s*(?:[A-Za-zµμ°%Å][A-Za-z%°]{0,3})(?![A-Za-z])|\d+\s*[-–]\s*\d+\s+[A-Za-z]{3,}")
+
+
+def factual_clause(text: str) -> bool:
+    """Whether a short sentence states a measurement or a count and may stand as a passage although it is short.
+
+    Owner decision 2026-11-25 (the 1904 monograph): ``Total length 50 mm.`` and ``32-34 scutes in a longitudinal series.``
+    are facts. The shape: at least two words of three letters, a number followed by a unit-shaped token or a numeric range
+    before a noun, no more than one comma (a name list is not a fact), at least 12 characters, not a citation or a header.
+    """
+    if len(text) < 12 or text.count(",") > 1 or len(re.findall(r"[A-Za-z]{3,}", text)) < 2:
+        return False
+    if not _MEASURE.search(text) or _citation_like(text) or _header_like(text):
+        return False
+    return not re.search(r"\.{3,}|\s--\s", text)   # a dotted leader or a dash run is a table-of-contents line
+
+
 def sentence_verdict(text: str) -> str | None:
     """Term-independent verdict on one sentence (display text); ``None`` when it may serve as a passage.
 
@@ -495,7 +514,7 @@ def sentence_verdict(text: str) -> str | None:
         return REASON_HEADER
     if _citation_like(text):
         return REASON_CITATION
-    if _fragment_like(text):
+    if _fragment_like(text) and not (factual_clause(text) and re.match(r"[A-Z(\[0-9]", text) and re.search(r"[.!?][\"')\]”’]*$", text)):
         return REASON_FRAGMENT
     if not re.match(r"[A-Z(\[0-9]", text):
         return REASON_MID_SENTENCE
@@ -746,10 +765,15 @@ def _passage_for(
 
     if page_no > refs[0] or (page_no == refs[0] and sentence.start >= refs[1]):
         return rejected(REASON_REFERENCES)
+    if sentence.reason is not None and table_like_page(pages[page_no]):
+        row = table_row_passage(pages[page_no], span.start)   # a fact that lives in a table: the row, with its header
+        if row is not None:
+            text, start, end = row
+            return Passage(text, start=start, end=end, kind=KIND_TABLE_ROW, **base)  # type: ignore[arg-type]
     if sentence.reason:
         return rejected(sentence.reason)
     text, start, end = sentence.text, sentence.start, sentence.end
-    if len(text) < MIN_CHARS:
+    if len(text) < MIN_CHARS and not factual_clause(text):
         sentences = index.sentences
         pos = sentences.index(sentence)
         nxt = sentences[pos + 1] if pos + 1 < len(sentences) else None
@@ -758,7 +782,7 @@ def _passage_for(
             and not (page_no == refs[0] and nxt.start >= refs[1])
         ):  # fmt: skip
             text, end = f"{text} {nxt.text}", nxt.end
-        if len(text) < MIN_CHARS:
+        if len(text) < MIN_CHARS and not factual_clause(sentence.text):
             return rejected(REASON_SHORT)
     windowed = False
     if len(text) > MAX_CHARS:
@@ -768,6 +792,56 @@ def _passage_for(
         start, end = sentence.offsets[w_start], sentence.offsets[w_end - 1] + 1
         text, windowed = text[w_start:w_end], True
     return Passage(text, start=start, end=end, clause_window=windowed, **base)  # type: ignore[arg-type]
+
+
+#: ``Passage.kind`` of a table row: the physical line of a table that holds the mention, with its column header.
+KIND_TABLE_ROW = "table_row"
+_NUMERIC_CELL = re.compile(r"\d|^[+±–%°/()-]+$")
+_TABLE_HEAD = re.compile(r"^\s*(?:TABLE|Table|Tab\.)\s*\d+", re.I)
+_PAGE_HEADER_IN_ROW = re.compile(r"^.*?\b(?:TABLE|Table)\s+\d+\s*\|?\s*(?:\(Continued\))?\s*", re.I)
+
+
+def _numeric_share(line: str) -> float:
+    tokens = line.split()
+    return sum(bool(_NUMERIC_CELL.search(t)) for t in tokens) / len(tokens) if tokens else 0.0
+
+
+@lru_cache(maxsize=4096)
+def table_like_page(page_text: str) -> bool:
+    """Whether a page reads as a table: at least 30% of its lines with three tokens or more are mostly numeric cells."""
+    lines = [ln for ln in page_text.splitlines() if len(ln.split()) >= 4]
+    if len(lines) < 8:
+        return False
+    rows = sum(_numeric_share(ln) >= 0.4 for ln in lines)
+    return rows >= 8 and rows / len(lines) >= 0.3
+
+
+def table_row_passage(page_text: str, mention: int) -> tuple[str, int, int] | None:
+    """The table row holding page offset ``mention`` with its column header: ``(text, start, end)``, or ``None``.
+
+    The row is the physical line of the mention, with the running page header cut off (anything up to and including
+    ``TABLE n |`` / ``(Continued)``); a row that is itself a header, boilerplate or URL line is not a passage. The header is
+    the nearest preceding line, within 60 lines and after the nearest ``Table n`` line, that has three or more tokens, at most
+    a third of them numeric (a column may be named ``2n``), and is neither a header nor a citation line. The result is
+    ``header | row``; a row with fewer than three tokens, or no header, is not a passage.
+    """
+    start = page_text.rfind("\n", 0, mention) + 1
+    end = page_text.find("\n", mention)
+    end = len(page_text) if end < 0 else end
+    row = _PAGE_HEADER_IN_ROW.sub("", page_text[start:end], count=1).strip() if "able" in page_text[start:end] else page_text[start:end].strip()
+    if len(row.split()) < 3 or _numeric_share(row) < 0.2 or _header_like(row) or _EMAIL_URL.search(row):
+        return None
+    before = page_text[:start].splitlines()
+    header = None
+    for line in reversed(before[-60:]):
+        text = line.strip()
+        if _TABLE_HEAD.match(text):
+            break
+        if len(text.split()) >= 3 and _numeric_share(text) <= 0.34 and not _header_like(text) and not _citation_like(text):
+            header = text
+    if header is None:
+        return None
+    return f"{header} | {row}", start, end
 
 
 def candidates(
@@ -804,8 +878,8 @@ _DEFINITION_WORDS = re.compile(r"\b(?:is|are|defined|refers?|called|known as|use
 
 
 def _rank_key(passage: Passage) -> tuple[int, int, int, int]:
-    """Ranking: 120-300 chars first, definition words, mention nearest the sentence start, earlier page."""
-    band = 0 if MIN_CHARS <= passage.length <= PREFERRED_MAX else 1
+    """Ranking: 120-300 chars first, definition words, mention nearest the sentence start, earlier page; a table row after a sentence."""
+    band = (0 if MIN_CHARS <= passage.length <= PREFERRED_MAX else 1) + (1 if passage.kind == KIND_TABLE_ROW else 0)
     return band, -len(_DEFINITION_WORDS.findall(passage.text)), passage.mention - passage.sentence_start, passage.page
 
 
@@ -864,80 +938,6 @@ class Grounding:
     rejected: bool
 
 
-#: Classes of a rejected sentence (see :func:`classify_rejection`).
-REJECT_NEAR_MATCH = "near_match"
-REJECT_TABLE = "table_row"
-REJECT_PARTIAL = "partial_overlap"
-REJECT_ABSENT = "not_in_paper"
-REJECT_CLASSES = (REJECT_NEAR_MATCH, REJECT_TABLE, REJECT_PARTIAL, REJECT_ABSENT)
-_WORD3 = re.compile(r"[a-z]{3,}")
-
-
-@lru_cache(maxsize=4096)
-def _page_words(page_text: str) -> frozenset[str]:
-    return frozenset(_WORD3.findall(page_text.lower()))
-
-
-def classify_rejection(sentence: str, pages: Sequence[str]) -> tuple[str, int | None]:
-    """Why a model sentence that was not found in the paper was not found: ``(class, 1-based page of best overlap)``.
-
-    Diagnostic only (it changes nothing that is stored). The share of the sentence's words (three letters or more) found on
-    its best page decides: a sentence made mostly of numbers and short cells with at least half of its words on a page is
-    ``table_row`` (a row of a table written out as a sentence); at least 85% is ``near_match`` (the words are there; a
-    paraphrase, an OCR or ligature difference or a reordering); at least 50% is ``partial_overlap`` (words from several lines);
-    anything less is ``not_in_paper`` (the model's own words or background knowledge).
-    """
-    words = _WORD3.findall(sentence.lower())
-    if not words:
-        return REJECT_ABSENT, None
-    best, best_page = 0.0, None
-    for number, text in enumerate(pages, 1):
-        known = _page_words(text)
-        share = sum(w in known or w + "s" in known or (w.endswith("s") and w[:-1] in known) for w in words) / len(words)
-        if share > best:
-            best, best_page = share, number
-    tokens = sentence.split()
-    numeric = sum(bool(re.fullmatch(r"[\d.,;:()/±+–-]+", t)) for t in tokens)
-    if best >= 0.5 and tokens and (numeric / len(tokens) >= 0.25 or sum(len(t) <= 3 for t in tokens) / len(tokens) >= 0.5):
-        return REJECT_TABLE, best_page
-    if best >= 0.85:
-        return REJECT_NEAR_MATCH, best_page
-    return (REJECT_PARTIAL if best >= 0.5 else REJECT_ABSENT), best_page
-
-
-def find_sentence(pages: Sequence[str], sentence: str, *, current: int | None = None) -> int | None:
-    """Return the 0-based index of the page that holds ``sentence``, or ``None``.
-
-    The match is the squash match, which includes the exact match after whitespace normalisation (case, hyphenation,
-    line breaks, dashes, ligatures, Greek letters and sub/superscripts are tolerated). The current page is tried
-    first, then the others in order.
-
-    Args:
-        pages: Page texts of the paper.
-        sentence: The model's sentence.
-        current: 0-based index of the page the sentence came from, if known.
-
-    Returns:
-        The page index, or ``None`` (also for a sentence too short to be specific).
-    """
-    wanted = squash(sentence)[0]
-    if len(wanted) < MIN_SENTENCE_KEY:
-        return None
-    order = list(range(len(pages)))
-    if current is not None and 0 <= current < len(pages):
-        order.remove(current)
-        order.insert(0, current)
-    for i in order:
-        if wanted in page_index(pages[i]).key:
-            return i
-    return None
-
-
-def ground_context(
-    *,
-    term: str,
-    sentence: str | None,
-    source_paper: str,
 # ---------------------------------------------------------------------------------------------------------------------
 # Aliases: the other names a paper gives a term, found by the shape of the text (no word list, no model)
 # ---------------------------------------------------------------------------------------------------------------------
@@ -1027,6 +1027,132 @@ def aliases_in_pages(term: str, pages: Sequence[str]) -> list[str]:
     return out
 
 
+#: Classes of a rejected sentence (see :func:`classify_rejection`).
+REJECT_NEAR_MATCH = "near_match"
+REJECT_TABLE = "table_row"
+REJECT_PARTIAL = "partial_overlap"
+REJECT_ABSENT = "not_in_paper"
+REJECT_CLASSES = (REJECT_NEAR_MATCH, REJECT_TABLE, REJECT_PARTIAL, REJECT_ABSENT)
+_WORD3 = re.compile(r"[a-z]{3,}")
+
+
+@lru_cache(maxsize=4096)
+def _page_words(page_text: str) -> frozenset[str]:
+    return frozenset(_WORD3.findall(page_text.lower()))
+
+
+def classify_rejection(sentence: str, pages: Sequence[str]) -> tuple[str, int | None]:
+    """Why a model sentence that was not found in the paper was not found: ``(class, 1-based page of best overlap)``.
+
+    Diagnostic only (it changes nothing that is stored). The share of the sentence's words (three letters or more) found on
+    its best page decides: a sentence made mostly of numbers and short cells with at least half of its words on a page is
+    ``table_row`` (a row of a table written out as a sentence); at least 85% is ``near_match`` (the words are there; a
+    paraphrase, an OCR or ligature difference or a reordering); at least 50% is ``partial_overlap`` (words from several lines);
+    anything less is ``not_in_paper`` (the model's own words or background knowledge).
+    """
+    words = _WORD3.findall(sentence.lower())
+    if not words:
+        return REJECT_ABSENT, None
+    best, best_page = 0.0, None
+    for number, text in enumerate(pages, 1):
+        known = _page_words(text)
+        share = sum(w in known or w + "s" in known or (w.endswith("s") and w[:-1] in known) for w in words) / len(words)
+        if share > best:
+            best, best_page = share, number
+    tokens = sentence.split()
+    numeric = sum(bool(re.fullmatch(r"[\d.,;:()/±+–-]+", t)) for t in tokens)
+    if best >= 0.5 and tokens and (numeric / len(tokens) >= 0.25 or sum(len(t) <= 3 for t in tokens) / len(tokens) >= 0.5):
+        return REJECT_TABLE, best_page
+    if best >= 0.85:
+        return REJECT_NEAR_MATCH, best_page
+    return (REJECT_PARTIAL if best >= 0.5 else REJECT_ABSENT), best_page
+
+
+def find_sentence(pages: Sequence[str], sentence: str, *, current: int | None = None) -> int | None:
+    """Return the 0-based index of the page that holds ``sentence``, or ``None``.
+
+    The match is the squash match, which includes the exact match after whitespace normalisation (case, hyphenation,
+    line breaks, dashes, ligatures, Greek letters and sub/superscripts are tolerated). The current page is tried
+    first, then the others in order.
+
+    Args:
+        pages: Page texts of the paper.
+        sentence: The model's sentence.
+        current: 0-based index of the page the sentence came from, if known.
+
+    Returns:
+        The page index, or ``None`` (also for a sentence too short to be specific).
+    """
+    wanted = squash(sentence)[0]
+    if len(wanted) < MIN_SENTENCE_KEY:
+        return None
+    order = list(range(len(pages)))
+    if current is not None and 0 <= current < len(pages):
+        order.remove(current)
+        order.insert(0, current)
+    for i in order:
+        if wanted in page_index(pages[i]).key:
+            return i
+    return None
+
+
+#: Share of a model sentence's words (three letters or more) that must appear in order on one page for a tolerant match.
+TOLERANT_MATCH_RATIO = 0.9
+_WORD_SPAN = re.compile(r"[A-Za-z]{3,}")
+
+
+def _ordered_overlap(wanted: list[str], page_words: list[tuple[str, int, int]]) -> tuple[int, int, int] | None:
+    """Longest in-order run of ``wanted`` found in ``page_words``: ``(matched, start offset, end offset)`` or ``None``.
+
+    Greedy left to right from each candidate start of the first word; a word may be skipped on either side (an OCR slip),
+    the match keeps the page order. Linear in the page per start, and a sentence has few distinct starts.
+    """
+    best: tuple[int, int, int] | None = None
+    firsts = [i for i, (word, _, _) in enumerate(page_words) if word == wanted[0]]
+    if not firsts:   # the first word may itself be the slip: start from the second
+        firsts = [i for i, (word, _, _) in enumerate(page_words) if len(wanted) > 1 and word == wanted[1]]
+    for start in firsts[:40]:
+        matched, i, last = 0, start, start
+        for word in wanted:
+            j = i
+            limit = min(len(page_words), i + 4)   # at most three stray page words between two sentence words
+            while j < limit and page_words[j][0] != word:
+                j += 1
+            if j < limit:
+                matched += 1
+                last, i = j, j + 1
+        if best is None or matched > best[0]:
+            best = (matched, page_words[start][1], page_words[last][2])
+    return best
+
+
+def find_sentence_tolerant(pages: Sequence[str], sentence: str, *, current: int | None = None) -> tuple[int, int, int] | None:
+    """A page that holds ``sentence`` up to OCR slips and small word changes: ``(page index, start, end)`` of the page's own text.
+
+    At least :data:`TOLERANT_MATCH_RATIO` of the sentence's words (three letters or more, case-folded) must appear in order
+    on one page, each within three words of the previous one. The returned span is the page's text from the first matched
+    word to the last, so what is stored is the paper's wording, not the model's. The current page is tried first.
+    """
+    wanted = [w.lower() for w in _WORD_SPAN.findall(sentence)]
+    if len(wanted) < 6:
+        return None
+    order = list(range(len(pages)))
+    if current is not None and 0 <= current < len(pages):
+        order.remove(current)
+        order.insert(0, current)
+    for i in order:
+        words = [(m.group(0).lower(), m.start(), m.end()) for m in _WORD_SPAN.finditer(pages[i])]
+        hit = _ordered_overlap(wanted, words)
+        if hit and hit[0] / len(wanted) >= TOLERANT_MATCH_RATIO:
+            return i, hit[1], hit[2]
+    return None
+
+
+def ground_context(
+    *,
+    term: str,
+    sentence: str | None,
+    source_paper: str,
     page: int | None,
     page_text: str | None,
     paper_pages: Sequence[str] | None,
@@ -1068,6 +1194,13 @@ def aliases_in_pages(term: str, pages: Sequence[str]) -> list[str]:
         found = find_sentence(pages, clean, current=current)
         if found is not None:
             return Grounding(ContextSnippet(clean, source_paper, number(found), kind="quoted", verified=True), False)
+        near = find_sentence_tolerant(pages, clean, current=current)
+        if near is not None:   # an OCR slip or a small change of wording: the page's own text is stored, not the model's
+            page_no, start, end = near
+            shown, _ = display_text(pages[page_no], start, end)
+            shown = re.sub(r"\s+", " ", shown).strip()
+            if MIN_SENTENCE_KEY <= len(shown) <= MAX_CHARS * 2:
+                return Grounding(ContextSnippet(shown, source_paper, number(page_no), kind="quoted", verified=True), False)
         rejected = True
     best: list[Passage] = []
     if current is not None:
@@ -1076,7 +1209,7 @@ def aliases_in_pages(term: str, pages: Sequence[str]) -> list[str]:
         best = best_passages(pages, term, limit=1)
     if best:
         top = best[0]
-        return Grounding(ContextSnippet(top.text, source_paper, number(top.page - 1), kind="located", verified=True),
+        return Grounding(ContextSnippet(top.text, source_paper, number(top.page - 1), kind=top.kind, verified=True),
                          rejected)
     return Grounding(None, rejected)
 

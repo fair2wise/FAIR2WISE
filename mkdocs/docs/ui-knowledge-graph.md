@@ -281,3 +281,5 @@ classes such as `ConjugatedPolymer`, `PhotovoltaicCell`, `OFET`, and
 For the server-side graph contract and validation rules, see
 [Agent API](agent-api.md). For component/state ownership, see
 [UI architecture](ui-architecture.md).
+
+A passage on a node card is marked **quoted** (a sentence the extraction quoted, checked against the paper), **located** (found by searching the paper for the term) or **table row** (a row of a table in the paper, shown with its column header: the honest evidence for a fact that lives in a table).

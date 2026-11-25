@@ -117,7 +117,8 @@ export interface PublicationInfo {
 }
 
 /** How a passage was found: `quoted` (the model's sentence, verified in the paper) or `located` (found by searching the paper). */
-export type PassageKind = 'quoted' | 'located';
+/** `table_row`: a row of a table in the paper, with its column header (a fact that lives in a table). */
+export type PassageKind = 'quoted' | 'located' | 'table_row';
 
 export interface PublicationSnippet {
   text: string;
