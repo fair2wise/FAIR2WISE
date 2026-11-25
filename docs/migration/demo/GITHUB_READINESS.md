@@ -260,3 +260,5 @@ Agent can prepare without pushing (not done here unless noted):
   primary checkout (decide track or ignore); `HANDOFF.md` is ignored but exists in history.
 - A local dry run of the guards that CI applies (`FROZEN_UI_TREE`, no `.env`, `tests/images tests/ci`) in a clean
   export, to shorten the first-run surprise list.
+
+Re-pin 2026-11-25: `FROZEN_UI_TREE` is `56362d01...` (dialogs centred with the translate property, coverage grid, schema name written at save). The Playwright, Tiled and Docling jobs only run when the head commit says `[ci full]`; the commit after a lint-only fix needs that marker again, and a docs-only commit with it completes the set when the Python and frontend jobs already passed on the same tree.
