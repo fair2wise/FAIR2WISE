@@ -2,8 +2,10 @@
 
 Status (2026-11-24): built on branch `passages`: the locator and quality rules, grounding at extraction time (b), per-run
 coverage counters and the manifest `passages` block (d), and the recovery job with its route, button, run-view coverage and
-the per-paper note (f). Not built: relationship evidence (the `has_evidence` section) and the deterministic 3-paper
-extraction suite test with thresholds (e; the real-path and counters tests cover grounding and coverage). The two fixes
+the per-paper note (f), and relationship evidence, located only (the relationship evidence section; owner decision
+2026-11-24: the extraction prompt is NOT changed). Not built: the deterministic 3-paper extraction suite test with
+thresholds (e; the real-path and counters tests cover grounding and coverage) and the optional second model pass for
+relations without evidence. The two fixes
 earlier on `forge_merge` (page context survives the tool threads, a missing page never discards a passage; the
 extracted-bundle KG build keeps the passages of a node that already existed) stay. Measurements come from the real RSoXS papers in `papers/` (334 PDFs,
 6,229 pages) and the shipped terms file; items not verified are marked.
@@ -108,23 +110,76 @@ re-extraction. Nothing is overwritten; the caps apply when a node is shown, not 
 relationships: evidence sentences are unioned by (paper, page, text) on the edge; the edge de-duplication by
 (subject, predicate, object) keeps the union of evidence, not the first edge's.
 
-## Relationship evidence (`has_evidence`)
+## Relationship evidence (located only)
 
-Never implemented: `register_term` has no per-relation evidence, the prompt does not ask for it, `validate_and_fix_term`
-rebuilds relations without it, and `TermStore.upsert` drops a new relation's evidence. Design:
+**Decision (owner, 2026-11-24): evidence is located, never asked of the model; the extraction prompt is not changed.** A
+prompt variant that asked the model for one evidence sentence per relation was measured and rejected.
 
-- Prompt and tool: each relation becomes `{relation, related_term, evidence}` where `evidence` is the sentence that
-  states the relation; the tool grounds it with the locator, requiring the subject mention and the object mention in
-  the sentence (or in two adjacent sentences of the same page). Not found: rejected and counted; a `located` fallback
-  looks for a sentence in the page containing both mentions.
-- Storage: `RelationRecord.evidence` becomes a list of `{text, source_paper, page, kind}`; `validate_and_fix_term` and
-  `upsert` keep and union it.
-- Edges: a new additive field `evidence: [{text, source_paper, page, kind}]`. `has_evidence` stays as today's
-  `"; "`-joined string of the texts for every reader that exists (`retrieval_agent`, `kg_rag_api`, `kg_update`,
-  `releases.py`, disclosure), and `kg_to_terms` reads the structured list first (its `"; "` split breaks a sentence that
-  contains `"; "`). `releases.py:970` expects a list of mappings; the structured field matches that shape.
-- Coverage for relations will stay well below that for terms (both ends must be found, and a relation inferred across
-  pages has no sentence). This is reported, not hidden.
+*The measurement* (one run, arm A the unchanged prompt run once, arm B the prompt with the extra bullet; free model
+`lbl/cborg-chat`, two papers of 10 and 17 pages, 55 model calls against a cap of 60): relations passed to `register_term`
+fell by 31% (612 to 421; 485 to 343 distinct), model requests rose by 27% (189 to 241); 89% of arm B's relations carried an
+evidence sentence that could be located on the page, but only 41% of the evidence named both endpoints, 32% repeated the
+term's own context sentence, and the ceiling (the two endpoints co-occurring in one sentence of any page) was about 58%.
+It costs relations and still mostly returns sentences that do not state the relation, so the prompt stays as it is.
+
+*What is built.* For each relation (subject, predicate, object) of a term the shared locator (`passages.locate`: squash
+rules, plural tail, short terms, `(ABBR)` where the paper defines it) searches the source paper's pages for every sentence
+that names **both** endpoints, or two adjacent sentences of one page that name one each (never when a sentence already
+names both), and the same quality rules as for term passages apply (references, headers by shape, captions, fragments,
+length; a sentence over 400 characters gives a clause window that must hold both mentions). A sentence that names only one
+endpoint is not evidence, and the term's own context sentence counts only when it names both. Ranking: one-sentence
+evidence before two-sentence windows, then 120-300 characters, definition words, mention nearest the sentence start, earlier
+page. Every such sentence is kept, unioned and de-duplicated by (paper, page, text), with **no cap** in storage (caps apply
+only when evidence is displayed). No model call.
+
+- **Where.** At extraction time, after a term's relations are validated (`ToolState.attach_relation_evidence`, and the JSON
+  fallback of the Orchestrator), using the paper's pages the tool already holds; and in the recovery job `library_passages`
+  for existing KGs (the hook `recover_relation_evidence` is now real), per paper, pages read once, a relation that already has
+  located evidence from the paper is left alone (idempotent), written atomically and resumable like the term part.
+- **Storage.** `RelationRecord.evidence` entries are strings (older files) or mappings `{text, source_paper, page, kind:
+  "located", verified: true}`. A string reads as `{text, kind: "unknown"}`: nothing is known about its paper, page or how it
+  was found. A relation without evidence keeps its exact old shape (no `evidence` key). The store unions the evidence of a
+  repeated relation instead of dropping it.
+- **Edges.** The KG edge gains `evidence` (the mappings) beside the unchanged `has_evidence`, which is the text of the best
+  (first) entry when there are mappings and the `"; "` join of the strings otherwise. A repeated edge keeps the union in the
+  bundle (opt-in merge) build. `kg_to_terms` reads `evidence` first and falls back to splitting `has_evidence`. The frozen
+  default build is byte-identical for inputs without evidence (`docs/migration/json_kg_contract.md` 2.6b).
+- **Display.** The single-node record carries `extra_fields.relationship_evidence` (per relationship `evidence_count`,
+  and the bounded sentences only with `F2W_DISCLOSE_SNIPPETS=1`, same caps and scrub as node passages). There is no edge
+  detail screen, so the node card shows the evidence under each relationship of its relationship list.
+- **Coverage.** Per paper and in total: `relations`, `relations_with_evidence`, `evidence_sentences`, `relations_without`
+  (counted once per relation and paper) in the run summary, the terms file metadata, the manifest `passages` block and the
+  recovery result; one info line per paper and a WARNING below 50% of the paper's relations.
+- Coverage for relations is well below that for terms (both ends must be found in one place, and a relation inferred across
+  pages has no sentence). It is reported, not hidden.
+
+*Real-data coverage* (no model call; `relcov.py` in the session scratchpad; the logic is the one the job runs):
+
+| Set | Relations | With a sentence naming both ends | Sentences stored | Time |
+|---|---|---|---|---|
+| The two measured papers (10 and 17 pages), relations of arm A, distinct per paper | 469 | 208 (44.3%) | 531 | 0.2 s per paper |
+| 10 papers of `papers/`, relations of the shipped `extracted_terms_rsoxs_v1.json` terms that cite them | 69,453 | 8,255 (11.9%) | 19,882 | 106 s in all, 10.6 s per paper (31 to 110 pages, 3,500 to 11,000 relations each) |
+
+The second set is a lower bound: the shipped terms carry the relations of every paper that mentioned the term, so most of a
+term's relations do not belong to the paper being searched (the object name is absent in 44,049 of the 61,198 without), and
+the first set is the honest one. Why the 261 relations of the first set have no sentence: object name not found 60 and
+subject name not found 42 (alias or paraphrase), neither found 18; both named on one page but never in one or two adjacent
+sentences 67, on different pages 12; two adjacent sentences over 400 characters 17; only in a figure caption 13, a sentence
+rejected for a missing final punctuation 15 or a header shape 8, the reference list 3, one table fragment, 3 sentences over
+400 characters with the endpoints too far apart. Examples (relation, why): `J61:m-ITIC bulk heterojunction` -> `J61`
+(subject written another way in the paper); `power conversion efficiency` -> `approached 10% in highly efficient OPV devices`
+(the object is a clause, never a name in the text); `selective excitation wavelength` -> `S1 excited state` (neither is
+named as such); `FRET` -> `organic solar cells` (only in the reference list); `electron-only device` -> `DIO` and
+`electron-only device` -> `disorder energy` (only in figure captions); `WAXS` -> `coherence length` and `aggregation` ->
+`PTB7:PC71BM blend` (same page, different sentences); `temperature-dependent mobility` -> `transistor configuration` (two
+adjacent sentences, 400 characters exceeded); `PTB7:PC71BM blend` -> `PTB7` and `DIO` -> `organic photovoltaics` (only in
+a sentence cut by a page break or a line without final punctuation). The `tomo_test` and `scattering_test` bundles exist on
+the pilot only and are to be measured there through the recovery job.
+
+*Optional second pass (not built).* If located coverage turns out too low, a separate model pass can ask for evidence only for
+the relations that have none, so it cannot reduce what the main extraction produces (the measured failure of the prompt
+change). It would reuse the same grounding: a returned sentence is kept only when the locator finds it in the paper and it
+names both endpoints.
 
 ## d. Coverage per run
 
@@ -133,7 +188,7 @@ per-paper unit result): `terms_total`, `terms_with_passage`, `relations_total`, 
 `passages_quoted`, `passages_located`, `passages_rejected_not_found`, and per paper the same four counts. Shown on the
 Extract page's run view (next to KG growth) and as one plain log line per paper plus a summary line. **Warning
 threshold (proposed):** a warning in the log and on the page when terms with a passage are below 90% of terms, or
-relations with evidence below 50% of relations, or any paper below 80% of its terms; the figures above justify 90% for
+relations with evidence below 50% of relations (built: a log warning per paper and a warning line on the run view), or any paper below 80% of its terms; the figures above justify 90% for
 terms (90.5% of names are findable, 84% of model calls carry a sentence, and the located fallback covers most of the
 rest), the relation figure is a first guess to revisit after the first real runs. The same counts are written into the
 bundle manifest (`passages` block) so a KG's coverage is visible later.
@@ -178,16 +233,19 @@ extraction:
 
 The result is the unit results of the job, shown by `GET /v1/jobs/{id}/progress` as `summary.recovery` (`total` and per-paper
 `{terms, with_passage_before, located_added, newly_covered, still_uncovered}` or `{reason, text}`), and as the coverage block
-of the Extract page. Relationship evidence does not exist yet, so only terms are processed:
-`passages_job.recover_relation_evidence` is the named hook for it and does nothing.
+of the Extract page. Relations are processed too (see the relationship evidence section): per paper the result adds
+`relations`, `relations_with_evidence_before`, `evidence_added`, `relations_newly_covered` and `relations_still_without`.
 
 **Cost, measured on this machine** (6 real papers of `papers/`, copied; 2,296 terms of the shipped RSoXS terms file that cite
-them, 2,497 term-paper pairs, 6 to 36 pages each): 8.5 s for the whole job (1.4 s per paper, PDF read, locate and rewrite of
-`terms.json` included); the second run, which adds nothing, 1.9 s. Located passages were attached for 1,912 of the 2,497
-term-paper pairs (76.6%; 1,910 with the earlier institution-word rule: 22 candidate sentences of these six papers, every one
-a complete sentence with a verb, such as "A new in-vacuum spectrometer has been installed on beamline X1A2 at the NSLS,
-Brookhaven National Laboratory.", were rejected as affiliations; only 2 term-paper pairs depended on them); the rest are terms whose name does not appear in the paper in a sentence that passes the quality
-rules (the earlier estimate of about 90% counted any mention, including headers, references and fragments).
+them, 2,497 term-paper pairs, 6 to 36 pages each). Terms only (before relation evidence): 8.5 s for the whole job (1.4 s per
+paper). With relation evidence, on the same data (the shipped terms carry tens of thousands of corpus-merged relations,
+so this is a worst case): 40.3 s, 6.7 s per paper, PDF read, locate and rewrite of `terms.json` included; the second run,
+which adds nothing, 29.4 s (the relations without a sentence are searched again; the terms are not). Located term passages:
+1,912 of the 2,497 term-paper pairs (76.6%; 1,910 with the earlier institution-word rule: 22 candidate sentences of these
+six papers, every one a complete sentence with a verb, such as "A new in-vacuum spectrometer has been installed on beamline
+X1A2 at the NSLS, Brookhaven National Laboratory.", were rejected as affiliations; only 2 term-paper pairs depended on
+them); the rest are terms whose name does not appear in the paper in a sentence that passes the quality rules (the earlier
+estimate of about 90% counted any mention, including headers, references and fragments).
 
 **Why the other 23% are not located** (the same six papers, 2,497 term-paper pairs, measured by running the locator and the
 quality rules on every mention; each pair is counted once under the cause closest to acceptance: length, then fragment,
@@ -221,7 +279,7 @@ indicative; the total of (a) is exact.
 **What it cannot recover:** terms the model rewrote (`electron-doped high-temperature superconductor`, LaTeX names, `1/C2-V
 Mott-Schottky plots`), scanned PDFs without a text layer (reported as such), papers no longer in the library or whose name is
 ambiguous (reported), terms whose only mentions are in headers, references or figure captions, and relations whose two
-ends never share a sentence (relations are not processed yet). A mention in a sentence over 400 characters is stored as a
+ends never share a sentence or two adjacent sentences (relations). A mention in a sentence over 400 characters is stored as a
 clause window, not the full sentence.
 
 Started from the Extract page: a **Find supporting text** button on the existing-KG picker, with progress per paper, cancel
@@ -233,7 +291,7 @@ A KG extracted before supporting text was recorded would show nothing on its car
 sets `passages_recorded: false` on each publication (an untyped key; the typed wire model is unchanged) that has no
 passages on the node and no entry in the manifest `passages` block, and the card says "No supporting text was recorded for
 this paper. Use Find supporting text on the Extract page to add it." It never says to extract again. The key is stripped
-before bookmarks and node edits.
+before bookmarks and node edits. Continuing a KG (`BundleStore.fork`) copies the parent's manifest `passages` entries into the child (an independent copy, which the child's own extractions sum onto, so a paper the parent covered has no note on the child); the parent's `recovery` block is not copied, because it describes a run of the parent. A plain KG file has no manifest, so continuing from one starts without a block.
 
 ## g. Privacy and limits
 
@@ -259,7 +317,7 @@ through (inference from reading, not a test).
 
 About 10 working days. (1) locator and quality rules as one module with the real-paper tests; (2) extraction-time
 grounding: verify the model's sentence, located fallback, rejected counts, remove the old fallback; (3) relationship
-evidence through prompt, tool, store, build and `kg_to_terms`; (4) coverage counters, log lines, warning threshold and
+evidence, located only, through tool, store, build, `kg_to_terms` and the recovery job (built); (4) coverage counters, log lines, warning threshold and
 the Extract page block; (5) the recovery job and its button (built); (6) the deterministic real-extraction suite test with the
 thresholds; (7) docs (statuses, coverage, recovery, known issues). Stop for review after this page.
 

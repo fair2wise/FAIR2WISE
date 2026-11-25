@@ -962,14 +962,25 @@ REASON_FAR = "endpoints_too_far"
 REASON_WINDOW = "window_too_long"
 
 
+@lru_cache(maxsize=65536)
+def _locate_cached(page_text: str, term: str, abbr_defined: bool | None) -> tuple[Span, ...]:
+    """:func:`locate` memoised per (page text, term, abbreviation flag): every relation of a term repeats these searches."""
+    return tuple(locate(page_text, term, abbr_defined=abbr_defined))
+
+
+@lru_cache(maxsize=16384)
+def _paper_abbr_defined(pages: tuple[str, ...], term: str) -> bool | None:
+    if term_forms(term)[1] is None:
+        return None
+    return True if any(s.form == "abbr" for page in pages for s in _locate_cached(page, term, None)) else None
+
+
 def paper_abbr_defined(pages: Sequence[str], term: str) -> bool | None:
     """``True`` when the paper itself defines the abbreviation of ``long form (ABBR)`` on some page, else ``None``.
 
     Passed to :func:`locate` for every page, so an abbreviation defined on page 2 is also found on page 6.
     """
-    if term_forms(term)[1] is None:
-        return None
-    return True if any(s.form == "abbr" for page in pages for s in locate(page, term)) else None
+    return _paper_abbr_defined(tuple(pages), term)
 
 
 def _hit_pairs(a_spans: list[Span], b_spans: list[Span]) -> tuple[int, int]:
@@ -1061,8 +1072,8 @@ def relation_candidates(pages: list[str], subject: str, obj: str, *, only_pages:
     for page_no, text in enumerate(pages):
         if only_pages is not None and page_no not in only_pages:
             continue
-        a_all = locate(text, subject, abbr_defined=a_abbr)
-        b_all = locate(text, obj, abbr_defined=b_abbr)
+        a_all = list(_locate_cached(text, subject, a_abbr))
+        b_all = list(_locate_cached(text, obj, b_abbr))
         if not a_all or not b_all:
             continue
         sentences = page_index(text).sentences
