@@ -6,7 +6,7 @@ Provides semantic/lexical retrieval over a JSON knowledge graph, LLM chat client
 """
 from __future__ import annotations
 
-from collections.abc import Mapping, Iterator
+from collections.abc import Iterator
 
 if __name__ == "__main__" and not __package__:
     # Checkout script launch (`python3 app/modules/kg_rag_api.py ...`, documented in
@@ -25,7 +25,7 @@ if __name__ == "__main__" and not __package__:
 import argparse
 import asyncio
 from collections import defaultdict, deque
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 import contextlib
 import contextvars
 from dataclasses import dataclass

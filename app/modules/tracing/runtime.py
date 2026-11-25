@@ -370,7 +370,7 @@ def record_span(name: str, attrs: Mapping[str, object], *, duration_ms: float, e
 LLM_LABELS = frozenset({
     "baseline", "KG-RAG", "KG-RAG-judge", "KG-RAG-leeway", "chat", "evidence-debate", "session-memory-compress",
     "legacy-route", "direct-response", "domain-knowledge-fallback", "rewrite-question", "general-answer",
-    "json-graph-leeway", "pending-download-intent", "pdf-validate", "paper-evidence", "vision.orientation",
+    "json-graph-leeway", "pending-download-intent", "kg-alternatives", "pdf-validate", "paper-evidence", "vision.orientation",
     "vision.classify", "orchestrator-classify", "supervisor-plan", "schema-generate", "other",
 })
 
