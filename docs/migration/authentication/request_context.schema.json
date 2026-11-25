@@ -328,7 +328,8 @@
         "library.read",
         "library.upload",
         "library.index",
-        "library.extract"
+        "library.extract",
+        "library.author_schema"
       ]
     }
   },

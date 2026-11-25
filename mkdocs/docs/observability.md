@@ -77,7 +77,7 @@ The label is one of a closed set in `app/modules/tracing/runtime.py` (`LLM_LABEL
 `KG-RAG-judge`, `KG-RAG-leeway`, `chat`, `evidence-debate`, `session-memory-compress`, `legacy-route`,
 `direct-response`, `domain-knowledge-fallback`, `rewrite-question`, `general-answer`, `json-graph-leeway`,
 `pending-download-intent`, `pdf-validate`, `paper-evidence`, `vision.orientation`, `vision.classify`,
-`orchestrator-classify`, `supervisor-plan`, and `other`. Any label outside the set is recorded as `other`, so the span
+`orchestrator-classify`, `supervisor-plan`, `schema-generate` (the schema generation call), and `other`. Any label outside the set is recorded as `other`, so the span
 name never holds user or model text and the number of distinct names stays bounded. A new call site adds its label
 to the set (a test scans the code for literal labels).
 

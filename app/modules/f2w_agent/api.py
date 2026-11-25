@@ -3218,11 +3218,11 @@ class AgentPipelineService:
                 continue
             gid = graph_id_for_path(rel)
             stem = Path(rel).stem
-            from ..library.bundles import resolve_registered_graph
+            from ..library.bundles import graph_source_label, resolve_registered_graph
 
             # An extracted KG (a registered bundle) is shown by its own name everywhere: not by the virtual file name
-            # ``matkg_<name>.json`` that no file of the release folder carries.
-            label = gid if resolve_registered_graph(rel) is not None else Path(rel).name
+            # ``matkg_<name>.json`` that no file of the release folder carries. A KG built on a user schema says so.
+            label = graph_source_label(rel) or (gid if resolve_registered_graph(rel) is not None else Path(rel).name)
             files.append(JsonFile(stem[len("matkg_"):] if stem.startswith("matkg_") else stem, gid, label, path))
         return files
 

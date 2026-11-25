@@ -24,11 +24,11 @@ logger = logging.getLogger(__name__)
 
 
 def _traced_chat(model: str, prompt: str, trace_label: str | None, timeout: int, call: Callable[[], str],
-                 provider: str | None = None) -> str:
-    """Run ``call`` and record the rendered prompt when a turn trace is active."""
+                 provider: str | None = None, system: str | None = None) -> str:
+    """Run ``call`` and record the rendered prompt (and the system message, when there is one) when a turn trace is active."""
     label = trace_label or "chat"
     started = time.perf_counter()
-    messages = [{"role": "user", "content": prompt}]
+    messages = [*([{"role": "system", "content": system}] if system else []), {"role": "user", "content": prompt}]
     try:
         result = call()
     except Exception as exc:
@@ -72,8 +72,15 @@ class ChatClient(ABC):
         temperature: float = 0.0,
         timeout: int = 240,
         trace_label: str | None = None,
+        system: str | None = None,
+        max_tokens: int | None = None,
+        num_ctx: int | None = None,
     ) -> str:
-        """Send ``prompt`` as one user message and return the reply text."""
+        """Send ``prompt`` as one user message and return the reply text.
+
+        ``system`` (an optional system message), ``max_tokens`` (reply cap) and ``num_ctx`` (Ollama context window; ignored
+        by CBORG) are optional and additive: left ``None`` the request is exactly what it was before they existed.
+        """
         ...
 
 
@@ -91,6 +98,9 @@ class OllamaChatClient(ChatClient):
         temperature: float = 0.0,
         timeout: int = 240,
         trace_label: str | None = None,
+        system: str | None = None,
+        max_tokens: int | None = None,
+        num_ctx: int | None = None,
     ) -> str:
         """Send ``prompt`` as a single user message and return the reply text.
 
@@ -99,6 +109,9 @@ class OllamaChatClient(ChatClient):
             temperature: Sampling temperature.
             timeout: HTTP timeout in seconds.
             trace_label: Label recorded for the LLM-call trace; defaults to "chat".
+            system: Optional system message sent before the user message.
+            max_tokens: Optional reply cap (Ollama ``num_predict``).
+            num_ctx: Optional context window (Ollama ``num_ctx``); the server default applies when ``None``.
 
         Raises:
             requests.HTTPError: If the server returns an error status.
@@ -106,11 +119,17 @@ class OllamaChatClient(ChatClient):
         logger.debug("OllamaClient.chat: model=%s prompt_len=%d", self.model, len(prompt))
 
         def call() -> str:
+            options: dict[str, Any] = {"temperature": temperature}
+            if max_tokens is not None:
+                options["num_predict"] = int(max_tokens)
+            if num_ctx is not None:
+                options["num_ctx"] = int(num_ctx)
             payload: dict[str, Any] = {
                 "model": self.model,
-                "messages": [{"role": "user", "content": prompt}],
+                "messages": [*([{"role": "system", "content": system}] if system else []),
+                             {"role": "user", "content": prompt}],
                 "stream": False,
-                "options": {"temperature": temperature},
+                "options": options,
             }
             response = requests.post(f"{self.base}/api/chat", json=payload, timeout=timeout)
             response.raise_for_status()
@@ -118,7 +137,7 @@ class OllamaChatClient(ChatClient):
             logger.debug("OllamaClient.chat: response_len=%d", len(result))
             return result
 
-        return _traced_chat(self.model, prompt, trace_label, timeout, call, provider="ollama")
+        return _traced_chat(self.model, prompt, trace_label, timeout, call, provider="ollama", system=system)
 
 
 class CBorgChatClient(ChatClient):
@@ -147,6 +166,9 @@ class CBorgChatClient(ChatClient):
         temperature: float = 0.0,
         timeout: int = 240,
         trace_label: str | None = None,
+        system: str | None = None,
+        max_tokens: int | None = None,
+        num_ctx: int | None = None,
     ) -> str:
         """Send ``prompt`` as a single user message and return the streamed reply text.
 
@@ -155,24 +177,31 @@ class CBorgChatClient(ChatClient):
             temperature: Sampling temperature.
             timeout: Request timeout in seconds.
             trace_label: Label recorded for the LLM-call trace; defaults to "chat".
+            system: Optional system message sent before the user message.
+            max_tokens: Optional reply cap.
+            num_ctx: Accepted for interface parity; CBORG has no such option and ignores it.
         """
         logger.debug("CBorgClient.chat: model=%s prompt_len=%d", self.model, len(prompt))
 
         def call() -> str:
             deadline = time.monotonic() + timeout * (LLM_MAX_RETRIES + 1)  # total bound: every retry included
+            extra: dict[str, Any] = {"max_tokens": int(max_tokens)} if max_tokens is not None else {}
+            messages: list[Any] = [*([{"role": "system", "content": system}] if system else []),
+                                   {"role": "user", "content": prompt}]
             with sync_slot():
                 resp = self.client.chat.completions.create(
                     model=self.model,
-                    messages=[{"role": "user", "content": prompt}],
+                    messages=messages,
                     temperature=temperature,
                     timeout=timeout,
                     stream=True,
+                    **extra,
                 )
             result = collect_stream_text(resp, deadline=deadline)
             logger.debug("CBorgClient.chat: response_len=%d", len(result))
             return result
 
-        return _traced_chat(self.model, prompt, trace_label, timeout, call, provider="cborg")
+        return _traced_chat(self.model, prompt, trace_label, timeout, call, provider="cborg", system=system)
 
 
 def make_chat_client(

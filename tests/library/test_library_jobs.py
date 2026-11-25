@@ -57,7 +57,7 @@ def _service(tmp_path: Path, settings: DeploymentSettings | None = None) -> JobS
 
 def test_capabilities_are_local_only() -> None:
     assert LOCAL_ONLY_CAPABILITIES == {"library.read", "library.upload", "library.index", "library.extract",
-                                        "library.harvest"}
+                                        "library.harvest", "library.author_schema"}
     # library_publish (2026-11-10) is submitted with graph.publish, the capability of the other publish rows
     assert {v for k, v in LIBRARY_KIND_CAPABILITIES.items() if k != "library_publish"} <= LOCAL_ONLY_CAPABILITIES
     assert LIBRARY_KIND_CAPABILITIES["library_publish"] == "graph.publish"

@@ -18,6 +18,7 @@ from ..ollama_catalog import OllamaListing, list_ollama_models
 from ..schema.registry import SchemaRegistry
 from .estimate import ModelPrice, PaperFacts, PaperLookup, estimate_extraction, verify_confirmation
 from .schemas import list_schemas, manifest_block, resolve_schema
+from .user_schemas import SCHEMAS_DIRNAME, UserSchemaStore
 
 _SOURCE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,200}\.json$")
 MAX_PAPER_IDS = 5000
@@ -33,6 +34,7 @@ class KgLibrary:
         papers: T35 paper lookup; ``None`` until T35 installs it (estimate then answers ``unavailable``).
         prices: Optional price table by model id.
         registry: Schema registry factory (default: discover ``storage/schema``).
+        user_schemas: Store of user-written schemas (default ``<workdir>/schemas``, the sibling of the bundle directory).
         ollama: Lists the models of the deployment's Ollama server (default :func:`list_ollama_models`; tests inject).
     """
 
@@ -40,8 +42,10 @@ class KgLibrary:
                  catalog: CachedModelCatalog | None = None, papers: PaperLookup | None = None,
                  prices: Mapping[str, ModelPrice] | None = None,
                  registry: Callable[[], SchemaRegistry] = SchemaRegistry.discover,
-                 ollama: Callable[[], OllamaListing] = list_ollama_models) -> None:
+                 ollama: Callable[[], OllamaListing] = list_ollama_models,
+                 user_schemas: UserSchemaStore | None = None) -> None:
         self.store = store
+        self.user_schemas = user_schemas or UserSchemaStore(store.root.parent / SCHEMAS_DIRNAME, bundles_root=store.root)
         self._release = release_dir
         self.catalog = catalog or CachedModelCatalog()
         self.papers = papers
@@ -65,9 +69,14 @@ class KgLibrary:
                              key=str.lower)
         return {"bundles": [b.summary() for b in self.store.list()], "sources": sources}
 
+    def resolve(self, schema: str) -> dict[str, Any]:
+        """The choice for ``schema``: an offered registry schema or a stored user schema (``INVALID_INPUT`` otherwise)."""
+        return resolve_schema(schema, self._registry(), self.user_schemas)
+
     def schemas(self) -> dict[str, Any]:
-        """``{schemas}`` from the schema registry (v0.3.x)."""
-        return {"schemas": [{k: v for k, v in s.items() if k != "path"} for s in list_schemas(self._registry())]}
+        """``{schemas}``: the registry's v0.3.x sets, then the user schemas (``origin: user``); no host paths."""
+        return {"schemas": [{k: v for k, v in s.items() if k != "path"}
+                            for s in list_schemas(self._registry(), self.user_schemas)]}
 
     def models(self, *, refresh: bool = False) -> dict[str, Any]:
         """The free models of the live list (model policy); ``available=false`` without a backend. Never writes settings.
@@ -101,19 +110,19 @@ class KgLibrary:
 
     def estimate(self, paper_ids: list[str], model: str, schema: str) -> dict[str, Any]:
         """Deterministic estimate and confirmation token (the schema must be an offered one)."""
-        resolve_schema(schema, self._registry())
+        self.resolve(schema)
         return estimate_extraction(self._facts(paper_ids), model, schema, self.prices)
 
     def check_confirmation(self, confirmation: str, paper_ids: list[str], model: str, schema: str) -> None:
         """For T39's start path: raise ``STALE_APPROVAL`` unless the token matches this exact selection."""
-        resolve_schema(schema, self._registry())
+        self.resolve(schema)
         verify_confirmation(confirmation, self._facts(paper_ids), model, schema, self.prices)
 
     # -------------------------------------------------------------- bundles
     def export(self, name: str) -> dict[str, Any]:
         """Export bundle ``name`` to the release directory as ``matkg_<name>.json``."""
         bundle = self.store.get(name)
-        choice = next((s for s in list_schemas(self._registry()) if s["name"] == bundle.schema), None)
+        choice = next((s for s in list_schemas(self._registry(), self.user_schemas) if s["name"] == bundle.schema), None)
         file_name = B.export_bundle(bundle, self.release_dir(),
                                     {"label": choice["label"]} if choice else None)
         size = (self.release_dir() / file_name).stat().st_size
@@ -161,7 +170,7 @@ class KgLibrary:
         if path.is_symlink() or not path.is_file():
             raise ContractError(ErrorCode.NOT_FOUND, "no such KG file")
         bundle, warnings = B.continue_from_kg(
-            self.store, path, name, schema=manifest_block(resolve_schema(schema, self._registry())), topic=topic,
+            self.store, path, name, schema=manifest_block(self.resolve(schema)), topic=topic,
             source_label=str(source))
         return {**bundle.summary(), "warnings": warnings[:50]}
 

@@ -31,6 +31,7 @@ from typing import TYPE_CHECKING, Any
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.json_types import JsonValue
+from .user_schemas import schema_origin
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -140,6 +141,7 @@ class Bundle:
             "name": self.name,
             "topic": m.get("topic"),
             "schema": str(m["schema"]["id"]),
+            **schema_origin(m["schema"]),
             "model": m.get("model"),
             "backend": m.get("backend"),
             "paper_count": len(m.get("papers") or []),
@@ -409,6 +411,7 @@ def export_bundle(bundle: Bundle, release_dir: Path, schema: Mapping[str, Any] |
     if schema:
         schema_block.update({k: v for k, v in schema.items() if k in ("id", "version", "sha256", "path", "label")})
     previous = kg.get("metadata")
+    schema_block.update(schema_origin(schema_block))  # a KG built on a user schema says so (origin, name, version)
     metadata = {**(previous if isinstance(previous, dict) else {}),
                 "schema": schema_block["id"], "schema_info": schema_block, "f2w_bundle": bundle.name,
                 "topic": bundle.manifest.get("topic"), "model": bundle.manifest.get("model"),
@@ -510,13 +513,33 @@ def schema_path_for_registered_graph(path: str, workdir: Path | str | None = Non
         bundle = BundleStore(root).get(name)
     except ContractError:  # an invalid name is no bundle
         return None
+    if schema_origin(bundle.manifest["schema"])["schema_origin"] == "user":
+        return None   # the path of a user schema is relative to the schema store, not to the repository
     value = bundle.manifest["schema"].get("path")
     return str(value) if value else None
+
+
+def graph_source_label(path: str, workdir: Path | str | None = None) -> str | None:
+    """The graph-source label of a registered bundle graph built on a user schema, else ``None``.
+
+    ``<name> (user schema <schema>, vN)``; shipped-schema bundles and every other path keep their file-name label.
+    """
+    name = _parse_virtual(path)
+    root = bundle_root(workdir)
+    if name is None or root is None:
+        return None
+    try:
+        info = schema_origin(BundleStore(root).get(name).manifest["schema"])
+    except ContractError:
+        return None
+    if info["schema_origin"] != "user":
+        return None
+    return f"{name} (user schema {info['schema_name']}, v{info['schema_version']})"
 
 
 __all__ = (
     "BUNDLES_DIRNAME", "BUNDLE_FILES", "Bundle", "BundleStore", "PaperRef", "RELEASE_DIR_ENV", "WORKDIR_ENV",
     "bundle_root", "continue_from_kg", "default_release_dir", "ensure_release_dir", "ensure_schema_locked", "export_bundle",
-    "export_file_name", "registered_graph_files", "registered_graph_paths", "resolve_registered_graph",
+    "export_file_name", "graph_source_label", "registered_graph_files", "registered_graph_paths", "resolve_registered_graph",
     "schema_path_for_registered_graph", "validate_name", "virtual_graph_path",
 )
