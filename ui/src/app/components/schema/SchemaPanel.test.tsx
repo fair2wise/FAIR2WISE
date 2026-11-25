@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import invalid from '../__fixtures__/schema_save_invalid.json';
 import reportInvalid from '../__fixtures__/schema_report_invalid.json';
-import { SchemaPanel, downloadName, suggestName } from './SchemaPanel';
+import { SchemaPanel, applySchemaName, downloadName, suggestName } from './SchemaPanel';
 import { MAX_SCHEMA_BYTES } from './schemaApi';
 import {
   defaultRoutes, diffFixture, generateFixture, previewEstimateFixture, previewResultFixture, reportOk, saveFixture, storedFixture,
@@ -105,6 +105,40 @@ describe('editing, validation and insert-core', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Insert required core' }));
     await waitFor(() => expect(textarea().value).toBe('with: core\n'));
     expect(post('/v1/library/schemas/insert-core')[0].body).toEqual({ text: 'a: 1\n' });
+  });
+});
+
+describe('the schema name', () => {
+  const draft = 'id: https://example.org/user/new_schema\nname: new_schema\ndescription: x\nclasses:\n  Thing:\n    name: kept\n';
+
+  it('is never suggested from a placeholder name', () => {
+    expect(suggestName(draft)).toBe('');
+    expect(suggestName('name: catfish\n')).toBe('catfish');
+  });
+
+  it('is written into the text: name, and id when it is the example.org placeholder; nothing else changes', () => {
+    expect(applySchemaName(draft, 'catfish')).toBe(
+      'id: https://example.org/user/catfish\nname: catfish\ndescription: x\nclasses:\n  Thing:\n    name: kept\n');
+    // The person's own id URL stays; a text without a name gets one first; a quoted name is replaced.
+    expect(applySchemaName('id: https://lab.example/s\nname: "old"\n', 'fish')).toBe('id: https://lab.example/s\nname: fish\n');
+    expect(applySchemaName('id: https://example.org/user/x\nclasses: {}\n', 'fish')).toBe('name: fish\nid: https://example.org/user/fish\nclasses: {}\n');
+    expect(applySchemaName('name: fish\n', 'fish')).toBe('name: fish\n');
+  });
+
+  it('saving under a different name rewrites the text first, so the saved name and the text agree', async () => {
+    routes['POST /v1/library/schemas'] = { status: 200, body: saveFixture };
+    mount();
+    fireEvent.change(textarea(), { target: { value: 'id: https://example.org/user/new_schema\nname: new_schema\n' } });
+    await screen.findByText('No problems found.', undefined, { timeout: 3000 });
+    expect(screen.getByLabelText('Schema name')).toHaveValue('');
+    expect(screen.getByTestId('schema-name-needed')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Accept and save' })).toBeDisabled();
+    await userEvent.type(screen.getByLabelText('Schema name'), 'catfish');
+    await userEvent.click(screen.getByRole('button', { name: 'Accept and save' }));
+    await waitFor(() => expect(post('/v1/library/schemas')).toHaveLength(1));
+    expect(post('/v1/library/schemas')[0].body).toEqual({ name: 'catfish', text: 'id: https://example.org/user/catfish\nname: catfish\n' });
+    await waitFor(() => expect(textarea().value).toBe('id: https://example.org/user/catfish\nname: catfish\n'));
+    expect(screen.getByTestId('schema-notice')).toHaveTextContent('the text now says name: catfish');
   });
 });
 

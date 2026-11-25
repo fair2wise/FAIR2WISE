@@ -30,10 +30,32 @@ export interface SchemaPanelProps {
   onSaved?: (id: string) => void;
 }
 
-/** The `name:` of the schema text when it is a valid schema name (used to suggest the save name). */
+/** Names the starting text and a model's copy of it use as a placeholder: never suggested as the save name. */
+const PLACEHOLDER_NAMES = new Set(['new_schema']);
+
+/** The `name:` of the schema text when it is a valid schema name and not a placeholder (used to suggest the save name). */
 export function suggestName(text: string): string {
   const match = /^name:\s*["']?([a-z][a-z0-9_-]{0,63})["']?\s*$/m.exec(text);
-  return match ? match[1] : '';
+  return match && !PLACEHOLDER_NAMES.has(match[1]) ? match[1] : '';
+}
+
+/**
+ * The text with its top-level `name:` set to `name` and, when `id:` is an `https://example.org/user/...` placeholder URL,
+ * `id:` set to `https://example.org/user/<name>`. Only column-0 keys change; any other id (the person's own URL) and every
+ * other line stay as they are. A text without a `name:` gets one as its first line. Written at save so the text's own name
+ * and the name it is saved under cannot disagree.
+ */
+export function applySchemaName(text: string, name: string): string {
+  const lines = text.split('\n');
+  const nameAt = lines.findIndex(line => /^name:/.test(line));
+  const idAt = lines.findIndex(line => /^id:/.test(line));
+  if (nameAt >= 0) lines[nameAt] = `name: ${name}`;
+  else lines.unshift(`name: ${name}`);
+  const at = idAt >= 0 && nameAt < 0 ? idAt + 1 : idAt;
+  if (at >= 0 && /^id:\s*["']?https:\/\/example\.org\/user\/[^\s"']*["']?\s*$/.test(lines[at])) {
+    lines[at] = `id: https://example.org/user/${name}`;
+  }
+  return lines.join('\n');
 }
 
 /** File name of a download: `<name>@vN.yaml` for a stored version, `<name>@draft.yaml` for text not yet saved. */
@@ -129,9 +151,11 @@ export function SchemaPanel({ modelValue, onSaved }: SchemaPanelProps) {
     setSaveProblems([]);
     setNotice(null);
     try {
-      const saved = await save.mutateAsync({ name, text });
+      const named = applySchemaName(text, name);
+      if (named !== text) setText(named);
+      const saved = await save.mutateAsync({ name, text: named });
       setLoadedId(saved.id);
-      setNotice(`Saved as ${saved.id}. It is now in the schema chooser as a user schema; a KG can be created on it.`);
+      setNotice(`Saved as ${saved.id}${named !== text ? `; the text now says name: ${name}` : ''}. It is now in the schema chooser as a user schema; a KG can be created on it.`);
       onSaved?.(saved.id);
     } catch (failure) {
       setError(schemaErrorText(failure, 'save'));
@@ -220,9 +244,11 @@ export function SchemaPanel({ modelValue, onSaved }: SchemaPanelProps) {
           <Label htmlFor="schema-name">Schema name</Label>
           <Input id="schema-name" value={name} maxLength={64} aria-invalid={name !== '' && !nameValid} aria-describedby="schema-name-help" onChange={event => setName(event.target.value)} />
           <p id="schema-name-help" className={name !== '' && !nameValid ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'}>
-            A lowercase letter first, then lowercase letters, digits, "_" or "-"; up to 64 characters. The text's own top-level
-            name must be the same. Each save is a new immutable version (v1, v2, ...); a KG keeps the version it started with.
+            A lowercase letter first, then lowercase letters, digits, "_" or "-"; up to 64 characters. Saving writes this name
+            into the text (<code>name:</code>, and <code>id:</code> when it is the example.org placeholder). Each save is a
+            new immutable version (v1, v2, ...); a KG keeps the version it started with.
           </p>
+          {name === '' && text.trim() !== '' && <p className="text-xs font-medium" data-testid="schema-name-needed">Give the schema a name to save it.</p>}
         </div>
         <Button type="button" size="sm" disabled={!canSave} onClick={() => void onSave()} className="disabled:cursor-not-allowed disabled:opacity-50">
           {save.isPending ? <Loader2 aria-hidden="true" className="animate-spin" /> : <Save aria-hidden="true" />}
