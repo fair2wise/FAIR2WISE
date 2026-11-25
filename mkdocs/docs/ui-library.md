@@ -56,6 +56,7 @@ In the pilot pod: `kubectl -n <namespace> exec deploy/<f2w-deployment> -- f2w-li
 | `POST /v1/library/papers?folder=<category>` | upload one PDF (multipart `file`) |
 | `POST /v1/library/papers/{id}/verify` | verify one paper |
 | `POST /v1/jobs` kind `library_verify`, `library_index`, `library_harvest` | background jobs (`inputs.params`, with a `nonce` to re-run) |
+| `POST /v1/library/kgs/{name}/passages` (V99) | Extract page, Existing KG picker, **Find supporting text**: starts the `library_passages` job (finds supporting text for a KG's terms from its source papers; no model), answers a job handle; progress and cancel on the ordinary job routes |
 | `GET /v1/library/harvest/runs`, `.../runs/{id}/candidates` | Harvester results |
 | `POST /v1/library/harvest/candidates/{id}/pdf` (`?confirm=true`, `?to=<candidate id>`), `.../undo`, `.../dismiss` | offer a PDF for a paper that needs one by hand (paywalled, blocked or failed), undo a filing, dismiss it |
 | `POST /v1/library/harvest/runs/{run_id}/pdf` | the multi-file drop: match one PDF to an open paper of the run (one file per request) |

@@ -1,8 +1,11 @@
 # Design: supporting passages for every term and relationship
 
-Status: proposal for owner review (2026-11-24). Nothing below is built except the two fixes already on `forge_merge`
-(page context survives the tool threads, a missing page never discards a passage; the extracted-bundle KG build keeps
-the passages of a node that already existed). Measurements come from the real RSoXS papers in `papers/` (334 PDFs,
+Status (2026-11-24): built on branch `passages`: the locator and quality rules, grounding at extraction time (b), per-run
+coverage counters and the manifest `passages` block (d), and the recovery job with its route, button, run-view coverage and
+the per-paper note (f). Not built: relationship evidence (the `has_evidence` section) and the deterministic 3-paper
+extraction suite test with thresholds (e; the real-path and counters tests cover grounding and coverage). The two fixes
+earlier on `forge_merge` (page context survives the tool threads, a missing page never discards a passage; the
+extracted-bundle KG build keeps the passages of a node that already existed) stay. Measurements come from the real RSoXS papers in `papers/` (334 PDFs,
 6,229 pages) and the shipped terms file; items not verified are marked.
 
 ## Where we are
@@ -146,20 +149,58 @@ bundle manifest (`passages` block) so a KG's coverage is visible later.
 
 ## f. Recovery for existing KGs (no model calls)
 
-A worker job `library_passages` (capability `library.extract`, `:local`): for one bundle, under the bundle lock, for
-each term and relationship without evidence, read every page of each of the term's source papers from the library (by
-file name, tie broken by the manifest sha256; an ambiguous name is reported, never guessed), run the locator and the
-quality rules, attach the best passages as `located`, then rewrite `terms.json` and rebuild `kg.json` atomically.
-Started from the Extract page: a **Find supporting text** button on the existing-KG picker, with progress per paper and
-the coverage block at the end; resumable and cancellable like an extraction.
+**Built.** A worker job `library_passages` (capability `library.extract`, `:local` only; module
+`app/modules/library/passages_job.py`, route `POST /v1/library/kgs/{name}/passages`, policy V99). For one bundle, under the
+bundle lock (the extraction lock: a running extraction or a second recovery of the bundle refuses the start with a typed
+error), one unit of work per source paper cited by the bundle's terms, so progress, cancel and resume work as for an
+extraction:
 
-What it recovers: on the shipped data about 90% of terms (name findable in own papers, 91.9% with variants). What it
-cannot: terms the model rewrote (`electron-doped high-temperature superconductor`, LaTeX names, `1/C2-V Mott-Schottky
-plots`), scanned PDFs without a text layer (reported as such), terms whose mention is only in headers or references,
-and relations whose two ends never share a sentence. Cost on this machine for a 2,000-term bundle of 40 papers x 15
-pages: about 17 s text extraction, 8 s normalising, about 10 s locating and ranking: under a minute. Pages are empty on
-`tomo_test` and `scattering_test`, so every page of each source paper is searched (one pass with a pre-built
-multi-pattern index per page set; never all pages of all papers per term).
+1. The paper is found in the library by file name. A name two files share is settled by the manifest's sha256 of the
+   extracted bytes; if that does not settle it the paper is reported `ambiguous_name` and skipped, never guessed. A name
+   not in the library is `missing`, a PDF with fewer than 20 words of text `no_text_layer`, one that cannot be opened
+   `unreadable`; each is reported per paper.
+2. Every page is read once (`passages.page_texts`, the extractor's reader) and the locator and quality rules run over the pages
+   for all of the paper's terms (`passages.best_passages`; never all pages of all papers per term). A term that has no passage
+   from this paper gets up to 2 passages, appended as `kind: located`, `verified: true`. Existing passages are never changed
+   or reordered; the union key is (paper, page, text). A term that has passages from another paper but none from this one is
+   searched too, because the per-paper note and the manifest coverage are per paper.
+3. `terms.json` is rewritten after each paper and `kg.json` is rebuilt once at the end (also after a cancel), both through a
+   temporary file next to the target and an atomic rename, so a failure leaves the old files; a rebuild that fails leaves
+   the old KG and the next run only has to rebuild. Terms written before a kill are kept; a resumed job skips the papers
+   that were finished.
+4. The manifest gains a `passages[<file name>]` entry per processed paper (absolute counts when the KG had no entry, otherwise
+   `located` and `with_passage` added and `uncovered` lowered) and a `recovery` block (last run, counts). That entry is what
+   removes the per-paper "no supporting text was recorded" note on the node card; a paper skipped for a reason has no entry
+   and keeps the note.
+5. Idempotent: a second run adds nothing and says so (no file is rewritten when nothing was added).
+
+The result is the unit results of the job, shown by `GET /v1/jobs/{id}/progress` as `summary.recovery` (`total` and per-paper
+`{terms, with_passage_before, located_added, newly_covered, still_uncovered}` or `{reason, text}`), and as the coverage block
+of the Extract page. Relationship evidence does not exist yet, so only terms are processed:
+`passages_job.recover_relation_evidence` is the named hook for it and does nothing.
+
+**Cost, measured on this machine** (6 real papers of `papers/`, copied; 2,296 terms of the shipped RSoXS terms file that cite
+them, 2,497 term-paper pairs, 6 to 36 pages each): 8.5 s for the whole job (1.4 s per paper, PDF read, locate and rewrite of
+`terms.json` included); the second run, which adds nothing, 1.9 s. Located passages were attached for 1,910 of the 2,497
+term-paper pairs (76%); the rest are terms whose name does not appear in the paper in a sentence that passes the quality
+rules (the earlier estimate of about 90% counted any mention, including headers, references and fragments).
+
+**What it cannot recover:** terms the model rewrote (`electron-doped high-temperature superconductor`, LaTeX names, `1/C2-V
+Mott-Schottky plots`), scanned PDFs without a text layer (reported as such), papers no longer in the library or whose name is
+ambiguous (reported), terms whose only mentions are in headers, references or figure captions, and relations whose two
+ends never share a sentence (relations are not processed yet). A mention in a sentence over 400 characters is stored as a
+clause window, not the full sentence.
+
+Started from the Extract page: a **Find supporting text** button on the existing-KG picker, with progress per paper, cancel
+and the coverage block at the end.
+
+## Per-paper note for older KGs
+
+A KG extracted before supporting text was recorded would show nothing on its cards. For a registered bundle the node record
+sets `passages_recorded: false` on each publication (an untyped key; the typed wire model is unchanged) that has no
+passages on the node and no entry in the manifest `passages` block, and the card says "No supporting text was recorded for
+this paper. Use Find supporting text on the Extract page to add it." It never says to extract again. The key is stripped
+before bookmarks and node edits.
 
 ## g. Privacy and limits
 
@@ -186,7 +227,7 @@ through (inference from reading, not a test).
 About 10 working days. (1) locator and quality rules as one module with the real-paper tests; (2) extraction-time
 grounding: verify the model's sentence, located fallback, rejected counts, remove the old fallback; (3) relationship
 evidence through prompt, tool, store, build and `kg_to_terms`; (4) coverage counters, log lines, warning threshold and
-the Extract page block; (5) the recovery job and its button; (6) the deterministic real-extraction suite test with the
+the Extract page block; (5) the recovery job and its button (built); (6) the deterministic real-extraction suite test with the
 thresholds; (7) docs (statuses, coverage, recovery, known issues). Stop for review after this page.
 
 ## Not verified

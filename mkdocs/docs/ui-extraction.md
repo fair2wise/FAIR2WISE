@@ -39,6 +39,12 @@ An extraction creates a KG under its name (for example `tomo_test`). You do **no
 
 **Export** is a different step. It does **not** download anything to your computer: after it succeeds the page says which file it wrote (`matkg_<name>.json`, with its size), that the file is stored on the server in the release folder for Publish to Tiled and Continue existing KG, and offers a **Download** link that streams that file to your browser (`GET /v1/library/kgs/<name>/download`, 404 until the KG has been exported). It writes a plain file, `matkg_<name>.json`, into the release folder (`F2W_KG_RELEASE_DIR`, by default `kg_releases` inside the state folder). You need that file when you want the KG as a file you can copy out, keep or hand to someone, when you want to continue from it as a plain KG file in another KG, or when you adopt it as a frozen release by hand. **Publish to Tiled** exports for you as its first step. A file in the release folder is *not* added to chat, the viewer or Operations by itself; only the KG itself is.
 
+## Supporting passages, and Find supporting text
+
+The sentences an extraction found a term in are shown on a node card when `F2W_DISCLOSE_SNIPPETS` is on. They are checked against the paper: a sentence the model quotes is kept only when it is found in the paper's text (and then stored with the page where it was found), otherwise the term's mention is searched for in the paper and the sentence around it is kept. The card marks each passage **quoted** (the model's sentence, found in the paper) or **located** (found by searching the paper). A term with no findable mention has no passage and is counted as such. The run view of an extraction shows the coverage: terms with supporting text, quoted, located, sentences rejected and terms without, per paper and in total, with a warning line for a paper under 90%. The counts are visible without `F2W_DISCLOSE_SNIPPETS`; the text is not.
+
+**Find supporting text** sits on the **Existing KG** picker (Continue existing KG) beside Export and Publish to Tiled. It searches the KG's source papers, in the library, for the sentences that mention each term; no model is used and existing text is kept. It shows the papers searched of the total with the paper in progress, can be cancelled (the papers done keep what was found) and ends with the coverage block: how many terms got text and how many passages, how many terms still have none, a line per paper, and the papers that could not be searched with the reason in plain words (two library files with the same name and no way to tell which was used; not in the library; a scan with no text layer; unreadable). Running it again adds nothing. On a KG extracted before supporting text was recorded, each paper with no passages and no coverage says on the card "No supporting text was recorded for this paper. Use Find supporting text on the Extract page to add it."; the note goes away for a paper once it has been searched. Design and measurements: `design-supporting-passages.md`.
+
 ## Known issues
 
 - **Supporting passages were dropped for nearly every term between 2026-09-15 and 2026-11-24.** The LangGraph tool-based
@@ -52,8 +58,9 @@ An extraction creates a KG under its name (for example `tomo_test`). You do **no
   pages, properties and publications into an existing node (the legacy json2kg CLI and the snapshot path keep their
   frozen T23A behaviour; `docs/migration/json_kg_contract.md` 2.6a). Still open, design pending owner review: relationship evidence
   (`has_evidence` was never populated by the extractor), passage quality rules (a fallback used to take the first 500
-  characters of a page, which can be a title/affiliation block), a recovery job for existing KGs without passages
-  (`tomo_test`, `scattering_test`), and per-run coverage reporting.
+  characters of a page, which can be a title/affiliation block). Built on branch `passages` since: the quality rules and the
+  locator, grounding at extraction time, per-run coverage, and the recovery job (Find supporting text) for existing KGs such
+  as `tomo_test` and `scattering_test`. Still open: relationship evidence.
 - **`storage/kg/matkg_rsoxs_v1.json` was built from an older, smaller terms snapshot** than the shipped
   `storage/terminology/extracted_terms_rsoxs_v1.json`: 18,490 of the terms file's 24,328 distinct ids are not in the KG
   and the current builder has no filter that would remove them (it is a snapshot-age difference, not a rule). The file
