@@ -256,7 +256,7 @@ export async function probeUserSchemas(fetcher: typeof fetch = fetch): Promise<U
 /** V93: one stored version with its text. */
 export function fetchStoredSchema(id: string, fetcher: typeof fetch = fetch): Promise<StoredSchema> {
   const ref = id.startsWith('user/') ? id.slice('user/'.length) : id;
-  return v1Json<StoredSchema>(v1Url(`${SCHEMAS_PATH}/user/${encodeURIComponent(ref)}`), {}, fetcher);
+  return v1Json<StoredSchema>(v1Url(`${SCHEMAS_PATH}/user/${encodeURIComponent(ref).replace(/%40/g, '@')}`), {}, fetcher);
 }
 
 /** V94: unified diff between two versions of `name`. */
@@ -267,7 +267,7 @@ export function fetchSchemaDiff(name: string, from: number, to: number, fetcher:
 /** V98: delete one version (409 `schema_in_use` while a KG uses it). */
 export async function deleteSchemaVersion(id: string, fetcher: typeof fetch = fetch): Promise<void> {
   const ref = id.startsWith('user/') ? id.slice('user/'.length) : id;
-  await v1Fetch(v1Url(`${SCHEMAS_PATH}/user/${encodeURIComponent(ref)}`), { method: 'DELETE' }, fetcher);
+  await v1Fetch(v1Url(`${SCHEMAS_PATH}/user/${encodeURIComponent(ref).replace(/%40/g, '@')}`), { method: 'DELETE' }, fetcher);
 }
 
 /** Body of V96. */

@@ -188,7 +188,7 @@ export function SchemaPanel({ modelValue, onSaved }: SchemaPanelProps) {
 
       <SchemaGenerateBox
         selection={selection}
-        onDraft={out => load(out.text, null)}
+        onDraft={draft => load(draft, null)}
         onPickAttempt={attempt => load(attempt, null)}
       />
 
