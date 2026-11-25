@@ -21,8 +21,8 @@ from ..modules.contracts.jobs import JobState
 from ..modules.library.jobs import LIBRARY_PASSAGES_KIND, LIBRARY_RELATIONS_KIND
 from ..modules.library.kg_service import MAX_PAPER_IDS, KgLibrary
 from ..modules.library.passages_job import LibraryPassages
-from ..modules.library.relations_job import LibraryRelations
 from ..modules.library.publish import LibraryPublisher
+from ..modules.library.relations_job import LibraryRelations
 from ..modules.security.authorization import require
 from .routes_common import Prefixed, context, dump, fresh_context, operations, project, project_dict
 

@@ -114,7 +114,7 @@ def repair_terms(doc: Mapping[str, Any], helper: SchemaHelper) -> tuple[dict[str
             moves.append((owner, {**original, "related_term": str(term.get("term") or ""), "verified": True}))
         for subject_cls, pred, object_cls in [*judged.invalid, *marked]:
             note("invalid", pred, subject_cls, object_cls)
-        kept = work["relations"]
+        kept: list[dict[str, Any]] = [r for r in work["relations"] if isinstance(r, dict)]
         for rel in kept:
             if rel.get("verified") and not category_of(str(rel["related_term"])):
                 note("unknown_object", str(rel["relation"]), subject_class, "")
