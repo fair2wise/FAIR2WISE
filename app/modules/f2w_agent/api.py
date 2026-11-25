@@ -1217,6 +1217,7 @@ def _attach_evidence_snippets(publications: list[dict[str, Any]], raw: dict[str,
         page = snippet.get("page")
         if isinstance(page, int) and not isinstance(page, bool) and page >= 0:
             entry["page"] = page
+        entry["kind"] = "located" if snippet.get("kind") == "located" else "quoted"
         current.append(entry)
         kept += 1
     return publications
@@ -7517,6 +7518,14 @@ def create_app(
                                     graph_data=graph.data if detail else None, include_evidence=detail)
         node.graph_id = node.graph_id or graph.graph_id
         node.graph_label = node.graph_label or graph.graph_label
+        if detail and graph.passage_papers is not None:
+            # A paper of an extracted KG with no passages and no coverage entry in the bundle manifest was extracted
+            # before supporting text was recorded: say so on that paper (the card reads it). A key of the untyped
+            # publication dicts, so the typed wire model is unchanged.
+            for publication in node.publications:
+                if ("snippets" not in publication and "snippet_count" not in publication
+                        and str(publication.get("source_paper") or "") not in graph.passage_papers):
+                    publication["passages_recorded"] = False
         return node
 
     def _source_payload(graph: SourceGraph) -> GraphPayload:

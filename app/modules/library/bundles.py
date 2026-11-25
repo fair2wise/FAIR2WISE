@@ -482,6 +482,23 @@ def registered_graph_paths(workdir: Path | str | None = None) -> list[str]:
         return []
 
 
+def passage_papers_for(kg_file: Path | str) -> frozenset[str] | None:
+    """File names of the papers whose supporting-text coverage the bundle of this ``kg.json`` records; ``None`` for any other file.
+
+    A paper has an entry in the manifest ``passages`` block once an extraction of this version or a recovery
+    (``library_passages``) handled it. A bundle without the block gives an empty set: no paper has coverage. Never raises.
+    """
+    path = Path(kg_file)
+    if path.name != KG_FILE or path.parent.parent.name != BUNDLES_DIRNAME:
+        return None
+    try:
+        manifest = _read_json(path.parent / MANIFEST_FILE)
+    except (OSError, ValueError):
+        return None
+    block = manifest.get("passages") if isinstance(manifest, dict) else None
+    return frozenset(str(name) for name in block) if isinstance(block, dict) else frozenset()
+
+
 def registered_graph_files(workdir: Path | str | None = None) -> list[str]:
     """Real ``kg.json`` paths of the registered bundles (non-empty KG, no link), sorted by name. Never raises.
 
@@ -568,7 +585,7 @@ def graph_source_label(path: str, workdir: Path | str | None = None) -> str | No
 
 __all__ = (
     "BUNDLES_DIRNAME", "BUNDLE_FILES", "Bundle", "BundleStore", "PaperRef", "RELEASE_DIR_ENV", "WORKDIR_ENV",
-    "bundle_root", "continue_from_kg", "default_release_dir", "ensure_release_dir", "ensure_schema_locked", "export_bundle",
+    "bundle_root", "continue_from_kg", "default_release_dir", "ensure_release_dir", "ensure_schema_locked", "passage_papers_for", "export_bundle",
     "export_file_name", "graph_source_label", "registered_graph_files", "registered_graph_paths", "resolve_registered_graph",
     "schema_path_for_registered_graph", "validate_name", "virtual_graph_path",
 )

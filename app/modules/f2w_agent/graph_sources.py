@@ -36,6 +36,7 @@ from __future__ import annotations
 
 from collections import OrderedDict, deque
 from collections.abc import Callable, Iterable, Mapping, Sequence
+import dataclasses
 from dataclasses import dataclass, field
 import json
 import logging
@@ -140,6 +141,9 @@ class SourceGraph:
     truncated: bool = False
     by_id: Mapping[str, JsonObject] = field(default_factory=dict, repr=False)
     adjacency: Mapping[str, tuple[int, ...]] = field(default_factory=dict, repr=False)
+    #: File names of the papers with an entry in the bundle manifest's ``passages`` block (supporting-text coverage);
+    #: ``None`` when the graph is not an extracted bundle (a flat file, a release, Tiled).
+    passage_papers: frozenset[str] | None = None
 
     @property
     def data(self) -> JsonObject:
@@ -464,7 +468,11 @@ class GraphSources:
         except (OSError, ValueError):
             raise SourceError("source_unreadable", 502, "The graph file could not be read") from None
         nodes, edges = normalize_json_graph(data)
-        graph = build_source_graph(sid, KIND_JSON, item.graph_id, item.label, f"{key[1]}:{key[2]}", nodes, edges)
+        from ..library.bundles import passage_papers_for
+
+        graph = dataclasses.replace(
+            build_source_graph(sid, KIND_JSON, item.graph_id, item.label, f"{key[1]}:{key[2]}", nodes, edges),
+            passage_papers=passage_papers_for(item.path))
         with self._lock:
             self._json_cache[key] = graph
             while len(self._json_cache) > JSON_CACHE_SIZE:

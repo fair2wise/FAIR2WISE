@@ -2703,9 +2703,11 @@ def test_evidence_snippets_are_attached_per_paper_on_the_single_node_record_only
     node = api_mod._graph_node_from_raw(dict(_EVIDENCE_RAW), include_evidence=True)
     by_source = {p["source_paper"]: p for p in node.publications}
     paper_a = by_source["10.1039_C8TC00875B.pdf"]
-    assert paper_a["snippets"] == [{"text": "CDW order peaks at 283 eV.", "page": 4}, {"text": "Second passage"}]
+    # Each snippet now also carries its ``kind`` (supporting passages, step 4): ``quoted`` when the stored one has none.
+    assert paper_a["snippets"] == [{"text": "CDW order peaks at 283 eV.", "page": 4, "kind": "quoted"},
+                                   {"text": "Second passage", "kind": "quoted"}]
     assert paper_a["snippet_count"] == 2
-    assert by_source["other.pdf"]["snippets"] == [{"text": "From another paper", "page": 9}]
+    assert by_source["other.pdf"]["snippets"] == [{"text": "From another paper", "page": 9, "kind": "quoted"}]
     # The whole-graph payload and a node without snippets carry no such field (nothing invented).
     assert all("snippets" not in p for p in api_mod._graph_node_from_raw(dict(_EVIDENCE_RAW)).publications)
     bare = api_mod._graph_node_from_raw({"id": "n", "name": "N", "publications": [{"source_paper": "a.pdf"}]},

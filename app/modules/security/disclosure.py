@@ -989,7 +989,7 @@ class DisclosureProjector:
     # ------------------------------------------------------------------ graph
 
     def _project_snippets(self, value: object, remaining: list[int]) -> list[dict[str, Any]]:
-        """Bounded ``[{text, page?}]`` passages: 20 per paper, 1,200 chars each, 6,000 in total per paper.
+        """Bounded ``[{text, page?, kind?}]`` passages: 20 per paper, 1,200 chars each, 6,000 in total per paper.
 
         ``remaining[0]`` is the number of passages left for the node.
 
@@ -998,8 +998,8 @@ class DisclosureProjector:
         and nothing after it is shown).
 
         Text goes through the same secret and path scrub as other free text; entries that are not
-        ``{text}`` mappings, are empty or look like artifact paths are dropped. Only ``text`` and an
-        integer ``page`` are kept.
+        ``{text}`` mappings, are empty or look like artifact paths are dropped. Only ``text``, an integer ``page`` and
+        a ``kind`` of ``quoted`` or ``located`` are kept.
         """
         out: list[dict[str, Any]] = []
         chars = 0
@@ -1016,6 +1016,8 @@ class DisclosureProjector:
             page = item.get("page")
             if isinstance(page, int) and not isinstance(page, bool) and page >= 0:
                 entry["page"] = page
+            if item.get("kind") in ("quoted", "located"):  # how the passage was found: a closed vocabulary, never free text
+                entry["kind"] = item["kind"]
             out.append(entry)
             remaining[0] -= 1
         return out

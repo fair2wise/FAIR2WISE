@@ -217,3 +217,47 @@ def test_an_exported_kg_can_be_downloaded_and_nothing_else(local, kgs):
     (release / "matkg_child.json").unlink()
     (release / "matkg_child.json").symlink_to(release / "matkg_old.json")
     assert c.get("/v1/library/kgs/child/download").status_code == 404           # a link is never served
+
+
+def test_a_paper_without_passages_and_without_coverage_is_noted_once_and_a_recovery_clears_it(local, kgs, monkeypatch):
+    """Per-paper older-KG note (owner decision 2026-11-24): ``passages_recorded: false`` on a paper that has neither
+    passages on the node nor an entry in the manifest ``passages`` block; never a per-bundle note."""
+    from app.modules.library import bundles as B
+
+    svc, _ = kgs
+    monkeypatch.setenv("F2W_WORKDIR", str(svc.store.root.parent))
+    monkeypatch.setenv("F2W_DISCLOSE_SNIPPETS", "1")
+    c = local.client()
+    terms = [{"term": "domain purity", "definition": "d", "category": "Method", "source_papers": ["a.pdf", "b.pdf"], "pages": [1],
+              "context_snippets": [{"text": "Domain purity was measured.", "source_paper": "a.pdf", "page": 1},
+                                   {"text": "Found by search.", "source_paper": "a.pdf", "page": 2, "kind": "located",
+                                    "verified": True}]}]
+    svc.store.create("two", schema={"id": _schema(c), "version": "0", "sha256": "x", "path": "x.yaml"},
+                     kg=build_graph_isolated(terms, []))
+    local.app.state.f2w_graph_sources._json_cache.clear()
+    sid = next(s for s in c.get("/v1/graph/sources").json()["sources"] if s["graph_id"] == "two")["id"]
+
+    def notes() -> list[str]:
+        local.app.state.f2w_graph_sources._json_cache.clear()
+        body = c.get("/graph/node/matkg:domainpurity", params={"source": sid})
+        assert body.status_code == 200, body.text
+        return sorted(p["source_paper"] for p in body.json()["publications"] if p.get("passages_recorded") is False)
+
+    assert notes() == ["b.pdf"]                       # a.pdf has passages on the node; exactly one note, for b.pdf
+    shown = c.get("/graph/node/matkg:domainpurity", params={"source": sid}).json()["publications"]
+    kinds = {s["text"]: s["kind"] for p in shown for s in p.get("snippets", [])}
+    assert kinds == {"Domain purity was measured.": "quoted", "Found by search.": "located"}   # the card labels each
+    bundle = svc.store.get("two")
+    manifest = dict(bundle.manifest)
+    manifest["passages"] = {"b.pdf": {"terms": 1, "with_passage": 0, "quoted": 0, "located": 0, "rejected": 0, "uncovered": 1}}
+    B._write_json(bundle.directory / B.MANIFEST_FILE, manifest)   # a recovery searched b.pdf and found nothing
+    assert notes() == []
+    # the passages of a.pdf come from the node, so a paper's coverage entry alone is enough for the other one
+    manifest["passages"] = {"a.pdf": {"terms": 1, "with_passage": 1, "quoted": 1, "located": 0, "rejected": 0, "uncovered": 0}}
+    B._write_json(bundle.directory / B.MANIFEST_FILE, manifest)
+    assert notes() == ["b.pdf"]
+    # a plain KG file (not a bundle) has no manifest: no note at all
+    flat = next(src for src in c.get("/v1/graph/sources").json()["sources"] if src["id"] != sid and src["kind"] == "json")
+    assert c.get("/graph", params={"source": flat["id"]}).status_code == 200
+    assert B.passage_papers_for(svc.store.root.parent / "elsewhere" / "kg.json") is None
+    assert B.passage_papers_for(bundle.directory / B.KG_FILE) == frozenset({"a.pdf"})
