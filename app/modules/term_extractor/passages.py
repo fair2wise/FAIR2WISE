@@ -9,6 +9,8 @@ sentence) and the recovery job, so both behave the same:
   Greek letters, sub/superscripts, ``R-SoXS`` for ``RSoXS``).
 * :func:`sentence_spans` and :class:`PageIndex` cut a page into sentences once and attach term-independent verdicts
   (references, header, citation, equation, caption ...), cached per page text.
+* Affiliation words include ``National`` (case-sensitive, owner decision 2026-11-24): a sentence naming a national
+  facility ("National Synchrotron Light Source II") is rejected as header/affiliation material, conservatively.
 * :func:`candidates` returns every located mention as a :class:`Passage`, accepted or rejected with a reason;
   :func:`best_passages` returns the ranked accepted ones, best first.
 """
@@ -668,7 +670,34 @@ def clause_window(shown: str, mention_start: int, mention_end: int, limit: int =
         start += 1
     while end > start and shown[end - 1] == " ":
         end -= 1
+    start = _drop_leading_connector(shown, start, end, mention_start, cuts, limit)
     return start, end
+
+
+_CONNECTOR = re.compile(r"(?:and|but|which|that|whereas|while)\b\s*", re.I)
+
+
+def _drop_leading_connector(shown: str, start: int, end: int, mention_start: int, cuts: list[int], limit: int) -> int:
+    """Move a window start off a bare connector or a lowercase opening.
+
+    A start on ``and``/``but``/``which``/``that``/``whereas``/``while`` moves forward past the connector to the next
+    word; a start on any other lowercase letter moves back to the previous clause boundary when that keeps the window
+    within ``limit``. The mention is never cut off.
+    """
+    for _ in range(3):
+        match = _CONNECTOR.match(shown, start, end)
+        if not match or match.end() >= mention_start or match.end() >= end:
+            break
+        start = match.end()
+    if start < end and shown[start].islower():
+        earlier = [c for c in cuts if c < start]
+        if earlier:
+            back = earlier[-1]
+            while back < start and shown[back] == " ":
+                back += 1
+            if back < start and end - back <= limit and not shown[back].islower():
+                start = back
+    return start
 
 
 def _passage_for(

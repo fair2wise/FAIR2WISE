@@ -6,6 +6,7 @@ absent (CI has no papers).
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import time
 
 import pytest
@@ -254,6 +255,24 @@ def test_clause_window_keeps_mention_clause_and_cuts_at_clauses() -> None:
     window = shown[a:b]
     assert "the key term sits here" in window and b - a <= 400
     assert window[0] != " " and window[-1] != " "
+
+
+def test_clause_window_never_opens_with_a_bare_connector() -> None:
+    shown = ("Alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau, " * 4
+             + "and which the key term sits here in the middle of the sentence, that we measured twice, "
+             + "While more words follow after it and after the rest of the long sentence goes on, " * 3)
+    s = shown.index("key term")
+    a, b = P.clause_window(shown, s, s + 8, limit=120)
+    window = shown[a:b]
+    assert "key term" in window and b - a <= 120
+    assert not re.match(r"(?i)(and|but|which|that|whereas|while)\b", window)
+
+
+def test_clause_window_lowercase_start_stays_within_limit() -> None:
+    shown = "Intro words here, some more words follow, the key term sits here, and then the sentence closes now."
+    s = shown.index("key term")
+    a, b = P.clause_window(shown, s, s + 8, limit=40)
+    assert shown[a:b] == "the key term sits here,"  # moving back would exceed the limit, so the start stays
 
 
 def test_clause_window_single_huge_clause_cuts_on_words() -> None:
