@@ -10,7 +10,7 @@ import threading
 from typing import Any
 
 from . import provenance
-from .models import PropertyRecord, TermRecord
+from .models import ContextSnippet, PropertyRecord, TermRecord
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,9 @@ class TermStore:
         self._state_lock = threading.Lock()
         self._save_lock = threading.Lock()
         self._tl = threading.local()
+        #: Passage coverage of this run (per paper; sets of term keys) and of earlier runs read from the file.
+        self._passage_run: dict[str, dict[str, Any]] = {}
+        self._passage_base: dict[str, dict[str, int]] = {}
         #: Running tally of what :meth:`upsert` did since this store was opened (a job's live KG growth counters).
         self._growth = {"entities_new": 0, "entities_merged": 0, "relations_new": 0, "relations_merged": 0}
         #: Returns ``True`` once the run owning this store was fenced out (another owner took its job over).
@@ -106,6 +109,12 @@ class TermStore:
                 self._snippet_seen.add(provenance.snippet_key(snip))
             # ``None`` marks an unknown value (reconstructed files): keep the in-memory default instead.
             self.metadata.update({k: v for k, v in (data.get("metadata") or {}).items() if v is not None})
+            base = self.metadata.pop("passages", None)
+            if isinstance(base, dict):
+                self._passage_base = {
+                    str(p): {str(k): int(v) for k, v in row.items() if isinstance(v, int)}
+                    for p, row in base.items() if isinstance(row, dict)
+                }
             logger.info(
                 "Loaded %d existing terms and %d code snippets from %s",
                 len(self._records), len(self.code_snippets), self.output_file,
@@ -121,6 +130,9 @@ class TermStore:
             self._sync_publications_locked()
             terms_out = [r.to_dict() for r in self._records.values()]
             metadata_snapshot = dict(self.metadata)
+            merged_stats = self._merged_stats_locked()
+            if merged_stats:
+                metadata_snapshot["passages"] = merged_stats
             snippets_out = list(self.code_snippets)
         with self._save_lock:
             try:
@@ -173,7 +185,8 @@ class TermStore:
 
         Merge rules:
         - Pages and source papers are appended (deduped).
-        - Context snippets are deduped by (source_paper, page).
+        - Context snippets are unioned by (source_paper, page, text); the same text as both kinds keeps ``quoted``;
+          new ones go after the existing ones, except a quoted+verified one goes before the first located one.
         - Longer definition wins.
         - New relations are appended (deduped by (relation, related_term)).
         - Chemical fields (formula, smiles, etc.) fill in only if currently None.
@@ -207,11 +220,7 @@ class TermStore:
                     existing.publications = provenance.publications_from_source_metadata(existing.source_metadata)
                     modified = True
             for snippet in record.context_snippets:   # union per paper, page and text: a second passage on a page is kept
-                if not any(
-                    s.source_paper == snippet.source_paper and s.page == snippet.page and s.text == snippet.text
-                    for s in existing.context_snippets
-                ):
-                    existing.context_snippets.append(snippet)
+                if self._union_snippet(existing.context_snippets, snippet):
                     modified = True
 
             if len(record.definition) > len(existing.definition):
@@ -254,6 +263,74 @@ class TermStore:
             if modified:
                 self._tl.updated = True
             return key, modified
+
+    @staticmethod
+    def _union_snippet(snippets: list[ContextSnippet], new: ContextSnippet) -> bool:
+        """Add ``new`` to ``snippets`` unless (paper, page, text) is there; returns whether the list changed.
+
+        The same text arriving as ``quoted`` over a stored ``located`` one upgrades that entry in place. A new
+        quoted+verified sentence is inserted before the first located one (the best passage stays first, the
+        disclosure caps cut in stored order); anything else is appended.
+        """
+        for old in snippets:
+            if old.source_paper == new.source_paper and old.page == new.page and old.text == new.text:
+                if old.kind == "located" and new.kind == "quoted":
+                    old.kind, old.verified = "quoted", new.verified or old.verified
+                    return True
+                return False
+        if new.kind == "quoted" and new.verified:
+            at = next((i for i, s in enumerate(snippets) if s.kind == "located"), len(snippets))
+            snippets.insert(at, new)
+        else:
+            snippets.append(new)
+        return True
+
+    # ------------------------------------------------------------------
+    # Passage coverage (design: supporting passages, section d)
+    # ------------------------------------------------------------------
+
+    def note_passage(self, paper: str, term_key: str, *, kind: str | None = None, rejected: int = 0) -> None:
+        """Record what grounding did for one registered term of ``paper``.
+
+        Args:
+            paper: Source paper file name.
+            term_key: Normalised key of the term.
+            kind: ``"quoted"`` or ``"located"`` when a passage was stored, ``None`` when none was.
+            rejected: Number of model sentences rejected (not found in the page text).
+        """
+        with self._state_lock:
+            row = self._passage_run.setdefault(paper, {"terms": set(), "covered": set(), "quoted": 0, "located": 0, "rejected": 0})
+            row["terms"].add(term_key)
+            if kind in ("quoted", "located"):
+                row["covered"].add(term_key)
+                row[kind] += 1
+            row["rejected"] += rejected
+
+    def _run_stats_locked(self) -> dict[str, dict[str, int]]:
+        out: dict[str, dict[str, int]] = {}
+        for paper, row in self._passage_run.items():
+            terms, covered = len(row["terms"]), len(row["covered"])
+            out[paper] = {"terms": terms, "with_passage": covered, "quoted": row["quoted"], "located": row["located"],
+                          "rejected": row["rejected"], "uncovered": terms - covered}
+        return out
+
+    def run_passage_stats(self) -> dict[str, dict[str, int]]:
+        """Per-paper passage coverage of this run only: terms, with_passage, quoted, located, rejected, uncovered."""
+        with self._state_lock:
+            return self._run_stats_locked()
+
+    def passage_stats(self) -> dict[str, dict[str, int]]:
+        """Per-paper passage coverage including earlier runs of this terms file (summed per paper)."""
+        with self._state_lock:
+            return self._merged_stats_locked()
+
+    def _merged_stats_locked(self) -> dict[str, dict[str, int]]:
+        merged = {paper: dict(row) for paper, row in self._passage_base.items()}
+        for paper, row in self._run_stats_locked().items():
+            into = merged.setdefault(paper, {k: 0 for k in row})
+            for key, value in row.items():
+                into[key] = int(into.get(key, 0)) + value
+        return merged
 
     def growth(self) -> dict[str, int]:
         """Snapshot of the KG growth counters of this run.

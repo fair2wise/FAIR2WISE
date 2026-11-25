@@ -68,7 +68,9 @@ def real_orchestrator(monkeypatch, tmp_path):
                                         "context": "Ray tracing follows each photon through the voxel grid of the scene to "
                                                    "render a synthetic image."}, "c2"),
             call("register_term", {"term": "field campaign", "definition": "Observations in the field.",
-                                        "category": "Thing"}, "c3"),          # the model gave no context
+                                        "category": "Thing"}, "c3"),          # no context, and the page names no sentence for it
+            call("register_term", {"term": "voxel grid", "definition": "Grid of small cubes.",
+                                        "category": "Thing"}, "c4"),          # no context: located in the page (two sentences)
         ]),
         AIMessage(content="done"),
     ]
@@ -99,12 +101,20 @@ def test_every_term_registered_with_a_context_has_its_passage_in_terms_json(real
     assert tool_threads and page_thread not in tool_threads      # the tools really ran on other threads
     orch.store.save()
     terms = {t["term"]: t for t in json.loads(terms_path.read_text(encoding="utf-8"))["terms"]}
-    assert set(terms) == {"cloud tomography", "ray tracing", "field campaign"}
+    assert set(terms) == {"cloud tomography", "ray tracing", "field campaign", "voxel grid"}
     for name in ("cloud tomography", "ray tracing"):
         record = terms[name]
         assert record["pages"] == [1] and record["source_papers"] == ["clouds.pdf"]
         assert len(record["context_snippets"]) == 1
         snippet = record["context_snippets"][0]
         assert snippet["source_paper"] == "clouds.pdf" and snippet["page"] == 1 and snippet["text"].startswith(name.split()[0].capitalize())
+        assert snippet["verified"] is True and "kind" not in snippet       # quoted is the default kind: not written
     assert terms["field campaign"]["context_snippets"] == [] and terms["field campaign"]["pages"] == [1]
+    (located,) = terms["voxel grid"]["context_snippets"]
+    assert located["kind"] == "located" and located["verified"] is True and located["page"] == 1
+    assert located["text"].startswith("A voxel grid divides") and located["text"].endswith("below and on simulated scenes.")
+    # Coverage counters (design d): this run, per paper, and persisted in the terms file's metadata.
+    expected = {"terms": 4, "with_passage": 3, "quoted": 2, "located": 1, "rejected": 0, "uncovered": 1}
+    assert orch.passage_summary() == {"total": expected, "papers": {"clouds.pdf": expected}}
+    assert json.loads(terms_path.read_text(encoding="utf-8"))["metadata"]["passages"] == {"clouds.pdf": expected}
     assert terms["ray tracing"]["relations"][0]["related_term"] == "voxel grid"

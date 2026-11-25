@@ -15,7 +15,7 @@ from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
 
-from . import provenance, source_repos
+from . import passages, provenance, source_repos
 from ..cborg_errors import IP_NOT_AUTHORIZED_LOG_TEXT, CborgIpNotAuthorized, as_ip_not_authorized
 from ..cborg_http import (
     LLM_MAX_RETRIES,
@@ -32,7 +32,7 @@ from ..model_policy import require_free_cborg_model
 from .agent import build_graph
 from .clients import make_chat_client
 from .merge_index import DEFAULT_EMBED_MODEL, DEFAULT_MERGE_TOP_K, TermMergeIndex
-from .models import ContextSnippet, RelationRecord, TermRecord
+from .models import RelationRecord, TermRecord
 from .prompts import build_page_prompt
 from .schema import SchemaHelper
 from .services import build_services, extract_and_attach_properties
@@ -40,6 +40,11 @@ from .store import TermStore
 from .tools import ToolState, build_tools
 
 logger = logging.getLogger(__name__)
+
+#: Passage coverage counts per paper (see :meth:`TermStore.run_passage_stats`) and the share of terms with a passage
+#: below which a paper is reported with a WARNING (design d: 90%).
+PASSAGE_COUNTS = ("terms", "with_passage", "quoted", "located", "rejected", "uncovered")
+COVERAGE_WARN_RATIO = 0.9
 
 _PAGE_STOPWORDS = {
     "about",
@@ -93,17 +98,6 @@ def _extract_terms_json_from_text(text: str) -> dict[str, Any]:
         if isinstance(obj, dict) and isinstance(obj.get("terms"), list):
             return obj
     return {"terms": []}
-
-
-def _context_for_term(text: str, term: str) -> str:
-    if not text:
-        return ""
-    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
-    term_lower = term.lower()
-    for sentence in sentences:
-        if term_lower in sentence.lower():
-            return sentence.strip()
-    return text.strip()[:500]
 
 
 def _keyword_tokens(values: Sequence[str]) -> list[str]:
@@ -366,7 +360,7 @@ class Orchestrator:
         terms_before = len(self.store)
         tool_state = getattr(self, "_tool_state", None)
         if tool_state is not None:
-            tool_state.set_page_context(filename, page_num + 1)
+            tool_state.set_page_context(filename, page_num + 1, text)
         try:
             try:
                 with sync_slot(enabled=self._uses_cborg_admission()):
@@ -447,7 +441,22 @@ class Orchestrator:
             if not isinstance(raw, dict) or not str(raw.get("term", "")).strip():
                 continue
             fixed = self.schema_helper.validate_and_fix_term(dict(raw))
-            context = str(raw.get("context") or _context_for_term(text, fixed["term"]))
+            # Grounding (design b): the sentence is kept only if found in the paper's text; else the mention is located.
+            tool_state = getattr(self, "_tool_state", None)
+            held = getattr(tool_state, "paper_pages", None)
+            grounded = passages.ground_context(
+                term=fixed["term"],
+                sentence=str(raw.get("context") or "") or None,
+                source_paper=filename,
+                page=page_num + 1,
+                page_text=text,
+                paper_pages=held[1] if held and held[0] == filename else None,
+            )
+            snippet = grounded.snippet
+            self.store.note_passage(
+                filename, TermStore.normalize(fixed["term"]), kind=snippet.kind if snippet else None,
+                rejected=int(grounded.rejected),
+            )
             record = TermRecord(
                 term=fixed["term"],
                 definition=fixed.get("definition", ""),
@@ -457,15 +466,49 @@ class Orchestrator:
                 relations=[RelationRecord.from_dict(r) for r in fixed.get("relations", [])],
                 pages=[page_num + 1],
                 source_papers=[filename],
-                context_snippets=[
-                    ContextSnippet(text=context, source_paper=filename, page=page_num + 1)
-                ] if context else [],
+                context_snippets=[snippet] if snippet else [],
             )
             _key, modified = self.store.upsert(record)
             updated = updated or modified
         if updated:
             logger.info("Registered %d JSON fallback term(s) from %s page %d", len(terms), filename, page_num + 1)
         return updated
+
+    def _set_paper_pages(self, filename: str, page_texts: list[str]) -> None:
+        """Hand the paper's page texts (read once per paper) to the tools for passage grounding."""
+        tool_state = getattr(self, "_tool_state", None)
+        if tool_state is not None:
+            tool_state.paper_pages = (filename, page_texts)
+
+    def _finish_paper_passages(self, filename: str) -> dict[str, int]:
+        """Drop the paper's page texts, log its passage coverage and return its counts (this run only).
+
+        One info line per paper; a WARNING when fewer than ``COVERAGE_WARN_RATIO`` of its terms carry a passage.
+        """
+        tool_state = getattr(self, "_tool_state", None)
+        if tool_state is not None:
+            tool_state.paper_pages = None
+        row = self.store.run_passage_stats().get(filename) or dict.fromkeys(PASSAGE_COUNTS, 0)
+        logger.info(
+            "passages %s: %d terms, %d with a passage (%d quoted, %d located), %d sentences rejected, %d uncovered",
+            filename, row["terms"], row["with_passage"], row["quoted"], row["located"], row["rejected"], row["uncovered"],
+        )
+        if row["terms"] and row["with_passage"] < COVERAGE_WARN_RATIO * row["terms"]:
+            logger.warning(
+                "passages %s: only %d of %d terms (%.0f%%) have a supporting passage (threshold %.0f%%)",
+                filename, row["with_passage"], row["terms"], 100 * row["with_passage"] / row["terms"],
+                100 * COVERAGE_WARN_RATIO,
+            )
+        return row
+
+    def passage_summary(self) -> dict[str, Any]:
+        """Passage coverage of this run for the run summary: ``total`` and ``papers`` (per file name)."""
+        papers = self.store.run_passage_stats()
+        total = dict.fromkeys(PASSAGE_COUNTS, 0)
+        for row in papers.values():
+            for key in total:
+                total[key] += row[key]
+        return {"total": total, "papers": papers}
 
     def process_pdf(self, pdf_path: str) -> int:
         """Open a PDF and process all pages in parallel. Returns pages that yielded terms."""
@@ -491,7 +534,8 @@ class Orchestrator:
             pub_meta = {}
 
         logger.debug("Processing '%s' (%d pages) with %d workers", filename, total_pages, self.max_workers)
-        page_texts = [doc.load_page(i).get_text() for i in range(total_pages)]
+        page_texts = passages.page_texts_from_doc(doc)
+        self._set_paper_pages(filename, page_texts)
         self._emit("paper_chunked", name=filename, pages=total_pages)
         pages_done = 0
 
@@ -550,6 +594,7 @@ class Orchestrator:
         self.store.increment("processed_files")
         self.store.increment("processed_pages_with_terms", pages_with_terms)
         logger.info("Finished '%s': %d/%d pages yielded terms", filename, pages_with_terms, total_pages)
+        self._finish_paper_passages(filename)
         if tool_state is not None:
             tool_state.current_source_paper = None
         return pages_with_terms
@@ -608,7 +653,8 @@ class Orchestrator:
             logger.warning("Pub-metadata extraction failed for %s: %s", filename, e)
             pub_meta = {}
 
-        page_texts = [doc.load_page(i).get_text() for i in range(total_pages)]
+        page_texts = passages.page_texts_from_doc(doc)
+        self._set_paper_pages(filename, page_texts)
         selected_pages = self.select_relevant_pages(
             page_texts,
             query,
@@ -672,6 +718,7 @@ class Orchestrator:
         self.store.increment("processed_files")
         self.store.increment("processed_pages_with_terms", pages_with_terms)
         self.store.increment("partial_processed_files")
+        passage_row = self._finish_paper_passages(filename)
         logger.info(
             "Finished targeted '%s': %d/%d selected pages yielded terms",
             filename,
@@ -690,6 +737,7 @@ class Orchestrator:
             "unique_terms": len(self.store),
             "output_file": self.store.output_file,
             "low_confidence": low_confidence,
+            "passages": passage_row,
         }
 
     def process_directory_targeted(
@@ -745,6 +793,7 @@ class Orchestrator:
             "unique_terms": len(self.store),
             "output_file": self.store.output_file,
             "pdf_results": pdf_results,
+            "passages": self.passage_summary(),
         }
 
     def process_directory(self, data_dir: str) -> dict[str, Any]:
@@ -780,6 +829,7 @@ class Orchestrator:
             "processed_pages_with_terms": meta.get("processed_pages_with_terms", 0),
             "unique_terms": len(self.store),
             "output_file": self.store.output_file,
+            "passages": self.passage_summary(),
         }
 
 

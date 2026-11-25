@@ -182,6 +182,27 @@ def test_end_to_end_bundle_kg_equals_the_cli_path_and_bookkeeping_has_the_coordi
     assert {t["importance"] for t in ours["terms"]} >= {"high"}  # assign_importance ran (P3HT is in two papers)
 
 
+def test_the_manifest_gets_a_passages_block_per_paper_summed_across_runs(tmp_path):
+    """Added with the passage coverage counters: a per-paper ``passages`` block beside the existing manifest fields."""
+    def hook(orch: FakeOrchestrator, name: str) -> None:
+        orch.store.note_passage(name, f"{name}-t1", kind="quoted")
+        orch.store.note_passage(name, f"{name}-t2", kind=None, rejected=1)
+
+    world = World(tmp_path, hook=hook)
+    names = _three(world)
+    _, state = world.run(world.params(names))
+    assert state is JobState.SUCCEEDED
+    block = world.bundle().manifest["passages"]
+    assert sorted(block) == names
+    assert block["a.pdf"] == {"terms": 2, "with_passage": 1, "quoted": 1, "located": 0, "rejected": 1, "uncovered": 1}
+    # a continued run of another paper adds its own entry and leaves the first untouched
+    world.put("d.pdf", "D term|Thing\nmore")
+    _, state = world.run(world.params([*names, "d.pdf"]), nonce="2")
+    assert state is JobState.SUCCEEDED
+    again = world.bundle().manifest["passages"]
+    assert again["a.pdf"] == block["a.pdf"] and again["d.pdf"]["terms"] == 2
+
+
 def test_progress_and_logs_are_visible(tmp_path):
     world = World(tmp_path)
     handle, state = world.run(world.params(_three(world)))

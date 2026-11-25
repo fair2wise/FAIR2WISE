@@ -68,16 +68,25 @@ class ContextSnippet:
         source_paper: Identifier of the paper the snippet comes from.
         page: Page number within that paper; ``None`` when the extraction did not know the page (the passage is kept:
             a missing page number never discards evidence).
+        kind: ``"quoted"`` (the model's sentence, found in the source) or ``"located"`` (found by searching the
+            source for the term's mention). Absent in older files, which read as ``"quoted"``.
+        verified: Whether the locator confirmed the text in the page text of ``source_paper``. Absent in older files,
+            which read as ``False``.
     """
 
     text: str
     source_paper: str
     page: int | None = None
+    kind: str = "quoted"
+    verified: bool = False
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> ContextSnippet:
-        """Construct from a plain dict (``page`` may be absent or ``None``)."""
-        return cls(text=d["text"], source_paper=d["source_paper"], page=d.get("page"))
+        """Construct from a plain dict (``page``, ``kind`` and ``verified`` may be absent)."""
+        return cls(
+            text=d["text"], source_paper=d["source_paper"], page=d.get("page"),
+            kind=str(d.get("kind") or "quoted"), verified=bool(d.get("verified", False)),
+        )
 
 
 @dataclass
@@ -171,7 +180,8 @@ class TermRecord:
         """Serialise to a plain nested dict (via ``dataclasses.asdict``).
 
         ``extra`` is flattened to the top level after the known fields, in insertion order. Optional
-        relation keys (``evidence``, ``related_id``, ``related_id_prefix``) are omitted when empty so older files keep their shape.
+        relation keys (``evidence``, ``related_id``, ``related_id_prefix``) and the snippet keys ``kind`` (when ``quoted``)
+        and ``verified`` (when false) are omitted when default so older files keep their shape.
         """
         data = dataclasses.asdict(self)
         extra = data.pop("extra")
@@ -181,6 +191,11 @@ class TermRecord:
             for optional in ("related_id", "related_id_prefix"):
                 if rel.get(optional) is None:
                     rel.pop(optional, None)
+        for snippet in data["context_snippets"]:
+            if snippet.get("kind") == "quoted":
+                snippet.pop("kind")
+            if not snippet.get("verified"):
+                snippet.pop("verified", None)
         for key, value in extra.items():
             data.setdefault(key, value)
         return data

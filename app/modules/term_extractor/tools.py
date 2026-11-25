@@ -9,6 +9,7 @@ import re
 
 from langchain_core.tools import BaseTool, tool
 
+from . import passages
 from .merge_index import TermMergeIndex, build_merge_prompt, clean_term
 from .models import ContextSnippet, RelationRecord, TermRecord
 from .schema import SchemaHelper
@@ -28,6 +29,7 @@ class _PageContext:
     owner: int
     source_paper: str | None
     page: int | None
+    text: str | None = None
 
 
 #: The page being extracted, per execution context (see :meth:`ToolState.set_page_context`).
@@ -48,8 +50,11 @@ class ToolState:
     llm_invoke: Callable[[str], str] | None = field(default=None, repr=False)
     merge_index: TermMergeIndex | None = field(default=None, repr=False)
     current_source_paper: str | None = None
+    #: ``(paper file name, every page text of that paper)``, set once per paper by the Orchestrator (the PDF is read
+    #: once); lets grounding find a sentence or a mention on a page other than the one being extracted.
+    paper_pages: tuple[str, list[str]] | None = field(default=None, repr=False)
 
-    def set_page_context(self, source_paper: str, page: int) -> None:
+    def set_page_context(self, source_paper: str, page: int, text: str | None = None) -> None:
         """Record the PDF page being extracted.
 
         ``current_source_paper`` is shared (all workers of one PDF). The page and its text live in a
@@ -60,13 +65,43 @@ class ToolState:
         came out without passages (pilot 2026-11-24).
         """
         self.current_source_paper = source_paper
-        _PAGE.set(_PageContext(id(self), source_paper, page))
+        _PAGE.set(_PageContext(id(self), source_paper, page, text))
 
     def clear_page_context(self) -> None:
         """Reset the page of this context (the shared paper name is kept)."""
         current = _PAGE.get()
         if current is not None and current.owner == id(self):
             _PAGE.set(None)
+
+    def page_text(self) -> str | None:
+        """Text of the page being extracted in this context (``None`` when the Orchestrator did not pass it)."""
+        current = _PAGE.get()
+        return current.text if current is not None and current.owner == id(self) else None
+
+    def ground(self, term_key: str, term: str, context: str | None, source_paper: str | None, page: int | None) -> ContextSnippet | None:
+        """Ground a term's supporting sentence against the page texts and count the outcome (design b).
+
+        Args:
+            term_key: Normalised term key (for the per-paper coverage counters).
+            term: Display name of the term.
+            context: The model's sentence, if any.
+            source_paper: Paper the term is registered for.
+            page: 1-based page, if known.
+
+        Returns:
+            The passage to store, or ``None`` (a rejected sentence is counted, never stored).
+        """
+        if not source_paper:
+            return None
+        pages = self.paper_pages[1] if self.paper_pages and self.paper_pages[0] == source_paper else None
+        result = passages.ground_context(
+            term=term, sentence=context, source_paper=source_paper, page=page, page_text=self.page_text(), paper_pages=pages,
+        )
+        snippet = result.snippet
+        self.store.note_passage(source_paper, term_key, kind=snippet.kind if snippet else None, rejected=int(result.rejected))
+        if result.rejected:
+            logger.info("ground: sentence for '%s' not found in %s; rejected", term, source_paper)
+        return snippet
 
     def page_context(self) -> tuple[str | None, int | None]:
         """Return ``(source_paper, page)`` for the current context.
@@ -238,9 +273,10 @@ def build_tools(state: ToolState) -> list[BaseTool]:
         Call even when check_existing_term or fuzzy_merge_term found a match so
         relations, context, and paper provenance can be merged onto the existing term.
         Relations must use exact predicate names from the schema.
-        Pass a short context sentence as 'context'. source_paper and page default
-        to the PDF page currently being processed; a passage is stored whenever a
-        context and a paper are known, with the page recorded as unknown if it is not.
+        Pass a short context sentence as 'context', copied from the page. source_paper and
+        page default to the PDF page currently being processed. The sentence is kept only if it is
+        found in the paper's text (the stored page is where it is found); otherwise the passage is
+        located from the term's mention, and a term with no findable mention gets no passage.
         """
         ctx_paper, ctx_page = state.page_context()
         source_paper = source_paper or ctx_paper
@@ -276,11 +312,9 @@ def build_tools(state: ToolState) -> list[BaseTool]:
         key = TermStore.normalize(fixed["term"])
         is_new = state.store.get(key) is None
 
-        snippet = ContextSnippet(text=context, source_paper=source_paper, page=page) if context and source_paper else None
-        if snippet is not None and page is None:
-            # Evidence is never thrown away for want of a page number: the passage is kept with the page unknown
-            # (pilot 2026-11-24: a lost page silently dropped the passage of nearly every term).
-            logger.warning("register_term: '%s' has no page number in this context; passage kept with page unknown", term)
+        # Grounding (design b): the model's sentence is kept only if found in the paper's page text, on the page where
+        # it is found; otherwise the term's mention is located; nothing found stores nothing and counts as uncovered.
+        snippet = state.ground(key, fixed["term"], context, source_paper, page)
 
         record = TermRecord(
             term=fixed["term"],

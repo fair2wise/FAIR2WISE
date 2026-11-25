@@ -276,8 +276,20 @@ class BundleStore:
             extraction_manifest=_read_json(source.file(EXTRACTION_MANIFEST_FILE)))
 
     def record_extraction(self, name: str, *, schema_id: str, model: str | None, backend: str | None,
-                          papers: Iterable[PaperRef]) -> Bundle:
-        """Update the manifest after an extraction (T39 calls this); the schema must be the locked one."""
+                          papers: Iterable[PaperRef],
+                          passages: Mapping[str, Mapping[str, int]] | None = None) -> Bundle:
+        """Update the manifest after an extraction (T39 calls this); the schema must be the locked one.
+
+        Args:
+            name: Bundle name.
+            schema_id: The locked schema id.
+            model: Model name recorded in the manifest.
+            backend: Backend name recorded in the manifest.
+            papers: Papers extracted (merged into the manifest's paper list by name).
+            passages: Passage coverage of this extraction per paper file name (``terms``, ``with_passage``,
+                ``quoted``, ``located``, ``rejected``, ``uncovered``); summed onto the manifest's ``passages`` block,
+                never overwritten, so continued runs accumulate.
+        """
         bundle = self.get(name)
         ensure_schema_locked(bundle.manifest, schema_id)
         known = {p.get("name"): p for p in bundle.manifest.get("papers") or []}
@@ -285,8 +297,25 @@ class BundleStore:
             known[paper.name] = paper.to_json()
         manifest = {**bundle.manifest, "model": model, "backend": backend, "papers": list(known.values()),
                     "updated_at": self._clock()}
+        if passages:
+            manifest["passages"] = sum_passage_blocks(bundle.manifest.get("passages"), passages)
         _write_json(bundle.directory / MANIFEST_FILE, manifest)
         return Bundle(name=name, directory=bundle.directory, manifest=manifest)
+
+
+def sum_passage_blocks(
+    old: Mapping[str, Any] | None, new: Mapping[str, Mapping[str, int]]
+) -> dict[str, dict[str, int]]:
+    """Sum two per-paper passage coverage blocks (``{file name: {count: n}}``); neither input is changed."""
+    out: dict[str, dict[str, int]] = {
+        str(p): {str(k): int(v) for k, v in row.items() if isinstance(v, int)}
+        for p, row in (old or {}).items() if isinstance(row, Mapping)
+    }
+    for paper, row in new.items():
+        into = out.setdefault(str(paper), {})
+        for key, value in row.items():
+            into[key] = into.get(key, 0) + int(value)
+    return out
 
 
 def ensure_schema_locked(manifest: Mapping[str, Any], requested: str | None) -> None:

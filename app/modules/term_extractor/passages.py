@@ -18,6 +18,7 @@ sentence) and the recovery job, so both behave the same:
 from __future__ import annotations
 
 from bisect import bisect_left, bisect_right
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 import logging
@@ -26,6 +27,7 @@ import re
 import unicodedata
 
 from ..literature.pdf_reader import PdfDocument, open_pdf
+from .models import ContextSnippet
 
 logger = logging.getLogger(__name__)
 
@@ -741,7 +743,7 @@ def _passage_for(
 
 
 def candidates(
-    pages: list[str], term: str, *, abbr_defined: bool | None = None
+    pages: list[str], term: str, *, abbr_defined: bool | None = None, only_pages: Sequence[int] | None = None
 ) -> list[Passage]:
     """Return every located mention of ``term`` in a paper, accepted and rejected, one per sentence.
 
@@ -749,6 +751,8 @@ def candidates(
         pages: Page texts (see :func:`page_texts`).
         term: The term to find.
         abbr_defined: Passed to :func:`locate`.
+        only_pages: 0-based indices of the pages to search (the references heading is still found over all pages);
+            ``None`` searches every page.
 
     Returns:
         Passages in document order; ``reason`` is ``None`` for accepted ones and names the rule otherwise. Empty
@@ -757,6 +761,8 @@ def candidates(
     refs = references_start(pages)
     found: list[Passage] = []
     for page_no, text in enumerate(pages):
+        if only_pages is not None and page_no not in only_pages:
+            continue
         seen: set[int] = set()
         for span in locate(text, term, abbr_defined=abbr_defined):
             if span.sentence_start in seen:
@@ -776,7 +782,12 @@ def _rank_key(passage: Passage) -> tuple[int, int, int, int]:
 
 
 def best_passages(
-    pages: list[str], term: str, *, limit: int = 3, abbr_defined: bool | None = None
+    pages: list[str],
+    term: str,
+    *,
+    limit: int = 3,
+    abbr_defined: bool | None = None,
+    only_pages: Sequence[int] | None = None,
 ) -> list[Passage]:
     """Return the best accepted passages for ``term``, best first.
 
@@ -785,11 +796,12 @@ def best_passages(
         term: The term to find.
         limit: Maximum number of passages.
         abbr_defined: Passed to :func:`locate`.
+        only_pages: Passed to :func:`candidates`.
 
     Returns:
         Accepted passages ordered by the ranking, de-duplicated by text.
     """
-    accepted = [p for p in candidates(pages, term, abbr_defined=abbr_defined) if p.accepted]
+    accepted = [p for p in candidates(pages, term, abbr_defined=abbr_defined, only_pages=only_pages) if p.accepted]
     accepted.sort(key=_rank_key)
     out: list[Passage] = []
     seen: set[str] = set()
@@ -801,3 +813,111 @@ def best_passages(
         if len(out) >= limit:
             break
     return out
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Grounding (design b): keep a model sentence only if the source has it, else locate the term
+# ---------------------------------------------------------------------------------------------------------------------
+
+#: A model sentence shorter than this many letters and digits is not specific enough to be found in a page.
+MIN_SENTENCE_KEY = 10
+
+
+@dataclass(frozen=True)
+class Grounding:
+    """What grounding a term's supporting sentence produced.
+
+    Attributes:
+        snippet: The passage to store (``quoted``/verified or ``located``), or ``None`` when nothing was found.
+        rejected: ``True`` when the model gave a sentence that was not found in the page text (counted, never stored).
+    """
+
+    snippet: ContextSnippet | None
+    rejected: bool
+
+
+def find_sentence(pages: Sequence[str], sentence: str, *, current: int | None = None) -> int | None:
+    """Return the 0-based index of the page that holds ``sentence``, or ``None``.
+
+    The match is the squash match, which includes the exact match after whitespace normalisation (case, hyphenation,
+    line breaks, dashes, ligatures, Greek letters and sub/superscripts are tolerated). The current page is tried
+    first, then the others in order.
+
+    Args:
+        pages: Page texts of the paper.
+        sentence: The model's sentence.
+        current: 0-based index of the page the sentence came from, if known.
+
+    Returns:
+        The page index, or ``None`` (also for a sentence too short to be specific).
+    """
+    wanted = squash(sentence)[0]
+    if len(wanted) < MIN_SENTENCE_KEY:
+        return None
+    order = list(range(len(pages)))
+    if current is not None and 0 <= current < len(pages):
+        order.remove(current)
+        order.insert(0, current)
+    for i in order:
+        if wanted in page_index(pages[i]).key:
+            return i
+    return None
+
+
+def ground_context(
+    *,
+    term: str,
+    sentence: str | None,
+    source_paper: str,
+    page: int | None,
+    page_text: str | None,
+    paper_pages: Sequence[str] | None,
+) -> Grounding:
+    """Ground the supporting sentence of one term (design b).
+
+    The model's sentence is kept (kind ``quoted``, verified) only when the locator finds it in a page of the paper; the
+    stored page is where it was found, not the claimed one. A sentence not found is rejected. With no sentence or a
+    rejected one, the term's mention is located (the page it came from first, then the paper's other pages) and the
+    best passage is stored as ``located``. Nothing found: no passage.
+
+    Args:
+        term: The term being registered.
+        sentence: The model's ``context`` sentence, if any.
+        source_paper: File name of the paper.
+        page: 1-based page the term was extracted from, if known.
+        page_text: Text of that page as the extractor saw it, if known.
+        paper_pages: All page texts of the paper, if known.
+
+    Returns:
+        The :class:`Grounding`. Without any page text the sentence cannot be verified and is rejected.
+    """
+    pages: list[str]
+    current: int | None
+    first: int | None
+    if paper_pages and (page is None or 1 <= page <= len(paper_pages)):
+        pages, current, first = list(paper_pages), (page - 1 if page else None), 1
+    elif page_text:
+        pages, current, first = [page_text], 0, page
+    else:
+        return Grounding(None, rejected=bool(sentence and sentence.strip()))
+
+    def number(index: int) -> int | None:
+        return None if first is None else first + index
+
+    clean = " ".join(sentence.split()) if sentence else ""
+    rejected = False
+    if clean:
+        found = find_sentence(pages, clean, current=current)
+        if found is not None:
+            return Grounding(ContextSnippet(clean, source_paper, number(found), kind="quoted", verified=True), False)
+        rejected = True
+    best: list[Passage] = []
+    if current is not None:
+        best = best_passages(pages, term, limit=1, only_pages=[current])
+    if not best:
+        best = best_passages(pages, term, limit=1)
+    if best:
+        top = best[0]
+        return Grounding(ContextSnippet(top.text, source_paper, number(top.page - 1), kind="located", verified=True),
+                         rejected)
+    return Grounding(None, rejected)

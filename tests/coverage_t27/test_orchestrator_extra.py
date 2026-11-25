@@ -27,11 +27,9 @@ def test_extract_terms_json_picks_largest_valid_object_with_terms_list():
     assert orch_mod._extract_terms_json_from_text("plain prose") == {"terms": []}
 
 
-def test_context_for_term_prefers_matching_sentence_then_page_prefix():
-    text = "First sentence. The Polystyrene film was annealed! Last one."
-    assert orch_mod._context_for_term(text, "polystyrene") == "The Polystyrene film was annealed!"
-    assert orch_mod._context_for_term("a" * 600, "zzz") == "a" * 500
-    assert orch_mod._context_for_term("", "x") == ""
+def test_context_for_term_is_gone():
+    """The first-sentence-by-punctuation rule and the text[:500] fallback were removed (design b): grounding replaces them."""
+    assert not hasattr(orch_mod, "_context_for_term")
 
 
 def test_keyword_tokens_and_phrases_dedup_and_drop_stopwords():
@@ -229,11 +227,14 @@ def test_process_page_agent_failure_recovers_via_json_fallback_and_clears_contex
     state = SimpleNamespace(set_page_context=lambda *a: calls.append(a), clear_page_context=lambda: calls.append("clear"))
     calls = []
     o = _bare(tmp_path, graph=Graph(), _snippet_client=client, _tool_state=state)
-    assert o.process_page(PAGE + ". Polystyrene is a polymer.", "a.pdf", 2) is True
-    assert calls == [("a.pdf", 3), "clear"]
+    page = PAGE + ". Polystyrene is a polymer and the film was annealed for ten minutes on a hot plate before the measuring of the scattering began."
+    assert o.process_page(page, "a.pdf", 2) is True
+    assert calls == [("a.pdf", 3, page), "clear"]
     rec = o.store.get(TermStore.normalize("Polystyrene"))
     assert rec.pages == [3] and rec.source_papers == ["a.pdf"] and rec.relations[0].related_term == "Polymer"
-    assert rec.context_snippets[0].text == "Polystyrene is a polymer."
+    # The model gave no sentence: the mention is located in the page (kind located), not the first matching sentence.
+    assert (rec.context_snippets[0].kind, rec.context_snippets[0].page) == ("located", 3)
+    assert rec.context_snippets[0].text.startswith("Polystyrene is a polymer and the film was annealed")
 
 
 def test_process_page_fallback_failure_and_unusable_replies_return_false(tmp_path):

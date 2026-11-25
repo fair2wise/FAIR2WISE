@@ -155,6 +155,21 @@ def default_orchestrator_factory(*, model: str, output_file: str, schema_path: s
     return Orchestrator(model=model, output_file=output_file, schema_path=schema_path, **kwargs)
 
 
+def _paper_passage_stats(orch: Any, name: str) -> dict[str, int]:  # noqa: ANN401  # Any: Orchestrator or a test fake
+    """The extractor's passage coverage counts of this run for one paper (empty for an extractor without them)."""
+    getter = getattr(getattr(orch, "store", None), "run_passage_stats", None)
+    try:
+        return {k: int(v) for k, v in (getter() if callable(getter) else {}).get(name, {}).items()}
+    except Exception:  # noqa: BLE001 - counters are informative only
+        return {}
+
+
+def _passage_delta(before: Mapping[str, int], after: Mapping[str, int], name: str) -> dict[str, dict[str, int]]:
+    """What one paper added to the run's passage counts, keyed for the manifest ``passages`` block."""
+    delta = {k: v - int(before.get(k, 0)) for k, v in after.items()}
+    return {name: delta} if any(delta.values()) else {}
+
+
 def _now() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -541,6 +556,7 @@ class LibraryExtractor:
             path = self.service.roots.policy("library").require_allowed(root / rel)
             sha = sha256_file(path)  # the bytes read now, not the catalog's earlier hash
             before = dict(orch.store.metadata)
+            passages_before = _paper_passage_stats(orch, name)
             with_terms = int(orch.process_pdf(str(path)) or 0)
             refused = getattr(orch, "refusal", None)
             if refused is not None:  # the pages were not read by the model: say why, do not call the PDF unreadable
@@ -554,7 +570,8 @@ class LibraryExtractor:
             # Per-PDF manifest entry now, not only at the end: a failed, hung or fenced-out run keeps its finished papers.
             self.store.record_extraction(
                 bundle.name, schema_id=str(schema_block["id"]), model=model, backend=backend["name"],
-                papers=[B.PaperRef(Path(rel).name, str(row["sha256"]), pages)])
+                papers=[B.PaperRef(Path(rel).name, str(row["sha256"]), pages)],
+                passages=_passage_delta(passages_before, _paper_passage_stats(orch, name), name))
             counts["extracted"] += 1
             counts["pages"] += pages
             counts["pages_with_terms"] += with_terms

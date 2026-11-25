@@ -174,7 +174,8 @@ def test_lookup_chebi_variants(make):
 def test_register_term_new_then_update_uses_page_context_and_merge_index(make):
     merge = FakeMerge([])
     state, tools = make(merge=merge)
-    state.set_page_context("p.pdf", 7)
+    # Grounding: the sentence must be in the page text the tool is given (changed: the tool used to store any context).
+    state.set_page_context("p.pdf", 7, "Some other words come first. PS is a polymer. Then more words follow here.")
     reg = tools["register_term"]
     out = reg.invoke({"term": "Polystyrene", "definition": "polymer", "category": "Chemical",
                       "context": "PS is a polymer.", "relations": [{"relation": "is_a", "related_term": "Polymer"}]})
@@ -183,6 +184,7 @@ def test_register_term_new_then_update_uses_page_context_and_merge_index(make):
     rec = state.store.get(key)
     assert rec.pages == [7] and rec.source_papers == ["p.pdf"]
     assert rec.context_snippets[0].text == "PS is a polymer." and rec.context_snippets[0].page == 7
+    assert (rec.context_snippets[0].kind, rec.context_snippets[0].verified) == ("quoted", True)
     assert reg.invoke({"term": "Polystyrene", "definition": "polymer", "category": "Chemical",
                        "source_paper": "q.pdf", "page": 2}) == f"updated:{key}"
     assert merge.added == ["Polystyrene"]  # not re-added
@@ -221,9 +223,10 @@ def test_the_page_reaches_tools_that_run_on_worker_threads_of_the_agent_graph(ma
     from langchain_core.runnables.config import ContextThreadPoolExecutor
 
     state, tools = make()
-    state.set_page_context("tomo.pdf", 5)
+    state.set_page_context("tomo.pdf", 5, "Intro words. Cloud tomography images clouds. Closing words here.")
     with ContextThreadPoolExecutor() as pool:
         assert pool.submit(state.page_context).result() == ("tomo.pdf", 5)
+        assert pool.submit(state.page_text).result().startswith("Intro words.")  # the page text reaches the tool thread
         pool.submit(tools["register_term"].invoke, {"term": "cloud tomography", "definition": "3D imaging of clouds.",
                                                     "category": "Thing", "context": "Cloud tomography images clouds."}).result()
     record = state.store.get("cloud tomography")
@@ -250,25 +253,80 @@ def test_pages_processed_in_parallel_keep_their_own_page(make):
     assert results == {n: ("a.pdf", n) for n in range(1, 9)}
 
 
-def test_a_passage_is_kept_with_the_page_unknown_when_no_page_is_known(make, caplog):
-    """A missing page number must never discard the evidence again."""
+def test_with_no_page_known_the_sentence_is_found_in_the_paper_and_the_found_page_is_stored(make):
+    """No page number: the sentence is searched in every page of the paper; the page where it is found is stored."""
     state, tools = make()
     state.clear_page_context()
     state.current_source_paper = "a.pdf"
-    with caplog.at_level("WARNING"):
-        tools["register_term"].invoke({"term": "voxel grid", "definition": "d", "category": "Thing",
-                                       "context": "A voxel grid divides the volume."})
+    state.paper_pages = ("a.pdf", ["Nothing here.", "Other words. A voxel grid divides the\nvolume. Close."])
+    tools["register_term"].invoke({"term": "voxel grid", "definition": "d", "category": "Thing",
+                                   "context": "A voxel grid divides the volume."})
     record = state.store.get("voxel grid")
-    assert [(s.text, s.source_paper, s.page) for s in record.context_snippets] == [("A voxel grid divides the volume.", "a.pdf", None)]
+    assert [(s.text, s.source_paper, s.page) for s in record.context_snippets] == [("A voxel grid divides the volume.", "a.pdf", 2)]
     assert record.pages == [] and record.source_papers == ["a.pdf"]      # what is known is recorded, nothing invented
-    assert any("page unknown" in r.message for r in caplog.records)
     tools["register_term"].invoke({"term": "no context term", "definition": "d", "category": "Thing"})
-    assert state.store.get("no context term").context_snippets == []      # no context: no passage, nothing invented
+    assert state.store.get("no context term").context_snippets == []      # no sentence, no findable mention: nothing
+
+
+def test_a_sentence_that_cannot_be_verified_is_not_stored_and_is_counted(make):
+    """Changed: with no page text at all the old code stored the model's sentence with the page unknown."""
+    state, tools = make()
+    state.clear_page_context()
+    state.current_source_paper = "a.pdf"
+    tools["register_term"].invoke({"term": "voxel grid", "definition": "d", "category": "Thing",
+                                   "context": "A voxel grid divides the volume."})
+    assert state.store.get("voxel grid").context_snippets == []
+    assert state.store.run_passage_stats()["a.pdf"] == {"terms": 1, "with_passage": 0, "quoted": 0, "located": 0,
+                                                         "rejected": 1, "uncovered": 1}
 
 
 def test_a_second_passage_of_the_same_term_on_the_same_page_is_kept(make):
     state, tools = make()
-    state.set_page_context("a.pdf", 2)
+    state.set_page_context("a.pdf", 2, "First mention of P3HT. Second mention of P3HT. Done.")
     for text in ("First mention of P3HT.", "Second mention of P3HT.", "First mention of P3HT."):
         tools["register_term"].invoke({"term": "P3HT", "definition": "d", "category": "Thing", "context": text})
     assert [s.text for s in state.store.get("p3ht").context_snippets] == ["First mention of P3HT.", "Second mention of P3HT."]
+
+
+def test_a_rejected_sentence_is_counted_and_never_stored_and_a_mention_is_located_instead(make):
+    page = ("Opening words of the page. P3HT films were annealed at 150 degrees for ten minutes before the measurement "
+            "and then cooled slowly to room temperature in the glove box. Closing words of the page.")
+    state, tools = make()
+    state.set_page_context("a.pdf", 1, page)
+    tools["register_term"].invoke({"term": "P3HT", "definition": "d", "category": "Thing",
+                                   "context": "P3HT is the most studied polymer in the world."})   # not in the page
+    record = state.store.get("p3ht")
+    (snippet,) = record.context_snippets
+    assert (snippet.kind, snippet.verified, snippet.page) == ("located", True, 1)
+    assert snippet.text.startswith("P3HT films were annealed")
+    assert "most studied" not in snippet.text
+    assert state.store.run_passage_stats()["a.pdf"] == {"terms": 1, "with_passage": 1, "quoted": 0, "located": 1,
+                                                         "rejected": 1, "uncovered": 0}
+
+
+def test_the_stored_page_is_where_the_sentence_is_found_not_the_claimed_page(make):
+    state, tools = make()
+    state.set_page_context("a.pdf", 1, "Page one has nothing about it at all in this text.")
+    state.paper_pages = ("a.pdf", ["Page one has nothing about it at all in this text.",
+                                   "Page two states that the scattering vector is the momentum transfer."])
+    tools["register_term"].invoke({"term": "scattering vector", "definition": "d", "category": "Thing",
+                                   "context": "The scattering vector is the momentum transfer."})
+    (snippet,) = state.store.get("scattering vector").context_snippets
+    assert (snippet.page, snippet.kind) == (2, "quoted")
+
+
+def test_no_sentence_and_no_mention_stores_nothing_and_counts_the_term_uncovered(make):
+    state, tools = make()
+    state.set_page_context("a.pdf", 1, "A page that never names the term the model invented for it, in plain words.")
+    tools["register_term"].invoke({"term": "unrelated notion", "definition": "d", "category": "Thing"})
+    assert state.store.get("unrelated notion").context_snippets == []
+    assert state.store.run_passage_stats()["a.pdf"]["uncovered"] == 1
+
+
+def test_a_hyphenated_line_broken_sentence_is_verified_by_the_squash_match(make):
+    state, tools = make()
+    state.set_page_context("a.pdf", 3, "The inter-\nface layer was grown on silicon.\nNext line.")
+    tools["register_term"].invoke({"term": "interface layer", "definition": "d", "category": "Thing",
+                                   "context": "The interface layer was grown on silicon."})
+    (snippet,) = state.store.get("interface layer").context_snippets
+    assert (snippet.text, snippet.page, snippet.verified) == ("The interface layer was grown on silicon.", 3, True)

@@ -468,7 +468,7 @@ def test_register_term_stamps_thread_local_page_context(tmp_path):
     state = ToolState(store=store, schema=schema, services=SimpleNamespace(chebi_lookup=None))
     tools = {t.name: t for t in build_tools(state)}
 
-    state.set_page_context("rsoxs-paper.pdf", 4)
+    state.set_page_context("rsoxs-paper.pdf", 4, "P-RSoXS measures molecular orientation in P3HT films. RSoXS measures domain spacing.")
     tools["register_term"].invoke(
         {
             "term": "P-RSoXS",
@@ -489,6 +489,7 @@ def test_register_term_stamps_thread_local_page_context(tmp_path):
     # Tools may run on a worker thread that never saw set_page_context.
     state.clear_page_context()
     state.current_source_paper = "rsoxs-paper.pdf"
+    state.paper_pages = ("rsoxs-paper.pdf", ["P-RSoXS measures molecular orientation in P3HT films. RSoXS measures domain spacing."])
     tools["register_term"].invoke(
         {
             "term": "RSoXS",
@@ -501,3 +502,4 @@ def test_register_term_stamps_thread_local_page_context(tmp_path):
     rsoxs = store.get("rsoxs")
     assert rsoxs is not None
     assert rsoxs.source_papers == ["rsoxs-paper.pdf"]
+    assert [(c.text, c.page) for c in rsoxs.context_snippets] == [("RSoXS measures domain spacing.", 1)]

@@ -115,6 +115,20 @@ def _snippet_key(snippet: Any) -> tuple[Any, ...]:  # noqa: ANN401 - a snippet i
     return ("?", None, repr(snippet))
 
 
+def _upgrade_located(existing: list[Any], incoming: Iterable[Any]) -> None:
+    """A passage held as ``located`` that arrives again as ``quoted`` becomes ``quoted`` (kind and verified)."""
+    quoted = {_snippet_key(i): i for i in incoming if isinstance(i, dict) and i.get("kind", "quoted") == "quoted"}
+    for item in existing:
+        if isinstance(item, dict) and item.get("kind") == "located":
+            hit = quoted.get(_snippet_key(item))
+            if hit is not None:
+                item.pop("kind", None)
+                if hit.get("verified"):
+                    item["verified"] = True
+                else:
+                    item.pop("verified", None)
+
+
 def merge_term_into_node(term: dict[str, Any], node: dict[str, Any]) -> None:
     """Carry what another record of the same term adds into the node that already exists (nothing is overwritten).
 
@@ -127,6 +141,7 @@ def merge_term_into_node(term: dict[str, Any], node: dict[str, Any]) -> None:
     for list_key in ("pages", "authors", "institutions", "keywords"):
         _union_by(node.setdefault(list_key, []), ensure_list(term.get(list_key)), lambda v: json.dumps(v, sort_keys=True))
     _union_by(node.setdefault("context_snippets", []), ensure_list(term.get("context_snippets")), _snippet_key)
+    _upgrade_located(node["context_snippets"], ensure_list(term.get("context_snippets")))
     _union_by(node.setdefault("properties", []), ensure_list(term.get("properties")),
               lambda v: json.dumps(v, sort_keys=True, default=str))
     pubs = node.setdefault("publications", [])

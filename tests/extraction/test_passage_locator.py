@@ -419,3 +419,35 @@ def test_real_timing(paper_pages: list[str]) -> None:
     for term in terms[:2000]:
         P.candidates(paper_pages, term)
     assert time.perf_counter() - t0 < 5.0
+
+
+# ---------------------------------------------------------------------------------------------------- grounding
+
+
+def test_ground_context_quoted_located_and_rejected() -> None:
+    pages = ["Opening words only on the first page of the paper.",
+             "The scattering vector is the momentum transfer of the photon in the sample. Further words follow here, and they run on "
+             "for a good while so that the pair of sentences is long enough to count."]
+    claimed = "The scattering  vector is the momentum transfer of the photon in the sample."
+    quoted = P.ground_context(term="scattering vector", sentence=claimed, source_paper="a.pdf", page=1,
+                              page_text=pages[0], paper_pages=pages)
+    assert quoted.snippet is not None and not quoted.rejected
+    assert (quoted.snippet.kind, quoted.snippet.verified, quoted.snippet.page) == ("quoted", True, 2)
+    wrong = P.ground_context(term="scattering vector", sentence="Something the paper never says about anything here.",
+                             source_paper="a.pdf", page=1, page_text=pages[0], paper_pages=pages)
+    assert wrong.rejected and wrong.snippet is not None and wrong.snippet.kind == "located" and wrong.snippet.page == 2
+    nothing = P.ground_context(term="unseen", sentence="Nothing at all of this is in the paper text.",
+                               source_paper="a.pdf", page=1, page_text=pages[0], paper_pages=pages)
+    assert nothing.rejected and nothing.snippet is None
+    none_given = P.ground_context(term="unseen", sentence=None, source_paper="a.pdf", page=1, page_text=pages[0],
+                                  paper_pages=pages)
+    assert not none_given.rejected and none_given.snippet is None
+
+
+def test_ground_context_prefers_the_page_it_came_from_for_the_located_fallback() -> None:
+    sentence = "RSoXS measurements were performed at the beamline with a calibrated detector in transmission mode at room temperature, after the films were aligned."
+    pages = [sentence, "Later " + sentence]
+    got = P.ground_context(term="RSoXS", sentence=None, source_paper="a.pdf", page=2, page_text=pages[1],
+                           paper_pages=pages)
+    assert got.snippet is not None and got.snippet.page == 2
+    assert [p.page for p in P.best_passages(pages, "RSoXS", only_pages=[0])] == [1]
