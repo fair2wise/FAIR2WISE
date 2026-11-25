@@ -161,7 +161,7 @@
         "case_sha256": "ac5e9517bb7b4d841736a778bcc2fc599ad953e7d3905afc707c4df17a02e2b6",
         "config_sha256": "830a1af9499262a2badcabf35a8197d2e128a62daef78276ad123fae5fe19685",
         "model_sha256": null,
-        "oracle_source_sha256": "0d9c0cbb3e78687089852a775d2d6a9945ffe557437373c57b14e1293d018735",
+        "oracle_source_sha256": "afa068d0a9175317a0a8fa4d77a8627d445e911482cf34eebe90caf740b8edaf",
         "schema_sha256": null
       },
       "input_fixture_refs": [
