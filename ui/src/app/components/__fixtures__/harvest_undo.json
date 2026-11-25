@@ -1,0 +1,27 @@
+{
+  "candidate": {
+    "id": "d7cdeb64c84204a2",
+    "run_id": "abababababababab",
+    "key": "doi:10.1038/s41563-020-0001-2",
+    "title": "Grazing incidence scattering of block copolymer thin films",
+    "year": 2020,
+    "doi": "10.1038/s41563-020-0001-2",
+    "arxiv_id": null,
+    "source": "openalex",
+    "tier": "C",
+    "score": 0.0,
+    "status": "failed",
+    "landing_url": "",
+    "relpath": null,
+    "detail": "the supplied file was removed again (undo)",
+    "oa": null,
+    "link_rule": null,
+    "provenance": null,
+    "supplied_by": null,
+    "match": null
+  },
+  "removed": {
+    "file": true,
+    "manifest": true
+  }
+}

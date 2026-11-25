@@ -39,8 +39,8 @@ def world(monkeypatch, tmp_path):
     return app, harvester, cid, done, lib
 
 
-def _post_pdf(client, cid, data=None, name="mine.pdf"):
-    return client.post(f"{BASE}/candidates/{cid}/pdf",
+def _post_pdf(client, cid, data=None, name="mine.pdf", query=""):
+    return client.post(f"{BASE}/candidates/{cid}/pdf{query}",
                        files={"file": (name, io.BytesIO(pdf("mine") if data is None else data), "application/pdf")})
 
 
@@ -72,15 +72,18 @@ def test_candidates_of_a_run_and_unknown_or_malformed_run_ids(world):
 
 def test_supplying_a_pdf_files_it_into_the_runs_category(world):
     app, harvester, cid, _, lib = world
-    resp = _post_pdf(app.client(), cid)
+    resp = _post_pdf(app.client(), cid)   # the fake probe reads nothing: a weak match is not filed
+    assert resp.status_code == 200 and resp.json()["filed"] is False and resp.json()["needs_confirmation"] is True
+    assert harvester.store.candidate(cid)["status"] == "paywalled" and not any(lib.rglob("*.pdf"))
+    resp = _post_pdf(app.client(), cid, query="?confirm=true")
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    assert body["candidate"]["status"] == "filed" and body["duplicate"] is False
+    assert body["filed"] is True and body["candidate"]["status"] == "filed" and body["duplicate"] is False
     relpath = body["paper"]["relpath"]
     assert relpath.startswith("rsoxs/") and (lib / relpath).is_file()
     assert harvester.store.candidate(cid)["status"] == "filed"
     assert str(lib) not in resp.text
-    assert _post_pdf(app.client(), cid).status_code == 409  # no longer paywalled
+    assert _post_pdf(app.client(), cid, query="?confirm=true").status_code == 409  # no longer waiting for a PDF
 
 
 def test_supplying_a_pdf_refuses_bad_ids_unknown_candidates_and_non_pdf(world):

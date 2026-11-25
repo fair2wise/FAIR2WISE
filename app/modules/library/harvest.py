@@ -35,9 +35,11 @@ import time
 from typing import Any
 from urllib.parse import urljoin, urlsplit
 
+from fastapi import HTTPException
 import httpx
 
 from .. import metrics
+from ...api.upload_limits import require_pdf
 from ..contracts.errors import ContractError, ErrorCode
 from ..jobs.pipeline import StageContext, StageResult
 from ..literature.legacy_download import (
@@ -56,6 +58,8 @@ from ..literature.safe_fetch import BlockedURL, NetworkPolicy
 from .arrange import is_valid_folder_name
 from .bibmeta import cap_abstract, clean_author_list, openalex_authors
 from .oa_links import ResolvedLink, oa_locations, resolve_links
+from .open_link import open_url
+from .pdf_match import best_match, facts_from_probe, match_candidate, other_candidate
 from .service import LibraryService
 
 logger = logging.getLogger(__name__)
@@ -447,16 +451,35 @@ CREATE TABLE IF NOT EXISTS candidates (
   id TEXT PRIMARY KEY, run_id TEXT NOT NULL, key TEXT NOT NULL, title TEXT NOT NULL, year INTEGER, doi TEXT,
   arxiv_id TEXT, source TEXT NOT NULL, tier TEXT NOT NULL, score REAL NOT NULL, status TEXT NOT NULL,
   landing_url TEXT, pdf_url TEXT, relpath TEXT, detail TEXT, authors TEXT, abstract TEXT, oa INTEGER, link_rule TEXT,
-  UNIQUE (run_id, key));
+  provenance TEXT, supplied_by TEXT, match_json TEXT, prev_status TEXT, filed_sha TEXT, UNIQUE (run_id, key));
 CREATE INDEX IF NOT EXISTS candidates_run ON candidates (run_id);
 """
 #: Columns added after the first release; an older ``harvest.sqlite`` gets them on open. ``authors`` (JSON list) and
 #: ``abstract`` are kept only to carry the registry's answer to the manifest row, never returned by the API.
-_ADDED_COLUMNS = (("authors", "TEXT"), ("abstract", "TEXT"), ("oa", "INTEGER"), ("link_rule", "TEXT"))
+_ADDED_COLUMNS = (("authors", "TEXT"), ("abstract", "TEXT"), ("oa", "INTEGER"), ("link_rule", "TEXT"),
+                  ("provenance", "TEXT"), ("supplied_by", "TEXT"), ("match_json", "TEXT"), ("prev_status", "TEXT"),
+                  ("filed_sha", "TEXT"))
 #: The same for the ``runs`` table: what each source answered (``{source: {state, returned, message}}`` as JSON).
 _ADDED_RUN_COLUMNS = (("source_status", "TEXT"),)
 _CANDIDATE_FIELDS = ("id", "title", "year", "doi", "arxiv_id", "source", "tier", "score", "status", "landing_url",
-                     "pdf_url", "relpath", "detail", "oa", "link_rule")
+                     "pdf_url", "relpath", "detail", "oa", "link_rule", "provenance", "supplied_by", "match_json")
+#: Columns that are the store's own bookkeeping and never leave it.
+_INTERNAL_COLUMNS = ("prev_status", "filed_sha")
+#: Statuses of a paper that still needs a PDF by hand (the drop zone, the batch view); everything else is settled.
+MANUAL_STATUSES = ("paywalled", "blocked", "failed")
+
+
+def _candidate_dto(row: dict[str, Any]) -> dict[str, Any]:
+    """A candidate row for the API: ``oa`` as a boolean or ``None``; ``match_json`` becomes ``match`` (DOIs and titles only)."""
+    out = dict(row)
+    out["oa"] = None if out.get("oa") is None else bool(out["oa"])
+    raw = out.pop("match_json", None)
+    try:
+        match = json.loads(raw) if raw else None
+    except ValueError:
+        match = None
+    out["match"] = match if isinstance(match, dict) else None
+    return out
 
 
 def candidate_id(run_id: str, key: str) -> str:
@@ -552,6 +575,29 @@ class HarvestStore:
             self._con.execute("UPDATE candidates SET status=?, relpath=COALESCE(?, relpath), detail=? WHERE id=?",
                               (status, relpath, detail, cid))
 
+    def set_supplied(self, cid: str, *, status: str, relpath: str, detail: str, provenance: str, supplied_by: str,
+                     match: Mapping[str, Any] | None, prev_status: str, filed_sha: str) -> None:
+        """A person supplied this paper's PDF: the new status, where it was filed and how it was matched (for the undo too)."""
+        with self._lock, self._con:
+            self._con.execute(
+                "UPDATE candidates SET status=?, relpath=?, detail=?, provenance=?, supplied_by=?, match_json=?, "
+                "prev_status=?, filed_sha=? WHERE id=?",
+                (status, relpath, detail, provenance, supplied_by, json.dumps(match) if match else None, prev_status,
+                 filed_sha, cid))
+
+    def clear_supplied(self, cid: str, *, status: str, detail: str) -> None:
+        """Undo :meth:`set_supplied`: back to ``status`` with no file, provenance or match recorded."""
+        with self._lock, self._con:
+            self._con.execute(
+                "UPDATE candidates SET status=?, relpath=NULL, detail=?, provenance=NULL, supplied_by=NULL, "
+                "match_json=NULL, prev_status=NULL, filed_sha=NULL WHERE id=?", (status, detail, cid))
+
+    def raw_candidate(self, cid: str) -> dict[str, Any] | None:
+        """The stored row including the bookkeeping columns (``prev_status``, ``filed_sha``); for the harvester only."""
+        with self._lock:
+            row = self._con.execute("SELECT * FROM candidates WHERE id=?", (cid,)).fetchone()
+        return dict(row) if row else None
+
     def finished_keys(self, run_id: str) -> set[str]:
         """Keys of the candidates a resumed job must not redo (any settled outcome; ``found`` and ``downloading`` are not)."""
         with self._lock:
@@ -566,8 +612,10 @@ class HarvestStore:
         if row is None:
             return None
         out = dict(row)
-        out["oa"] = None if out.get("oa") is None else bool(out["oa"])
         authors, abstract = out.pop("authors", None), out.pop("abstract", None)
+        for internal in _INTERNAL_COLUMNS:
+            out.pop(internal, None)
+        out = _candidate_dto(out)
         if with_metadata:
             try:
                 parsed = json.loads(authors) if authors else []
@@ -582,8 +630,7 @@ class HarvestStore:
         with self._lock:
             rows = self._con.execute("SELECT * FROM candidates WHERE run_id=? ORDER BY tier, score DESC, title",
                                      (run_id,)).fetchall()
-        return [{k: (None if k == "oa" and r[k] is None else bool(r[k])) if k == "oa" else r[k]
-                 for k in _CANDIDATE_FIELDS} for r in rows]
+        return [_candidate_dto({k: r[k] for k in _CANDIDATE_FIELDS}) for r in rows]
 
 
 # -- the harvester ------------------------------------------------------------------------------------------
@@ -628,7 +675,8 @@ class Harvester:
     def __init__(self, service: LibraryService, store: HarvestStore, *, searchers: Mapping[str, Searcher] | None = None,
                  downloader: Downloader | None = None, delay: float = 1.0,
                  sleep: Callable[[float], None] = time.sleep,
-                 link_resolver: Callable[[Candidate], Iterable[ResolvedLink]] | None = None) -> None:
+                 link_resolver: Callable[[Candidate], Iterable[ResolvedLink]] | None = None,
+                 proxy_prefix: str | None = None) -> None:
         """Create a harvester.
 
         Args:
@@ -640,7 +688,10 @@ class Harvester:
             sleep: Clock for the delay.
             link_resolver: ``candidate -> further free links`` for open-access papers (default: :func:`resolve_links`
                 over the hardened getters; tests inject a fake).
+            proxy_prefix: The validated ``F2W_LIBRARY_PROXY_PREFIX`` (or ``None``); only put in front of the
+                ``open_url`` links the candidates response carries, never requested.
         """
+        self.proxy_prefix = proxy_prefix
         self._link_resolver = link_resolver
         self.service = service
         self.store = store
@@ -871,45 +922,143 @@ class Harvester:
 
     # -- reads and the paywalled queue --------------------------------------------------------------
 
-    def file_candidate_pdf(self, cid: str, filename: str | None, data: bytes) -> dict[str, Any]:
-        """File a PDF a person supplied for a ``paywalled`` candidate into the run's category.
+    def supply_pdf(self, cid: str, filename: str | None, data: bytes, *, confirm: bool = False, to: str | None = None,
+                   supplied_by: str = "local-operator") -> dict[str, Any]:
+        """File a PDF a person supplied for a paper that needs one by hand (``paywalled``, ``blocked`` or ``failed``).
+
+        The file is validated like any upload (size cap, ``%PDF-``), probed with the library's bounded probe and matched
+        to the candidate (:func:`~app.modules.library.pdf_match.match_candidate`). A **strong** match is filed at once.
+        Otherwise nothing is stored and the answer asks for confirmation (``confirm=True`` files it, with the verdict
+        recorded as provenance), naming the verdict, what the PDF carries and, when its DOI belongs to another open
+        candidate of the run, that candidate (``to=<its id>`` files it there instead).
+
+        Args:
+            cid: The candidate the person dropped the file on.
+            filename: The client's file name (sanitised on upload).
+            data: The bytes, already size-limited by the route.
+            confirm: The person confirmed a weak match or a mismatch.
+            to: Another open candidate of the same run to file the PDF against.
+            supplied_by: The acting principal's subject, recorded next to the provenance.
 
         Returns:
-            ``{"candidate", "paper", "duplicate", "manifest"}``.
+            ``{"filed": True, "candidate", "paper", "duplicate", "manifest", "verdict"}`` or ``{"filed": False,
+            "needs_confirmation": True, "candidate": {...}, "verdict": {...}, "other_candidate": {...} | None}``.
 
         Raises:
-            ContractError: ``NOT_FOUND`` for an unknown candidate, ``CONFLICT`` unless it is ``paywalled``.
+            ContractError: ``NOT_FOUND`` for an unknown candidate, ``CONFLICT`` for one that needs no PDF by hand.
+            HTTPException: 413 or 415 from the upload checks.
         """
-        row = self._paywalled(cid, with_metadata=True)
-        run = self.store.run(row["run_id"])
+        if len(data) > self.service.max_upload_bytes:
+            raise HTTPException(status_code=413, detail=f"upload exceeds the {self.service.max_upload_bytes} byte limit")
+        require_pdf(data)
+        asked = self._manual(cid, with_metadata=True)
+        target = asked
+        if to and to != cid:
+            target = self._manual(to, with_metadata=True)
+            if target["run_id"] != asked["run_id"]:
+                raise ContractError(ErrorCode.CONFLICT, "the other candidate belongs to another run", retryable=False)
+        run = self.store.run(target["run_id"])
         category = run["category"] if run else ""
-        known = {"year": row["year"], "title": row["title"], "doi": row["doi"], "arxiv_id": row["arxiv_id"],
-                 "source": row["source"], "authors": row.get("authors"), "abstract": row.get("abstract")}
-        result = self.service.upload(filename or f"{file_stem(Candidate(row['title'], row['source'], doi=row['doi'], arxiv_id=row['arxiv_id']))}.pdf",
-                                     data, category, known=known)
+        root = self.service._require_root()
+        probe = self.service._probe_bytes(root, data)
+        facts = facts_from_probe(probe)
+        verdict = match_candidate(facts, doi=target["doi"], title=target["title"])
+        if verdict.kind != "strong" and not confirm:
+            others = [c for c in self.store.candidates(target["run_id"]) if c["status"] in MANUAL_STATUSES]
+            other = other_candidate(facts, others, exclude=target["id"])
+            return {"filed": False, "needs_confirmation": True,
+                    "candidate": {"id": target["id"], "title": target["title"], "doi": target["doi"]},
+                    "verdict": verdict.as_dict(),
+                    "other_candidate": ({"id": other["id"], "title": other["title"], "doi": other["doi"],
+                                         "status": other["status"]} if other else None)}
+        provenance = {"strong": "user_supplied", "weak": "user_supplied_confirmed",
+                      "mismatch": "user_supplied_mismatch_confirmed"}[verdict.kind]
+        known = {"year": target["year"], "title": target["title"], "doi": target["doi"], "arxiv_id": target["arxiv_id"],
+                 "source": target["source"], "authors": target.get("authors"), "abstract": target.get("abstract"),
+                 "provenance": provenance, "supplied_by": supplied_by}
+        stem = file_stem(Candidate(target["title"], target["source"], doi=target["doi"], arxiv_id=target["arxiv_id"]))
+        result = self.service.upload(filename or f"{stem}.pdf", data, category, known=known)
         relpath = result["paper"]["relpath"]
         if result["duplicate"]:
-            self.store.set_status(cid, "in_library", relpath=relpath, detail=f"identical to {relpath}")
-        else:
-            self.store.set_status(cid, "filed", relpath=relpath, detail="supplied by hand")
-        return {"candidate": self.store.candidate(cid), **result}
+            self.store.set_status(target["id"], "in_library", relpath=relpath, detail=f"identical to {relpath}")
+            return {"filed": True, "candidate": self.store.candidate(target["id"]), "verdict": verdict.as_dict(), **result}
+        how = {"strong": "strong match", "weak": "confirmed by the user", "mismatch": "mismatch confirmed by the user"}[verdict.kind]
+        match = None
+        if verdict.kind == "mismatch":   # both DOIs and both titles stay on record
+            match = {"candidate_doi": target["doi"], "candidate_title": target["title"], "found_dois": list(verdict.found_dois),
+                     "found_title": verdict.found_title}
+        sha = hashlib.sha256(data).hexdigest()
+        self.store.set_supplied(target["id"], status="filed", relpath=relpath, detail=f"supplied by the user ({how})",
+                                provenance=provenance, supplied_by=supplied_by, match=match, prev_status=target["status"],
+                                filed_sha=sha)
+        return {"filed": True, "candidate": self.store.candidate(target["id"]), "verdict": verdict.as_dict(), **result}
+
+    def supply_pdf_to_run(self, run_id: str, filename: str | None, data: bytes, *,
+                          supplied_by: str = "local-operator") -> dict[str, Any]:
+        """File a dropped PDF against whichever open candidate of the run it belongs to (the batch drop).
+
+        A strong match is filed like :meth:`supply_pdf`; a weak one answers ``needs_confirmation`` naming the candidate
+        (the caller then confirms on that candidate's route); a PDF that matches nothing, or ties between candidates, is
+        ``{"filed": False, "unmatched": True}`` and nothing is stored.
+        """
+        if self.store.run(run_id) is None:
+            raise ContractError(ErrorCode.NOT_FOUND, "run not found")
+        if len(data) > self.service.max_upload_bytes:
+            raise HTTPException(status_code=413, detail=f"upload exceeds the {self.service.max_upload_bytes} byte limit")
+        require_pdf(data)
+        open_candidates = [c for c in self.store.candidates(run_id) if c["status"] in MANUAL_STATUSES]
+        facts = facts_from_probe(self.service._probe_bytes(self.service._require_root(), data))
+        picked = best_match(facts, open_candidates)
+        if picked is None:
+            return {"filed": False, "unmatched": True}
+        candidate, verdict = picked
+        if verdict.kind == "strong":
+            return self.supply_pdf(str(candidate["id"]), filename, data, supplied_by=supplied_by)
+        return {"filed": False, "needs_confirmation": True,
+                "candidate": {"id": candidate["id"], "title": candidate["title"], "doi": candidate["doi"]},
+                "verdict": verdict.as_dict(), "other_candidate": None}
+
+    def undo_supplied(self, cid: str) -> dict[str, Any]:
+        """Reverse a filing made by :meth:`supply_pdf`: the file, its manifest row and catalog row, and the candidate's status.
+
+        Only the file this feature filed is removed (its sha256 must match); the candidate returns to the status it had
+        and the run's counts follow from that. Anything else is refused.
+
+        Raises:
+            ContractError: ``NOT_FOUND`` for an unknown candidate, ``CONFLICT`` unless a supplied PDF is filed for it.
+        """
+        row = self.store.raw_candidate(cid)
+        if row is None:
+            raise ContractError(ErrorCode.NOT_FOUND, "candidate not found")
+        provenance = str(row.get("provenance") or "")
+        if row["status"] != "filed" or not provenance.startswith("user_supplied") or not row.get("filed_sha") or not row.get("relpath"):
+            raise ContractError(ErrorCode.CONFLICT, "no file supplied by the user is filed for this candidate", retryable=False)
+        removed = self.service.remove_filed(str(row["relpath"]), str(row["filed_sha"]))
+        restored = row.get("prev_status") if row.get("prev_status") in MANUAL_STATUSES else "failed"
+        self.store.clear_supplied(cid, status=str(restored), detail="the supplied file was removed again (undo)")
+        return {"candidate": self.store.candidate(cid), "removed": removed}
+
+    def candidates_view(self, run_id: str) -> list[dict[str, Any]]:
+        """The run's candidates as the API lists them: each with ``open_url`` (the link the person opens, or ``None``)."""
+        return [{**row, "open_url": open_url(self.proxy_prefix, row.get("doi"), row.get("landing_url"))}
+                for row in self.store.candidates(run_id)]
 
     def dismiss(self, cid: str) -> dict[str, Any]:
-        """Mark a ``paywalled`` candidate ``dismissed``."""
-        self._paywalled(cid)
+        """Mark a candidate that needs a PDF by hand ``dismissed``."""
+        self._manual(cid)
         self.store.set_status(cid, "dismissed", detail="dismissed by hand")
         return {"candidate": self.store.candidate(cid)}
 
-    def _paywalled(self, cid: str, *, with_metadata: bool = False) -> dict[str, Any]:
+    def _manual(self, cid: str, *, with_metadata: bool = False) -> dict[str, Any]:
         row = self.store.candidate(cid, with_metadata=with_metadata)
         if row is None:
             raise ContractError(ErrorCode.NOT_FOUND, "candidate not found")
-        if row["status"] != "paywalled":
-            raise ContractError(ErrorCode.CONFLICT, f"candidate is {row['status']}, not paywalled",
+        if row["status"] not in MANUAL_STATUSES:
+            raise ContractError(ErrorCode.CONFLICT, f"candidate is {row['status']}, not waiting for a PDF by hand",
                 retryable=False)
         return row
 
 
-__all__ = ("Candidate", "Harvester", "HarvestStore", "SOURCES", "STATUSES", "arxiv_queries",
+__all__ = ("Candidate", "Harvester", "HarvestStore", "MANUAL_STATUSES", "SOURCES", "STATUSES", "arxiv_queries",
            "arxiv_searcher", "candidate_id", "clean_doi", "file_stem", "merge_candidates", "openalex_keyed", "openalex_searcher",
            "pdf_downloader", "score_candidate", "topic_terms")

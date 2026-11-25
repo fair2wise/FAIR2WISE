@@ -1,6 +1,6 @@
 # Design: papers the server cannot fetch, finished in the user's own browser
 
-Status: proposal for owner review. Nothing here is built. It extends the manual helper that already exists on the Harvester's paywalled queue.
+Status: implemented (steps 1 to 6, owner decisions of 2026-11-24 below). User guide: [Library tab, Finishing papers by hand](ui-library.md#finishing-papers-by-hand-the-manual-pdf-flow). It extends the manual helper that already existed on the Harvester's paywalled queue.
 
 ## Goal and hard rules
 
@@ -63,7 +63,11 @@ About 4 to 5 working days with tests. Order: (1) the matcher and its tests; (2) 
 
 The probe's quality on scanned or encrypted PDFs (those fall to "weak"); how an institutional proxy behaves for DOIs the proxy does not cover; whether the first-pages text reliably carries the DOI for older papers (archive.org scans often do not, which is why the title fallback exists).
 
-## Open questions for the owner
+## Owner decisions (2026-11-24)
+
+The open questions below were answered: (1) the `login?url=` prefix form is enough for v1, no host rewriting; (2) a strong DOI match files without a click, with a visible confirmation and an Undo that reverses the filing cleanly; (3) "File anyway" is allowed on a mismatch, showing both DOIs and titles with a plain warning, explicit confirmation and provenance recorded as a confirmed mismatch with both DOIs; (4) 20 files per drop, each file its own request; (5) provenance is shown in the Library table as a small badge. Additions: a single-row drop is matched against all open candidates of the run (`other_candidate`, `to=<id>`), `supplied_by` is recorded next to the provenance, and the rights note stays on the queue and in the docs.
+
+## Open questions (as asked)
 
 1. Is the "login?url=" prefix form enough for v1, or is a host-rewriting proxy needed?
 2. Should a strong DOI match file without any click, as proposed?

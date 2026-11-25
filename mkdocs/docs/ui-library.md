@@ -21,8 +21,8 @@ The Harvester finds new papers for a topic and files them into a category.
 1. **Form.** *Topic* (up to 200 characters; quote a phrase to keep it whole), *Category* (an existing folder or a new one; the root is not offered), *Schema (label only)*, *Sources* (arXiv, OpenAlex), and *Max downloads* (1 to 200, default 20). The schema is recorded with the run so Extraction can default to it; it does not change the search or the ranking.
 2. **Search and ranking.** The job searches each chosen source and merges duplicates by DOI or arXiv id. Each paper is scored against the topic words: **A** when every word appears in the title or abstract and at least half in the title, **B** when at least 60 % appear, **C** otherwise. Papers already in the library (same DOI) are skipped.
 3. **Downloads.** Tier A, then B, in score order: the open-access PDF is fetched (every redirect checked against the network policy, size and time limits, `%PDF-` check) and filed like an upload, with the registry's year, title and DOI. Tier C is never downloaded. The run stops downloading at *Max downloads*.
-4. **Paywalled queue.** An A/B paper with no free PDF (or whose "open" link is not a PDF) is **paywalled**. The queue shows an **Open publisher** link (opens in your own browser; the server never requests the publisher), a drop slot for the PDF you save, and **Dismiss**. A PDF you drop is filed in the run's category by the paper's year and the candidate becomes *filed*.
-5. **Run view.** Progress, a live log, **Cancel**, and a results table with the status of every candidate: *downloaded*, *in library*, *paywalled*, *filed*, *failed*, *skipped*, *dismissed*. Past runs are listed and can be reopened; a run still in progress is re-attached after a page reload. The page follows the run by short polling (the job state and `GET /v1/jobs/{id}/logs?after=<seq>`, about every 2 s, slower when idle or after errors), not by a long-lived stream, so a proxy that cuts idle connections cannot break it. Polling pauses while the tab or the browser page is hidden and resumes, from the last line seen, when it is shown again.
+4. **Needs a PDF.** A paper the harvester could not file waits in the **Needs a PDF (N left)** list, best tier and score first: *paywalled* (not open access), *blocked by network policy* and *failed* (open access, the fetch failed). Each has **Open at publisher**, a drop slot and **Dismiss**; see [Finishing papers by hand](#finishing-papers-by-hand-the-manual-pdf-flow) below.
+5. **Run view.** Progress, a live log, **Cancel**, and a results table with the status of every candidate: *downloaded*, *in library*, *paywalled*, *blocked*, *filed*, *failed*, *skipped*, *dismissed* (the first three that need a PDF by hand are in the Needs a PDF list). Past runs are listed and can be reopened; a run still in progress is re-attached after a page reload. The page follows the run by short polling (the job state and `GET /v1/jobs/{id}/logs?after=<seq>`, about every 2 s, slower when idle or after errors), not by a long-lived stream, so a proxy that cuts idle connections cannot break it. Polling pauses while the tab or the browser page is hidden and resumes, from the last line seen, when it is shown again.
 
 OpenAlex is searched with `OPENALEX_API_KEY` when the server environment has one. Without a key it is still searched, unauthenticated and at a reduced rate (about one request per second, one request per search, the contact address sent when one is configured); the Harvester panel shows "running without a key, reduced rate" next to OpenAlex and the job log starts the OpenAlex stage with a line saying so. If OpenAlex answers that the unauthenticated search is rate limited, OpenAlex is skipped for that run with a plain log line ("add OPENALEX_API_KEY") and arXiv results still count. Library metadata verify and backfill still require the key. After the searches the log carries one `search summary` line in plain words: what each source returned or why it could not be searched, how many results the merge dropped (no title, duplicates) and how many distinct papers remain. A search that found nothing says whether that is an empty answer or a source that never ran.
 
@@ -57,11 +57,48 @@ In the pilot pod: `kubectl -n <namespace> exec deploy/<f2w-deployment> -- f2w-li
 | `POST /v1/library/papers/{id}/verify` | verify one paper |
 | `POST /v1/jobs` kind `library_verify`, `library_index`, `library_harvest` | background jobs (`inputs.params`, with a `nonce` to re-run) |
 | `GET /v1/library/harvest/runs`, `.../runs/{id}/candidates` | Harvester results |
-| `POST /v1/library/harvest/candidates/{id}/pdf`, `.../dismiss` | complete or dismiss a paywalled paper |
+| `POST /v1/library/harvest/candidates/{id}/pdf` (`?confirm=true`, `?to=<candidate id>`), `.../undo`, `.../dismiss` | offer a PDF for a paper that needs one by hand (paywalled, blocked or failed), undo a filing, dismiss it |
+| `POST /v1/library/harvest/runs/{run_id}/pdf` | the multi-file drop: match one PDF to an open paper of the run (one file per request) |
 
 The full route table with capabilities is in `docs/migration/api/README.md`. All of these need the local-operator `library.*` capabilities.
 
 To turn a harvested and extracted KG into a published graph, continue with [The `:local` image, end to end](local-image.md).
+
+## Finishing papers by hand (the manual PDF flow)
+
+For a paper the server cannot fetch you open it with your own access, save the PDF and drop it on the row. The server files it as if you had uploaded it, after checking that it is the right paper. The design and its decisions are in [Design: manual PDF flow](design-manual-pdf-flow.md) (status: implemented).
+
+**Which papers.** Three statuses get the flow: *paywalled* (OpenAlex lists no open-access copy), *blocked by network policy* (open access, but this deployment refused the host) and *failed* (open access, the fetch failed). They are listed under **Needs a PDF (N left)**, ordered tier then score, with one line saying why. After a paper is filed or dismissed, keyboard focus moves to the next one.
+
+**Open at publisher.** A link that opens `https://doi.org/<doi>` (or the landing page when there is no DOI) in a new tab with `rel="noopener noreferrer"`. Your browser makes that request, so your login, VPN or campus network applies. The server never fetches paywalled content, and it never sees or stores your credentials, cookies or session: the only thing that reaches it is the file you choose to upload. If the operator set `F2W_LIBRARY_PROXY_PREFIX` (the institutional library proxy, the `login?url=` form, for example `https://ezproxy.example.edu/login?url=`; see [Configuration](configuration.md)), the link is that prefix followed by the full target URL. The server only builds this string (`open_url` on each candidate); it never requests it, and host-rewriting proxies are not supported. An invalid prefix stops the API at startup with `config_rejected` naming the variable (never its value).
+
+**Dropping one PDF.** Drop it on a row or use *Choose or drop PDF*. The upload is checked like any upload: the size cap (413 over it), the `%PDF-` signature (415 otherwise), a safe file name, and a byte-identical file already in the library is reported as such (the paper becomes *in library*; nothing is written and there is nothing to undo). The PDF is then read by the library's bounded probe (title, first pages, DOIs) and matched to the paper. Each file is its own request, so the size cap applies per file and one failure never fails the others.
+
+**Matching rules and verdicts.**
+
+| Verdict | When | What happens |
+|---|---|---|
+| Strong | the paper's DOI is in the PDF (in its metadata or the top of its first pages, or the titles agree as well), or the paper has no DOI and the titles agree closely (similarity at least 0.9) | filed at once, with a note *Filed <file> against <title> (strong match)* and an **Undo** button |
+| Weak | only the titles are similar (0.6 to 0.9), the DOI is only buried in the text (it may just be cited), or the PDF has no readable text (scanned, encrypted) | nothing is stored; a dialog asks, with **File anyway** |
+| Mismatch | the PDF names a different DOI than the paper | nothing is stored; the dialog shows both DOIs and both titles side by side with a plain warning (a preprint or repository copy of the same work can carry its own DOI, but it may also be the wrong paper); **File anyway** needs an explicit tick |
+
+When the PDF's DOI belongs to *another* paper still waiting in the same run, the dialog also offers **File it under <title> instead** (the request repeats with `to=<candidate id>`) instead of calling it a mismatch. A weak or mismatching answer stores nothing: no file, no manifest row, no change to the paper.
+
+**Provenance.** A filing made this way is recorded on the candidate and on the category manifest row, next to who supplied it (`supplied_by`: the signed-in user's subject, the operator subject on `:local`):
+
+| `provenance` | Meaning |
+|---|---|
+| `user_supplied` | a strong match |
+| `user_supplied_confirmed` | a weak match the user confirmed |
+| `user_supplied_mismatch_confirmed` | a mismatch the user confirmed; the candidate also records `match` with both DOIs and both titles |
+
+The Library **Papers** table shows a small *Supplied by hand* badge (the hover text says how it was matched) for these papers; `GET /v1/library/papers` carries the same `provenance` field, read from the file's own manifest row.
+
+**Undo.** The *Filed ... Undo* note reverses the filing cleanly: the file is deleted (only if its sha256 is still the one filed, never a link), its manifest row and catalog row are removed (other rows are untouched), and the paper returns to the status it had (paywalled, blocked or failed), so the run's counts follow. An identical file that was already in the library and a paper the harvester downloaded itself cannot be undone (409).
+
+**Dropping many PDFs.** The area at the top of the list takes at most **20 PDFs per drop** (more are refused whole with a plain message and nothing is sent). Every file is sent as its own `POST /v1/library/harvest/runs/{run_id}/pdf` request, two at a time, and matched against all open papers of the run. A table lists, per file, the matched paper and the result: a strong match is filed (with Undo), a weak one waits for **Confirm** (the candidate route with `confirm=true`), a file that matches nothing, or ties between papers, is listed as *No match* and never stored, and a file that fails (too large, not a PDF) shows its own error without stopping the others.
+
+**Rights.** Text-mining rights for subscription content are the operator's responsibility to confirm; the tool only files what a person with access supplies. The same line is shown on the Needs a PDF list.
 
 ## How free links are found
 
@@ -81,7 +118,7 @@ Every request goes through the same network check as a download (scheme, port an
 
 | Status | Meaning |
 |---|---|
-| Paywalled | genuinely not open access: OpenAlex lists no open-access copy (`is_oa` false, no open-access location). A person completes it: open the publisher in their own browser, save the PDF, drop it on the row |
+| Paywalled | genuinely not open access: OpenAlex lists no open-access copy (`is_oa` false, no open-access location). A person completes it: open the paper at the publisher in their own browser, save the PDF, drop it on the row |
 | Blocked by network policy | the paper is open access, but this deployment's network policy refused the host (the detail names it, for example `blocked by network policy (private_address) at example.org`, or `proxy_refused` when the egress proxy's allowlist said no). Fix the allowlist or supply the PDF by hand; it is never counted as paywalled |
 | Failed | open access, but the fetch failed for another reason (timeout, network error, an HTTP 401/403/5xx from the host, a link that is not a PDF, no direct PDF link); the detail gives the reason and the host |
 | Downloaded / Filed / In library / Skipped / Dismissed | as before |

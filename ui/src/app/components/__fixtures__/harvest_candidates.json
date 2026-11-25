@@ -1,0 +1,44 @@
+{
+  "candidates": [
+    {
+      "id": "d7cdeb64c84204a2",
+      "title": "Grazing incidence scattering of block copolymer thin films",
+      "year": 2020,
+      "doi": "10.1038/s41563-020-0001-2",
+      "arxiv_id": null,
+      "source": "openalex",
+      "tier": "C",
+      "score": 0.0,
+      "status": "failed",
+      "landing_url": "",
+      "relpath": null,
+      "detail": "the supplied file was removed again (undo)",
+      "oa": null,
+      "link_rule": null,
+      "provenance": null,
+      "supplied_by": null,
+      "match": null,
+      "open_url": "https://doi.org/10.1038/s41563-020-0001-2"
+    },
+    {
+      "id": "93f40ca703f7e777",
+      "title": "Resonant soft X-ray scattering of polymer blend morphology",
+      "year": 2020,
+      "doi": "10.1021/acs.macromol.0c01782",
+      "arxiv_id": null,
+      "source": "openalex",
+      "tier": "C",
+      "score": 0.0,
+      "status": "blocked",
+      "landing_url": "",
+      "relpath": null,
+      "detail": "",
+      "oa": null,
+      "link_rule": null,
+      "provenance": null,
+      "supplied_by": null,
+      "match": null,
+      "open_url": "https://doi.org/10.1021/acs.macromol.0c01782"
+    }
+  ]
+}

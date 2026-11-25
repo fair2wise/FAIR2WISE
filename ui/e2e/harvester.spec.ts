@@ -53,11 +53,14 @@ test.describe('Harvester panel', () => {
     await expect(table.getByText('Open access RSoXS paper')).toBeVisible();
     await expect(table.getByText('Downloaded')).toBeVisible();
     await expect(table.getByText('In library')).toBeVisible();
-    await expect(table.getByText('Failed')).toHaveAttribute('title', 'HTTP 403');
-    const queue = page.getByRole('list', { name: 'Paywalled papers' });
-    await expect(queue.getByRole('listitem')).toHaveCount(2);
+    const queue = page.getByRole('list', { name: 'Papers needing a PDF' });
+    // paywalled, blocked and failed papers all wait in the queue; the failed one names why
+    await expect(queue.getByRole('listitem')).toHaveCount(3);
+    await expect(queue.getByText('HTTP 403')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Needs a PDF (3 left)' })).toBeVisible();
+    await expect(page.getByTestId('harvest-rights-note')).toContainText('responsibility to confirm');
 
-    const publisher = queue.getByRole('link', { name: /Open publisher page for Behind a paywall/ });
+    const publisher = queue.getByRole('link', { name: 'Open at publisher: Behind a paywall' });
     await expect(publisher).toHaveAttribute('href', 'https://doi.org/10.1/wall1');
     await expect(publisher).toHaveAttribute('target', '_blank');
     await expect(publisher).toHaveAttribute('rel', 'noopener noreferrer');
@@ -67,11 +70,14 @@ test.describe('Harvester panel', () => {
       name: 'behind-a-paywall.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n'),
     });
     await expect.poll(() => harvestFiles).toEqual([{ id: 'wall1', name: 'behind-a-paywall.pdf' }]);
-    await expect(queue.getByRole('listitem')).toHaveCount(1);
+    await expect(queue.getByRole('listitem')).toHaveCount(2);
     await expect(table.getByText('Behind a paywall')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Filed behind-a-paywall.pdf against Behind a paywall (strong match)' }))
+      .toBeVisible();
 
     await page.getByRole('button', { name: 'Dismiss Also paywalled' }).click();
-    await expect.poll(() => harvestDismisses).toEqual(['wall2']);
+    await page.getByRole('button', { name: 'Dismiss Broken download' }).click();
+    await expect.poll(() => harvestDismisses).toEqual(['wall2', 'bad']);
     await expect(page.getByText('Nothing is waiting for a PDF.')).toBeVisible();
 
     // The filed paper shows up in the Papers panel.
@@ -80,7 +86,173 @@ test.describe('Harvester panel', () => {
     await page.getByRole('button', { name: 'Back to the form' }).click();
     await expect(page.getByRole('form', { name: 'Start a harvest' })).toBeVisible();
     await page.getByRole('tab', { name: 'Papers' }).click();
-    await expect(page.getByRole('table', { name: 'Library papers' }).getByText('behind-a-paywall.pdf')).toBeVisible();
+    const papersTable = page.getByRole('table', { name: 'Library papers' });
+    await expect(papersTable.getByText('behind-a-paywall.pdf')).toBeVisible();
+    await expect(papersTable.getByTestId('supplied-badge')).toHaveText('Supplied by hand');
+  });
+
+  test('a blocked or failed paper takes a PDF too, and Undo reverses a strong match', async ({ page }) => {
+    const harvestFiles: Array<{ id: string; name: string }> = [];
+    const harvestUndos: string[] = [];
+    await mockAgent(page);
+    await mockLibrary(page, {
+      papers: PAPERS, harvestFiles, harvestUndos,
+      harvestRuns: [{
+        id: 'h9', topic: 'blocked ones', category: 'rsoxs',
+        candidates: [
+          mockCandidate('blk', { title: 'Blocked by policy', status: 'blocked', detail: 'open access, blocked by network policy (private_address) at repo.example',
+            open_url: 'https://ezproxy.example.edu/login?url=https://doi.org/10.1/blk' }),
+        ],
+      }],
+    });
+    await page.goto('/');
+    await page.getByRole('link', { name: 'Library' }).click();
+    await page.getByRole('tab', { name: 'Harvester' }).click();
+    await page.getByRole('button', { name: /blocked ones/ }).click();
+
+    const link = page.getByRole('link', { name: 'Open at publisher: Blocked by policy' });
+    await expect(link).toHaveAttribute('href', 'https://ezproxy.example.edu/login?url=https://doi.org/10.1/blk');
+    await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    await page.getByTestId('harvest-file-blk').setInputFiles({
+      name: 'blocked.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n'),
+    });
+    const notice = page.getByRole('status').filter({ hasText: 'Filed blocked.pdf against Blocked by policy (strong match)' });
+    await expect(notice).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Papers needing a PDF' })).toHaveCount(0);
+
+    await notice.getByRole('button', { name: 'Undo filing of blocked.pdf' }).click();
+    await expect.poll(() => harvestUndos).toEqual(['blk']);
+    await expect(notice).toHaveCount(0);
+    // the paper is back in the queue, as blocked again
+    await expect(page.getByRole('list', { name: 'Papers needing a PDF' }).getByText('Blocked by policy')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Needs a PDF (1 left)' })).toBeVisible();
+  });
+
+  test('a mismatch asks first (both DOIs and titles), "File anyway" needs a tick, and the other paper can be chosen instead', async ({ page }) => {
+    const harvestFiles: Array<{ id: string; name: string; confirm?: boolean; to?: string }> = [];
+    await mockAgent(page);
+    await mockLibrary(page, {
+      papers: PAPERS, harvestFiles,
+      harvestMatches: {
+        'preprint.pdf': { kind: 'mismatch', found_title: 'A preprint of it', found_dois: ['10.48550/arxiv.2001.00001'] },
+        'other.pdf': { kind: 'mismatch', found_title: 'Paper two', found_dois: ['10.1/two'], other: 'two' },
+        'scan.pdf': { kind: 'weak' },
+      },
+      harvestRuns: [{
+        id: 'h9', topic: 'queue', category: 'rsoxs',
+        candidates: [mockCandidate('one', { title: 'Paper one', status: 'paywalled' }),
+          mockCandidate('two', { title: 'Paper two', status: 'failed' })],
+      }],
+    });
+    await page.goto('/');
+    await page.getByRole('link', { name: 'Library' }).click();
+    await page.getByRole('tab', { name: 'Harvester' }).click();
+    await page.getByRole('button', { name: /queue/ }).click();
+    const pdf = (name: string) => ({ name, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n') });
+
+    // weak (a scan): nothing is stored until the user confirms
+    await page.getByTestId('harvest-file-one').setInputFiles(pdf('scan.pdf'));
+    const dialog = page.getByTestId('harvest-confirm-dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'File anyway' })).toBeEnabled();
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).toHaveCount(0);
+    expect(harvestFiles).toEqual([{ id: 'one', name: 'scan.pdf' }]);
+
+    // mismatch: both sides and a warning; the button waits for the tick
+    await page.getByTestId('harvest-file-one').setInputFiles(pdf('preprint.pdf'));
+    await expect(dialog.getByTestId('confirm-paper')).toContainText('Paper one');
+    await expect(dialog.getByTestId('confirm-pdf')).toContainText('A preprint of it');
+    await expect(dialog.getByTestId('confirm-pdf')).toContainText('10.48550/arxiv.2001.00001');
+    await expect(dialog.getByRole('alert')).toContainText('not the DOI of the paper in the queue');
+    await expect(dialog.getByRole('button', { name: 'File anyway' })).toBeDisabled();
+    await dialog.getByRole('checkbox', { name: /I have checked/ }).click();
+    await dialog.getByRole('button', { name: 'File anyway' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Filed preprint.pdf against Paper one (mismatch confirmed by you)' }))
+      .toBeVisible();
+    expect(harvestFiles.at(-1)).toEqual({ id: 'one', name: 'preprint.pdf', confirm: true });
+
+    // the file's DOI belongs to the other open paper: file it there instead
+    await page.getByTestId('harvest-file-two').setInputFiles(pdf('other.pdf'));
+    await dialog.getByRole('button', { name: 'File it under Paper two instead' }).waitFor();
+    await dialog.getByRole('button', { name: 'File it under Paper two instead' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Filed other.pdf against Paper two (strong match)' })).toBeVisible();
+    expect(harvestFiles.at(-1)).toEqual({ id: 'two', name: 'other.pdf', to: 'two' });
+  });
+
+  test('the Needs a PDF list: batch drop (one request per file, strong files, weak waits, unmatched never stored)', async ({ page }) => {
+    const harvestFiles: Array<{ id: string; name: string; confirm?: boolean }> = [];
+    await mockAgent(page);
+    await mockLibrary(page, {
+      papers: PAPERS, harvestFiles,
+      harvestMatches: { 'weak.pdf': { kind: 'weak' } },
+      harvestRunMatches: {
+        'strong.pdf': { kind: 'strong', candidate: 'q1' },
+        'weak.pdf': { kind: 'weak', candidate: 'q2', found_title: 'Paper two, revised' },
+      },
+      harvestRuns: [{
+        id: 'h9', topic: 'queue', category: 'rsoxs',
+        candidates: [
+          mockCandidate('q1', { title: 'Queue one', status: 'paywalled', tier: 'A', score: 0.9 }),
+          mockCandidate('q2', { title: 'Queue two', status: 'blocked', tier: 'A', score: 0.8 }),
+          mockCandidate('q3', { title: 'Queue three', status: 'failed', tier: 'B', score: 0.7 }),
+        ],
+      }],
+    });
+    await page.goto('/');
+    await page.getByRole('link', { name: 'Library' }).click();
+    await page.getByRole('tab', { name: 'Harvester' }).click();
+    await page.getByRole('button', { name: /queue/ }).click();
+    const pdf = (name: string) => ({ name, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n') });
+    const queue = page.getByRole('list', { name: 'Papers needing a PDF' });
+
+    await expect(page.getByRole('heading', { name: 'Needs a PDF (3 left)' })).toBeVisible();
+    await expect(queue.getByRole('listitem').getByText(/^Queue /)).toHaveText(['Queue one', 'Queue two', 'Queue three']);
+
+    // more than 20 files: refused whole, nothing sent
+    await page.getByTestId('harvest-batch-input').setInputFiles(Array.from({ length: 21 }, (_, i) => pdf(`bulk-${i}.pdf`)));
+    await expect(page.getByTestId('harvest-batch-refused')).toContainText('at most 20 can be dropped at once. Nothing was sent.');
+    expect(harvestFiles).toEqual([]);
+
+    // three files: each is its own request
+    await page.getByTestId('harvest-batch-input').setInputFiles([pdf('strong.pdf'), pdf('weak.pdf'), pdf('stranger.pdf')]);
+    const table = page.getByRole('table', { name: 'Dropped files' });
+    await expect(table.getByRole('row', { name: /strong\.pdf/ })).toContainText('Queue one');
+    await expect(table.getByRole('row', { name: /strong\.pdf/ })).toContainText('Strong match: filed');
+    await expect(table.getByRole('row', { name: /weak\.pdf/ })).toContainText('Weak match: not filed');
+    await expect(table.getByRole('row', { name: /stranger\.pdf/ })).toContainText('No match: not stored');
+    expect(harvestFiles.map(item => item.id).sort()).toEqual(['run:h9', 'run:h9', 'run:h9']);
+    await expect(page.getByRole('heading', { name: 'Needs a PDF (2 left)' })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Filed strong.pdf against Queue one (strong match)' })).toBeVisible();
+
+    // the weak one files only after Confirm (the candidate route with confirm=true)
+    await table.getByRole('button', { name: 'Confirm weak.pdf' }).click();
+    await expect(table.getByRole('row', { name: /weak\.pdf/ })).toContainText('Filed (confirmed by you)');
+    expect(harvestFiles.at(-1)).toEqual({ id: 'q2', name: 'weak.pdf', confirm: true });
+    await expect(page.getByRole('heading', { name: 'Needs a PDF (1 left)' })).toBeVisible();
+    expect(harvestFiles.some(item => item.name === 'stranger.pdf' && item.id !== 'run:h9')).toBe(false);
+  });
+
+  test('after a row is filed, focus moves to the next paper in the queue', async ({ page }) => {
+    await mockAgent(page);
+    await mockLibrary(page, {
+      papers: PAPERS,
+      harvestRuns: [{
+        id: 'h9', topic: 'queue', category: 'rsoxs',
+        candidates: [
+          mockCandidate('f1', { title: 'First', status: 'paywalled', tier: 'A', score: 0.9 }),
+          mockCandidate('f2', { title: 'Second', status: 'paywalled', tier: 'A', score: 0.8 }),
+        ],
+      }],
+    });
+    await page.goto('/');
+    await page.getByRole('link', { name: 'Library' }).click();
+    await page.getByRole('tab', { name: 'Harvester' }).click();
+    await page.getByRole('button', { name: /queue/ }).click();
+    await page.getByTestId('harvest-choose-f1').focus();
+    await page.getByTestId('harvest-file-f1').setInputFiles({ name: 'first.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n') });
+    await expect(page.getByRole('heading', { name: 'Needs a PDF (1 left)' })).toBeVisible();
+    await expect(page.getByTestId('harvest-choose-f2')).toBeFocused();
   });
 
   test('a new category needs a valid name', async ({ page }) => {
@@ -136,7 +308,7 @@ test.describe('Harvester panel', () => {
     const runs = page.getByRole('list', { name: 'Harvest runs' });
     await runs.getByRole('button', { name: /tomography/ }).click();
     await expect(runs.getByRole('button', { name: /tomography/ })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('list', { name: 'Paywalled papers' }).getByText('Old tomography paper')).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Papers needing a PDF' }).getByText('Old tomography paper')).toBeVisible();
   });
 
   test('the Extraction tab does not pick up a running harvest', async ({ page }) => {

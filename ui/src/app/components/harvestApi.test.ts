@@ -1,11 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 import jobHandle from './__fixtures__/job_handle.json';
+import filedFixture from './__fixtures__/harvest_filed.json';
+import needsFixture from './__fixtures__/harvest_needs_confirmation.json';
+import undoFixture from './__fixtures__/harvest_undo.json';
+import unmatchedFixture from './__fixtures__/harvest_unmatched.json';
 import { ApiError } from './apiHttp';
 import {
   dismissHarvestCandidate,
   fetchHarvestCandidates,
   fetchHarvestRuns,
   fileHarvestPdf,
+  fileHarvestRunPdf,
+  MANUAL_STATUSES,
+  needsPdf,
+  undoHarvestPdf,
   harvestFormProblem,
   isOpenableUrl,
   startHarvest,
@@ -16,6 +24,62 @@ function respond(status: number, body: unknown) {
 }
 const asFetch = (mock: unknown) => mock as unknown as typeof fetch;
 const call = (mock: ReturnType<typeof respond>) => mock.mock.calls[0] as unknown as [string, RequestInit];
+
+describe('the manual PDF flow client', () => {
+  const pdf = () => new File(['%PDF'], 'a.pdf', { type: 'application/pdf' });
+
+  it('sends confirm and to as query parameters, and only when asked', async () => {
+    const plain = respond(200, needsFixture);
+    await fileHarvestPdf('c1', pdf(), {}, asFetch(plain));
+    expect(call(plain)[0]).not.toContain('?');
+    const confirmed = respond(200, filedFixture);
+    await fileHarvestPdf('c1', pdf(), { confirm: true }, asFetch(confirmed));
+    expect(call(confirmed)[0]).toMatch(/\/pdf\?confirm=true$/);
+    const moved = respond(200, filedFixture);
+    await fileHarvestPdf('c1', pdf(), { to: 'c 2' }, asFetch(moved));
+    expect(call(moved)[0]).toMatch(/\/pdf\?to=c\+2$/);
+    const no = respond(200, needsFixture);
+    await fileHarvestPdf('c1', pdf(), { confirm: false }, asFetch(no));
+    expect(call(no)[0]).not.toContain('confirm');
+  });
+
+  it('reads the real answers: filed, needs confirmation, unmatched', async () => {
+    const filed = await fileHarvestPdf('c1', pdf(), {}, asFetch(respond(200, filedFixture)));
+    if (!filed.filed) throw new Error('expected filed');
+    expect(filed.candidate.provenance).toBe('user_supplied');
+    expect(filed.verdict.kind).toBe('strong');
+    const asked = await fileHarvestPdf('c1', pdf(), {}, asFetch(respond(200, needsFixture)));
+    if (asked.filed) throw new Error('expected a question');
+    expect(asked.verdict.found_dois.length).toBeGreaterThan(0);
+    expect(asked.other_candidate?.id).toBeTruthy();
+    const none = await fileHarvestRunPdf('run 1', pdf(), asFetch(respond(200, unmatchedFixture)));
+    expect(none).toEqual({ filed: false, unmatched: true });
+  });
+
+  it('drops a file on a run with one POST and the file as field "file"', async () => {
+    const drop = respond(200, unmatchedFixture);
+    await fileHarvestRunPdf('run 1', pdf(), asFetch(drop));
+    const [url, init] = call(drop);
+    expect(url).toContain('/v1/library/harvest/runs/run%201/pdf');
+    expect(init.method).toBe('POST');
+    expect([...(init.body as FormData).keys()]).toEqual(['file']);
+  });
+
+  it('undoes a filing with a POST', async () => {
+    const undo = respond(200, undoFixture);
+    const out = await undoHarvestPdf('c1', asFetch(undo));
+    expect(call(undo)[0]).toContain('/v1/library/harvest/candidates/c1/undo');
+    expect(call(undo)[1].method).toBe('POST');
+    expect(out.removed).toEqual({ file: true, manifest: true });
+  });
+
+  it('knows which statuses still need a PDF', () => {
+    expect([...MANUAL_STATUSES]).toEqual(['paywalled', 'blocked', 'failed']);
+    expect(needsPdf({ status: 'blocked' })).toBe(true);
+    expect(needsPdf({ status: 'filed' })).toBe(false);
+    expect(needsPdf({ status: 'dismissed' })).toBe(false);
+  });
+});
 
 describe('harvestApi', () => {
   it('submits a library_harvest job with the params under inputs.params (no top-level nonce)', async () => {
@@ -46,10 +110,11 @@ describe('harvestApi', () => {
   });
 
   it('files a PDF as multipart field "file" and dismisses with a POST', async () => {
-    const filed = respond(200, { candidate: {}, paper: {}, duplicate: false });
-    await fileHarvestPdf('c1', new File(['%PDF'], 'a.pdf', { type: 'application/pdf' }), asFetch(filed));
+    const filed = respond(200, filedFixture);
+    const answer = await fileHarvestPdf('c1', new File(['%PDF'], 'a.pdf', { type: 'application/pdf' }), {}, asFetch(filed));
+    expect(answer.filed).toBe(true);
     const [url, init] = call(filed);
-    expect(url).toContain('/v1/library/harvest/candidates/c1/pdf');
+    expect(url).toMatch(/\/v1\/library\/harvest\/candidates\/c1\/pdf$/);
     expect(init.method).toBe('POST');
     expect((init.body as FormData).get('file')).toBeInstanceOf(File);
     const dismissed = respond(200, { candidate: {} });
@@ -59,7 +124,7 @@ describe('harvestApi', () => {
   });
 
   it('surfaces the server detail (409 for a candidate that is not paywalled)', async () => {
-    const promise = fileHarvestPdf('c1', new File(['x'], 'a.pdf'), asFetch(respond(409, { detail: 'not paywalled' })));
+    const promise = fileHarvestPdf('c1', new File(['x'], 'a.pdf'), {}, asFetch(respond(409, { detail: 'not paywalled' })));
     await expect(promise).rejects.toBeInstanceOf(ApiError);
     await expect(promise).rejects.toMatchObject({ status: 409 });
   });

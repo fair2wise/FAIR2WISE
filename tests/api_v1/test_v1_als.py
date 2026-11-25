@@ -71,7 +71,7 @@ def test_anonymous_gets_sign_in_required_on_every_v1_route(als):
             continue
         assert resp.status_code == 401, (policy.route_id, resp.status_code, resp.text)
         assert resp.json()["code"] == "sign_in_required"
-    assert local_only == 21 and {p.path for p in API_ROUTE_POLICIES if not p.on_als} == {
+    assert local_only == 23 and {p.path for p in API_ROUTE_POLICIES if not p.on_als} == {
         "/v1/folders/roots", "/v1/folders/list", "/v1/folders/index",
         # T35 (A8): library status, papers (list and upload) and verify
         "/v1/library", "/v1/library/papers", "/v1/library/papers/{paper_id}/verify",
@@ -81,6 +81,7 @@ def test_anonymous_gets_sign_in_required_on_every_v1_route(als):
         # T45 (A8): Harvester runs, candidates, the paywalled queue
         "/v1/library/harvest/runs", "/v1/library/harvest/runs/{run_id}/candidates",
         "/v1/library/harvest/candidates/{candidate_id}/pdf", "/v1/library/harvest/candidates/{candidate_id}/dismiss",
+        "/v1/library/harvest/candidates/{candidate_id}/undo", "/v1/library/harvest/runs/{run_id}/pdf",
         # owner bug list (task 9): the shared category list (GET and POST share the path)
         "/v1/library/categories"}
     assert als.ops.jobs.store.list_jobs() == []

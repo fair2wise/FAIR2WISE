@@ -9,6 +9,8 @@ export interface MockPaper {
   file_name: string;
   title: string | null;
   doi: string | null;
+  /** `user_supplied*` when a person supplied the file by hand. */
+  provenance?: string | null;
 }
 
 /** One mocked job: its record and the log lines `GET /v1/jobs/{id}/logs` returns. */
@@ -34,11 +36,26 @@ export interface MockHarvestCandidate {
   source: string;
   tier: 'A' | 'B' | 'C';
   score: number;
-  status: 'downloaded' | 'in_library' | 'paywalled' | 'filed' | 'failed' | 'skipped' | 'dismissed';
+  status: 'downloaded' | 'in_library' | 'paywalled' | 'blocked' | 'filed' | 'failed' | 'skipped' | 'dismissed';
   landing_url: string | null;
   pdf_url: string | null;
   relpath: string | null;
   detail: string | null;
+  /** The link "Open at publisher" opens (the server builds it; absent on an older server). */
+  open_url?: string | null;
+  /** Set when a person supplied the PDF. */
+  provenance?: string | null;
+  supplied_by?: string | null;
+  match?: Record<string, unknown> | null;
+}
+
+/** What the mock server's matcher says about a dropped file (default: a strong match). */
+export interface MockMatch {
+  kind: 'strong' | 'weak' | 'mismatch';
+  found_title?: string;
+  found_dois?: string[];
+  /** Another open candidate of the run whose DOI the file carries. */
+  other?: string;
 }
 
 /** A harvest run the server already has (its job id is the run id). */
@@ -76,8 +93,17 @@ export interface MockLibraryOptions {
   harvestRuns?: MockHarvestRun[];
   /** Candidates every newly started harvest finds (default: none). */
   harvestFinds?: MockHarvestCandidate[];
-  /** Captures `POST .../harvest/candidates/{id}/pdf`: candidate id and file name. */
-  harvestFiles?: Array<{ id: string; name: string }>;
+  /** Captures `POST .../harvest/candidates/{id}/pdf` (and the batch route, with `id: 'run:<run id>'`): candidate id, file name, `confirm` and `to` when sent. */
+  harvestFiles?: Array<{ id: string; name: string; confirm?: boolean; to?: string }>;
+  /** How the mock matcher judges a dropped file name (default: strong). A weak or mismatch answer stores nothing until `confirm=true`. */
+  harvestMatches?: Record<string, MockMatch>;
+  /**
+   * How the mock matcher answers the batch route `POST .../harvest/runs/{id}/pdf` per file name: the candidate it
+   * belongs to and strong or weak; a file name not listed is unmatched (nothing stored).
+   */
+  harvestRunMatches?: Record<string, MockMatch & { candidate: string }>;
+  /** Captures `POST .../harvest/candidates/{id}/undo` candidate ids. */
+  harvestUndos?: string[];
   /** Captures `POST .../harvest/candidates/{id}/dismiss` candidate ids. */
   harvestDismisses?: string[];
   /** Captures `POST /v1/jobs/{id}/cancel` job ids. */
@@ -128,6 +154,31 @@ export async function mockLibrary(page: Page, options: MockLibraryOptions = {}) 
       if (candidate) return { run, candidate };
     }
     return null;
+  };
+  const previous = new Map<string, string>();   // status before a supplied PDF was filed (for undo)
+  /** File a supplied PDF against a candidate in the mock server's state; the body of the 200 `filed: true` answer. */
+  const fileInto = (target: { run: MockHarvestRun; candidate: MockHarvestCandidate }, name: string,
+    kind: MockMatch['kind'], match: MockMatch) => {
+    const chosen = target.candidate;
+    previous.set(chosen.id, chosen.status);
+    chosen.status = 'filed';
+    chosen.relpath = `${target.run.category}/${chosen.year ?? 'unknown'}/${name}`;
+    chosen.provenance = kind === 'strong' ? 'user_supplied'
+      : kind === 'weak' ? 'user_supplied_confirmed' : 'user_supplied_mismatch_confirmed';
+    chosen.supplied_by = 'local-operator';
+    const paper = mockPaper(name.replace(/\.pdf$/, ''), target.run.category,
+      { relpath: chosen.relpath, provenance: chosen.provenance });
+    papers.push(paper);
+    return {
+      filed: true,
+      candidate: chosen,
+      paper: { ...paper, sha256: paper.id, size_bytes: 1000, verify_status: 'unverified', verified_at: null,
+        index_status: 'not_indexed' },
+      duplicate: false,
+      manifest: { updated: true, path: `${target.run.category}/manifest.json`, detail: 'added to the manifest' },
+      verdict: { kind, reason: 'the paper\'s DOI is in the PDF', title_similarity: 1, found_dois: match.found_dois ?? [],
+        found_title: match.found_title ?? chosen.title },
+    };
   };
   let nextJob = 1;
 
@@ -210,7 +261,9 @@ export async function mockLibrary(page: Page, options: MockLibraryOptions = {}) 
           candidates: (options.harvestFinds ?? []).map(item => ({ ...item })),
         });
       }
-      await route.fulfill(json({ id: job.id, kind: body.kind, state: job.state }));
+      // the real handle: the id is named `job_id` (a mock that said `id` hid a 'runs/undefined' request in the pilot)
+      await route.fulfill(json({ job_id: job.id, kind: body.kind, state: job.state, submitted_at: '2026-11-03T12:00:00Z',
+        settings_revision: null }));
     } else if (path === '/v1/jobs' && method === 'GET') {
       const state = url.searchParams.get('state');
       const kind = url.searchParams.get('kind');
@@ -225,7 +278,7 @@ export async function mockLibrary(page: Page, options: MockLibraryOptions = {}) 
           max_downloads: run.max_downloads, created_at: '2026-11-03T12:00:00Z',
           counts: {
             total: run.candidates.length, downloaded: count('downloaded'), in_library: count('in_library'),
-            paywalled: count('paywalled'), filed: count('filed'), failed: count('failed'), skipped: count('skipped'),
+            paywalled: count('paywalled'), blocked: count('blocked'), filed: count('filed'), failed: count('failed'), skipped: count('skipped'),
             dismissed: count('dismissed'),
           },
         };
@@ -235,26 +288,80 @@ export async function mockLibrary(page: Page, options: MockLibraryOptions = {}) 
       await route.fulfill(json({ candidates: runs.get(path.split('/')[5])?.candidates ?? [] }));
     } else if (/^\/v1\/library\/harvest\/candidates\/[^/]+\/pdf$/.test(path) && method === 'POST') {
       const hit = find(path.split('/')[5]);
-      if (!hit || hit.candidate.status !== 'paywalled') {
-        await route.fulfill(json({ detail: 'candidate is not paywalled' }, 409));
+      const manual = ['paywalled', 'blocked', 'failed'];
+      if (!hit || !manual.includes(hit.candidate.status)) {
+        await route.fulfill(json({ detail: `candidate is ${hit?.candidate.status ?? 'unknown'}, not waiting for a PDF by hand` }, 409));
         return;
       }
       const name = /filename="([^"]+)"/.exec(request.postData() ?? '')?.[1] ?? 'saved.pdf';
-      options.harvestFiles?.push({ id: hit.candidate.id, name });
-      hit.candidate.status = 'filed';
-      hit.candidate.relpath = `${hit.run.category}/${hit.candidate.year ?? 'unknown'}/${name}`;
-      const paper = mockPaper(name.replace(/\.pdf$/, ''), hit.run.category, { relpath: hit.candidate.relpath });
-      papers.push(paper);
-      await route.fulfill(json({
-        candidate: hit.candidate,
-        paper: { ...paper, sha256: paper.id, size_bytes: 1000, verify_status: 'unverified', verified_at: null,
-          index_status: 'not_indexed' },
-        duplicate: false,
-      }));
+      const confirm = url.searchParams.get('confirm') === 'true';
+      const to = url.searchParams.get('to') ?? undefined;
+      const target = to ? find(to) : hit;
+      if (!target || !manual.includes(target.candidate.status)) {
+        await route.fulfill(json({ detail: 'the other candidate is not waiting for a PDF' }, 409));
+        return;
+      }
+      const match = options.harvestMatches?.[name] ?? { kind: 'strong' as const };
+      // a `to=` re-target is judged strong (the file's DOI is the other paper's)
+      const kind = to ? 'strong' : match.kind;
+      options.harvestFiles?.push({ id: hit.candidate.id, name, ...(confirm ? { confirm } : {}), ...(to ? { to } : {}) });
+      if (kind !== 'strong' && !confirm) {
+        const other = match.other ? find(match.other) : null;
+        await route.fulfill(json({
+          filed: false, needs_confirmation: true,
+          candidate: { id: hit.candidate.id, title: hit.candidate.title, doi: hit.candidate.doi },
+          verdict: {
+            kind, reason: kind === 'weak' ? 'the PDF has no readable text (scanned, encrypted or unreadable), so it cannot be checked'
+              : 'the PDF names a different DOI',
+            title_similarity: 0.1, found_dois: match.found_dois ?? [], found_title: match.found_title ?? '',
+          },
+          other_candidate: other ? { id: other.candidate.id, title: other.candidate.title, doi: other.candidate.doi,
+            status: other.candidate.status } : null,
+        }));
+        return;
+      }
+      await route.fulfill(json(fileInto(target, name, kind, match)));
+    } else if (/^\/v1\/library\/harvest\/runs\/[^/]+\/pdf$/.test(path) && method === 'POST') {
+      const run = runs.get(path.split('/')[5]);
+      const name = /filename="([^"]+)"/.exec(request.postData() ?? '')?.[1] ?? 'saved.pdf';
+      if (!run) {
+        await route.fulfill(json({ detail: 'run not found' }, 404));
+        return;
+      }
+      options.harvestFiles?.push({ id: `run:${run.id}`, name });
+      const hit = options.harvestRunMatches?.[name];
+      const target = hit ? find(hit.candidate) : null;
+      if (!hit || !target || !['paywalled', 'blocked', 'failed'].includes(target.candidate.status)) {
+        await route.fulfill(json({ filed: false, unmatched: true }));
+      } else if (hit.kind === 'strong') {
+        await route.fulfill(json(fileInto(target, name, 'strong', hit)));
+      } else {
+        await route.fulfill(json({
+          filed: false, needs_confirmation: true,
+          candidate: { id: target.candidate.id, title: target.candidate.title, doi: target.candidate.doi },
+          verdict: { kind: 'weak', reason: 'the titles are similar but the DOI could not be confirmed', title_similarity: 0.7,
+            found_dois: [], found_title: hit.found_title ?? '' },
+          other_candidate: null,
+        }));
+      }
+    } else if (/^\/v1\/library\/harvest\/candidates\/[^/]+\/undo$/.test(path) && method === 'POST') {
+      const hit = find(path.split('/')[5]);
+      if (!hit || hit.candidate.status !== 'filed' || !hit.candidate.provenance) {
+        await route.fulfill(json({ detail: 'no file supplied by the user is filed for this candidate' }, 409));
+        return;
+      }
+      options.harvestUndos?.push(hit.candidate.id);
+      const index = papers.findIndex(item => item.relpath === hit.candidate.relpath);
+      if (index >= 0) papers.splice(index, 1);
+      hit.candidate.status = (previous.get(hit.candidate.id) ?? 'failed') as MockHarvestCandidate['status'];
+      hit.candidate.relpath = null;
+      hit.candidate.provenance = null;
+      hit.candidate.supplied_by = null;
+      await route.fulfill(json({ candidate: hit.candidate, removed: { file: true, manifest: true } }));
     } else if (/^\/v1\/library\/harvest\/candidates\/[^/]+\/dismiss$/.test(path) && method === 'POST') {
       const hit = find(path.split('/')[5]);
-      if (!hit || hit.candidate.status !== 'paywalled') {
-        await route.fulfill(json({ detail: 'candidate is not paywalled' }, 409));
+      if (!hit || !['paywalled', 'blocked', 'failed'].includes(hit.candidate.status)) {
+        await route.fulfill(json({ detail: 'candidate is not waiting for a PDF by hand' }, 409));
         return;
       }
       options.harvestDismisses?.push(hit.candidate.id);

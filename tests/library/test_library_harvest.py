@@ -335,12 +335,15 @@ def _run_with_paywalled(tmp_path):
 
 def test_a_supplied_pdf_is_filed_in_the_runs_category_by_the_candidates_year(tmp_path):
     world, handle, row = _run_with_paywalled(tmp_path)
-    out = world.harvester.file_candidate_pdf(row["id"], "whatever.pdf", pdf("paywalled-copy"))
-    assert out["duplicate"] is False and out["candidate"]["status"] == "filed"
+    asked = world.harvester.supply_pdf(row["id"], "whatever.pdf", pdf("paywalled-copy"))  # nothing readable to check it by
+    assert asked["filed"] is False and asked["needs_confirmation"] is True and not list(world.lib.rglob("whatever.pdf"))
+    out = world.harvester.supply_pdf(row["id"], "whatever.pdf", pdf("paywalled-copy"), confirm=True)
+    assert out["filed"] is True and out["duplicate"] is False and out["candidate"]["status"] == "filed"
+    assert out["candidate"]["provenance"] == "user_supplied_confirmed"
     assert out["paper"]["relpath"].startswith("rsoxs/") and out["paper"]["relpath"].endswith("whatever.pdf")
     assert out["candidate"]["relpath"] == out["paper"]["relpath"] and out["manifest"]["updated"] is True
     with pytest.raises(ContractError) as again:  # no longer paywalled
-        world.harvester.file_candidate_pdf(row["id"], "x.pdf", pdf("other"))
+        world.harvester.supply_pdf(row["id"], "x.pdf", pdf("other"), confirm=True)
     assert again.value.code is ErrorCode.CONFLICT
 
 

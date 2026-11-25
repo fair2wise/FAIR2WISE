@@ -57,6 +57,8 @@ export interface LibraryPaper {
   abstract_truncated?: boolean;
   /** Which of `year`, `authors`, `abstract` no source holds for this paper. */
   metadata_missing?: Array<'year' | 'authors' | 'abstract'>;
+  /** `user_supplied*` when a person supplied this file by hand (how it was matched); `null`/absent otherwise. */
+  provenance?: 'user_supplied' | 'user_supplied_confirmed' | 'user_supplied_mismatch_confirmed' | null;
 }
 
 /** `GET /v1/library/papers`. */

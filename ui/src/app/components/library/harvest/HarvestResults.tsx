@@ -1,22 +1,30 @@
 import { ExternalLink, Upload } from 'lucide-react';
-import { useRef, useState, type DragEvent } from 'react';
-import { isOpenableUrl, type HarvestCandidate } from '../../harvestApi';
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { isOpenableUrl, needsPdf, type HarvestCandidate } from '../../harvestApi';
 import { isPdfFile } from '../../libraryApi';
 import { Button } from '../../ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../ui/table';
 import { cn } from '../../ui/utils';
 import { HarvestStatusBadge } from './HarvestStatusBadge';
+import { SuppliedBadge } from '../SuppliedBadge';
 
 /** Props of {@link HarvestResults}. */
 export interface HarvestResultsProps {
   candidates: HarvestCandidate[];
   /** Id of the candidate whose PDF is being filed or that is being dismissed (its controls show busy). */
   busyId: string | null;
-  /** File the PDF the user saved for a paywalled candidate. */
+  /** Offer the PDF the user saved for a candidate that needs one (paywalled, blocked or failed). */
   onFile: (candidate: HarvestCandidate, file: File) => void;
   onDismiss: (candidate: HarvestCandidate) => void;
   /** Called with the names of files rejected client-side because they are not PDFs. */
   onRejected: (names: string[]) => void;
+  /** Shown at the top of the queue: the multi-file drop area. */
+  batch?: ReactNode;
+}
+
+/** The queue in working order: best tier first, then highest score, then title (the server's own order). */
+export function sortQueue(candidates: readonly HarvestCandidate[]): HarvestCandidate[] {
+  return [...candidates].sort((a, b) => a.tier.localeCompare(b.tier) || b.score - a.score || a.title.localeCompare(b.title));
 }
 
 /** DOI or arXiv id of a candidate, for display. */
@@ -24,8 +32,14 @@ function identifier(candidate: HarvestCandidate): string | null {
   return candidate.doi ?? (candidate.arxiv_id ? `arXiv:${candidate.arxiv_id}` : null);
 }
 
-/** One paywalled candidate: the publisher link, a PDF drop slot and Dismiss. */
-function PaywalledItem({ candidate, busy, onFile, onDismiss, onRejected }: {
+/** Where "Open at publisher" goes: the server's `open_url` (DOI or landing page, behind the library proxy when set), else the landing page. */
+export function publisherHref(candidate: HarvestCandidate): string | null {
+  if (isOpenableUrl(candidate.open_url)) return candidate.open_url;
+  return isOpenableUrl(candidate.landing_url) ? candidate.landing_url : null;
+}
+
+/** One candidate that needs a PDF by hand: Open at publisher, a PDF drop slot and Dismiss. */
+function NeedsPdfItem({ candidate, busy, onFile, onDismiss, onRejected }: {
   candidate: HarvestCandidate;
   busy: boolean;
   onFile: HarvestResultsProps['onFile'];
@@ -48,12 +62,14 @@ function PaywalledItem({ candidate, busy, onFile, onDismiss, onRejected }: {
     setDragging(false);
     if (!busy) handle(event.dataTransfer.files);
   };
-  const openable = isOpenableUrl(candidate.landing_url);
+  const href = publisherHref(candidate);
+  const showDetail = candidate.status !== 'paywalled' && !!candidate.detail;
 
   return (
     <li
       aria-busy={busy}
       data-dragging={dragging}
+      data-candidate-id={candidate.id}
       onDragOver={event => {
         event.preventDefault();
         if (!busy) setDragging(true);
@@ -67,17 +83,23 @@ function PaywalledItem({ candidate, busy, onFile, onDismiss, onRejected }: {
         <p className="truncate text-xs text-muted-foreground">
           {[candidate.year, identifier(candidate), `tier ${candidate.tier}`].filter(Boolean).join(' · ')}
         </p>
+        {showDetail ? (
+          <p className="truncate text-xs text-muted-foreground" title={candidate.detail as string}>
+            {candidate.detail}
+          </p>
+        ) : null}
       </div>
-      {openable ? (
+      <HarvestStatusBadge status={candidate.status} detail={candidate.detail} />
+      {href ? (
         <a
-          href={candidate.landing_url as string}
+          href={href}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
-          aria-label={`Open publisher page for ${candidate.title}`}
+          aria-label={`Open at publisher: ${candidate.title}`}
         >
           <ExternalLink aria-hidden="true" className="size-4" />
-          Open publisher
+          Open at publisher
         </a>
       ) : (
         <span className="text-xs text-muted-foreground">No publisher link</span>
@@ -88,6 +110,7 @@ function PaywalledItem({ candidate, busy, onFile, onDismiss, onRejected }: {
         size="sm"
         disabled={busy}
         aria-label={`Choose PDF for ${candidate.title}`}
+        data-testid={`harvest-choose-${candidate.id}`}
         onClick={() => inputRef.current?.click()}
         className="disabled:cursor-not-allowed disabled:opacity-50"
       >
@@ -123,12 +146,49 @@ function PaywalledItem({ candidate, busy, onFile, onDismiss, onRejected }: {
 }
 
 /**
- * Results of one harvest run: the paywalled queue (people finish these: open the publisher in their own
- * browser, save the PDF, drop it here) and a table of every other candidate with its outcome.
+ * When the row that last held focus leaves the queue (filed, or dismissed), move focus to the next row's "Choose PDF"
+ * button so a person can go down the list without hunting for the mouse. Nothing moves when focus was elsewhere.
  */
-export function HarvestResults({ candidates, busyId, onFile, onDismiss, onRejected }: HarvestResultsProps) {
-  const queue = candidates.filter(candidate => candidate.status === 'paywalled');
-  const rest = candidates.filter(candidate => candidate.status !== 'paywalled');
+export function useFocusNextAfterRemoval(listRef: { current: HTMLElement | null }, ids: readonly string[]) {
+  const previous = useRef<readonly string[]>(ids);
+  const focusedId = useRef<string | null>(null);
+  useEffect(() => {
+    const list = listRef.current;
+    const onFocusIn = (event: FocusEvent) => {
+      const row = (event.target as HTMLElement | null)?.closest?.('[data-candidate-id]');
+      focusedId.current = row ? row.getAttribute('data-candidate-id') : null;
+    };
+    list?.addEventListener('focusin', onFocusIn);
+    return () => list?.removeEventListener('focusin', onFocusIn);
+  });
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = ids;
+    const held = focusedId.current;
+    if (held === null || ids.includes(held) || !before.includes(held)) return;
+    const active = document.activeElement;
+    if (active && active !== document.body && listRef.current?.contains(active)) return;   // focus is already on a live row
+    const after = before.slice(before.indexOf(held) + 1).find(id => ids.includes(id)) ?? ids[ids.length - 1];
+    focusedId.current = null;
+    if (!after) return;
+    listRef.current?.querySelector<HTMLElement>(`[data-testid="harvest-choose-${after}"]`)?.focus();
+  }, [ids, listRef]);
+}
+
+/** The rights note shown on the queue (and in the docs). */
+export const RIGHTS_NOTE = 'Text-mining rights for subscription content are the operator\u2019s responsibility to confirm; '
+  + 'this tool only files what a person with access supplies.';
+
+/**
+ * Results of one harvest run: the queue of papers that need a PDF (paywalled, blocked by network policy or failed to
+ * fetch; people finish these: open the publisher in their own browser, save the PDF, drop it here) and a table of
+ * every other candidate with its outcome.
+ */
+export function HarvestResults({ candidates, busyId, onFile, onDismiss, onRejected, batch }: HarvestResultsProps) {
+  const queue = sortQueue(candidates.filter(needsPdf));
+  const listRef = useRef<HTMLUListElement>(null);
+  useFocusNextAfterRemoval(listRef, queue.map(candidate => candidate.id));
+  const rest = candidates.filter(candidate => !needsPdf(candidate));
   if (candidates.length === 0) {
     return <p className="text-sm text-muted-foreground">No papers found yet.</p>;
   }
@@ -136,19 +196,21 @@ export function HarvestResults({ candidates, busyId, onFile, onDismiss, onReject
     <div className="space-y-4">
       <section aria-labelledby="harvest-queue-title" className="space-y-2">
         <h4 id="harvest-queue-title" className="text-sm font-semibold">
-          Paywalled queue ({queue.length})
+          Needs a PDF ({queue.length} left)
         </h4>
         {queue.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nothing is waiting for a PDF.</p>
         ) : (
           <>
             <p className="text-xs text-muted-foreground">
-              These need a human: open the publisher page, save the PDF in your own browser, then choose or drop it
-              here. It is filed in the run&apos;s category by year.
+              These need a human: open the paper at the publisher, save the PDF in your own browser, then choose or
+              drop it here. It is checked against the paper and filed in the run&apos;s category by year.
             </p>
-            <ul aria-label="Paywalled papers" className="divide-y divide-border rounded-md border border-border">
+            <p className="text-xs text-muted-foreground" data-testid="harvest-rights-note">{RIGHTS_NOTE}</p>
+            {batch}
+            <ul ref={listRef} aria-label="Papers needing a PDF" className="divide-y divide-border rounded-md border border-border">
               {queue.map(candidate => (
-                <PaywalledItem
+                <NeedsPdfItem
                   key={candidate.id}
                   candidate={candidate}
                   busy={busyId === candidate.id}
@@ -194,12 +256,7 @@ export function HarvestResults({ candidates, busyId, onFile, onDismiss, onReject
                   </TableCell>
                   <TableCell>
                     <HarvestStatusBadge status={candidate.status} detail={candidate.detail} />
-                    {(candidate.status === 'failed' || candidate.status === 'blocked') && candidate.detail ? (
-                      <span className="mt-1 block max-w-64 truncate text-xs text-muted-foreground"
-                        title={candidate.detail}>
-                        {candidate.detail}
-                      </span>
-                    ) : null}
+                    {candidate.provenance ? <SuppliedBadge provenance={candidate.provenance} /> : null}
                   </TableCell>
                 </TableRow>
               ))}

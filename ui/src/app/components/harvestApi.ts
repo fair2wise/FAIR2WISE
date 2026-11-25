@@ -1,7 +1,9 @@
 /**
  * Harvester API client (A8, T46). Typed against the T45 contract (policy rows V76-V79 plus the
  * `library_harvest` job kind): `GET /v1/library/harvest/runs`, `GET .../runs/{id}/candidates`,
- * `POST .../candidates/{id}/pdf` (multipart) and `POST .../candidates/{id}/dismiss`. A run is a
+ * `POST .../candidates/{id}/pdf` (multipart, one file per request; policy V78 with the verdict contract),
+ * `POST .../runs/{id}/pdf` (V88, the batch drop), `POST .../candidates/{id}/undo` (V87) and
+ * `POST .../candidates/{id}/dismiss`. A run is a
  * `library_harvest` job submitted through `POST /v1/jobs`; its id is the run id. `:local` only: on ALS
  * the routes answer 404 (the Library tab itself is hidden there).
  */
@@ -117,19 +119,104 @@ export interface HarvestCandidate {
   detail: string | null;
   /** Whether the source calls the paper open access; `null`/absent when unknown. */
   oa?: boolean | null;
+  /** The rule that found the free link, when one did. */
+  link_rule?: string | null;
+  /** How a PDF a person supplied was matched; `null`/absent for anything the harvester fetched itself. */
+  provenance?: HarvestProvenance | null;
+  /** Who supplied it (the acting principal's subject). */
+  supplied_by?: string | null;
+  /** For a confirmed mismatch: both DOIs and both titles. */
+  match?: HarvestMismatchRecord | null;
+  /**
+   * The link the user's own browser opens ("Open at publisher"): the DOI URL or landing page, behind the
+   * deployment's library proxy prefix when one is set. The server only builds it; absent on an older server.
+   */
+  open_url?: string | null;
 }
 
-/** `GET /v1/library/harvest/runs/{run_id}/candidates`. */
-export interface HarvestCandidatesResponse {
-  candidates: HarvestCandidate[];
+/** `provenance` of a candidate whose PDF a person supplied. */
+export type HarvestProvenance = 'user_supplied' | 'user_supplied_confirmed' | 'user_supplied_mismatch_confirmed';
+
+/** Recorded with a confirmed mismatch. */
+export interface HarvestMismatchRecord {
+  candidate_doi: string | null;
+  candidate_title: string;
+  found_dois: string[];
+  found_title: string;
 }
 
-/** `POST /v1/library/harvest/candidates/{id}/pdf`: the filed candidate, its paper and the upload outcome. */
+/** Statuses of a paper that still needs a PDF by hand (`MANUAL_STATUSES` on the server). */
+export const MANUAL_STATUSES: readonly HarvestStatus[] = ['paywalled', 'blocked', 'failed'];
+
+/** True when the candidate still needs a PDF by hand. */
+export function needsPdf(candidate: Pick<HarvestCandidate, 'status'>): boolean {
+  return MANUAL_STATUSES.includes(candidate.status);
+}
+
+/** How a supplied PDF was matched to a paper. */
+export type MatchKind = 'strong' | 'weak' | 'mismatch';
+
+/** The matcher's verdict: what the PDF carries against the paper (never the PDF text). */
+export interface HarvestVerdict {
+  kind: MatchKind;
+  /** Plain-words reason. */
+  reason: string;
+  title_similarity: number;
+  found_dois: string[];
+  found_title: string;
+}
+
+/** The paper a PDF was dropped on or matched to. */
+export interface HarvestTarget {
+  id: string;
+  title: string;
+  doi: string | null;
+}
+
+/** `filed: true`: the PDF was filed (a strong match, a confirmed one, or `duplicate` of a file already in the library). */
 export interface HarvestFileResult {
+  filed: true;
   candidate: HarvestCandidate;
   paper: LibraryPaper;
   duplicate: boolean;
   manifest?: { updated: boolean; path: string; detail: string };
+  verdict: HarvestVerdict;
+}
+
+/** `filed: false, needs_confirmation: true`: nothing was stored; the user decides. */
+export interface HarvestNeedsConfirmation {
+  filed: false;
+  needs_confirmation: true;
+  candidate: HarvestTarget;
+  verdict: HarvestVerdict;
+  /** The PDF's DOI belongs to this other open candidate of the run (`to=<id>` files it there). */
+  other_candidate: (HarvestTarget & { status: HarvestStatus }) | null;
+}
+
+/** `filed: false, unmatched: true`: the batch drop found no paper for the file; nothing was stored. */
+export interface HarvestUnmatched {
+  filed: false;
+  unmatched: true;
+}
+
+/** Answer of the candidate route (V78). */
+export type HarvestSupplyResult = HarvestFileResult | HarvestNeedsConfirmation;
+
+/** Answer of the batch route (V88). */
+export type HarvestRunDropResult = HarvestFileResult | HarvestNeedsConfirmation | HarvestUnmatched;
+
+/** `POST /v1/library/harvest/candidates/{id}/undo`. */
+export interface HarvestUndoResult {
+  candidate: HarvestCandidate;
+  removed: { file: boolean; manifest: boolean };
+}
+
+/** Most files one multi-file drop accepts (each is sent as its own request). */
+export const MAX_FILES_PER_DROP = 20;
+
+/** `GET /v1/library/harvest/runs/{run_id}/candidates`. */
+export interface HarvestCandidatesResponse {
+  candidates: HarvestCandidate[];
 }
 
 /** `POST /v1/library/harvest/candidates/{id}/dismiss`. */
@@ -151,9 +238,6 @@ export interface StartHarvestRequest {
   per_query?: number;
   nonce?: string;
 }
-
-/** Statuses a person still has to act on. */
-export const PAYWALLED_STATUS: HarvestStatus = 'paywalled';
 
 /** Submit a `library_harvest` job. */
 export function startHarvest(request: StartHarvestRequest, fetcher: typeof fetch = fetch): Promise<JobRef> {
@@ -184,17 +268,58 @@ export function fetchHarvestCandidates(
   );
 }
 
-/** File a PDF the user saved for a paywalled candidate (multipart field `file`; 409 unless it is paywalled). */
+/** Options of {@link fileHarvestPdf}. */
+export interface FileHarvestPdfOptions {
+  /** The user confirmed a weak match or a mismatch. */
+  confirm?: boolean;
+  /** File it against this other open candidate of the same run instead. */
+  to?: string;
+}
+
+/**
+ * Offer a PDF the user saved for a candidate that needs one by hand (multipart field `file`, one file per request).
+ * A strong match is filed at once; otherwise nothing is stored and the answer asks for confirmation. 409 unless the
+ * candidate is paywalled, blocked or failed.
+ */
 export function fileHarvestPdf(
   candidateId: string,
   file: File,
+  options: FileHarvestPdfOptions = {},
   fetcher: typeof fetch = fetch,
-): Promise<HarvestFileResult> {
+): Promise<HarvestSupplyResult> {
   const form = new FormData();
   form.append('file', file, file.name);
-  return v1Json<HarvestFileResult>(
-    v1Url(`/v1/library/harvest/candidates/${encodeURIComponent(candidateId)}/pdf`),
+  const query = new URLSearchParams();
+  if (options.confirm) query.set('confirm', 'true');
+  if (options.to) query.set('to', options.to);
+  const suffix = query.size > 0 ? `?${query.toString()}` : '';
+  return v1Json<HarvestSupplyResult>(
+    v1Url(`/v1/library/harvest/candidates/${encodeURIComponent(candidateId)}/pdf${suffix}`),
     { method: 'POST', body: form },
+    fetcher,
+  );
+}
+
+/** Drop one PDF on a run: it is matched against all open candidates (one file per request; nothing stored unless strong). */
+export function fileHarvestRunPdf(
+  runId: string,
+  file: File,
+  fetcher: typeof fetch = fetch,
+): Promise<HarvestRunDropResult> {
+  const form = new FormData();
+  form.append('file', file, file.name);
+  return v1Json<HarvestRunDropResult>(
+    v1Url(`/v1/library/harvest/runs/${encodeURIComponent(runId)}/pdf`),
+    { method: 'POST', body: form },
+    fetcher,
+  );
+}
+
+/** Reverse a filing made from a supplied PDF (file, manifest row, catalog row; the candidate returns to its earlier status). */
+export function undoHarvestPdf(candidateId: string, fetcher: typeof fetch = fetch): Promise<HarvestUndoResult> {
+  return v1Json<HarvestUndoResult>(
+    v1Url(`/v1/library/harvest/candidates/${encodeURIComponent(candidateId)}/undo`),
+    { method: 'POST' },
     fetcher,
   );
 }

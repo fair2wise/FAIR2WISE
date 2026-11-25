@@ -28,6 +28,9 @@ MAX_AUTHORS = 40
 #: The fields this module reports on, in display order.
 FIELDS = ("year", "authors", "abstract")
 
+#: Provenance values a manifest row may carry (a PDF a person supplied by hand; see ``harvest.supply_pdf``).
+PROVENANCES = ("user_supplied", "user_supplied_confirmed", "user_supplied_mismatch_confirmed")
+
 _YEAR_FOLDER = re.compile(r"^(?:19|20)\d{2}$")
 _PREFIX = "papers/"
 
@@ -140,7 +143,8 @@ class _Index:
         Returns:
             ``year`` (``int | None``), ``year_source`` (``manifest`` | ``folder`` | ``None``), ``authors``
             (``list[str] | None``), ``authors_total`` (int), ``abstract`` (``str | None``), ``abstract_truncated`` and
-            ``metadata_missing`` (the names among :data:`FIELDS` no source holds).
+            ``metadata_missing`` (the names among :data:`FIELDS` no source holds) and ``provenance`` (one of
+            :data:`PROVENANCES` when the file's own manifest row says a person supplied it, else ``None``).
         """
         row = self.by_path.get(relpath) or self.by_sha.get(sha256) or (self.by_doi.get(_doi_key(doi)) if doi else None) or {}
         year, source = None, None
@@ -156,8 +160,12 @@ class _Index:
             "abstract": abstract, "abstract_truncated": truncated,
         }
         out["metadata_missing"] = [f for f in FIELDS if out[f] is None]
+        # How a person-supplied file was matched; only the row of this very file counts (path or hash), never a DOI twin.
+        own = self.by_path.get(relpath) or self.by_sha.get(sha256) or {}
+        stored = own.get("provenance")
+        out["provenance"] = stored if isinstance(stored, str) and stored in PROVENANCES else None
         return out
 
 
-__all__ = ("FIELDS", "MAX_ABSTRACT_CHARS", "MAX_AUTHORS", "ManifestMetadata", "clean_abstract", "clean_authors",
+__all__ = ("FIELDS", "MAX_ABSTRACT_CHARS", "MAX_AUTHORS", "ManifestMetadata", "PROVENANCES", "clean_abstract", "clean_authors",
            "folder_year")

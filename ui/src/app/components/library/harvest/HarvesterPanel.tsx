@@ -9,7 +9,9 @@ import {
   MAX_DOWNLOADS_MAX,
   MAX_DOWNLOADS_MIN,
   TOPIC_MAX_CHARS,
+  type FileHarvestPdfOptions,
   type HarvestCandidate,
+  type HarvestFileResult,
   type HarvestSource,
 } from '../../harvestApi';
 import {
@@ -20,6 +22,7 @@ import {
   useHarvestRuns,
   useRunningHarvest,
   useStartHarvest,
+  useUndoHarvestPdf,
 } from '../../harvestHooks';
 import { TERMINAL_JOB_STATES } from '../../extractionApi';
 import { FAST_POLL_MS, useCancelJob, useJob, useSchemas } from '../../extractionHooks';
@@ -33,6 +36,9 @@ import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { NewCategoryField } from '../NewCategoryField';
 import { RunLog } from '../../extraction/RunLog';
+import { HarvestBatchDrop } from './HarvestBatchDrop';
+import { HarvestConfirmDialog, type PendingConfirmation } from './HarvestConfirmDialog';
+import { HarvestFiledNotices, type FiledNotice } from './HarvestFiledNotices';
 import { HarvestResults } from './HarvestResults';
 import { HarvestRunsList } from './HarvestRunsList';
 import { HarvestRunView } from './HarvestRunView';
@@ -95,6 +101,9 @@ export function HarvesterPanel() {
   const candidates = useHarvestCandidates(openRunId, live && active ? POLL_MS : false);
   const fileMutation = useFileHarvestPdf();
   const dismissMutation = useDismissCandidate();
+  const undoMutation = useUndoHarvestPdf();
+  const [pending, setPending] = useState<PendingConfirmation | null>(null);
+  const [notices, setNotices] = useState<FiledNotice[]>([]);
 
   // React once when the followed run reaches a terminal state.
   const reported = useRef<string | null>(null);
@@ -144,16 +153,51 @@ export function HarvesterPanel() {
   const busyId = fileMutation.isPending ? fileMutation.variables.candidate.id
     : dismissMutation.isPending ? dismissMutation.variables.id : null;
 
-  function handleFile(candidate: HarvestCandidate, file: File) {
-    fileMutation.mutate({ candidate, file }, {
+  function announce(file: File, result: HarvestFileResult) {
+    if (result.duplicate) {
+      toast.info(`${file.name} is already in the library (${result.paper.relpath}).`);
+      return;
+    }
+    const notice: FiledNotice = {
+      candidateId: result.candidate.id,
+      fileName: file.name,
+      title: result.candidate.title,
+      kind: result.verdict.kind,
+    };
+    setNotices(current => [notice, ...current.filter(item => item.candidateId !== notice.candidateId)]);
+    if (result.manifest && !result.manifest.updated && result.manifest.detail !== 'already listed in the manifest') {
+      toast.warning(result.manifest.detail);
+    }
+  }
+
+  /** Offer a PDF for a candidate: a strong match is filed (and announced with an Undo), anything else asks first. */
+  function handleFile(candidate: HarvestCandidate, file: File, options: FileHarvestPdfOptions = {}) {
+    fileMutation.mutate({ candidate, file, ...options }, {
       onSuccess: result => {
-        if (result.duplicate) toast.info(`${file.name} is already in the library (${result.paper.relpath}).`);
-        else toast.success(`Filed ${file.name} as ${result.paper.relpath}.`);
-        if (result.manifest && !result.manifest.updated && result.manifest.detail !== 'already listed in the manifest') {
-          toast.warning(result.manifest.detail);
+        if (result.filed) {
+          setPending(null);
+          announce(file, result);
+        } else {
+          setPending({ candidate, file, answer: result });
         }
       },
-      onError: error => toast.error(error.message),
+      onError: error => {
+        setPending(null);
+        toast.error(error.message);
+      },
+    });
+  }
+
+  function handleUndo(notice: FiledNotice) {
+    undoMutation.mutate(notice.candidateId, {
+      onSuccess: () => {
+        setNotices(current => current.filter(item => item.candidateId !== notice.candidateId));
+        toast.success(`Undone: ${notice.fileName} was removed and ${notice.title} is back in the queue.`);
+      },
+      onError: error => {
+        setNotices(current => current.filter(item => item.candidateId !== notice.candidateId));
+        toast.error(`Could not undo: ${error.message}`);
+      },
     });
   }
 
@@ -342,6 +386,13 @@ export function HarvesterPanel() {
           ) : candidates.isPending ? (
             <p role="status" className="text-sm text-muted-foreground">Loading papers…</p>
           ) : (
+            <>
+            <HarvestFiledNotices
+              notices={notices}
+              undoingId={undoMutation.isPending ? undoMutation.variables : null}
+              onUndo={handleUndo}
+              onClose={notice => setNotices(current => current.filter(item => item !== notice))}
+            />
             <HarvestResults
               candidates={candidates.data.candidates}
               busyId={busyId}
@@ -349,10 +400,20 @@ export function HarvesterPanel() {
               onDismiss={candidate =>
                 dismissMutation.mutate(candidate, { onError: error => toast.error(error.message) })}
               onRejected={names => toast.error(`Only PDF files can be filed. Rejected: ${names.join(', ')}`)}
+              batch={openRunId !== null ? <HarvestBatchDrop key={openRunId} runId={openRunId} onFiled={announce} /> : null}
             />
+            </>
           )}
         </section>
       ) : null}
+
+      <HarvestConfirmDialog
+        pending={pending}
+        busy={fileMutation.isPending}
+        onFileAnyway={target => handleFile(target.candidate, target.file, { confirm: true })}
+        onFileElsewhere={(target, otherId) => handleFile(target.candidate, target.file, { to: otherId, confirm: false })}
+        onCancel={() => setPending(null)}
+      />
 
       {openRunId !== null && openRunId !== watch?.id ? (
         <section aria-labelledby="harvest-log-title" className="space-y-2">
