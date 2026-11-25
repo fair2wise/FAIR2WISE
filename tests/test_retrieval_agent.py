@@ -142,7 +142,8 @@ def test_judge_system_distinguishes_conceptual_from_numeric():
     assert "photon_energy" in JUDGE_SYSTEM
     assert "vocabulary/relation" in JUDGE_SYSTEM
     assert "Never invent authors" in JUDGE_SYSTEM
-    assert "not a KG measurement fact" in JUDGE_SYSTEM
+    assert "not a KG measurement fact" not in JUDGE_SYSTEM.replace("never write the words 'KG measurement fact'", "")   # no label for the model to repeat
+    assert "In general," in JUDGE_SYSTEM
     assert "Use ONLY the Retrieved Context" not in JUDGE_SYSTEM
     assert "Do NOT infer, extrapolate, or guess" not in JUDGE_SYSTEM
 

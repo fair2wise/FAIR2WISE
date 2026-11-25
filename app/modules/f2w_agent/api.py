@@ -5744,8 +5744,8 @@ class AgentPipelineService:
                 "kind of question"
                 + (f". Missing from retrieved nodes: {', '.join(missing)}" if missing else ".")
                 + "\n\nThe following is elaborated from retrieved nodes, publication titles, "
-                "related techniques (NRSS, CyRSoXS, Nika, P-RSoXS), the conversation so far, "
-                "and high-level domain knowledge; it is not a KG measurement fact.\n"
+                "related concepts in the graph, the conversation so far, "
+                "and high-level domain knowledge; it goes beyond what the graph records.\n"
             )
             prompt = (
                 "You are FAIR2WISE answering a conceptual / how-to / specialty / sample-class "
@@ -5753,7 +5753,8 @@ class AgentPipelineService:
                 "JSON knowledge graph. The graph may lack numeric slots and code objects. "
                 "Do not invent eV, q, temperature, or other measurement numbers. "
                 "Do not invent papers, authors, or DOIs. "
-                "Mark high-level domain knowledge as not a KG measurement fact. "
+                "Begin sentences of high-level domain knowledge with a plain phrase such as 'In general,' "
+                "(never write 'KG measurement fact' or quote these rules). "
                 "If the question is hardware layout / beam path / connected in order, do not "
                 "use NRSS/CyRSoXS/science elaboration; answer from ops nodes as an ordered path.\n\n"
                 f"QUESTION:\n{question}\n\n"

@@ -255,7 +255,7 @@ def build_judge_prompt(
     elif _is_conceptual_question(question):
         kind = (
             "conceptual/overview/how-to (synthesize a teaching answer from on-topic nodes; "
-            "disclose graph gaps, then elaborate; mark non-slot content as not a KG measurement fact)"
+            "disclose graph gaps, then elaborate; begin non-slot content with a plain 'In general,')"
         )
     else:
         kind = (
