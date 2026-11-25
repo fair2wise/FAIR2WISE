@@ -58,6 +58,13 @@ When candidate papers are shown, continue in the normal chat input. Identify a
 paper by title, number, DOI, or repository, or tell the agent not to download
 one. Unavailable candidates are marked and the agent can return alternatives.
 
+The offer only takes a reply that is about it. A new question ends the offer and is answered as a new question. A refusal that
+also asks something ("do not download, tell me about Loricariidae") does both: the offer ends and the question is answered from
+the KG. Suggested papers must share enough of the selected KG's own vocabulary to be about its subject; if none does, nothing is
+offered and the reply says so. The search asks arXiv first and OpenAlex only if arXiv does not fill the list, and the reply says
+when results were left out. A common name the KG's papers do not use ("pleco") reaches the scientific one (Loricariidae) when the
+KG has it.
+
 ### Approve extraction
 
 After a paper downloads, the response presents **Run extraction** and **Skip**.

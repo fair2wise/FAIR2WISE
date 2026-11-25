@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import Counter
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Sequence
 import contextlib
 import contextvars
@@ -101,6 +102,13 @@ from .retrieval_agent import (
     _is_conceptual_question,
     _is_numeric_claim,
     _is_ops_layout_question,
+)
+from .candidate_relevance import (
+    expand_common_names,
+    filter_relevant,
+    is_about_download,
+    kg_vocabulary,
+    split_decline,
 )
 from .session_memory import SessionMemory
 from .trace import (
@@ -2018,6 +2026,18 @@ def _sse(event: str, data: dict[str, Any]) -> str:
 
 
 MAX_HISTORY_MESSAGES = 8
+def _search_note(found: int, dropped: int, kept: list[dict[str, Any]]) -> str:
+    """One sentence on where the suggestions came from and what was held back (plain words, shown with the offer)."""
+    repositories = sorted({str(c.get("repository") or "") for c in kept if c.get("repository")})
+    where = (
+        "The search asks arXiv first and OpenAlex open-access works only if arXiv does not fill the list"
+        + (f"; these come from {', '.join(repositories)}" if repositories else "")
+        + "."
+    )
+    held = f" {dropped} of {found} results were left out because they do not share enough of this knowledge graph's subject." if dropped else ""
+    return where + held
+
+
 CANDIDATE_PAPERS_INTRO = (
     "I could not answer this query reliably from the retrieved context. "
     "Below is a list of papers that might be relevant to the subject."
@@ -2940,6 +2960,10 @@ class SaveBackendProvider(Protocol):
 class AgentPipelineService:
     """Reusable in-process orchestrated pipeline for HTTP chat requests."""
 
+    #: What a reply to a pending offer leaves for the normal turn: the question to answer once the offer is gone.
+    _pending_rewrite: str | None = None
+    #: The question re-asked after a refused offer: its own turn makes no new offer, in any graph source.
+    _declined_rewrite: str | None = None
     #: Class-level default so a service built without ``__init__`` (unit tests) still routes Saves to Splash.
     tiled_save: TiledSaveBackend | None = None
     #: Lazily resolved Save backend (``:local`` after the first publication); ``None`` keeps the paths above.
@@ -4602,6 +4626,7 @@ class AgentPipelineService:
                 pending_response = await self._handle_pending_message(original_question, emit=None)
                 if pending_response is not None:
                     return pending_response
+                original_question = self._take_pending_rewrite() or original_question
             self.workflow.update(orchestration_steps=0)
             extraction_response = await self._maybe_report_active_extraction(original_question, emit=None)
             if extraction_response is not None:
@@ -4756,6 +4781,7 @@ class AgentPipelineService:
                 pending_response = await self._handle_pending_message(original_question, emit=emit)
                 if pending_response is not None:
                     return pending_response
+                original_question = self._take_pending_rewrite() or original_question
             self.workflow.update(orchestration_steps=0)
             extraction_response = await self._maybe_report_active_extraction(original_question, emit=emit)
             if extraction_response is not None:
@@ -5869,6 +5895,11 @@ class AgentPipelineService:
                 skipped=[item.as_dict() for item in union_set.skipped],
             )
 
+        # The selected KG's own words: they let a common name reach the scientific one ("pleco" -> Loricariidae) and
+        # they are the bar a suggested paper has to meet (candidate_relevance.py).
+        kg_words = self._kg_vocabulary(active_graph_source, list(resolved_files))
+        retrieval_question = expand_common_names(question, kg_words)
+
         for round_no in range(1, self.cfg.max_rounds + 1):
             await self._emit(
                 emit,
@@ -5878,7 +5909,7 @@ class AgentPipelineService:
             )
             try:
                 verdict = await self._query_retrieval(
-                    question, history=history, source_rag=source_rag, use_live_tiled=use_live_tiled
+                    retrieval_question, history=history, source_rag=source_rag, use_live_tiled=use_live_tiled
                 )
             except Exception as exc:
                 self.workflow.update(phase="retrieval_error")
@@ -6025,7 +6056,9 @@ class AgentPipelineService:
 
             # Bug 2 fix: if the user already declined a paper download for this topic
             # (within the last 5 declines), stop immediately instead of re-prompting.
-            if (
+            declined_just_now = self._declined_rewrite is not None and question == self._declined_rewrite
+            self._declined_rewrite = None
+            if declined_just_now or (
                 active_graph_source == "json"
                 and not _direct_download_request(question)
                 and self._was_download_recently_declined(question)
@@ -6111,6 +6144,12 @@ class AgentPipelineService:
                         active_graph_path,
                     )
                 candidates = search.get("candidates") or []
+                found_count = len(candidates)
+                # A person who asked for papers on a topic gets them; the bar is for the chat's own fallback offer.
+                candidates, off_topic = (
+                    (candidates, []) if _direct_download_request(question) else filter_relevant(candidates, kg_words)
+                )
+                search_note = _search_note(found_count, len(off_topic), candidates)
                 self.workflow.update(
                     phase="candidates_found" if candidates else "stop_insufficient",
                     candidates=candidates,
@@ -6125,7 +6164,13 @@ class AgentPipelineService:
                     await self._orchestrator_decision(question, emit)
                     return self._response(
                         "stop_insufficient",
-                        "No usable open-access paper candidates were found.",
+                        (
+                            f"The knowledge graph has no direct evidence for this question, and none of the {found_count} "
+                            "papers the search returned is about this knowledge graph's subject, so I am not suggesting any. "
+                            f"{search_note}"
+                            if found_count
+                            else "No usable open-access paper candidates were found."
+                        ),
                         False,
                         verdict,
                         rounds,
@@ -6282,7 +6327,7 @@ class AgentPipelineService:
                     CANDIDATE_PAPERS_INTRO
                     if has_recommendation
                     else CANDIDATE_PAPERS_UNRANKED_INTRO
-                ),
+                ) + (f" {search_note}" if off_topic else ""),
                 False,
                 verdict,
                 rounds,
@@ -6682,12 +6727,45 @@ class AgentPipelineService:
             index = None
         return {"action": action, "candidate_index": index}
 
+    def _kg_vocabulary(self, graph_source: str, files: list[str]) -> Counter[str]:
+        """The selected KG's words; only a JSON KG has a file to read them from (a live corpus gives none)."""
+        return kg_vocabulary(files) if graph_source == "json" else Counter()
+
+    def _take_pending_rewrite(self) -> str | None:
+        """The question a reply to a pending offer left for the normal turn (once), or ``None``."""
+        rewrite, self._pending_rewrite = self._pending_rewrite, None
+        return rewrite
+
     async def _handle_pending_download_message(
         self,
         message: str,
         emit: ProgressEmitter | None,
     ) -> ChatResponse | None:
-        """Act on a pending download message, or re-prompt if the intent is unclear."""
+        """Act on a reply to a pending download offer; a message that is about something else is a new question.
+
+        The offer consumes a message only when the message is about the offer (naming a paper, "yes", a refusal).
+        A refusal that also asks something does both: the offer ends, the topic is remembered as declined and the
+        rest is answered from the KG as a normal turn. A message about something else ends the offer and is
+        answered as a normal turn. In both cases ``None`` is returned and :meth:`_take_pending_rewrite` holds the
+        question to answer.
+        """
+        pending = self.pending or {}
+        declines, rest = split_decline(message)
+        if declines:
+            topic = str(pending.get("effective_question") or pending.get("original_question") or "")
+            self._record_download_decline(topic)
+            self._set_pending(None, phase="stopped_by_user")
+            self.workflow.update(approved_action=None)
+            # A bare refusal re-asks the original question from the KG (the declined topic is remembered, so no
+            # new offer follows); a refusal with a question answers that question.
+            self._pending_rewrite = rest if len(rest.split()) >= 2 else str(pending.get("original_question") or topic) or None
+            self._declined_rewrite = self._pending_rewrite
+            return None
+        candidates = self._pending_candidate_list()
+        if self._heuristic_pending_download_intent(message, candidates) is None and not is_about_download(message, candidates):
+            self._set_pending(None, phase="superseded_by_new_question")
+            self._pending_rewrite = message
+            return None
         intent = await self._interpret_pending_download_message(message)
         action_name = intent.get("action")
         if action_name == "decline":
@@ -6699,6 +6777,10 @@ class AgentPipelineService:
                 emit,
                 candidate_index=int(intent["candidate_index"]),
             )
+        if action_name == "new_question":
+            self._set_pending(None, phase="superseded_by_new_question")
+            self._pending_rewrite = message
+            return None
 
         verdict = (self.pending or {}).get("verdict") or {}
         return self._response(
