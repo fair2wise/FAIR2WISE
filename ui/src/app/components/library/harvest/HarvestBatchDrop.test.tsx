@@ -88,10 +88,11 @@ describe('HarvestBatchDrop', () => {
     const onFiled = setup();
     await userEvent.upload(input(), ['strong.pdf', 'weak.pdf', 'none.pdf'].map(pdf));
     const table = await screen.findByRole('table', { name: 'Dropped files' });
+    // The files are sent in turn: wait for every row's result, not only the first.
     await waitFor(() => expect(within(table).getByText('Strong match: filed')).toBeInTheDocument());
+    await waitFor(() => expect(within(table).getByText('Weak match: not filed')).toBeInTheDocument());
+    await waitFor(() => expect(within(table).getByText('No match: not stored')).toBeInTheDocument());
     expect(within(table).getByText('Strong paper')).toBeInTheDocument();
-    expect(within(table).getByText('Weak match: not filed')).toBeInTheDocument() ;
-    expect(within(table).getByText('No match: not stored')).toBeInTheDocument();
     expect(onFiled).toHaveBeenCalledTimes(1);
     expect(onFiled.mock.calls[0][0].name).toBe('strong.pdf');
     expect(calls.some(c => c.search !== '')).toBe(false);   // nothing confirmed yet
