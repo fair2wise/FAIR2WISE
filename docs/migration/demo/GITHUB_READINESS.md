@@ -262,3 +262,5 @@ Agent can prepare without pushing (not done here unless noted):
   export, to shorten the first-run surprise list.
 
 Re-pin 2026-11-25: `FROZEN_UI_TREE` is `ce848904...` (dialogs centred with the translate property, coverage grid, schema name written at save). The Playwright, Tiled and Docling jobs only run when the head commit says `[ci full]`; the commit after a lint-only fix needs that marker again, and a docs-only commit with it completes the set when the Python and frontend jobs already passed on the same tree.
+
+Re-pin 2026-11-25 (second): `FROZEN_UI_TREE` is `ce848904...` (schema warnings, publication titles, recovery line). The judge prompt of the chat changed on purpose (it no longer asks the model to label sentences with a phrase it then quoted); `QA-01` in `docs/migration/f2w_llm_qa_baseline.json` is re-recorded for it.
