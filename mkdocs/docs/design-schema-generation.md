@@ -1,6 +1,6 @@
 # Design: on-the-fly LinkML schema generation
 
-Status: **backend implemented** on branch `schema_gen` (steps 1 to 7 below); the UI (schema panel, editor, error list) is not built yet. This page records the owner decisions, the numbers used, what the routes do and what is still open. Items that could not be verified are listed at the end.
+Status: **backend implemented** on branch `schema_gen` (steps 1 to 7 below); **UI built** on branch `schema_ui` (schema panel, editor, error list; see [Extraction tab](ui-extraction.md#schema-panel-create-edit-and-try-a-schema)). Extraction now bounds the prompt text of a user schema (see "Extraction prompt bound" below). This page records the owner decisions, the numbers used, what the routes do and what is still open. Items that could not be verified are listed at the end.
 
 ## Goal
 
@@ -81,6 +81,10 @@ Request bodies are capped before they are parsed (256 KiB plus overhead for sche
 
 `app/modules/library/schema_preview.py`. Without `confirm` the route answers only an estimate (pages at most 3, tokens, optional cost, confirmation token from `estimate.py`); nothing is read or called. With the matching token it reads the first up to 3 pages with text, makes one plain-JSON model call per page and coerces the answers onto the schema with `SchemaHelper` (the extractor's own matching). It returns the terms (category, truncated definition, relations with `verified`) and a summary: how many categories fell back to `Thing`, how many relations became `related_to` or stayed unverified. Nothing is stored: no bundle, no KG, no term store; a text schema is written under `<workdir>/tmp/schema-preview-*` and removed. The difference from real extraction (agent with tool calls, merging, snippet passes) is stated in the answer's `note`.
 
+## Extraction prompt bound
+
+Extraction used to send the full rendering of the schema to the model. For a user schema that can be large (the caps allow about 200 KB of description text), so the extractor now bounds it: a user schema's prompt text is kept within 6,000 characters (Ollama) or 12,000 (CBORG), the same budgets as generation, by the deterministic condensed view of `schema_prompt.py` (class names with the first sentence, relations with `domain>range`, whole lines, a fixed `... (N more classes omitted)` line). A text that already fits is sent byte for byte as before, and a shipped schema is never bounded. When a run is condensed the run log has a warning line and the run summary (`GET /v1/jobs/{id}/progress`) carries `schema_prompt_condensed: {full_chars, used_chars, budget}`; `POST /v1/library/estimate` for a user schema carries `schema_prompt: {full_chars, budgets: {ollama, cborg}}` so the Extract form says it before the run. Code: `SchemaHelper.bounded_schema_context`, `Orchestrator(schema_prompt_budget=...)`, `default_orchestrator_factory`.
+
 ## What the UI must state
 
 The validator checks: the text parses as YAML (no tags, anchors or duplicate keys), the structural rules (closed set of keys, names, caps, imports exactly `linkml:types`), the required core, and that it loads in `SchemaView` and `SchemaHelper` with every reference resolving. It does **not** check full LinkML conformance (the `linkml` linter and validator are not used). The report carries `checked` and `note` for exactly this wording. The generate and preview results must be shown with their limits (a draft is a draft; a preview is three pages).
@@ -112,7 +116,7 @@ Estimated effort: 6 to 8 working days including tests and a rehearsal on the in-
 ## Not verified
 
 - No live model call was made (tests use fakes); the 6,000 and 12,000 character budgets and the reply caps were not tried against a real small Ollama model, and `num_ctx` 8192 was not tried against a real server.
-- The UI does not exist yet; the route shapes are tested through the real `create_api_app` on `:local` and `:als-dev`.
+- The route shapes are tested through the real `create_api_app` on `:local` and `:als-dev`; the UI is tested against mocked fetch and fixtures pinned to the real route answers, not against a running server in a browser.
 - The preview and the extraction share the schema prompt text, but the preview does not run the agent loop, so the number of model calls and the terms differ from a real extraction by design.
 - A user schema with a very large number of classes makes a large extraction prompt (the 150-class and 400-slot caps allow about 200 KB of description text); the preview caps the schema text at 30,000 characters, extraction does not.
 - Whether every KG node builder works without the base `Thing` slots was not exercised beyond the required core.
@@ -122,4 +126,4 @@ Estimated effort: 6 to 8 working days including tests and a rehearsal on the in-
 
 1. Publication of user-schema KGs: wanted, and under what review (see above)?
 2. Are the caps (256 KiB, 150 classes, 400 slots, 2 repairs, 3 preview pages) acceptable, or should any change?
-3. Should extraction cap the schema prompt text the way the preview does?
+3. ~~Should extraction cap the schema prompt text the way the preview does?~~ Yes: done for user schemas (see "Extraction prompt bound").
