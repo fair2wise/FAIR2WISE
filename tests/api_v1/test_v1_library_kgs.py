@@ -297,3 +297,13 @@ def test_the_node_record_carries_relationship_evidence_with_counts_always_and_te
     assert measured["evidence"][0] == {"text": located["text"], "page": 3, "kind": "located", "source_paper": "a.pdf"}
     assert shown["rel:related_to"]["evidence"] == [{"text": "an older sentence", "kind": "unknown"}]   # a legacy string
     assert all(set(v) == {"source", "predicate", "target", "evidence_count", "evidence"} for v in shown.values())
+    # the UI fixture (``relationship_evidence.json``) pins this shape: same keys and types, per entry
+    from pathlib import Path
+
+    from tests.api_v1.test_v1_library_schemas_ui_fixtures import same_shape
+
+    pinned = json.loads((Path(__file__).resolve().parents[2] / "ui" / "src" / "app" / "components" / "__fixtures__"
+                         / "relationship_evidence.json").read_text(encoding="utf-8"))
+    same_shape(shown["rel:measured_by"], pinned[0])
+    same_shape(shown["rel:related_to"], pinned[1])
+    assert shown["rel:measured_by"]["evidence"][0]["source_paper"] == "a.pdf"

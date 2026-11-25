@@ -65,6 +65,11 @@ export interface PassageCounts {
   /** Sentences the model gave that were not found in the paper (not stored). */
   rejected: number;
   uncovered: number;
+  /** Relation evidence (absent on an older server): relations, those with a sentence naming both ends, sentences stored, without. */
+  relations?: number;
+  relations_with_evidence?: number;
+  evidence_sentences?: number;
+  relations_without?: number;
 }
 
 /** `summary.passages` of an extraction: its coverage per paper (file name) and in total. */
@@ -83,6 +88,11 @@ export interface RecoveryPaperResult {
   located_added?: number;
   newly_covered?: number;
   still_uncovered?: number;
+  relations?: number;
+  relations_with_evidence_before?: number;
+  evidence_added?: number;
+  relations_newly_covered?: number;
+  relations_still_without?: number;
   reason?: RecoveryReason | string;
   text?: string;
 }
@@ -95,11 +105,19 @@ export interface RecoveryBlock {
     located_added: number;
     newly_covered: number;
     still_uncovered: number;
+    relations?: number;
+    relations_with_evidence_before?: number;
+    evidence_added?: number;
+    relations_newly_covered?: number;
+    relations_still_without?: number;
     papers_processed: number;
     papers_skipped: number;
   };
   papers: Record<string, RecoveryPaperResult>;
 }
+
+/** Share of a paper's relations that must have a sentence naming both ends before the run view stops warning (the server logs the same 50%). */
+export const RELATION_WARN_RATIO = 0.5;
 
 /** Share of a paper's terms that must carry a passage before the run view stops warning (the server logs the same 90%). */
 export const PASSAGE_WARN_RATIO = 0.9;

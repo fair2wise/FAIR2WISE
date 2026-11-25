@@ -126,6 +126,37 @@ export interface PublicationSnippet {
   kind?: PassageKind;
 }
 
+/** One sentence that supports a relationship: found in the paper naming both endpoints (`located`), or an older stored text (`unknown`). */
+export interface RelationshipEvidenceItem {
+  text: string;
+  page?: number;
+  kind?: PassageKind | 'unknown';
+  source_paper?: string;
+}
+
+/**
+ * The supporting sentences of one relationship of the node (`extra_fields.relationship_evidence` of the single-node record):
+ * `evidence_count` is always sent; `evidence` (bounded) only where the deployment releases passages.
+ */
+export interface RelationshipEvidence {
+  source: string;
+  predicate: string;
+  target: string;
+  evidence_count: number;
+  evidence?: RelationshipEvidenceItem[];
+}
+
+/** The node's relationship evidence from its record; malformed entries are dropped. */
+export function relationshipEvidenceOf(node: Pick<LiveGraphNode, 'extra_fields'> | null | undefined): RelationshipEvidence[] {
+  const raw = node?.extra_fields?.relationship_evidence;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((item): item is RelationshipEvidence => {
+    const entry = item as Partial<RelationshipEvidence> | null;
+    return !!entry && typeof entry.source === 'string' && typeof entry.target === 'string'
+      && typeof entry.predicate === 'string' && typeof entry.evidence_count === 'number';
+  });
+}
+
 /**
  * The bibliographic part of a publication: the read-only supporting text (`snippets`, `snippet_count`) and the
  * `passages_recorded` note removed.

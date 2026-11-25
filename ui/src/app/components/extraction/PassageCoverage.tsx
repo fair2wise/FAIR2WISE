@@ -1,6 +1,7 @@
 import { TriangleAlert } from 'lucide-react';
 import {
   PASSAGE_WARN_RATIO,
+  RELATION_WARN_RATIO,
   RECOVERY_REASON_TEXT,
   type PassageCounts,
   type PassagesBlock,
@@ -23,6 +24,21 @@ export function papersUnderThreshold(passages: PassagesBlock): Array<{ name: str
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Papers with relations where fewer than {@link RELATION_WARN_RATIO} have a sentence naming both ends, with their percentage. */
+export function papersUnderRelationThreshold(passages: PassagesBlock): Array<{ name: string; percent: number }> {
+  return Object.entries(passages.papers)
+    .filter(([, row]) => (row.relations ?? 0) > 0 && (row.relations_with_evidence ?? 0) < RELATION_WARN_RATIO * (row.relations ?? 0))
+    .map(([name, row]) => ({ name, percent: percentOf(row.relations_with_evidence ?? 0, row.relations ?? 0) ?? 0 }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+const relationRow = (counts: PassageCounts) => {
+  const percent = percentOf(counts.relations_with_evidence ?? 0, counts.relations ?? 0);
+  return percent === null
+    ? 'no relations'
+    : `${n(counts.relations_with_evidence)} of ${n(counts.relations)} (${percent}%)`;
+};
+
 const row = (counts: PassageCounts) => {
   const percent = percentOf(counts.with_passage, counts.terms);
   return percent === null ? 'no terms' : `${n(counts.with_passage)} of ${n(counts.terms)} (${percent}%)`;
@@ -35,6 +51,8 @@ const row = (counts: PassageCounts) => {
  */
 export function ExtractionCoverage({ passages }: { passages: PassagesBlock }) {
   const under = papersUnderThreshold(passages);
+  const relationsUnder = papersUnderRelationThreshold(passages);
+  const hasRelations = (passages.total.relations ?? 0) > 0;
   const papers = Object.entries(passages.papers).sort(([a], [b]) => a.localeCompare(b));
   return (
     <section className="space-y-2" data-testid="run-passages" aria-label="Supporting text recorded">
@@ -60,6 +78,31 @@ export function ExtractionCoverage({ passages }: { passages: PassagesBlock }) {
           <dd className="font-medium">{n(passages.total.uncovered)}</dd>
         </div>
       </dl>
+      {hasRelations && (
+        <dl className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3" data-testid="run-relation-evidence">
+          <div>
+            <dt className="text-muted-foreground">Relations with a sentence naming both ends</dt>
+            <dd className="font-medium" data-testid="relations-total">{relationRow(passages.total)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Relation sentences stored</dt>
+            <dd className="font-medium">{n(passages.total.evidence_sentences)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Relations without</dt>
+            <dd className="font-medium">{n(passages.total.relations_without)}</dd>
+          </div>
+        </dl>
+      )}
+      {relationsUnder.length > 0 && (
+        <p role="status" className="flex items-start gap-1 text-xs text-amber-700 dark:text-amber-300" data-testid="relations-warning">
+          <TriangleAlert aria-hidden="true" size={14} className="mt-0.5 shrink-0" />
+          <span>
+            Under {Math.round(RELATION_WARN_RATIO * 100)}% of the relations have a sentence naming both ends for{' '}
+            {relationsUnder.map(item => `${item.name} (${item.percent}%)`).join(', ')}.
+          </span>
+        </p>
+      )}
       {under.length > 0 && (
         <p role="status" className="flex items-start gap-1 text-xs text-amber-700 dark:text-amber-300" data-testid="passages-warning">
           <TriangleAlert aria-hidden="true" size={14} className="mt-0.5 shrink-0" />
@@ -81,7 +124,8 @@ export function ExtractionCoverage({ passages }: { passages: PassagesBlock }) {
                 <th scope="col" className="pr-2 font-normal">Quoted</th>
                 <th scope="col" className="pr-2 font-normal">Located</th>
                 <th scope="col" className="pr-2 font-normal">Rejected</th>
-                <th scope="col" className="font-normal">Without</th>
+                <th scope="col" className="pr-2 font-normal">Without</th>
+                <th scope="col" className="font-normal">Relations with a sentence</th>
               </tr>
             </thead>
             <tbody>
@@ -92,7 +136,8 @@ export function ExtractionCoverage({ passages }: { passages: PassagesBlock }) {
                   <td className="pr-2">{n(counts.quoted)}</td>
                   <td className="pr-2">{n(counts.located)}</td>
                   <td className="pr-2">{n(counts.rejected)}</td>
-                  <td>{n(counts.uncovered)}</td>
+                  <td className="pr-2">{n(counts.uncovered)}</td>
+                  <td>{relationRow(counts)}</td>
                 </tr>
               ))}
             </tbody>
@@ -125,7 +170,13 @@ export function RecoveryResult({ recovery }: { recovery: RecoveryBlock }) {
             + `(${n(total.located_added)} passage${total.located_added === 1 ? '' : 's'}).`
           : 'Nothing new to add.'}{' '}
         {n(total.still_uncovered)} term{total.still_uncovered === 1 ? '' : 's'} still {total.still_uncovered === 1 ? 'has' : 'have'} no
-        supporting text. {n(total.papers_processed)} paper{total.papers_processed === 1 ? '' : 's'} searched
+        supporting text.{' '}
+        {(total.relations ?? 0) > 0
+          ? `Relations: ${n(total.evidence_added)} sentence${total.evidence_added === 1 ? '' : 's'} naming both ends found for `
+            + `${n(total.relations_newly_covered)} relation${total.relations_newly_covered === 1 ? '' : 's'}; `
+            + `${n(total.relations_still_without)} still ${total.relations_still_without === 1 ? 'has' : 'have'} none. `
+          : ''}
+        {n(total.papers_processed)} paper{total.papers_processed === 1 ? '' : 's'} searched
         {total.papers_skipped > 0 ? `, ${n(total.papers_skipped)} skipped` : ''}.
       </p>
       {searched.length > 0 && (
@@ -136,7 +187,8 @@ export function RecoveryResult({ recovery }: { recovery: RecoveryBlock }) {
               <th scope="col" className="pr-2 font-normal">Terms</th>
               <th scope="col" className="pr-2 font-normal">Had text</th>
               <th scope="col" className="pr-2 font-normal">Added</th>
-              <th scope="col" className="font-normal">Still without</th>
+              <th scope="col" className="pr-2 font-normal">Still without</th>
+              <th scope="col" className="font-normal">Relation sentences added</th>
             </tr>
           </thead>
           <tbody>
@@ -146,7 +198,8 @@ export function RecoveryResult({ recovery }: { recovery: RecoveryBlock }) {
                 <td className="pr-2">{n(result.terms)}</td>
                 <td className="pr-2">{n(result.with_passage_before)}</td>
                 <td className="pr-2">{n(result.located_added)}</td>
-                <td>{n(result.still_uncovered)}</td>
+                <td className="pr-2">{n(result.still_uncovered)}</td>
+                <td>{n(result.evidence_added)}</td>
               </tr>
             ))}
           </tbody>

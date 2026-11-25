@@ -163,4 +163,19 @@ describe('FindSupportingText', () => {
     expect(result).toHaveTextContent('blank.pdf: This PDF has no text layer');
     expect(result).toHaveTextContent('gone.pdf: This paper is not in the library, so it was skipped.');
   });
+
+  it('reports the relation sentences found in the recovery result', async () => {
+    routes['GET /v1/jobs/j9'] = { status: 200, body: { job_id: 'j9', kind: 'library_passages', state: 'succeeded' } };
+    routes['GET /v1/jobs/j9/progress'] = {
+      status: 200, body: { job_id: 'j9', summary: summary({ state: 'succeeded', outcome: 'succeeded', recovery: {
+        total: { ...RECOVERY.total, relations: 9, evidence_added: 4, relations_newly_covered: 3, relations_still_without: 5 },
+        papers: { 'a.pdf': { terms: 4, with_passage_before: 0, located_added: 3, newly_covered: 3, still_uncovered: 1, relations: 5,
+          evidence_added: 2, relations_newly_covered: 2, relations_still_without: 3 } } } }) },
+    };
+    setup();
+    await userEvent.click(screen.getByRole('button', { name: 'Find supporting text' }));
+    expect(await screen.findByTestId('recovery-summary')).toHaveTextContent(
+      'Relations: 4 sentences naming both ends found for 3 relations; 5 still have none.');
+    expect(screen.getByTestId('recovery-papers')).toHaveTextContent('a.pdf');
+  });
 });

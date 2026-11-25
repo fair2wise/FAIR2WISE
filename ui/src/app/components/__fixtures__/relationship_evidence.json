@@ -1,0 +1,34 @@
+[
+  {
+    "source": "matkg:domainpurity",
+    "predicate": "rel:measured_by",
+    "target": "matkg:RSoXS",
+    "evidence_count": 2,
+    "evidence": [
+      {
+        "text": "Domain purity was measured by resonant soft X-ray scattering of the blend films at the carbon edge.",
+        "page": 3,
+        "kind": "located",
+        "source_paper": "a.pdf"
+      },
+      {
+        "text": "A second sentence naming both domain purity and RSoXS in one place of the paper.",
+        "page": 4,
+        "kind": "located",
+        "source_paper": "a.pdf"
+      }
+    ]
+  },
+  {
+    "source": "matkg:domainpurity",
+    "predicate": "rel:related_to",
+    "target": "matkg:blend",
+    "evidence_count": 1,
+    "evidence": [
+      {
+        "text": "an older sentence",
+        "kind": "unknown"
+      }
+    ]
+  }
+]

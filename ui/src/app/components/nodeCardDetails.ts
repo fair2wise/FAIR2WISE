@@ -265,6 +265,7 @@ const PROPERTY_LABELS: Record<string, string> = {
 };
 
 const SKIP_PROPERTY_KEYS = new Set([
+  'relationship_evidence',
   'haystack',
   'outgoinglinks',
   'relations',

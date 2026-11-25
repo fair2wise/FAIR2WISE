@@ -21,6 +21,7 @@ import { PublicationList } from './PublicationList';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable';
 import { loadAgentSettings } from './agentSettings';
 import { canEditNode, snippetsDisclosed } from './capabilitiesApi';
+import { RelationshipEvidenceList } from './RelationshipEvidenceList';
 import { GraphSourceSelect } from './GraphSourceSelect';
 import { graphSourceFromPath, useGraphSourceState } from './graphSourceStore';
 import { useGraphSources } from './graphSourcesHooks';
@@ -29,6 +30,7 @@ import { useCapabilities } from './capabilitiesHooks';
 import {
   fetchGraphNeighborhoodResult,
   fetchGraphNodeDetail,
+  relationshipEvidenceOf,
   withoutSnippets,
   fetchLiveGraph,
   GraphPayload,
@@ -791,6 +793,10 @@ function NodeDetailPanel({
   const removedRelationshipKeys = new Set(
     relationshipUpdates.filter(update => update.action === 'remove').map(relationshipKey),
   );
+  const evidenceByRelationship = useMemo(
+    () => new Map(relationshipEvidenceOf(display).map(item => [relationshipKey(item), item])),
+    [display],
+  );
   const visibleRelationships = [
     ...incidentRelationships
       .filter(edge => !removedRelationshipKeys.has(relationshipKey(edge)))
@@ -1241,11 +1247,10 @@ function NodeDetailPanel({
                 const outgoing = relationship.source === node.id;
                 const otherId = outgoing ? relationship.target : relationship.source;
                 const other = nodeById.get(otherId);
+                const evidence = relationship.staged ? undefined : evidenceByRelationship.get(relationshipKey(relationship));
                 return (
-                  <div
-                    key={`${relationshipKey(relationship)}:${relationship.staged ? 'new' : 'existing'}`}
-                    className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2"
-                  >
+                  <div key={`${relationshipKey(relationship)}:${relationship.staged ? 'new' : 'existing'}`}>
+                  <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2">
                     <span className="min-w-0 flex-1 text-xs text-slate-600">
                       <span className="font-medium text-slate-700">{outgoing ? 'This node' : other?.label || otherId}</span>
                       <span className="mx-1.5 text-slate-400">→</span>
@@ -1263,6 +1268,12 @@ function NodeDetailPanel({
                     >
                       <Trash2 size={13} />
                     </button>
+                  </div>
+                  {evidence && (
+                    <div className="px-3 pb-1">
+                      <RelationshipEvidenceList item={evidence} disclosed={snippetsDisclosed(capabilities)} />
+                    </div>
+                  )}
                   </div>
                 );
               })}
