@@ -231,11 +231,13 @@ def test_shipped_schema_rendering_is_pinned_byte_for_byte():
         assert SchemaHelper(rel, sanitize_descriptions=False).get_schema_context_for_llm() == text
 
 
-#: Computed on the code before ``sanitize_descriptions`` existed.
+#: Computed on the code before ``sanitize_descriptions`` existed, then re-pinned once on 2026-11-25 by owner decision: the
+#: prompt no longer offers the pipeline-only CodeSnippet class, its code_* slots or has_code_snippet (a model filed a
+#: staining method under it). Nothing else in the rendering changed.
 PINNED = {
-    "storage/schema/matkg_schema.yaml": "5204ab31c9bb0f56b99e5ee54d1f75fd10c8fc68f7a093c2c058d920ea7d823f",
-    "storage/schema/v0.3.1/matkg_schema.yaml": "91407f920cdf5d885caa2a7e870c817e23df5af70d0497abaf80adb4aa2a5e8d",
-    "storage/schema/rsoxs_schema.yaml": "57703cfbeb5dabdd77f89e242404c18e663a35d807bd60501b326d3853f59c77",
+    "storage/schema/matkg_schema.yaml": "68d4d5c72116f88cd1b9ed9b3eadb45fcd6f2cd5b6214195cdb64236f2462880",
+    "storage/schema/v0.3.1/matkg_schema.yaml": "11241afb7e22580f1143c340581d536179a473c24567fa680344e4ac28ef7eff",
+    "storage/schema/rsoxs_schema.yaml": "e4e1dc24bbd1941615ab61e61ab9cf0e4cf6b01238d9ccafbdd7fe85fe0c88e4",
 }
 
 

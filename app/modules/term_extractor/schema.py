@@ -116,6 +116,12 @@ GENERAL_RELATION_ALIASES: dict[str, str] = {
 }
 
 
+#: Classes the pipeline fills itself (``code_snippets`` become CodeSnippet nodes, ``has_code_snippet`` edges are synthesised).
+#: They stay in the schema, but the extraction and preview prompts never offer them to the model as a category or relation:
+#: a model that was offered CodeSnippet filed ordinary terms such as a staining method under it (pilot 2026-11-25).
+PIPELINE_ONLY_CLASSES: frozenset[str] = frozenset({"CodeSnippet"})
+
+
 class SchemaHelper:
     """Load a LinkML schema and validate extracted terms against it.
 
@@ -181,10 +187,29 @@ class SchemaHelper:
         self._slot_map_lower = {s.lower(): s for s in self.slots}
         logger.debug("Built fuzzy indexes for classes and slots")
 
+    def offered_classes(self) -> dict[str, dict[str, Any]]:
+        """The classes a model may choose as a category: every class except :data:`PIPELINE_ONLY_CLASSES`."""
+        return {name: info for name, info in self.classes.items() if name not in PIPELINE_ONLY_CLASSES}
+
+    def offered_slots(self) -> dict[str, dict[str, Any]]:
+        """The relations a model may use: every slot except those that belong to or point at a pipeline-only class.
+
+        A slot belongs to such a class when it is declared in the class's own ``slots`` list (``code_snippet``,
+        ``code_language`` ... have no ``domain``) or names it as its domain; it points at one when its range is the class.
+        """
+        own: set[str] = set()
+        for cls in PIPELINE_ONLY_CLASSES & set(self.classes):
+            try:
+                own.update(self.schema_view.class_slots(cls, direct=True))
+            except Exception:  # noqa: BLE001 - a class the view cannot resolve owns no slot we can name
+                logger.debug("Could not list the slots of %s", cls, exc_info=True)
+        return {name: info for name, info in self.slots.items()
+                if name not in own and info["domain"] not in PIPELINE_ONLY_CLASSES and info["range"] not in PIPELINE_ONLY_CLASSES}
+
     def get_schema_context_for_llm(self) -> str:
         """Render the schema classes and relations as prompt text for the LLM."""
         lines: list[str] = ["=== KNOWLEDGE SCHEMA ===\n", "ENTITY TYPES (use exactly these names):"]
-        for cls in sorted(self.classes):
+        for cls in sorted(self.offered_classes()):
             desc = self.classes[cls]["description"]
             parent = self.class_parents[cls]
             if parent:
@@ -192,7 +217,7 @@ class SchemaHelper:
             else:
                 lines.append(f"- {cls}: {desc}")
         lines.append("\nVALID RELATIONSHIPS (use exactly these names):")
-        for slot in sorted(self.slots):
+        for slot in sorted(self.offered_slots()):
             info = self.slots[slot]
             dom = info["domain"] or "Any"
             rng = info["range"] or "Any"
@@ -218,8 +243,8 @@ class SchemaHelper:
         head = "=== KNOWLEDGE SCHEMA (condensed: the full schema is too long for the prompt) ===\n"
         tail = "\nIMPORTANT: Do NOT use relations named 'description' or 'category'."
         view = condensed_view(
-            {name: info["description"] for name, info in self.classes.items()},
-            {slot: (info["domain"], info["range"] or "Any") for slot, info in self.slots.items() if info["domain"]},
+            {name: info["description"] for name, info in self.offered_classes().items()},
+            {slot: (info["domain"], info["range"] or "Any") for slot, info in self.offered_slots().items() if info["domain"]},
             max(max_chars - len(head) - len(tail), 0))
         text = head + view + tail
         return text, {"full_chars": len(full), "used_chars": len(text), "budget": max_chars}
