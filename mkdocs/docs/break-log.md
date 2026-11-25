@@ -8,7 +8,7 @@ run 45713088709). Model calls used so far: **0 of the 400 allowed**.
 
 - **Tier 1 A, item 4: Repair relations** for a bundle on a user schema (`library_relations`, route V100, Extract page button).
   No model. Swaps relations valid only reversed, turns value-slot relations into properties, counts per pattern, keeps one
-  previous generation (`previous/terms.json`, `previous/kg.json`), rebuilds the KG, idempotent. Commit: see below. CI: see below.
+  previous generation (`previous/terms.json`, `previous/kg.json`), rebuilds the KG, idempotent. Commit a221bb64 (re-pin follows). CI: see the next entry.
   - Decision taken: the job refuses a bundle on a shipped schema (`not_user_schema`) rather than running as a no-op, because
     shipped-schema relations were judged with the old rules on purpose (pinned prompt and behaviour).
   - Decision taken: the previous generation lives inside the bundle directory under `previous/`; nothing outside the bundle
