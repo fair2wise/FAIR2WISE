@@ -321,6 +321,60 @@ evidence, located only, through tool, store, build, `kg_to_terms` and the recove
 the Extract page block; (5) the recovery job and its button (built); (6) the deterministic real-extraction suite test with the
 thresholds; (7) docs (statuses, coverage, recovery, known issues). Stop for review after this page.
 
+## Table-heavy and scanned papers (measured 2026-11-25, proposals not built)
+
+The plecos run (9 harvested papers, 2,935 terms) had 68% of terms with supporting text overall, six papers at 86 to 93%, the
+1904 Regan monograph at 54% (1,215 sentences rejected) and the 2024 Loricariidae cytogenetics review at 38% (429 rejected);
+relations with a sentence naming both ends were 24% overall, 5% on the monograph and 11% on the review. The two papers were
+fetched again (open access, DOIs 10.1111/j.1096-3642.1904.tb00040.x and 10.1590/1982-0224-2024-0050) and profiled with the
+passage rules, no model. The pilot's own term lists were not available, so the counts below are of the **text**, not of the
+terms; the rejected-sentence sample needs the next run (the extractor now logs it, see the end of this section).
+
+| | 1904 monograph | 2024 review |
+|---|---|---|
+| Pages, words | 173 pages, 63,487 words | 36 pages, 20,145 words |
+| Text layer | present (OCR); 33 plate pages under 50 words; 74% of 4-letter words are dictionary words, with OCR slips such as `afinis`, `Chretostomvs`, `vertebrse` | born digital, clean |
+| Where the facts are | running prose of species descriptions in telegraphic style | Table 1 on pages 6 to 21: 16 of the 23 body pages, 53% of all words, about 390 rows (species, locality with coordinates, 2n, karyotype formula, citation); references start on page 24 |
+| Sentence spans | 8,520; **6,219 (73%) rejected as fragments**, 6,207 of them for having fewer than 5 words of 3+ letters; 2,215 accepted (26%) | 1,002; 237 accepted (24%); 325 fragments, 281 header or boilerplate (the page header glued into the table), 85 starting mid-sentence |
+| Samples of what is rejected | `Total length 50 mm.` `32-34 scutes in a longitudinal series.` `H. acipenserinus Kner.` `Plecostomus afinis Steind.` `255 -- auomalus ....` | `"Pão" Xingu River, Belo Monte hydroeletric plant 3°06'12.8"S 51°43'53.9"W 52♀♂ 94 40m/sm + 12st/a Almeida et al. (2023)` and `8/36 Neotropical Ichthyology, 22(4):e240050, 2024 ... TABLE 1 | (Continued) Subfami...` |
+
+What this says:
+
+- **The review is a table paper.** Its facts are table rows, which the PDF reader flattens into one line per row with the page
+  header glued in. A model asked for a sentence writes one from the row (`X has 2n = 54, 40 m/sm + 12 st/a`), which is not in
+  the text, so it is rejected; the located fallback looks for a sentence that mentions the term and finds only rows the rules
+  call fragments or headers. Both routes fail for the same reason, which is the honest reason: the evidence is a row.
+- **The monograph is not a poor text layer so much as telegraphic prose.** The OCR is imperfect but readable. The rule that
+  rejects a sentence with fewer than five words of three letters throws away real measurements (`Total length 50 mm.`) and
+  keeps only the long prose. Rejected model sentences there are probably near matches that fail on OCR slips; the next run
+  confirms or refutes it.
+- Relation coverage follows: a relation needs one sentence (or two adjacent ones) naming both ends, and a row or a telegraphic
+  clause rarely names two terms in a sentence the rules accept.
+
+Proposals (nothing is built):
+
+1. **A `table_row` evidence kind.** For a paper where the text of a page looks like a table (many numeric cells, coordinates,
+   repeated column pattern), a located passage may be the row, shown with its column header, with `kind: table_row` and
+   `verified: true`. The unit is the row, split on its line in the extracted text; the header is the nearest preceding line
+   with the table's column words, and the running page header is cut off. A relation between two entities of one row (species and
+   locality, species and 2n) is evidenced by that row. The card labels it **table row** (not a sentence). This is the honest
+   evidence for a karyotype review. Estimated effort: about 3 days with real-paper tests on this review.
+2. **Accept short factual clauses.** Allow a sentence of fewer than five words when it carries a number and a unit or an anatomical
+   count (`Total length 50 mm.`, `32-34 scutes ...`) and is not a name list. About half a day; it needs the pass over the six
+   measured papers to show nothing worse gets in.
+3. **Tolerate OCR when matching the model's sentence.** A quoted sentence whose words are at least 90% in order on one page is
+   accepted as `quoted` with the page's own text stored (not the model's), so OCR slips do not reject a true quote. About 1 day.
+4. **Scanned text.** A page with under 50 words is a plate or a scan: today it contributes nothing. Options are an OCR pass with
+   the Docling OCR already in the image for those pages (cost: seconds per page on CPU, a larger image only if its OCR models are
+   not already present, which was not checked) or leaving them out and saying so per paper, which the recovery already does for
+   a paper with no text at all. Recommendation: say so per page count for now, OCR later if scans matter.
+
+Instrumentation added with this section (diagnostic, changes nothing stored): each rejected model sentence is classified as
+`near_match` (the words are on a page; paraphrase, OCR slip or reordering), `table_row`, `partial_overlap` (words from several
+lines) or `not_in_paper` (the model's own words), counted per paper, and 20 samples (at most 6 per class, 300 characters) are
+written to the run log at the end of an extraction, with the counts by class. Run the plecos extraction again, or only the
+two papers, to read it.
+
 ## Not verified
 
 Clause-window trimming (proposed only); the caption and Methods rules; short-acronym false positives across the corpus;

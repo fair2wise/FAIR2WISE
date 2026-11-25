@@ -553,9 +553,23 @@ class Orchestrator:
             logger.warning("relation %s %s: %d times", shape, what, row["count"])
         return report
 
+    def rejection_summary(self) -> dict[str, Any]:
+        """Log what the rejected model sentences were (counts by class per run, then a bounded sample of 20): diagnostics only."""
+        report = self.store.rejection_report()
+        if not report:
+            return {}
+        counts = ", ".join(f"{name} {report['by_reason'].get(name, 0)}" for name in passages.REJECT_CLASSES)
+        logger.info("rejected model sentences by class: %s", counts)
+        for paper, by in sorted(report["by_paper"].items()):
+            logger.info("rejected model sentences in %s: %s", paper, ", ".join(f"{k} {v}" for k, v in sorted(by.items())))
+        for item in report["samples"]:
+            logger.info("rejected sample (%s, %s, page %s): %s", item["paper"], item["reason"], item["page"], item["text"])
+        return report
+
     def passage_summary(self) -> dict[str, Any]:
         """Passage coverage of this run for the run summary: ``total`` and ``papers`` (per file name)."""
         papers = self.store.run_passage_stats()
+        self.rejection_summary()   # what the rejected model sentences were (logged once per run end)
         total = dict.fromkeys(PASSAGE_COUNTS, 0)
         for row in papers.values():
             for key in total:

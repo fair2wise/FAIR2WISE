@@ -101,6 +101,9 @@ class ToolState:
         self.store.note_passage(source_paper, term_key, kind=snippet.kind if snippet else None, rejected=int(result.rejected))
         if result.rejected:
             logger.info("ground: sentence for '%s' not found in %s; rejected", term, source_paper)
+            if context:
+                reason, near = passages.classify_rejection(context, pages if pages else ([self.page_text()] if self.page_text() else []))
+                self.store.note_rejection(source_paper, reason, context, near)
         return snippet
 
     def attach_relation_evidence(self, term: str, relations: list[RelationRecord], source_paper: str | None,

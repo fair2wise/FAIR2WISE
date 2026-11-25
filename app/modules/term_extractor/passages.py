@@ -864,6 +864,47 @@ class Grounding:
     rejected: bool
 
 
+#: Classes of a rejected sentence (see :func:`classify_rejection`).
+REJECT_NEAR_MATCH = "near_match"
+REJECT_TABLE = "table_row"
+REJECT_PARTIAL = "partial_overlap"
+REJECT_ABSENT = "not_in_paper"
+REJECT_CLASSES = (REJECT_NEAR_MATCH, REJECT_TABLE, REJECT_PARTIAL, REJECT_ABSENT)
+_WORD3 = re.compile(r"[a-z]{3,}")
+
+
+@lru_cache(maxsize=4096)
+def _page_words(page_text: str) -> frozenset[str]:
+    return frozenset(_WORD3.findall(page_text.lower()))
+
+
+def classify_rejection(sentence: str, pages: Sequence[str]) -> tuple[str, int | None]:
+    """Why a model sentence that was not found in the paper was not found: ``(class, 1-based page of best overlap)``.
+
+    Diagnostic only (it changes nothing that is stored). The share of the sentence's words (three letters or more) found on
+    its best page decides: a sentence made mostly of numbers and short cells with at least half of its words on a page is
+    ``table_row`` (a row of a table written out as a sentence); at least 85% is ``near_match`` (the words are there; a
+    paraphrase, an OCR or ligature difference or a reordering); at least 50% is ``partial_overlap`` (words from several lines);
+    anything less is ``not_in_paper`` (the model's own words or background knowledge).
+    """
+    words = _WORD3.findall(sentence.lower())
+    if not words:
+        return REJECT_ABSENT, None
+    best, best_page = 0.0, None
+    for number, text in enumerate(pages, 1):
+        known = _page_words(text)
+        share = sum(w in known or w + "s" in known or (w.endswith("s") and w[:-1] in known) for w in words) / len(words)
+        if share > best:
+            best, best_page = share, number
+    tokens = sentence.split()
+    numeric = sum(bool(re.fullmatch(r"[\d.,;:()/±+–-]+", t)) for t in tokens)
+    if best >= 0.5 and tokens and (numeric / len(tokens) >= 0.25 or sum(len(t) <= 3 for t in tokens) / len(tokens) >= 0.5):
+        return REJECT_TABLE, best_page
+    if best >= 0.85:
+        return REJECT_NEAR_MATCH, best_page
+    return (REJECT_PARTIAL if best >= 0.5 else REJECT_ABSENT), best_page
+
+
 def find_sentence(pages: Sequence[str], sentence: str, *, current: int | None = None) -> int | None:
     """Return the 0-based index of the page that holds ``sentence``, or ``None``.
 

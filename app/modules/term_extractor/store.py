@@ -46,6 +46,9 @@ class TermStore:
         self._passage_run: dict[str, dict[str, Any]] = {}
         #: ``(outcome, relation, subject_class, object_class) -> count`` of the relation repairs of this run.
         self._relation_checks: dict[tuple[str, str, str, str], int] = {}
+        #: ``(paper, class) -> count`` of rejected model sentences and a bounded sample of them (diagnostics only).
+        self._rejected_classes: dict[tuple[str, str], int] = {}
+        self._rejected_samples: list[dict[str, Any]] = []
         self._passage_base: dict[str, dict[str, int]] = {}
         #: Running tally of what :meth:`upsert` did since this store was opened (a job's live KG growth counters).
         self._growth = {"entities_new": 0, "entities_merged": 0, "relations_new": 0, "relations_merged": 0}
@@ -324,6 +327,33 @@ class TermStore:
     # ------------------------------------------------------------------
     # Passage coverage (design: supporting passages, section d)
     # ------------------------------------------------------------------
+
+    #: Most rejected sentences kept as a sample per run, and per class.
+    REJECT_SAMPLE_TOTAL = 20
+    REJECT_SAMPLE_PER_CLASS = 6
+
+    def note_rejection(self, paper: str, reason: str, sentence: str, page: int | None) -> None:
+        """Count one rejected model sentence by class and keep a bounded, spread-out sample of the text."""
+        with self._state_lock:
+            key = (paper, reason)
+            self._rejected_classes[key] = self._rejected_classes.get(key, 0) + 1
+            same = sum(1 for item in self._rejected_samples if item["reason"] == reason)
+            if len(self._rejected_samples) < self.REJECT_SAMPLE_TOTAL and same < self.REJECT_SAMPLE_PER_CLASS:
+                self._rejected_samples.append({"paper": paper, "reason": reason, "page": page, "text": " ".join(sentence.split())[:300]})
+
+    def rejection_report(self) -> dict[str, Any]:
+        """Rejected model sentences of this run by class (``by_reason``, ``by_paper``) and the sample; ``{}`` when none."""
+        with self._state_lock:
+            classes = dict(self._rejected_classes)
+            samples = [dict(item) for item in self._rejected_samples]
+        if not classes:
+            return {}
+        by_reason: dict[str, int] = {}
+        by_paper: dict[str, dict[str, int]] = {}
+        for (paper, reason), count in classes.items():
+            by_reason[reason] = by_reason.get(reason, 0) + count
+            by_paper.setdefault(paper, {})[reason] = count
+        return {"by_reason": by_reason, "by_paper": by_paper, "samples": samples}
 
     def note_relation_check(self, outcome: str, relation: str, subject_class: str, object_class: str) -> None:
         """Count one relation repair of this run (``attribute``, ``swapped`` or ``invalid``) under its pattern."""
