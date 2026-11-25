@@ -48,7 +48,7 @@ env:
   # Re-pinned 2026-11-23 (owner bug list, task 3): Extract tab model list: CBORG address-refusal reason and Ollama models in a grouped picker (modelChoices, ExtractionIdleForm, extractionApi); previous e1a6fec0.
   # Re-pinned 2026-11-23 (owner bug list, task 4): Ollama model dropdown in Settings (OllamaModelSetting, ollamaApi) fed by GET /v1/ollama/models; previous a21f0906.
   # Re-pinned 2026-11-23 (owner request, extraction feedback): Extract page shows live progress, KG growth, a filterable log, a runs list and survives reload/tab switch (ExtractionTab, extraction/Run*, useJobLogPolling, extractionApi/Hooks, KeepAliveMainContent, tabActivity); previous b34dce75.
-  FROZEN_UI_TREE: 98b33102798aaeb4c745c2ecfda0557338eb16a6
+  FROZEN_UI_TREE: 62f54630248d000cf9672c38534dfa132185a3b3
   KG_RAG_RETRIEVAL_BACKEND: lexical
   KG_RAG_FORCE_CPU: "1"
   F2W_SOURCE_RAG: "0"
