@@ -48,8 +48,9 @@ Candidate sentences are computed once per page (the verdicts are term-independen
    `i.e.` and single initials do not end a sentence; a line break inside a sentence is a space; `x-\ny` is dehyphenated
    for display, with offsets kept into the page text.
 2. Rejected: anything in or after the `References` heading; header, title, affiliation and boilerplate lines
-   (institution words, e-mail or URL or DOI, long comma lists, copyright/received/accepted/license, journal name
-   lines); citation entries (year + volume + page range, author-initial lists); equations and fragments (fewer than 5
+   (by shape, not by a bare institution word: e-mail or URL or DOI, author markers, long comma lists, a verbless
+   fragment of institution names or a postal address, copyright/received/accepted/license, journal name lines; a complete
+   sentence with a verb that names a national laboratory or facility is kept); citation entries (year + volume + page range, author-initial lists); equations and fragments (fewer than 5
    alphabetic words, under 55% letters, more than 6 math symbols); sentences without a capital, bracket or digit at the
    start or without final punctuation; figure captions (a paragraph starting `Fig.`/`Figure N` or with panel letters);
    page-number-only lines.
@@ -71,7 +72,8 @@ Examples from a real 10-page paper (`10.1038_s41467-020-14549-w.pdf`), text as t
 | EL measurement / EL measurements | same passage, p7 (plural tolerated) |
 | grazing-incidence wide-angle X-ray scattering (GIWAXS) | rejected: the long form occurs only in two sentences over 400 chars (this is why the clause window is proposed) |
 | PCBM, nanostructure, polymer blend, thin film | rejected: found only in the reference list |
-| Nature Communications, synchrotron | rejected: 20 header/boilerplate and 10 reference hits, 1 boilerplate and 2 reference hits |
+| Nature Communications | rejected: 13 header/boilerplate and 7 reference hits |
+| synchrotron | accepted, p7: the Methods sentence "GIWAXS measurements were performed at the 11-BM ... beamline of the National Synchrotron Light Source II" (the earlier `National` word rule rejected it; owner decision 2026-11-24); 2 further hits in the reference list are rejected |
 | P3HT:PCBM, CH4, denoising diffusion probabilistic model (DDPM) | not found in this paper (correct: nothing invented) |
 
 Known false accepts of the prototype: figure-caption sentences and Methods boilerplate ("The solid and dashed black
@@ -181,8 +183,10 @@ of the Extract page. Relationship evidence does not exist yet, so only terms are
 
 **Cost, measured on this machine** (6 real papers of `papers/`, copied; 2,296 terms of the shipped RSoXS terms file that cite
 them, 2,497 term-paper pairs, 6 to 36 pages each): 8.5 s for the whole job (1.4 s per paper, PDF read, locate and rewrite of
-`terms.json` included); the second run, which adds nothing, 1.9 s. Located passages were attached for 1,910 of the 2,497
-term-paper pairs (76%); the rest are terms whose name does not appear in the paper in a sentence that passes the quality
+`terms.json` included); the second run, which adds nothing, 1.9 s. Located passages were attached for 1,912 of the 2,497
+term-paper pairs (76.6%; 1,910 with the earlier institution-word rule: 22 candidate sentences of these six papers, every one
+a complete sentence with a verb, such as "A new in-vacuum spectrometer has been installed on beamline X1A2 at the NSLS,
+Brookhaven National Laboratory.", were rejected as affiliations; only 2 term-paper pairs depended on them); the rest are terms whose name does not appear in the paper in a sentence that passes the quality
 rules (the earlier estimate of about 90% counted any mention, including headers, references and fragments).
 
 **What it cannot recover:** terms the model rewrote (`electron-doped high-temperature superconductor`, LaTeX names, `1/C2-V

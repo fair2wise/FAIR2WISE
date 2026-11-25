@@ -399,7 +399,9 @@ def test_real_header_and_boilerplate_terms_are_rejected(paper_pages: list[str]) 
     assert {c.reason for c in got} <= {P.REASON_HEADER, P.REASON_REFERENCES}
     assert sum(c.reason == P.REASON_HEADER for c in got) >= 10
     syn = P.candidates(paper_pages, "synchrotron")
-    assert syn and not any(c.accepted for c in syn)
+    # owner decision 2026-11-24: a Methods sentence naming a national facility is evidence, not an affiliation
+    assert [(c.page, c.accepted) for c in syn if c.page == 7] == [(7, True)]
+    assert "National Synchrotron Light Source II" in next(c.text for c in syn if c.page == 7)
 
 
 @pytest.mark.parametrize("term", ["P3HT:PCBM", "CH4", "denoising diffusion probabilistic model (DDPM)"])
@@ -451,3 +453,59 @@ def test_ground_context_prefers_the_page_it_came_from_for_the_located_fallback()
                            paper_pages=pages)
     assert got.snippet is not None and got.snippet.page == 2
     assert [p.page for p in P.best_passages(pages, "RSoXS", only_pages=[0])] == [1]
+
+
+# ---------------------------------------------------------------------------------------------------- facility sentences
+
+
+FACILITY_SENTENCES = [
+    # s41467-020-14549-w, p7 (Methods) and p8
+    "GIWAXS measurements were performed at the 11-BM Complex Materials Scattering (CMS) beamline of the National "
+    "Synchrotron Light Source II (NSLS-II) with a beam energy of 10 keV.",
+    "R-SoXS measurements were performed in transmission geometry at the ALS beamline 11.0.1.260 following procedures "
+    "described earlier61.",
+    # other measured papers
+    "A new in-vacuum spectrometer has been installed on beamline X1A2 at the NSLS, Brookhaven National Laboratory.",
+    "Instruments with that option are operated at the Swiss Light Source [40] and the National Synchrotron Light Source [45].",
+    "Resonant soft X-ray scattering was carried out at beamline 11.0.1.2 of the Advanced Light Source, Lawrence Berkeley "
+    "National Laboratory, in transmission geometry.",
+]
+AFFILIATIONS = [
+    # real first-page lines of 10.1038_s41467-020-14549-w
+    "1Department of Chemistry and Biochemistry, University of Bern, Freiestrasse 3, CH-3012 Bern, Switzerland.",
+    "6 Material Measurement Laboratory, National Institute of Standards and Technology (NIST), Gaithersburg, MD 20899, USA.",
+    "5 Institute of Physics and Astronomy, University of Potsdam, Karl-Liebknecht-Str. 24-25, 14476 Potsdam-Golm, Germany.",
+    "Lawrence Berkeley National Laboratory, Berkeley, CA 94720, USA.",
+    "Dr. H. Hu, Dr. L. Ye, Prof. H. Ade, Department of Physics and ORaCEL, North Carolina State University, Raleigh, NC 27695, USA.",
+    "E-mail: hwade@ncsu.edu",
+]
+
+
+@pytest.mark.parametrize("sentence", FACILITY_SENTENCES)
+def test_a_complete_sentence_naming_a_facility_is_kept(sentence: str) -> None:
+    assert P.sentence_verdict(sentence) is None
+    page = "Opening words of the methods section of the paper here. " + sentence + " Closing words of the section follow."
+    assert any(c.accepted for c in P.candidates([page], "beamline" if "beamline" in sentence else "Light Source"))
+
+
+@pytest.mark.parametrize("fragment", AFFILIATIONS)
+def test_an_affiliation_block_is_still_rejected_by_its_shape(fragment: str) -> None:
+    assert P.sentence_verdict(fragment) == P.REASON_HEADER
+
+
+def test_the_shape_rule_needs_no_verb_not_a_word_list() -> None:
+    assert P.sentence_verdict("The Faculty of the university approved the measurements of the blend films in this study.") is None
+    assert P.sentence_verdict("Department of Physics, University of Somewhere, Somewhere City, Someland.") == P.REASON_HEADER
+    # the same institution words inside a sentence about work are kept wherever the sentence stands
+    kept = ("The samples were prepared at the Department of Chemistry of the University of Bern and measured at the National "
+            "Institute of Standards and Technology.")
+    assert P.sentence_verdict(kept) is None
+
+
+def test_real_facility_sentences_of_the_paper_are_accepted(paper_pages: list[str]) -> None:
+    als = [c for c in P.candidates(paper_pages, "ALS beamline") if c.accepted and c.page == 8]
+    assert als and "11.0.1.2" in als[0].text
+    nsls = [c for c in P.candidates(paper_pages, "National Synchrotron Light Source II") if c.accepted]
+    assert nsls and nsls[0].page == 7
+    first = paper_pages[0]
+    assert P.sentence_verdict(" ".join(first[first.index("1Department"):].split(".")[0].split())+ ".") == P.REASON_HEADER

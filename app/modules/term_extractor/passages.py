@@ -9,8 +9,12 @@ sentence) and the recovery job, so both behave the same:
   Greek letters, sub/superscripts, ``R-SoXS`` for ``RSoXS``).
 * :func:`sentence_spans` and :class:`PageIndex` cut a page into sentences once and attach term-independent verdicts
   (references, header, citation, equation, caption ...), cached per page text.
-* Affiliation words include ``National`` (case-sensitive, owner decision 2026-11-24): a sentence naming a national
-  facility ("National Synchrotron Light Source II") is rejected as header/affiliation material, conservatively.
+* Affiliation and header blocks are recognised by SHAPE, never by a bare institution word: e-mail, URL, DOI, journal and
+  licence lines, author markers (``Name1,2``), long comma lists, and a verbless fragment of institution names or a
+  postal address ("Department of Chemistry, University of Bern, Freiestrasse 3, CH-3012 Bern, Switzerland."). A complete
+  sentence with a verb is kept wherever it is, also when it names a national laboratory or facility ("...at beamline
+  11.0.1.2 of the Advanced Light Source, Lawrence Berkeley National Laboratory"): such Methods sentences are prime evidence
+  for beamlines, instruments and techniques (owner decision 2026-11-24, reversing the earlier ``National`` rule).
 * :func:`candidates` returns every located mention as a :class:`Passage`, accepted or rejected with a reason;
   :func:`best_passages` returns the ranked accepted ones, best first.
 """
@@ -402,9 +406,23 @@ def display_text(text: str, start: int, end: int) -> tuple[str, list[int]]:
 # Term-independent sentence verdicts
 # ---------------------------------------------------------------------------------------------------------------------
 
+#: Institution words. They count only in a fragment with no verb (see :func:`_affiliation_fragment`), never in a sentence.
 _INSTITUTION = re.compile(
     r"\b(?:Universit\w*|Department|Dept\.|Institut\w*|Laborator(?:y|ies)|School of|College|Centre|Center for"
     r"|Division of|Faculty|Academy of|National|Corporation|Inc\.|Ltd\.?|Foundation|Ministry)\b"
+)
+#: Postal-address shapes: ``CH-3012`` or a five-digit code, a street line, or a country name that ends the fragment.
+_POSTAL = re.compile(
+    r"\b[A-Z]{1,2}-\d{4,5}\b|\b\d{5}(?:-\d{4})?\b"
+    r"|\b\d+\s+[A-Z][a-z]+\s+(?:Street|St\.|Road|Rd\.|Avenue|Ave\.|Strasse|Stra\u00dfe|Platz|Drive)\b"
+    r"|\b(?:USA|U\.S\.A\.|Switzerland|Germany|China|Japan|France|UK|United Kingdom|Canada|Australia|Korea|Netherlands"
+    r"|Sweden|Italy|Spain|Denmark|Norway|Finland|Austria|Belgium|India|Singapore|Taiwan)\b[.,]?\s*$"
+)
+#: A finite verb or a past participle in lower case (``Advanced Light Source`` has none; ``were performed`` has two).
+_VERB = re.compile(
+    r"\b(?:is|are|was|were|be|been|being|has|have|had|do|does|did|can|could|will|would|may|might|must|shall|should"
+    r"|show(?:s|n)?|use[sd]?|measure[sd]?|perform(?:s)?|operate[sd]?|reveal(?:s)?|demonstrate[sd]?|report(?:s)?|find|found"
+    r"|observe[sd]?|indicate[sd]?|provide[sd]?|allow(?:s)?|give[sn]?|obtain(?:s)?)\b|\b[a-z]{3,}ed\b"
 )
 _CITATION = re.compile(
     r"\b(?:19|20)\d\d\b[^.]{0,60}?\b\d{1,4}\s*[,:]\s*\d{1,6}\s*[–\-]\s*\d{1,6}"
@@ -424,11 +442,20 @@ _PANEL_LABELS = re.compile(r"\ba\)\s+\S.*\bb\)\s+\S")
 _CAPTION_RUN = 4
 
 
+def _affiliation_fragment(text: str) -> bool:
+    """A verbless run of institution names or a postal address: an affiliation block, not a sentence about a facility."""
+    return not _VERB.search(text) and bool(_INSTITUTION.search(text) or _POSTAL.search(text))
+
+
 def _header_like(text: str) -> bool:
-    """Header, title, affiliation or boilerplate: institution words, e-mail/URL/DOI, long comma lists, licence text."""
+    """Header, title, affiliation or boilerplate, recognised by shape.
+
+    E-mail/URL/DOI, journal and licence lines, an affiliation fragment, long comma lists and author markers. A complete
+    sentence with a verb is never rejected for the words it names.
+    """
     if _EMAIL_URL.search(text) or _BOILERPLATE.search(text) or _JOURNAL_LINE.search(text):
         return True
-    if _INSTITUTION.search(text):
+    if _affiliation_fragment(text):
         return True
     commas = text.count(",")
     if commas >= 6 and commas / max(1, len(text.split())) > 0.15:
