@@ -82,6 +82,48 @@ test.describe('Extraction tab', () => {
     await expect(page.getByRole('checkbox', { name: 'I confirm this cost estimate' })).toBeDisabled();
   });
 
+  test('lays the supporting-text coverage out as one aligned grid (pilot 2026-11-25: uneven cells across a wide row)', async ({ page }) => {
+    const counts = { terms: 57, with_passage: 57, quoted: 74, located: 8, rejected: 8, uncovered: 0, relations: 127, relations_with_evidence: 82,
+      evidence_sentences: 194, relations_without: 45 };
+    await mockAgent(page);
+    await mockLibrary(page, {
+      papers: PAPERS,
+      jobs: [{
+        id: 'job8', state: 'succeeded', progress: { done: 1, total: 1 },
+        summary: {
+          outcome: 'succeeded', state: 'succeeded', started_at: '2026-11-25T12:00:00Z', finished_at: '2026-11-25T12:00:38Z', elapsed_seconds: 38,
+          stage: { name: 'run', status: 'completed', phase: null }, current_paper: null,
+          papers: { total: 1, done: 1, failed: 0, skipped: 0, failed_list: [] },
+          growth: { entities_new: 57, entities_merged: 0, relations_new: 127, relations_merged: 0, entities_total: 57, relations_total: 127 },
+          counters: {}, params: { bundle: 'tomo_test1', model: 'cheap-model', backend: 'cborg' }, error: null,
+          logs: { kept: 1, total: 1, cap: 2000 },
+          passages: { total: counts, papers: { 'tomo-a.pdf': counts } },
+        },
+        logs: ['done'],
+      }],
+    });
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.goto('/');
+    await page.getByRole('link', { name: 'Extract' }).click();
+
+    const terms = page.getByTestId('run-term-coverage');
+    await expect(terms).toBeVisible();
+    await expect(page.getByTestId('passages-total')).toHaveText('57 of 57 (100%)');
+    await expect(page.getByTestId('relations-total')).toHaveText('82 of 127 (65%)');
+    const boxes = async (locator: ReturnType<typeof page.locator>) =>
+      (await locator.locator('> div').evaluateAll(cells => cells.map(cell => { const r = cell.getBoundingClientRect(); return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) }; })));
+    const top = await boxes(terms);
+    const bottom = await boxes(page.getByTestId('run-relation-evidence'));
+    // Five equal cells of one height on one row; the relation cells sit in the same columns as the first three above them.
+    expect(new Set(top.map(b => b.y)).size).toBe(1);
+    expect(new Set(top.map(b => b.h)).size).toBe(1);
+    expect(Math.max(...top.map(b => b.w)) - Math.min(...top.map(b => b.w))).toBeLessThanOrEqual(1);
+    expect(new Set(bottom.map(b => b.y)).size).toBe(1);
+    expect(bottom.map(b => b.x)).toEqual(top.slice(0, 3).map(b => b.x));
+    expect(bottom.map(b => b.w)).toEqual(top.slice(0, 3).map(b => b.w));
+    await page.getByTestId('run-passages').screenshot({ path: process.env.F2W_SHOT_COVERAGE || 'test-results/coverage-grid.png' });
+  });
+
   test('shows live progress, KG growth and filterable warnings for a running extraction', async ({ page }) => {
     await mockAgent(page);
     await mockLibrary(page, {

@@ -1,4 +1,5 @@
 import { TriangleAlert } from 'lucide-react';
+import type { ReactNode } from 'react';
 import {
   PASSAGE_WARN_RATIO,
   RELATION_WARN_RATIO,
@@ -44,6 +45,19 @@ const row = (counts: PassageCounts) => {
   return percent === null ? 'no terms' : `${n(counts.with_passage)} of ${n(counts.terms)} (${percent}%)`;
 };
 
+/** Both coverage rows use this grid, so their columns line up: five equal columns from a small screen up, two below. */
+const GRID = 'grid grid-cols-2 gap-2 text-xs sm:grid-cols-5';
+
+/** One cell of the coverage grid: a label (up to two lines, the same height in every cell) over a right-aligned-figure value. */
+function Stat({ label, testId, children }: { label: string; testId?: string; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col justify-between gap-1 rounded-md border border-border bg-muted/30 px-3 py-2">
+      <dt className="min-h-[2rem] leading-4 text-muted-foreground">{label}</dt>
+      <dd className="text-sm font-medium tabular-nums" data-testid={testId}>{children}</dd>
+    </div>
+  );
+}
+
 /**
  * Supporting-text coverage of an extraction (`summary.passages`): the terms that carry a passage, how the passages were
  * found (quoted from the model, located by searching the paper), the model sentences that were not found in the paper
@@ -56,42 +70,18 @@ export function ExtractionCoverage({ passages }: { passages: PassagesBlock }) {
   const papers = Object.entries(passages.papers).sort(([a], [b]) => a.localeCompare(b));
   return (
     <section className="space-y-2" data-testid="run-passages" aria-label="Supporting text recorded">
-      <dl className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
-        <div>
-          <dt className="text-muted-foreground">Terms with supporting text</dt>
-          <dd className="font-medium" data-testid="passages-total">{row(passages.total)}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Quoted</dt>
-          <dd className="font-medium">{n(passages.total.quoted)}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Located</dt>
-          <dd className="font-medium">{n(passages.total.located)}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Sentences rejected</dt>
-          <dd className="font-medium">{n(passages.total.rejected)}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Terms without</dt>
-          <dd className="font-medium">{n(passages.total.uncovered)}</dd>
-        </div>
+      <dl className={GRID} data-testid="run-term-coverage">
+        <Stat label="Terms with supporting text" testId="passages-total">{row(passages.total)}</Stat>
+        <Stat label="Quoted">{n(passages.total.quoted)}</Stat>
+        <Stat label="Located">{n(passages.total.located)}</Stat>
+        <Stat label="Sentences rejected">{n(passages.total.rejected)}</Stat>
+        <Stat label="Terms without">{n(passages.total.uncovered)}</Stat>
       </dl>
       {hasRelations && (
-        <dl className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3" data-testid="run-relation-evidence">
-          <div>
-            <dt className="text-muted-foreground">Relations with a sentence naming both ends</dt>
-            <dd className="font-medium" data-testid="relations-total">{relationRow(passages.total)}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Relation sentences stored</dt>
-            <dd className="font-medium">{n(passages.total.evidence_sentences)}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Relations without</dt>
-            <dd className="font-medium">{n(passages.total.relations_without)}</dd>
-          </div>
+        <dl className={GRID} data-testid="run-relation-evidence">
+          <Stat label="Relations with a sentence naming both ends" testId="relations-total">{relationRow(passages.total)}</Stat>
+          <Stat label="Relation sentences stored">{n(passages.total.evidence_sentences)}</Stat>
+          <Stat label="Relations without">{n(passages.total.relations_without)}</Stat>
         </dl>
       )}
       {relationsUnder.length > 0 && (
