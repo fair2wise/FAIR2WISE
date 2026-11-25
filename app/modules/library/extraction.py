@@ -49,8 +49,8 @@ from ..jobs.stages import WorkUnit, chunked_stage
 from ..jobs.store import LeaseLost
 from .catalog import sha256_file
 from .kg_service import KgLibrary
-from .schemas import manifest_block
 from .schema_prompt import BUDGET_CBORG, BUDGET_OLLAMA
+from .schemas import manifest_block
 from .user_schemas import is_user_schema_id
 
 if TYPE_CHECKING:

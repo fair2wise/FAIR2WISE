@@ -170,6 +170,10 @@ class Orchestrator:
     processed on a thread pool of ``max_workers``.
     """
 
+    #: Class-level defaults so an Orchestrator built without ``__init__`` (test doubles) is unbounded.
+    schema_prompt_budget: int | None = None
+    _bounded_context: tuple[str, dict[str, int] | None] | None = None
+
     #: Polled before each page; ``True`` ends the work (the owning job stopped or lost its lease).
     cancel_check: Callable[[], bool] | None = None
     #: Set by the first CBORG ``ip_not_authorized`` refusal; once set no further LLM call is made (it is terminal
@@ -216,7 +220,7 @@ class Orchestrator:
         self.schema_helper = SchemaHelper(schema_path=schema_path, **({"sanitize_descriptions": True} if sanitize_schema_descriptions else {}))
         # Set only for user schemas (see the library extractor): the prompt text is bounded; shipped schemas stay unbounded.
         self.schema_prompt_budget = schema_prompt_budget
-        self._bounded_context: tuple[str, dict[str, int] | None] | None = None
+        self._bounded_context = None
         self.store = TermStore(output_file)
         self.services = build_services(chebi_obo_path=chebi_obo_path)
         self.merge_index = TermMergeIndex(
