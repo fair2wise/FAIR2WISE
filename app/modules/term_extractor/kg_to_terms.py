@@ -383,6 +383,8 @@ def _term_from_node(
     term["source_papers"] = papers
     term["context_snippets"] = copy.deepcopy(list(node.get("context_snippets") or []))
     term["properties"] = copy.deepcopy(list(node.get("properties") or []))
+    if node.get("aliases"):
+        term["aliases"] = [str(a) for a in node.get("aliases") or []]
     term["source_metadata"] = copy.deepcopy(node.get("source_metadata") or {})
     term["publications"] = copy.deepcopy(list(node.get("publications") or []))
     for key in _CHEMISTRY_FIELDS:

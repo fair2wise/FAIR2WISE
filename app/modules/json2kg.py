@@ -174,6 +174,8 @@ def merge_term_into_node(term: dict[str, Any], node: dict[str, Any]) -> None:
     _upgrade_located(node["context_snippets"], ensure_list(term.get("context_snippets")))
     _union_by(node.setdefault("properties", []), ensure_list(term.get("properties")),
               lambda v: json.dumps(v, sort_keys=True, default=str))
+    if term.get("aliases"):   # only when the record has any: a node without aliases keeps its shape
+        _union_by(node.setdefault("aliases", []), [str(a) for a in ensure_list(term.get("aliases"))], lambda v: str(v).lower())
     pubs = node.setdefault("publications", [])
     for pub in normalize_publications(term):
         match = next((p for p in pubs if p.get("source_paper") == pub.get("source_paper")), None)
@@ -437,6 +439,7 @@ def build_graph(
                 "formula": term.get("formula", "") or "",
                 "formula_validation": term.get("formula_validation", {}) or {},
                 "properties": ensure_list(term.get("properties")),
+                **({"aliases": [str(a) for a in ensure_list(term.get("aliases"))]} if term.get("aliases") else {}),
                 "publication_year": term.get("publication_year"),
                 "paper_title": term.get("paper_title"),
                 "source_metadata": term.get("source_metadata", {}),

@@ -11,7 +11,7 @@ from langchain_core.tools import BaseTool, tool
 
 from . import passages
 from .merge_index import TermMergeIndex, build_merge_prompt, clean_term
-from .models import ContextSnippet, PropertyRecord, RelationRecord, TermRecord, union_evidence
+from .models import ContextSnippet, PropertyRecord, RelationRecord, TermRecord, union_aliases, union_evidence
 from .schema import SchemaHelper, judge_relations, mark_invalid_relations
 from .services import Services
 from .store import TermStore
@@ -290,6 +290,7 @@ def build_tools(state: ToolState) -> list[BaseTool]:
         source_paper: str | None = None,
         page: int | None = None,
         context: str | None = None,
+        aliases: list[str] | None = None,
     ) -> str:
         """Register or update an extracted materials-science term.
 
@@ -300,6 +301,8 @@ def build_tools(state: ToolState) -> list[BaseTool]:
         page default to the PDF page currently being processed. The sentence is kept only if it is
         found in the paper's text (the stored page is where it is found); otherwise the passage is
         located from the term's mention, and a term with no findable mention gets no passage.
+        Pass as 'aliases' the other names the page gives the term (a common name, an abbreviation, a synonym);
+        names the page itself defines in brackets are added as well.
         """
         ctx_paper, ctx_page = state.page_context()
         source_paper = source_paper or ctx_paper
@@ -340,6 +343,11 @@ def build_tools(state: ToolState) -> list[BaseTool]:
         relation_records = [RelationRecord.from_dict(r) for r in fixed.get("relations", [])]
         state.attach_relation_evidence(fixed["term"], relation_records, source_paper, page)
 
+        found_aliases: list[str] = []
+        union_aliases(found_aliases, [a for a in (aliases or []) if isinstance(a, str)], fixed["term"])
+        page_text = state.page_text()
+        if page_text:
+            union_aliases(found_aliases, passages.aliases_in_text(fixed["term"], page_text), fixed["term"])
         record = TermRecord(
             term=fixed["term"],
             definition=fixed.get("definition", ""),
@@ -347,6 +355,7 @@ def build_tools(state: ToolState) -> list[BaseTool]:
             raw_category=fixed.get("raw_category"),
             formula=fixed.get("formula"),
             relations=relation_records,
+            aliases=found_aliases,
             pages=[page] if page is not None else [],
             source_papers=[source_paper] if source_paper else [],
             context_snippets=[snippet] if snippet else [],

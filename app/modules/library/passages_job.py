@@ -33,7 +33,7 @@ from ..jobs.pipeline import StageBusy, StageContext, StageResult
 from ..jobs.stages import WorkUnit, chunked_stage
 from ..term_extractor import passages as P
 from ..term_extractor import provenance
-from ..term_extractor.models import union_evidence
+from ..term_extractor.models import union_aliases, union_evidence
 from ..term_extractor.pub_clean import merge_known_publication
 from .jobs import library_inputs
 from .publication_records import PublicationRecords
@@ -68,6 +68,8 @@ COUNT_KEYS = ("terms", "with_passage", "quoted", "located", "rejected", "uncover
 RELATION_KEYS = ("relations", "relations_with_evidence", "evidence_sentences", "relations_without")
 #: Words below which a paper counts as having no text layer.
 MIN_TEXT_WORDS = 20
+#: Words below which one page counts as having no text layer (a plate, a scan).
+MIN_PAGE_WORDS = 10
 #: The job notices a stop request at least this often inside one paper (terms between checks).
 GUARD_EVERY = 100
 
@@ -262,13 +264,17 @@ class LibraryPassages:
                 ctx.log(f"{paper}: skipped, {REASON_TEXT[REASON_NO_TEXT]}", level="warning")
                 return {"recovery": {"reason": REASON_NO_TEXT, "text": REASON_TEXT[REASON_NO_TEXT]}}
             result = self._recover_paper(sc, bundle, terms_path, paper, pages)
-            changed["added"] += result["located_added"] + result["evidence_added"] + result["publication_terms_corrected"]
+            changed["added"] += (result["located_added"] + result["evidence_added"] + result["publication_terms_corrected"]
+                                 + result["aliases_added"])
             ctx.log(f"{paper}: {result['terms']} terms, {result['with_passage_before']} with text before, "
                     f"{result['located_added']} passages added for {result['newly_covered']} terms, "
                     f"{result['still_uncovered']} still without; {result['relations']} relations, {result['evidence_added']} sentences added "
                     f"for {result['relations_newly_covered']}, {result['relations_still_without']} without a sentence naming both ends"
                     + (f"; publication record corrected on {result['publication_terms_corrected']} terms"
-                       if result["publication_terms_corrected"] else ""))
+                       if result["publication_terms_corrected"] else "")
+                    + (f"; {result['aliases_added']} other names recorded" if result["aliases_added"] else "")
+                    + (f"; {result['pages_without_text']} of {result['pages']} pages have no text layer"
+                       if result["pages_without_text"] else ""))
             return {"recovery": result}
 
         try:
@@ -322,13 +328,15 @@ class LibraryPassages:
         pub_fixed = self._correct_publication(terms, paper)
         quoted_now = located_now = 0
         for term in terms:
+        aliases_added = self._recover_aliases(terms, pages)
+        pages_without_text = sum(1 for text in pages if len(text.split()) < MIN_PAGE_WORDS)
             for s in term.get("context_snippets") or []:
                 if isinstance(s, dict) and s.get("source_paper") == paper:
                     if s.get("kind") == "located":
                         located_now += 1
                     else:
                         quoted_now += 1
-        if added or rel_added or pub_fixed:
+        if added or rel_added or pub_fixed or aliases_added:
             doc.setdefault("metadata", {})
             meta = doc["metadata"] if isinstance(doc["metadata"], dict) else {}
             if isinstance(meta, dict) and (added or rel_added):
@@ -349,7 +357,30 @@ class LibraryPassages:
                 "still_uncovered": len(terms) - with_before - newly, "relations": rel_total,
                 "relations_with_evidence_before": rel_before, "evidence_added": rel_added,
                 "relations_newly_covered": rel_newly, "relations_still_without": rel_total - rel_before - rel_newly,
-                "publication_terms_corrected": pub_fixed}
+                "publication_terms_corrected": pub_fixed, "aliases_added": aliases_added,
+                "pages": len(pages), "pages_without_text": pages_without_text}
+
+    @staticmethod
+    def _recover_aliases(terms: list[dict[str, Any]], pages: list[str]) -> int:
+        """Add the other names this paper gives each term (``term (X)``, ``X (term)``, ``also known as``) to ``aliases``.
+
+        By the shape of the text only, no word list, no model (:func:`~app.modules.term_extractor.passages.aliases_in_pages`).
+        Returns the number of aliases added; a second run adds none.
+        """
+        added = 0
+        for term in terms:
+            found = P.aliases_in_pages(str(term.get("term") or ""), pages)
+            if not found:
+                continue
+            held = term.setdefault("aliases", [])
+            if not isinstance(held, list):
+                held = term["aliases"] = []
+            before = len(held)
+            union_aliases(held, found, str(term.get("term") or ""))
+            added += len(held) - before
+            if not held:
+                term.pop("aliases", None)
+        return added
 
     def _correct_publication(self, terms: list[dict[str, Any]], paper: str) -> int:
         """Set the publication metadata of ``paper`` on the terms that cite it from the library's own record (in place).
@@ -465,7 +496,7 @@ class LibraryPassages:
 #: Counts of one paper's recovery result that are summed into the totals.
 RESULT_KEYS = ("terms", "with_passage_before", "located_added", "newly_covered", "still_uncovered", "relations",
                "relations_with_evidence_before", "evidence_added", "relations_newly_covered", "relations_still_without",
-               "publication_terms_corrected")
+               "publication_terms_corrected", "aliases_added", "pages", "pages_without_text")
 
 
 def recovery_block(units: Mapping[str, Mapping[str, Any] | None]) -> dict[str, Any]:

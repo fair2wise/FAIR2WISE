@@ -76,6 +76,16 @@ class PublicationRecords:
                     name = Path(str(row["pdf_path"]).removeprefix(f"{PDF_PATH_PREFIX}/")).name
                     self._by_name.setdefault(name, []).append(row)
 
+    def source_for(self, name: str, sha256: str | None = None) -> str | None:
+        """The registry a library file came from (the manifest row's ``source``: ``openalex``, ``arxiv``, ``upload`` ...), or ``None``."""
+        rows = self._by_name.get(name) or []
+        if len(rows) > 1 and sha256:
+            rows = [r for r in rows if r.get("pdf_sha256") == sha256]
+        if len(rows) != 1:
+            return None
+        source = str(rows[0].get("source") or "").strip().lower()
+        return source or None
+
     def for_file(self, name: str, sha256: str | None = None) -> dict[str, Any] | None:
         """The publication metadata of the library file ``name``, or ``None`` (no row, or two rows and no hash to tell)."""
         rows = self._by_name.get(name) or []

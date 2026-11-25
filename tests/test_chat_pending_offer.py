@@ -69,6 +69,8 @@ def make_service(tmp_path, monkeypatch, candidates):
     monkeypatch.setattr(api_mod.AgentPipelineService, "_kg_vocabulary", lambda self, source, files: KG_WORDS)
     service = api_mod.AgentPipelineService(CoordinatorConfig(workdir=tmp_path, max_rounds=1, kg_mode="splash", workflow_mode="agentic"))
     force_agent_router(service)
+    # The alternative-terms helper is a model call: by default it proposes nothing (tests that want it override this).
+    monkeypatch.setattr(service, "_labeled_completion", lambda prompt, *, timeout, label: "[]")
     return service
 
 
@@ -78,12 +80,33 @@ def ask_all(service, *messages):
     return asyncio.run(run())
 
 
-def test_a_common_name_reaches_the_scientific_name_in_the_kg(tmp_path, monkeypatch):
+def test_a_question_the_kg_cannot_answer_is_retried_once_with_terms_the_model_proposes(tmp_path, monkeypatch):
     service = make_service(tmp_path, monkeypatch, [])
+    prompts: list[str] = []
+
+    def fake_completion(prompt: str, *, timeout: int, label: str) -> str:
+        prompts.append(f"{label}: {prompt}")
+        return '["Loricariidae", "armoured catfish", "pleco"]'   # "pleco" is already in the question and is dropped
+
+    monkeypatch.setattr(service, "_labeled_completion", fake_completion)
     (answer,) = ask_all(service, "tell me about pleco catfish")
     assert answer.status == "answered" and "armoured catfish" in answer.answer
-    assert Retrieval.asked == ["tell me about pleco catfish (Loricariidae)"]
-    assert AgenticDownload.instances[0].search_calls == []   # no paper search was needed
+    assert Retrieval.asked == ["tell me about pleco catfish", "tell me about pleco catfish (Loricariidae, armoured catfish)"]
+    assert len([p for p in prompts if p.startswith("kg-alternatives:")]) == 1   # one call, only after the KG failed
+    assert "loricariidae" in prompts[0].lower()   # the KG's own vocabulary is shown, not a word list
+    assert AgenticDownload.instances[0].search_calls == []
+    assert answer.rounds[0]["retrieval"]["alternatives_tried"] == ["Loricariidae", "armoured catfish"]
+
+
+def test_no_retry_when_the_kg_answers_and_a_failed_helper_never_breaks_the_turn(tmp_path, monkeypatch):
+    service = make_service(tmp_path, monkeypatch, [])
+    calls: list[str] = []
+    monkeypatch.setattr(service, "_labeled_completion", lambda prompt, *, timeout, label: calls.append(label) or "not json at all")
+    (answer,) = ask_all(service, "tell me about Loricariidae")
+    assert answer.status == "answered" and calls == []
+    (second,) = ask_all(make_service(tmp_path, monkeypatch, []), "tell me about suckerfish")
+    assert second.status == "stop_insufficient"   # the KG still cannot answer; nothing was offered (no candidates)
+    assert Retrieval.asked[-1] == "tell me about suckerfish"
 
 
 def test_unrelated_papers_are_not_offered_and_the_reply_says_why(tmp_path, monkeypatch):
@@ -91,7 +114,7 @@ def test_unrelated_papers_are_not_offered_and_the_reply_says_why(tmp_path, monke
     (reply,) = ask_all(service, "what do suckerfish eat in captivity")
     assert reply.status == "stop_insufficient" and reply.pending is None and service.pending is None
     assert "none of the 3 papers" in reply.answer and "not suggesting any" in reply.answer
-    assert "arXiv first" in reply.answer
+    assert "OpenAlex open-access works first" in reply.answer   # the default order when the KG's own sources are not known
 
 
 def test_a_new_question_is_a_new_question_and_a_decline_with_a_question_does_both(tmp_path, monkeypatch):
@@ -152,6 +175,28 @@ def test_is_about_download_and_the_relevance_bar():
     assert [c["id"] for c in kept] == ["W1"] and {c["id"] for c in dropped} == {"W2", "W3", "W4"}
     assert R.filter_relevant(OFF_TOPIC, Counter())[0] == OFF_TOPIC   # no vocabulary: nothing to judge against
     assert R.filter_relevant(OFF_TOPIC, Counter({"catfish": 3, "length": 3}))[0] == OFF_TOPIC   # a demo-sized one neither
-    assert R.expand_common_names("tell me about plecos", KG_WORDS) == "tell me about plecos (Loricariidae)"
-    assert R.expand_common_names("tell me about plecos", Counter({"species": 3})) == "tell me about plecos"
-    assert R.expand_common_names("tell me about Loricariidae pleco", KG_WORDS) == "tell me about Loricariidae pleco"
+    assert not hasattr(R, "COMMON_NAMES") and not hasattr(R, "expand_common_names")   # no domain word list anywhere here
+
+
+def test_the_search_asks_the_registries_of_the_kgs_own_papers_first(tmp_path, monkeypatch):
+    import json
+
+    service = make_service(tmp_path, monkeypatch, [])
+    lib = tmp_path / "library"
+    (lib / "fish").mkdir(parents=True)
+    (lib / "fish" / "manifest.json").write_text(json.dumps({"corpus": "fish", "papers": [
+        {"pdf_path": "papers/fish/2020/a.pdf", "pdf_sha256": "a", "source": "arxiv"},
+        {"pdf_path": "papers/fish/2020/b.pdf", "pdf_sha256": "b", "source": "arxiv"},
+        {"pdf_path": "papers/fish/2020/c.pdf", "pdf_sha256": "c", "source": "openalex"},
+        {"pdf_path": "papers/fish/2020/d.pdf", "pdf_sha256": "d", "source": "upload"}]}), encoding="utf-8")
+    bundle = tmp_path / "kgs" / "plecos"
+    bundle.mkdir(parents=True)
+    (bundle / "manifest.json").write_text(json.dumps({"schema": {"id": "x"}, "papers": [
+        {"name": "a.pdf", "sha256": "a"}, {"name": "b.pdf", "sha256": "b"}, {"name": "c.pdf", "sha256": "c"}, {"name": "d.pdf", "sha256": "d"}]}),
+        encoding="utf-8")
+    monkeypatch.setenv("F2W_LIBRARY_DIR", str(lib))
+    assert service._source_order_for_kg("json", [str(bundle / "kg.json")]) == ["arxiv", "openalex"]
+    assert service._source_order_for_kg("splash", [str(bundle / "kg.json")]) == ["openalex", "arxiv"]
+    assert service._source_order_for_kg("json", [str(tmp_path / "plain.json")]) == ["openalex", "arxiv"]
+    monkeypatch.delenv("F2W_LIBRARY_DIR")
+    assert service._source_order_for_kg("json", [str(bundle / "kg.json")]) == ["openalex", "arxiv"]

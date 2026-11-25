@@ -55,8 +55,8 @@ from ..runtime_bridge.selection import attach_read_path, attach_summary_path
 from ..security.authorization import SETTINGS_DEPLOYMENT_FIELDS, StartupConfigError
 from ..tracing.asgi import install as install_tracing_middleware
 from .candidate_relevance import (
-    expand_common_names,
     filter_relevant,
+    has_vocabulary,
     is_about_download,
     kg_vocabulary,
     split_decline,
@@ -65,6 +65,7 @@ from .coordinator import Coordinator, CoordinatorConfig
 from .corpus_union import ChatCorpusUnion, ChatGraphSet
 from .debate_agent import EvidenceDebateAgent
 from .download_agent import (
+    DEFAULT_SOURCE_ORDER,
     DownloadAgent,
     _reconstruct_abstract,
     _safe_name,
@@ -151,6 +152,8 @@ EXTRA_FIELD_DICT_MAX_ITEMS = 16  # a larger dict extra on a node is dropped
 CANDIDATE_ABSTRACT_MAX_CHARS = 600  # abstract length on a pending-paper card
 PUBLICATION_ABSTRACT_MAX_CHARS = 1600  # abstract length on the approved paper's publication record
 MAX_CANDIDATE_PREVIEW = 5  # candidate papers listed to the user and in a candidate_search_result event
+#: Most alternative terms the model may propose for a question the KG could not answer (one retry per turn).
+MAX_ALTERNATIVE_TERMS = 5
 MAX_DECLINED_DOWNLOAD_TOPICS = 5  # declined download topics remembered per session (oldest evicted)
 DECLINED_TOPIC_OVERLAP_MIN = 0.5  # word-overlap share at which a question matches a declined topic
 CANDIDATE_TITLE_MATCH_MIN = 0.5  # word-overlap share at which a reply names a candidate by its title
@@ -2026,11 +2029,15 @@ def _sse(event: str, data: dict[str, Any]) -> str:
 
 
 MAX_HISTORY_MESSAGES = 8
-def _search_note(found: int, dropped: int, kept: list[dict[str, Any]]) -> str:
+_SOURCE_NAMES = {"openalex": "OpenAlex open-access works", "arxiv": "arXiv"}
+
+
+def _search_note(found: int, dropped: int, kept: list[dict[str, Any]], order: Sequence[str] = ("openalex", "arxiv")) -> str:
     """One sentence on where the suggestions came from and what was held back (plain words, shown with the offer)."""
     repositories = sorted({str(c.get("repository") or "") for c in kept if c.get("repository")})
+    names = [_SOURCE_NAMES.get(str(s), str(s)) for s in order] or ["OpenAlex open-access works", "arXiv"]
     where = (
-        "The search asks arXiv first and OpenAlex open-access works only if arXiv does not fill the list"
+        f"The search asks {names[0]} first" + (f" and {', then '.join(names[1:])} only if that does not fill the list" if len(names) > 1 else "")
         + (f"; these come from {', '.join(repositories)}" if repositories else "")
         + "."
     )
@@ -5896,10 +5903,10 @@ class AgentPipelineService:
                 skipped=[item.as_dict() for item in union_set.skipped],
             )
 
-        # The selected KG's own words: they let a common name reach the scientific one ("pleco" -> Loricariidae) and
-        # they are the bar a suggested paper has to meet (candidate_relevance.py).
+        # The selected KG's own words: the bar a suggested paper has to meet (candidate_relevance.py), and what the model
+        # is shown when it proposes alternative terms for a question the KG could not answer.
         kg_words = self._kg_vocabulary(active_graph_source, list(resolved_files))
-        retrieval_question = expand_common_names(question, kg_words)
+        retried_with: list[str] | None = None
 
         for round_no in range(1, self.cfg.max_rounds + 1):
             await self._emit(
@@ -5910,7 +5917,7 @@ class AgentPipelineService:
             )
             try:
                 verdict = await self._query_retrieval(
-                    retrieval_question, history=history, source_rag=source_rag, use_live_tiled=use_live_tiled
+                    question, history=history, source_rag=source_rag, use_live_tiled=use_live_tiled
                 )
             except Exception as exc:
                 self.workflow.update(phase="retrieval_error")
@@ -5922,6 +5929,25 @@ class AgentPipelineService:
                     rounds,
                     active_graph_path,
                 )
+            # No evidence on the first try against a selected KG with a vocabulary: the model proposes other names the
+            # subject may appear under (a scientific name for a common one, a synonym, an abbreviation), and the KG is
+            # asked once more before any paper is offered. One model call per turn, only when needed; no word list.
+            if retried_with is None and round_no == 1 and isinstance(verdict, dict) and not verdict.get("sufficient") \
+                    and not str(verdict.get("status", "")).endswith("_error") and has_vocabulary(kg_words):
+                retried_with = await self._propose_alternatives(question, kg_words)
+                if retried_with:
+                    await self._emit(emit, "retrieval_retry", "Asking the KG again with alternative terms: " + ", ".join(retried_with),
+                                     round=round_no, alternatives=retried_with)
+                    try:
+                        second = await self._query_retrieval(f"{question} ({', '.join(retried_with)})", history=history,
+                                                             source_rag=source_rag, use_live_tiled=use_live_tiled)
+                    except Exception as exc:
+                        self.workflow.update(phase="retrieval_error")
+                        return self._response("retrieval_error", f"Retrieval failed safely: {exc}", False, {}, rounds, active_graph_path)
+                    if isinstance(second, dict):
+                        second["alternatives_tried"] = list(retried_with)
+                        if second.get("sufficient") or not str(second.get("status", "")).endswith("_error"):
+                            verdict = second
             last_verdict = verdict
             if self._union_set is not None:     # additive: the corpora this verdict was drawn from (rounds[].retrieval)
                 verdict["corpora"] = self._union_set.describe()
@@ -6108,6 +6134,11 @@ class AgentPipelineService:
                         rounds,
                         active_graph_path,
                     )
+                source_order = self._source_order_for_kg(active_graph_source, list(resolved_files))
+                self.download.source_order = tuple(source_order)   # the agent asks the KG's own registries first
+                if tuple(source_order) != DEFAULT_SOURCE_ORDER:   # the frozen event stays as it was for the default order
+                    await self._emit(emit, "candidate_sources", "Asking " + " then ".join(_SOURCE_NAMES.get(s, s) for s in source_order)
+                                     + " (the registries this KG's papers came from)", round=round_no, sources=list(source_order))
                 await self._emit(
                     emit,
                     "candidate_search_started",
@@ -6150,7 +6181,7 @@ class AgentPipelineService:
                 candidates, off_topic = (
                     (candidates, []) if _direct_download_request(question) else filter_relevant(candidates, kg_words)
                 )
-                search_note = _search_note(found_count, len(off_topic), candidates)
+                search_note = _search_note(found_count, len(off_topic), candidates, source_order)
                 self.workflow.update(
                     phase="candidates_found" if candidates else "stop_insufficient",
                     candidates=candidates,
@@ -6727,6 +6758,79 @@ class AgentPipelineService:
             action = "clarify"
             index = None
         return {"action": action, "candidate_index": index}
+
+    async def _propose_alternatives(self, question: str, kg_words: Counter[str]) -> list[str]:
+        """Up to :data:`MAX_ALTERNATIVE_TERMS` other names the question's subject may appear under in the selected KG.
+
+        One call to the chat model, made only when the KG could not answer. The model is shown the question and a sample of
+        the KG's own vocabulary (its most frequent node words) and asked for scientific names, synonyms, abbreviations or
+        broader terms; nothing is hard-coded. Names already in the question, over 60 characters or not strings are dropped.
+        A failed or empty answer gives ``[]`` and the turn goes on as before.
+        """
+        sample = [word for word, _ in kg_words.most_common(60)]
+        prompt = (
+            "A knowledge graph built from scientific papers could not answer the question below. Propose up to "
+            f"{MAX_ALTERNATIVE_TERMS} other names its subject might appear under in such a graph: the scientific name of a "
+            "common name, a synonym, an abbreviation or its expansion, a broader or narrower term. Return ONLY a JSON list of "
+            "strings, most likely first; return [] when there is none.\n\n"
+            f"WORDS THE GRAPH USES (a sample):\n{json.dumps(sample, ensure_ascii=False)}\n\n"
+            f"QUESTION:\n{question}"
+        )
+
+        def run() -> list[Any]:
+            raw = str(self._labeled_completion(prompt, timeout=LLM_HELPER_TIMEOUT_SECONDS, label="kg-alternatives") or "")
+            body = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip())   # the whole answer must be the JSON list
+            parsed = json.loads(body) if body.startswith("[") else []
+            return parsed if isinstance(parsed, list) else []
+
+        try:
+            loop = asyncio.get_event_loop()
+            proposed = await loop.run_in_executor(None, bind_context(run))
+        except Exception as exc:  # noqa: BLE001 - a failed helper call never breaks the turn
+            note_error("AgentPipelineService._propose_alternatives", exc)
+            return []
+        lowered = question.lower()
+        out: list[str] = []
+        for item in proposed:
+            name = " ".join(str(item).split()) if isinstance(item, str) else ""
+            if 1 < len(name) <= 60 and name.lower() not in lowered and name.lower() not in {o.lower() for o in out}:
+                out.append(name)
+            if len(out) >= MAX_ALTERNATIVE_TERMS:
+                break
+        return out
+
+    def _source_order_for_kg(self, graph_source: str, files: list[str]) -> list[str]:
+        """The registries to ask for papers, most used by the selected KG's own papers first; OpenAlex first when unknown.
+
+        For a JSON KG that is a bundle, the bundle manifest names its papers and the library manifests say which registry
+        each came from (``source``); the counts order the sources. A live corpus, a plain KG file or a library with no
+        record gives the default order.
+        """
+        from ..library.publication_records import PublicationRecords
+        from ..library.service import library_dir_from
+        from .download_agent import DEFAULT_SOURCE_ORDER, normalize_source_order
+
+        if graph_source != "json":
+            return list(DEFAULT_SOURCE_ORDER)
+        root = library_dir_from(os.environ)
+        if root is None or not root.is_dir():
+            return list(DEFAULT_SOURCE_ORDER)
+        counts: Counter[str] = Counter()
+        records = PublicationRecords(root)
+        for name in files:
+            manifest = Path(name).parent / "manifest.json"
+            try:
+                papers = json.loads(manifest.read_text(encoding="utf-8")).get("papers") or []
+            except (OSError, ValueError, AttributeError):
+                continue
+            for paper in papers:
+                if isinstance(paper, dict) and paper.get("name"):
+                    source = records.source_for(str(paper["name"]), paper.get("sha256"))
+                    if source:
+                        counts[source] += 1
+        if not counts:
+            return list(DEFAULT_SOURCE_ORDER)
+        return list(normalize_source_order([s for s, _ in counts.most_common()]))
 
     def _kg_vocabulary(self, graph_source: str, files: list[str]) -> Counter[str]:
         """The selected KG's words; only a JSON KG has a file to read them from (a live corpus gives none)."""

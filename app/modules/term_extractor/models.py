@@ -8,6 +8,7 @@ keys, and ``TermRecord`` additionally exposes ``to_dict`` for serialisation.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 import dataclasses
 from dataclasses import dataclass, field
 from typing import Any
@@ -102,6 +103,19 @@ class RelationRecord:
         )
 
 
+def union_aliases(held: list[str], new: Sequence[str] | None, term: str = "") -> bool:
+    """Add the names of ``new`` to ``held`` (case-insensitive, whitespace collapsed, never ``term`` itself); True when it grew."""
+    seen = {a.lower() for a in held} | ({term.strip().lower()} if term else set())
+    grew = False
+    for raw in new or ():
+        name = " ".join(str(raw).split())
+        if name and name.lower() not in seen:
+            held.append(name)
+            seen.add(name.lower())
+            grew = True
+    return grew
+
+
 @dataclass
 class ContextSnippet:
     """A verbatim text excerpt that provides evidence for a term.
@@ -193,6 +207,7 @@ class TermRecord:
         inchikey: InChIKey, if available.
         mass: Molecular mass, if available.
         importance: Subjective relevance tier — ``"high"``, ``"medium"``, or ``"low"``.
+        aliases: Other names the papers give the term (common name, abbreviation, synonym), searched like the name.
         extra: Unknown top-level keys of the source dict (for example beamline overlay fields), preserved
             in order by ``from_dict`` and written back at the top level by ``to_dict``.
     """
@@ -217,6 +232,9 @@ class TermRecord:
     inchikey: str | None = None
     mass: Any | None = None
     importance: str | None = None  # "high" | "medium" | "low"
+    #: Other names the papers give this term (a common name, an abbreviation, a synonym); searched like the name. Empty in
+    #: older files (omitted when empty so they keep their shape).
+    aliases: list[str] = field(default_factory=list)
     extra: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -228,6 +246,8 @@ class TermRecord:
         """
         data = dataclasses.asdict(self)
         extra = data.pop("extra")
+        if not data.get("aliases"):
+            data.pop("aliases", None)
         for rel in data["relations"]:
             if not rel.get("evidence"):
                 rel.pop("evidence", None)
@@ -274,6 +294,7 @@ class TermRecord:
             inchikey=d.get("inchikey"),
             mass=d.get("mass"),
             importance=d.get("importance"),
+            aliases=[str(a) for a in (d.get("aliases") or []) if str(a).strip()],
             extra={key: value for key, value in d.items() if key not in known},
         )
 

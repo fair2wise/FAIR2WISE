@@ -250,10 +250,11 @@ def fake_openalex(monkeypatch):
     return fake
 
 
-def test_search_candidates_merges_arxiv_first_then_openalex_dedupes_by_title_and_doi(fake_openalex, monkeypatch):
+def test_search_candidates_merges_the_sources_in_the_set_order_and_dedupes_by_title_and_doi(fake_openalex, monkeypatch):
     arxiv_hit = {"id": "https://arxiv.org/abs/1", "doi": "https://doi.org/10.1/a", "title": "Shared Title",
                  "pdf_urls": ["https://arxiv.org/pdf/1"]}
     agent = da.DownloadAgent(download_delay_seconds=0, mailto="me@example.org")
+    agent.source_order = ("arxiv", "openalex")   # the chat sets this per turn; OpenAlex is first by default
     monkeypatch.setattr(agent, "_search_arxiv_candidates", lambda q, m, pool: [arxiv_hit])
     fake_openalex.data = {"q": [
         {"id": "W1", "doi": "https://doi.org/10.1/a", "title": "Other", "pdf_urls": ["https://zenodo.org/a.pdf"]},

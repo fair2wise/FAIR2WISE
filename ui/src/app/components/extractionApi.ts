@@ -102,6 +102,11 @@ export interface RecoveryPaperResult {
   relations_still_without?: number;
   /** Terms whose publication record (title, authors, year, venue) was set from the library's own record. */
   publication_terms_corrected?: number;
+  /** Other names (common name, abbreviation, synonym) the paper gives its terms, recorded as aliases. */
+  aliases_added?: number;
+  /** Pages of the paper, and those with no text layer (a plate, a scan): nothing can be found on them. */
+  pages?: number;
+  pages_without_text?: number;
   reason?: RecoveryReason | string;
   text?: string;
 }
@@ -120,6 +125,9 @@ export interface RecoveryBlock {
     relations_newly_covered?: number;
     relations_still_without?: number;
     publication_terms_corrected?: number;
+    aliases_added?: number;
+    pages?: number;
+    pages_without_text?: number;
     papers_processed: number;
     papers_skipped: number;
   };

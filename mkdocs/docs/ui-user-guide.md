@@ -61,9 +61,9 @@ one. Unavailable candidates are marked and the agent can return alternatives.
 The offer only takes a reply that is about it. A new question ends the offer and is answered as a new question. A refusal that
 also asks something ("do not download, tell me about Loricariidae") does both: the offer ends and the question is answered from
 the KG. Suggested papers must share enough of the selected KG's own vocabulary to be about its subject; if none does, nothing is
-offered and the reply says so. The search asks arXiv first and OpenAlex only if arXiv does not fill the list, and the reply says
-when results were left out. A common name the KG's papers do not use ("pleco") reaches the scientific one (Loricariidae) when the
-KG has it.
+offered and the reply says so. The search asks the registries the selected KG's own papers came from first (OpenAlex or arXiv, by how many of its papers
+each supplied) and OpenAlex first when that is not known; the reply says the order and when results were left out. When a question finds nothing, the chat asks the model once for other names the subject may appear under (a scientific
+name for a common one, a synonym, an abbreviation) and asks the KG again before offering papers; no name is hard-coded.
 
 ### Approve extraction
 

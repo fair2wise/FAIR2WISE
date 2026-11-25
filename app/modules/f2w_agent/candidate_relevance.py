@@ -1,4 +1,4 @@
-"""Relevance bar for paper suggestions, common-name lookup and decline parsing for the chat's download offer.
+"""Relevance bar for paper suggestions and decline parsing for the chat's download offer.
 
 The chat offers papers to download when the KG cannot answer a question. Pilot 2026-11-25: "tell me about pleco catfish"
 (the papers say Loricariidae, never "pleco") produced offers of an ML benchmark and a paper on fake dating profiles, because
@@ -30,14 +30,6 @@ this that with from have been were their there which these those about using use
 data model models method methods result results paper papers approach between within across over under into onto than
 more most also such other both each only same different novel new case review towards toward via
 """.split())
-
-#: Common names that a paper would not use for the scientific group the KG is written in. A name is added to a question
-#: only when the KG's own vocabulary has the scientific name.
-COMMON_NAMES: dict[str, str] = {
-    "pleco": "Loricariidae", "plecos": "Loricariidae", "plecostomus": "Loricariidae", "plecostomi": "Loricariidae",
-    "suckermouth": "Loricariidae", "suckermouths": "Loricariidae",
-}
-
 
 def words(text: str) -> set[str]:
     """Lower-case content words (four letters or more, no generic ones) of ``text``."""
@@ -73,24 +65,15 @@ def kg_vocabulary(files: list[str]) -> Counter[str]:
     return total
 
 
-def expand_common_names(question: str, vocabulary: Counter[str]) -> str:
-    """The question with the scientific name added after a common name the KG's vocabulary can answer.
-
-    ``tell me about pleco catfish`` becomes ``tell me about pleco catfish (Loricariidae)`` when the KG has Loricariidae.
-    A question with no such word, or a KG without the scientific name, is returned unchanged.
-    """
-    added: list[str] = []
-    for token in re.findall(r"[a-z]+", question.lower()):
-        scientific = COMMON_NAMES.get(token)
-        if scientific and vocabulary.get(scientific.lower(), 0) and scientific not in added and scientific.lower() not in question.lower():
-            added.append(scientific)
-    return f"{question} ({', '.join(added)})" if added else question
-
-
 def shared_kg_words(candidate: dict[str, Any], vocabulary: Counter[str]) -> set[str]:
     """KG-vocabulary words (see :data:`MIN_NODE_COUNT`) that occur in the candidate's title and abstract."""
     text = f"{candidate.get('title') or ''} {candidate.get('abstract') or ''}"
     return {w for w in words(text) if vocabulary.get(w, 0) >= MIN_NODE_COUNT}
+
+
+def has_vocabulary(vocabulary: Counter[str]) -> bool:
+    """Whether a KG's vocabulary is large enough to judge against (see :data:`MIN_VOCABULARY_WORDS`)."""
+    return sum(1 for count in vocabulary.values() if count >= MIN_NODE_COUNT) >= MIN_VOCABULARY_WORDS
 
 
 def filter_relevant(candidates: list[dict[str, Any]], vocabulary: Counter[str]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -98,7 +81,7 @@ def filter_relevant(candidates: list[dict[str, Any]], vocabulary: Counter[str]) 
 
     A KG with too small a vocabulary (see :data:`MIN_VOCABULARY_WORDS`) keeps every candidate, as before.
     """
-    if sum(1 for count in vocabulary.values() if count >= MIN_NODE_COUNT) < MIN_VOCABULARY_WORDS:
+    if not has_vocabulary(vocabulary):
         return list(candidates), []
     kept: list[dict[str, Any]] = []
     dropped: list[dict[str, Any]] = []

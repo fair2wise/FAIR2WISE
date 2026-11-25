@@ -10,7 +10,7 @@ import threading
 from typing import Any
 
 from . import provenance
-from .models import ContextSnippet, PropertyRecord, RelationRecord, TermRecord, union_evidence
+from .models import ContextSnippet, PropertyRecord, RelationRecord, TermRecord, union_aliases, union_evidence
 
 logger = logging.getLogger(__name__)
 
@@ -249,6 +249,8 @@ class TermStore:
                     if union_evidence(held.evidence, rel.evidence):   # the evidence of a repeated relation is kept, never dropped
                         modified = True
 
+            if union_aliases(existing.aliases, record.aliases, existing.term):
+                modified = True
             held_props = {(p.property, str(p.value)) for p in existing.properties}
             for prop in record.properties:   # attributes of the term (a literal-range slot): unioned, never duplicated
                 if (prop.property, str(prop.value)) not in held_props:
@@ -279,6 +281,20 @@ class TermStore:
             if modified:
                 self._tl.updated = True
             return key, modified
+
+    def add_aliases(self, term: str, aliases: Sequence[str]) -> bool:
+        """Union ``aliases`` onto an existing term (case-insensitive, never the term itself); ``False`` when the term is unknown."""
+        key = self.normalize(term)
+        if self._is_fenced():
+            return False
+        with self._state_lock:
+            existing = self._records.get(key)
+            if existing is None:
+                return False
+            changed = union_aliases(existing.aliases, aliases, existing.term)
+            if changed:
+                self._tl.updated = True
+            return changed
 
     def add_relation(self, term: str, rel: RelationRecord) -> bool:
         """Add one relation to an existing term (merging a repeated one's evidence); ``False`` when the term is unknown.

@@ -62,14 +62,14 @@ def test_result_block_reports_every_paper_with_reasons(tmp_path):
     assert units["a.pdf"]["result"]["recovery"] == {
         "terms": 3, "with_passage_before": 0, "located_added": 2, "newly_covered": 2, "still_uncovered": 1, "relations": 5,
         "relations_with_evidence_before": 0, "evidence_added": 2, "relations_newly_covered": 2, "relations_still_without": 3,
-        "publication_terms_corrected": 0}
+        "publication_terms_corrected": 0, "aliases_added": 0, "pages": 2, "pages_without_text": 0}
     assert units["b.pdf"]["result"]["recovery"]["located_added"] == 2      # domain purity and ellipsometer
     assert units["blank.pdf"]["result"]["recovery"]["reason"] == PJ.REASON_NO_TEXT
     assert units["gone.pdf"]["result"]["recovery"]["reason"] == PJ.REASON_MISSING
     block = PJ.recovery_block({k: v["result"]["recovery"] for k, v in units.items()})
     assert block["total"] == {"terms": 5, "with_passage_before": 0, "located_added": 4, "newly_covered": 4,
                               "still_uncovered": 1, "relations": 9, "relations_with_evidence_before": 0, "evidence_added": 4,
-                              "relations_newly_covered": 4, "relations_still_without": 5, "publication_terms_corrected": 0,
+                              "relations_newly_covered": 4, "relations_still_without": 5, "publication_terms_corrected": 0, "aliases_added": 0, "pages": 3, "pages_without_text": 0,
                               "papers_processed": 2,
                               "papers_skipped": 2}
 

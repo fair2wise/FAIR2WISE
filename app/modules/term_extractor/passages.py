@@ -938,6 +938,95 @@ def ground_context(
     term: str,
     sentence: str | None,
     source_paper: str,
+# ---------------------------------------------------------------------------------------------------------------------
+# Aliases: the other names a paper gives a term, found by the shape of the text (no word list, no model)
+# ---------------------------------------------------------------------------------------------------------------------
+
+#: Longest alias kept and most words in one.
+MAX_ALIAS_CHARS = 60
+MAX_ALIAS_WORDS = 5
+_ALIAS_INNER = r"([A-Za-z][^()\n]{1,78})"
+_ALIAS_JUNK = re.compile(r"\d{4}|\bet al\b|\bfig|\btable\b|\beq\b|\bsee\b|\bp\.\s*\d|\bpp\b|\bvol\b|^[a-z]{1,2}$|\bhttp|@", re.I)
+_ALIAS_LINK = r"(?:also|commonly|formerly|hereafter|hereinafter|sometimes)?\s*(?:known as|called|named|termed|referred to as|abbreviated(?: as| to)?|i\.e\.|or)"
+_ALIAS_SPLIT = re.compile(rf"\s*(?:,|;)\s*(?:{_ALIAS_LINK}\s+)?|\s+(?:{_ALIAS_LINK})\s+", re.I)
+#: Words a bracketed or preceding phrase may start with that are not part of the name (grammar, not a domain list).
+_LEAD_WORDS = re.compile(r"^(?:the|a|an|this|these|those|its|their|our|or|and|of|in|as|is|are|was|were|so|i\.e\.|e\.g\.)\s+", re.I)
+
+
+def _alias_pieces(candidate: str) -> list[str]:
+    """The names inside a bracketed phrase: ``armoured catfish, commonly called plecos`` gives both names."""
+    tail = re.split(r"[.;:!?]\s+", candidate)[-1]   # the clause after the last sentence boundary only
+    out: list[str] = []
+    for piece in _ALIAS_SPLIT.split(tail):
+        piece = piece or ""
+        while True:
+            stripped = _LEAD_WORDS.sub("", piece.strip())
+            if stripped == piece.strip():
+                break
+            piece = stripped
+        if piece.strip():
+            out.append(piece.strip())
+    return out
+
+
+def _alias_ok(candidate: str, term: str) -> str | None:
+    text = " ".join(candidate.replace("\u2019", "'").split()).strip(" .,;:")
+    if not (2 <= len(text) <= MAX_ALIAS_CHARS) or len(text.split()) > MAX_ALIAS_WORDS:
+        return None
+    if _ALIAS_JUNK.search(text) or text.lower() == term.lower():
+        return None
+    if sum(ch.isalpha() for ch in text) < max(2, len(text) // 2):
+        return None
+    return text
+
+
+def aliases_in_text(term: str, text: str) -> list[str]:
+    """Other names ``text`` gives ``term``, by the shape of the sentence, in order of appearance (no word list, no model).
+
+    Shapes: ``term (X)`` and ``X (term)`` (an abbreviation, a common name, a synonym in brackets; ``X, also called Y``
+    inside the brackets gives both), ``term, also known as X``, ``X, also called term``, ``term (hereafter X)``. A bracketed
+    year, a citation, a figure or table reference, a URL and a bare one- or two-letter token are never aliases; a leading
+    article or function word is dropped. The term itself is never returned.
+    """
+    base, abbr = term_forms(term)
+    found: list[str] = []
+    names = [n for n in (base, abbr) if n]
+    lowered_names = {n.lower() for n in names}
+
+    def keep(candidate: str, name: str) -> None:
+        pieces = _alias_pieces(candidate)
+        if any(re.search(r"\d{4}|\bet al\b", piece) for piece in pieces):
+            return   # a bracket with a year or "et al." is a citation, not a list of names
+        for piece in pieces:
+            alias = _alias_ok(piece, name)
+            if alias and alias.lower() not in {a.lower() for a in found} and alias.lower() not in lowered_names:
+                found.append(alias)
+
+    for name in names:
+        esc = re.escape(name)
+        for match in re.finditer(rf"\b{esc}\s*\(\s*(?:{_ALIAS_LINK}\s+)?{_ALIAS_INNER}\)", text, re.I):
+            keep(match.group(1), name)
+        for match in re.finditer(rf"{_ALIAS_INNER}\s*\(\s*(?:{_ALIAS_LINK}\s+)?{esc}\s*\)", text, re.I):
+            keep(match.group(1), name)
+        for match in re.finditer(rf"\b{esc}\s*,\s*{_ALIAS_LINK}\s+([^(),\n.;:]{{2,78}})", text, re.I):
+            keep(match.group(1), name)
+        for match in re.finditer(rf"([^(),\n.;:]{{2,78}}?)\s*,\s*{_ALIAS_LINK}\s+{esc}\b", text, re.I):
+            keep(match.group(1), name)
+    if abbr and abbr.lower() not in {a.lower() for a in found}:
+        found.insert(0, abbr)   # the abbreviation of a ``long form (ABBR)`` term is itself an alias
+    return found
+
+
+def aliases_in_pages(term: str, pages: Sequence[str]) -> list[str]:
+    """:func:`aliases_in_text` over every page of a paper, de-duplicated, first appearance first."""
+    out: list[str] = []
+    for page in pages:
+        for alias in aliases_in_text(term, page):
+            if alias.lower() not in {a.lower() for a in out}:
+                out.append(alias)
+    return out
+
+
     page: int | None,
     page_text: str | None,
     paper_pages: Sequence[str] | None,

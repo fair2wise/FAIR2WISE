@@ -273,6 +273,21 @@ def _dedupe_key(work: dict[str, Any]) -> str:
     return (work.get("id") or "").strip().lower() or json.dumps(work, sort_keys=True, default=str)[:200]
 
 
+#: Sources the candidate search can ask, and the order used when the selected KG's own sources are not known.
+KNOWN_SOURCES: tuple[str, ...] = ("openalex", "arxiv")
+DEFAULT_SOURCE_ORDER: tuple[str, ...] = ("openalex", "arxiv")
+
+
+def normalize_source_order(order: object) -> tuple[str, ...]:
+    """``order`` as a tuple of known sources in the given order, the rest of :data:`KNOWN_SOURCES` appended; the default when empty."""
+    wanted: list[str] = []
+    for item in order if isinstance(order, (list, tuple)) else ():
+        name = str(item).strip().lower()
+        if name in KNOWN_SOURCES and name not in wanted:
+            wanted.append(name)
+    return tuple([*wanted, *(s for s in KNOWN_SOURCES if s not in wanted)]) if wanted else DEFAULT_SOURCE_ORDER
+
+
 def _search_queries(query: str, missing_topics: list[str]) -> list[str]:
     """Build focused OpenAlex queries, broad first then missing-topic variants."""
     out: list[str] = []
@@ -464,35 +479,43 @@ class DownloadAgent(Agent):
                 logger.warning("arXiv search failed for %r (%s)", search_text, exc)
         return merged
 
+    #: The order the sources are asked in until ``pool`` candidates are found. The chat sets it per turn from the registries
+    #: the selected KG's papers came from (owner decision 2026-11-25); when that is not known OpenAlex is asked first.
+    source_order: tuple[str, ...] = DEFAULT_SOURCE_ORDER
+
     def _search_candidates(self, query: str, missing_topics: list[str], pool: int) -> list[dict[str, Any]]:
-        """Merge arXiv then OpenAlex OA works until ``pool`` unique candidates."""
-        merged = self._search_arxiv_candidates(query, missing_topics, pool)
-        seen = {_dedupe_key(work) for work in merged}
-        seen_titles = {
-            _normalize_title(str(work.get("title") or ""))
-            for work in merged
-            if str(work.get("title") or "").strip()
-        }
-        if len(merged) >= pool:
-            return merged[:pool]
-        for search_text in _search_queries(query, missing_topics):
-            for work in self._search_one(search_text, pool):
-                reliable_urls = _reliable_pdf_urls(work)
-                if not reliable_urls:
-                    continue
-                work = dict(work)
-                work["pdf_urls"] = reliable_urls
-                work["repository"] = _repository_name(reliable_urls)
-                key = _dedupe_key(work)
-                title_key = _normalize_title(str(work.get("title") or work.get("display_name") or ""))
-                if key in seen or (title_key and title_key in seen_titles):
-                    continue
-                seen.add(key)
-                if title_key:
-                    seen_titles.add(title_key)
-                merged.append(work)
-                if len(merged) >= pool:
-                    return merged
+        """Merge the sources in :attr:`source_order` (OpenAlex OA works, arXiv) until ``pool`` unique candidates."""
+        merged: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        seen_titles: set[str] = set()
+
+        def take(work: dict[str, Any]) -> bool:
+            key = _dedupe_key(work)
+            title_key = _normalize_title(str(work.get("title") or work.get("display_name") or ""))
+            if key in seen or (title_key and title_key in seen_titles):
+                return False
+            seen.add(key)
+            if title_key:
+                seen_titles.add(title_key)
+            merged.append(work)
+            return len(merged) >= pool
+
+        for source in normalize_source_order(self.source_order):
+            if source == "arxiv":
+                for work in self._search_arxiv_candidates(query, missing_topics, pool):
+                    if take(work):
+                        return merged
+            elif source == "openalex":
+                for search_text in _search_queries(query, missing_topics):
+                    for work in self._search_one(search_text, pool):
+                        reliable_urls = _reliable_pdf_urls(work)
+                        if not reliable_urls:
+                            continue
+                        work = dict(work)
+                        work["pdf_urls"] = reliable_urls
+                        work["repository"] = _repository_name(reliable_urls)
+                        if take(work):
+                            return merged
         return merged
 
     def _rank(self, query: str, candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:

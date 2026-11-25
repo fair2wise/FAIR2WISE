@@ -287,3 +287,26 @@ def test_download_agent_rejects_semantically_invalid_pdf(tmp_path, monkeypatch):
     records = [json.loads(line) for line in Path(result["manifest"]).read_text().splitlines()]
     assert records[-1]["status"] == "semantic_rejected"
     assert not list(target.glob("*.pdf"))
+
+
+def test_the_sources_are_asked_in_the_set_order_and_openalex_first_by_default(monkeypatch):
+    from app.modules.f2w_agent.download_agent import DownloadAgent, normalize_source_order
+
+    agent = DownloadAgent.__new__(DownloadAgent)
+    order: list[str] = []
+    monkeypatch.setattr(agent, "_search_arxiv_candidates", lambda query, missing, pool: order.append("arxiv") or [
+        {"id": "https://arxiv.org/abs/1", "title": "A", "pdf_urls": ["https://arxiv.org/pdf/1"], "repository": "arXiv"}])
+    monkeypatch.setattr(agent, "_search_one", lambda text, pool: order.append("openalex") or [
+        {"id": "https://openalex.org/W1", "title": "B", "open_access": {"oa_url": "https://arxiv.org/pdf/2"}}])
+    found = agent._search_candidates("question", [], 10)
+    assert order[0] == "openalex" and "arxiv" in order and [w["title"] for w in found][0] == "B"
+    order.clear()
+    agent.source_order = ("arxiv", "openalex")
+    found = agent._search_candidates("question", [], 10)
+    assert order[0] == "arxiv" and [w["title"] for w in found][0] == "A"
+    order.clear()
+    agent.source_order = ("arxiv",)
+    agent._search_candidates("question", [], 1)   # the pool is full after the first source
+    assert order == ["arxiv"]
+    assert normalize_source_order(["ARXIV", "unknown", "arxiv"]) == ("arxiv", "openalex")
+    assert normalize_source_order([]) == ("openalex", "arxiv") and normalize_source_order(None) == ("openalex", "arxiv")

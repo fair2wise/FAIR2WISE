@@ -6,7 +6,7 @@ Provides semantic/lexical retrieval over a JSON knowledge graph, LLM chat client
 """
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Mapping, Iterator
 
 if __name__ == "__main__" and not __package__:
     # Checkout script launch (`python3 app/modules/kg_rag_api.py ...`, documented in
@@ -1026,6 +1026,12 @@ def load_pdf_text(path: str) -> str:
 
 
 # ───────────────────── KnowledgeGraph ─────────────────────
+def _node_aliases(node: Mapping[str, Any]) -> list[str]:
+    """The ``aliases`` of a node record as strings (empty for a node without any)."""
+    raw = node.get("aliases")
+    return [str(a) for a in raw if str(a).strip()] if isinstance(raw, list) else []
+
+
 class KnowledgeGraph:
     """In-memory knowledge graph with lexical and semantic search over nodes."""
 
@@ -1075,6 +1081,9 @@ class KnowledgeGraph:
         for nid, n in self.nodes.items():
             canon = re.sub(r"[^a-z0-9]", "", n.get("name", "").lower())
             self._canon_to_id.setdefault(canon, nid)
+        for nid, n in self.nodes.items():   # an alias (common name, abbreviation, synonym) resolves like the name; a name wins
+            for alias in _node_aliases(n):
+                self._canon_to_id.setdefault(re.sub(r"[^a-z0-9]", "", alias.lower()), nid)
 
         texts, self.ids = [], []
         for nid, n in self.nodes.items():
@@ -1093,7 +1102,7 @@ class KnowledgeGraph:
                 for field in ("function_name", "code_domain", "code_description", "code_language")
             )
             txt = (
-                f"{n.get('name','')} {n.get('description','')} {src} {title} {publication_text} "
+                f"{n.get('name','')} {' '.join(_node_aliases(n))} {n.get('description','')} {src} {title} {publication_text} "
                 f"{code_bits} {domain_features}"
             ).strip()[:MAX_TEXT_CHARS]
             texts.append(txt)
@@ -1314,7 +1323,7 @@ class KnowledgeGraph:
             raw = self.nodes[nid]
             name = raw.get("name", nid)
             desc = raw.get("description", "")
-            txt_low = f"{name} {desc}".lower()
+            txt_low = f"{name} {' '.join(_node_aliases(raw))} {desc}".lower()
             hit = sum(1 for t in qt if t in txt_low)
             lex = math.sqrt(hit) / max(1, len(qt))
             evid = (
