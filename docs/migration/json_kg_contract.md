@@ -183,6 +183,18 @@ extracted library bundle, opts in: on the shipped RSoXS terms file the default k
 (203 of 917 passage-bearing terms), the opt-in keeps all 849 (914 terms), with identical node and edge counts.
 Flipping the default is a contract change for the owner to decide; the expected fixtures are unchanged.
 
+### 2.6b Additive edge field `evidence` (relation evidence, 2026-11-24)
+
+An edge may carry one more key, `evidence`: a list of mappings `{text, source_paper, page, kind, verified}`, each a sentence
+of the source paper that names both endpoints of the relation (kind `located`). It is present only when the relation's
+`evidence` list in the terms file holds at least one mapping; `has_evidence` stays the string field above and is then the
+text of the first (best) entry instead of the `"; "` join. Every input without mapping evidence (all frozen fixtures: the
+corpus has no evidence at all, string evidence included) yields exactly the old edge, key for key and byte for byte, in
+the default path and in the merge path. In the opt-in merge path (`merge_existing=True`, used by the bundle build) a repeated
+`(subject, predicate, object)` keeps the union of the evidence by (paper, page, text); the default path still keeps the
+first edge only. `kg_to_terms` reads `evidence` first and falls back to splitting `has_evidence`. Verified by
+`tests/contracts/json_kg` and `tests/test_json2kg_passages.py` (unchanged) and `tests/extraction/test_relation_evidence.py`.
+
 ### 2.7 Hazards that are part of the frozen behavior
 
 These are recorded, not fixed. Changing any of them is a deliberate behavior change that needs its own migration
