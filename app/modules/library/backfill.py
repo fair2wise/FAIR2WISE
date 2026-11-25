@@ -36,9 +36,9 @@ from ..literature.legacy_download import (
     openalex_api_key,
     openalex_get,
 )
+from ..term_extractor.pub_clean import is_junk_title
 from .arrange import is_valid_folder_name
 from .bibmeta import cap_abstract, clean_author_list, openalex_abstract, openalex_authors
-from ..term_extractor.pub_clean import is_junk_title
 from .manifest import PDF_PATH_PREFIX, fill_row_metadata, is_empty
 
 logger = logging.getLogger(__name__)

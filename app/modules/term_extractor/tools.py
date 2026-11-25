@@ -102,7 +102,8 @@ class ToolState:
         if result.rejected:
             logger.info("ground: sentence for '%s' not found in %s; rejected", term, source_paper)
             if context:
-                reason, near = passages.classify_rejection(context, pages if pages else ([self.page_text()] if self.page_text() else []))
+                page_text = self.page_text()
+                reason, near = passages.classify_rejection(context, list(pages) if pages else ([page_text] if page_text else []))
                 self.store.note_rejection(source_paper, reason, context, near)
         return snippet
 

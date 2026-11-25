@@ -33,8 +33,8 @@ from ..jobs.pipeline import StageBusy, StageContext, StageResult
 from ..jobs.stages import WorkUnit, chunked_stage
 from ..term_extractor import passages as P
 from ..term_extractor import provenance
-from ..term_extractor.pub_clean import merge_known_publication
 from ..term_extractor.models import union_evidence
+from ..term_extractor.pub_clean import merge_known_publication
 from .jobs import library_inputs
 from .publication_records import PublicationRecords
 

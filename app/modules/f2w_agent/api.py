@@ -54,6 +54,13 @@ from ..project_config import config_value, get_config
 from ..runtime_bridge.selection import attach_read_path, attach_summary_path
 from ..security.authorization import SETTINGS_DEPLOYMENT_FIELDS, StartupConfigError
 from ..tracing.asgi import install as install_tracing_middleware
+from .candidate_relevance import (
+    expand_common_names,
+    filter_relevant,
+    is_about_download,
+    kg_vocabulary,
+    split_decline,
+)
 from .coordinator import Coordinator, CoordinatorConfig
 from .corpus_union import ChatCorpusUnion, ChatGraphSet
 from .debate_agent import EvidenceDebateAgent
@@ -102,13 +109,6 @@ from .retrieval_agent import (
     _is_conceptual_question,
     _is_numeric_claim,
     _is_ops_layout_question,
-)
-from .candidate_relevance import (
-    expand_common_names,
-    filter_relevant,
-    is_about_download,
-    kg_vocabulary,
-    split_decline,
 )
 from .session_memory import SessionMemory
 from .trace import (

@@ -33,8 +33,8 @@ from .agent import build_graph
 from .clients import make_chat_client
 from .merge_index import DEFAULT_EMBED_MODEL, DEFAULT_MERGE_TOP_K, TermMergeIndex
 from .models import RelationRecord, TermRecord, union_evidence
-from .pub_clean import merge_known_publication
 from .prompts import build_page_prompt
+from .pub_clean import merge_known_publication
 from .schema import SchemaHelper
 from .services import build_services, extract_and_attach_properties
 from .store import TermStore

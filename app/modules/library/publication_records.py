@@ -19,9 +19,16 @@ import json
 from pathlib import Path
 from typing import Any
 
-from ..term_extractor.pub_clean import FIELDS, is_junk_author, is_junk_title, merge_known_publication, sanitize_pdf_meta
+from ..term_extractor.pub_clean import (
+    FIELDS,
+    is_junk_author,
+    is_junk_title,
+    merge_known_publication,
+    sanitize_pdf_meta,
+)
 from .bibmeta import cap_abstract, clean_author_list
 from .manifest import PDF_PATH_PREFIX
+
 
 def meta_from_row(row: Mapping[str, Any]) -> dict[str, Any]:
     """Publication metadata of one manifest row: only fields that are present and not junk."""

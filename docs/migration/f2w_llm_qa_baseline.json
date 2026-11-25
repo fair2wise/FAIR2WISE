@@ -1403,7 +1403,7 @@
       "output_schema": "{\"sufficient\": true|false, \"answer\": string|null, \"missing_topics\": [string, ...]}",
       "call_site": "retrieval_agent.py L1322 krag.Conversation(JUDGE_SYSTEM).build(build_judge_prompt(...)), label 'KG-RAG-judge'"
      },
-     "text_sha256": "9ae2a566e68ec04ecd99f1e3a326511eceed52f83a34ec8c04f3a4dec6668bd6",
+     "text_sha256": "10b78aac8cf177c99c5c3ec0626224a3105035268cc3d0f21f25395c848ec5c5",
      "hash_method": "literal",
      "covered_by_tests": [
       "tests/test_retrieval_agent.py::test_judge_system_distinguishes_conceptual_from_numeric",
