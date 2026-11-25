@@ -1,0 +1,1687 @@
+{
+  "approvals.pending": {
+    "body": {
+      "counts": {
+        "publication": 1
+      },
+      "generated_at": "2026-10-15T12:00:00+00:00",
+      "includes": {
+        "cost_control": true,
+        "merge_apply": false,
+        "plans": true,
+        "review_cases": true
+      },
+      "items": [
+        {
+          "approve": {
+            "body": {
+              "plan_sha256": "d00b4fa5bf3f7e1ca9e55795d76c7618d4b2d4b7c06cc027b24f21a5a6449459"
+            },
+            "method": "POST",
+            "path": "v1/publications/job-fd600e47e4322534ea06d567/approval"
+          },
+          "corpus_scope": [
+            "rsoxs"
+          ],
+          "id": "job-fd600e47e4322534ea06d567",
+          "job_id": "job-fd600e47e4322534ea06d567",
+          "job_kind": "publish",
+          "kind": "publication",
+          "plan": {
+            "affected": 5,
+            "base_revision": "rev-0-0-0",
+            "creates": 3,
+            "links": 2,
+            "plan_id": "plan-d00b4fa5bf3f",
+            "plan_sha256": "d00b4fa5bf3f7e1ca9e55795d76c7618d4b2d4b7c06cc027b24f21a5a6449459",
+            "snapshot_id": "rsoxs/v1",
+            "supersessions": 0
+          },
+          "reason": null,
+          "reject": {
+            "body": null,
+            "method": "POST",
+            "path": "v1/jobs/job-fd600e47e4322534ea06d567/cancel"
+          },
+          "requested_by": "local-operator",
+          "snapshot_ref": "rsoxs/v1",
+          "submitted_at": "2026-10-15T12:00:00+00:00",
+          "target": "http://127.0.0.1:59871/api#f2w"
+        }
+      ],
+      "total": 1
+    },
+    "method": "GET",
+    "path": "/v1/approvals/pending",
+    "status": 200
+  },
+  "capabilities": {
+    "body": {
+      "can_approve": true,
+      "can_edit": true,
+      "can_publish": false,
+      "can_run_operations": true,
+      "can_save": true,
+      "can_upload": true,
+      "profile": "local",
+      "role": "local_operator",
+      "snippets_disclosed": false
+    },
+    "method": "GET",
+    "path": "/v1/capabilities",
+    "status": 200
+  },
+  "graph.sources": {
+    "body": {
+      "default": "json:contract_v1",
+      "sources": [
+        {
+          "available": true,
+          "detail": null,
+          "edge_count": null,
+          "graph_id": "contract_v1",
+          "id": "json:contract_v1",
+          "kind": "json",
+          "label": "matkg_contract_v1.json",
+          "node_count": null,
+          "read_only": true,
+          "revision": null
+        },
+        {
+          "available": true,
+          "detail": null,
+          "edge_count": null,
+          "graph_id": "kg1",
+          "id": "json:kg1",
+          "kind": "json",
+          "label": "matkg_kg1.json",
+          "node_count": null,
+          "read_only": true,
+          "revision": null
+        }
+      ],
+      "tiled": {
+        "detail": "Tiled is not offered by this deployment",
+        "status": "not_offered"
+      }
+    },
+    "method": "GET",
+    "path": "/v1/graph/sources",
+    "status": 200
+  },
+  "harvest.candidates": {
+    "body": {
+      "candidates": [
+        {
+          "arxiv_id": null,
+          "detail": "",
+          "doi": "10.1/f",
+          "id": "e309605cd2dc6df2",
+          "landing_url": "",
+          "link_rule": null,
+          "match": null,
+          "oa": null,
+          "open_url": "https://doi.org/10.1/f",
+          "provenance": null,
+          "relpath": null,
+          "score": 0.0,
+          "source": "openalex",
+          "status": "downloaded",
+          "supplied_by": null,
+          "tier": "C",
+          "title": "Fetched study",
+          "year": 2021
+        },
+        {
+          "arxiv_id": null,
+          "detail": "",
+          "doi": "10.1/p",
+          "id": "c2d73ca61e296765",
+          "landing_url": "https://doi.org/10.1/p",
+          "link_rule": null,
+          "match": null,
+          "oa": null,
+          "open_url": "https://doi.org/10.1/p",
+          "provenance": null,
+          "relpath": null,
+          "score": 0.0,
+          "source": "openalex",
+          "status": "paywalled",
+          "supplied_by": null,
+          "tier": "C",
+          "title": "Paywalled study",
+          "year": 2020
+        }
+      ]
+    },
+    "method": "GET",
+    "path": "/v1/library/harvest/runs/job-cf3c8fd8392b040e338ffc84/candidates",
+    "status": 200
+  },
+  "harvest.dismiss": {
+    "body": {
+      "candidate": {
+        "arxiv_id": null,
+        "detail": "dismissed by hand",
+        "doi": "10.1/p",
+        "id": "c2d73ca61e296765",
+        "key": "doi:10.1/p",
+        "landing_url": "https://doi.org/10.1/p",
+        "link_rule": null,
+        "match": null,
+        "oa": null,
+        "provenance": null,
+        "relpath": null,
+        "run_id": "job-cf3c8fd8392b040e338ffc84",
+        "score": 0.0,
+        "source": "openalex",
+        "status": "dismissed",
+        "supplied_by": null,
+        "tier": "C",
+        "title": "Paywalled study",
+        "year": 2020
+      }
+    },
+    "method": "POST",
+    "path": "/v1/library/harvest/candidates/c2d73ca61e296765/dismiss",
+    "status": 200
+  },
+  "harvest.runs": {
+    "body": {
+      "openalex_keyed": false,
+      "runs": [
+        {
+          "category": "rsoxs",
+          "counts": {
+            "blocked": 0,
+            "dismissed": 0,
+            "downloaded": 1,
+            "downloading": 0,
+            "failed": 0,
+            "filed": 0,
+            "found": 0,
+            "in_library": 0,
+            "paywalled": 1,
+            "skipped": 0,
+            "total": 2
+          },
+          "created_at": "2026-11-25T23:58:52.840371+00:00",
+          "id": "job-cf3c8fd8392b040e338ffc84",
+          "max_downloads": 5,
+          "schema": null,
+          "source_status": {},
+          "sources": [
+            "openalex"
+          ],
+          "topic": "resonant soft x-ray scattering"
+        }
+      ]
+    },
+    "method": "GET",
+    "path": "/v1/library/harvest/runs",
+    "status": 200
+  },
+  "harvest.undo.refused": {
+    "body": {
+      "code": "conflict",
+      "message": "no file supplied by the user is filed for this candidate",
+      "retryable": false
+    },
+    "method": "POST",
+    "path": "/v1/library/harvest/candidates/c2d73ca61e296765/undo",
+    "status": 409
+  },
+  "jobs.cancel.finished": {
+    "body": {
+      "job_id": "job-2e04243ea76a48d299af18f6",
+      "kind": "library_passages",
+      "settings_revision": null,
+      "state": "succeeded",
+      "submitted_at": "2026-10-15T12:00:00Z"
+    },
+    "method": "POST",
+    "path": "/v1/jobs/job-2e04243ea76a48d299af18f6/cancel",
+    "status": 200
+  },
+  "jobs.list": {
+    "body": {
+      "jobs": [
+        {
+          "job_id": "job-2e04243ea76a48d299af18f6",
+          "kind": "library_passages",
+          "settings_revision": null,
+          "state": "succeeded",
+          "submitted_at": "2026-10-15T12:00:00Z",
+          "summary": {
+            "counters": {
+              "recovery_aliases_added": 0,
+              "recovery_evidence_added": 0,
+              "recovery_located_added": 3,
+              "recovery_newly_covered": 3,
+              "recovery_pages": 3,
+              "recovery_pages_without_text": 0,
+              "recovery_papers_processed": 2,
+              "recovery_papers_skipped": 0,
+              "recovery_publication_terms_corrected": 0,
+              "recovery_relations": 0,
+              "recovery_relations_newly_covered": 0,
+              "recovery_relations_still_without": 0,
+              "recovery_relations_with_evidence_before": 0,
+              "recovery_searches_skipped": 0,
+              "recovery_still_uncovered": 0,
+              "recovery_terms": 3,
+              "recovery_with_passage_before": 0,
+              "units_done": 2,
+              "units_failed": 0,
+              "units_reused": 0,
+              "units_total": 2
+            },
+            "current_paper": null,
+            "elapsed_seconds": 0.0,
+            "error": null,
+            "finished_at": "2026-10-15T12:00:00+00:00",
+            "growth": {},
+            "logs": {
+              "cap": 2000,
+              "kept": 4,
+              "total": 4
+            },
+            "outcome": "succeeded",
+            "papers": {
+              "done": 2,
+              "failed": 0,
+              "skipped": 0,
+              "total": 2
+            },
+            "params": {
+              "bundle": "kg1"
+            },
+            "recovery": {
+              "papers": {
+                "a.pdf": {
+                  "aliases_added": 0,
+                  "evidence_added": 0,
+                  "located_added": 2,
+                  "newly_covered": 2,
+                  "pages": 2,
+                  "pages_without_text": 0,
+                  "publication_terms_corrected": 0,
+                  "relations": 0,
+                  "relations_newly_covered": 0,
+                  "relations_still_without": 0,
+                  "relations_with_evidence_before": 0,
+                  "searches_skipped": 0,
+                  "still_uncovered": 0,
+                  "terms": 2,
+                  "with_passage_before": 0
+                },
+                "b.pdf": {
+                  "aliases_added": 0,
+                  "evidence_added": 0,
+                  "located_added": 1,
+                  "newly_covered": 1,
+                  "pages": 1,
+                  "pages_without_text": 0,
+                  "publication_terms_corrected": 0,
+                  "relations": 0,
+                  "relations_newly_covered": 0,
+                  "relations_still_without": 0,
+                  "relations_with_evidence_before": 0,
+                  "searches_skipped": 0,
+                  "still_uncovered": 0,
+                  "terms": 1,
+                  "with_passage_before": 0
+                }
+              },
+              "total": {
+                "aliases_added": 0,
+                "evidence_added": 0,
+                "located_added": 3,
+                "newly_covered": 3,
+                "pages": 3,
+                "pages_without_text": 0,
+                "papers_processed": 2,
+                "papers_skipped": 0,
+                "publication_terms_corrected": 0,
+                "relations": 0,
+                "relations_newly_covered": 0,
+                "relations_still_without": 0,
+                "relations_with_evidence_before": 0,
+                "searches_skipped": 0,
+                "still_uncovered": 0,
+                "terms": 3,
+                "with_passage_before": 0
+              }
+            },
+            "schema_prompt_condensed": null,
+            "stage": {
+              "name": "run",
+              "phase": null,
+              "status": "completed"
+            },
+            "started_at": "2026-10-15T12:00:00+00:00",
+            "state": "succeeded"
+          }
+        },
+        {
+          "job_id": "job-454e9bb437628907b786389b",
+          "kind": "library_relations",
+          "settings_revision": null,
+          "state": "succeeded",
+          "submitted_at": "2026-10-15T12:00:00Z",
+          "summary": {
+            "counters": {
+              "done": 1,
+              "repair_attributes": 2,
+              "repair_invalid": 1,
+              "repair_relations": 6,
+              "repair_swapped": 1,
+              "repair_terms_changed": 3,
+              "repair_unchanged": 0,
+              "repair_unknown_object": 1,
+              "total": 1
+            },
+            "current_paper": null,
+            "elapsed_seconds": 0.0,
+            "error": null,
+            "finished_at": "2026-10-15T12:00:00+00:00",
+            "growth": {},
+            "logs": {
+              "cap": 2000,
+              "kept": 7,
+              "total": 7
+            },
+            "outcome": "succeeded",
+            "papers": {
+              "done": 0,
+              "failed": 0,
+              "skipped": 0,
+              "total": 0
+            },
+            "params": {
+              "bundle": "plecos"
+            },
+            "schema_prompt_condensed": null,
+            "stage": {
+              "name": "run",
+              "phase": null,
+              "status": "completed"
+            },
+            "started_at": "2026-10-15T12:00:00+00:00",
+            "state": "succeeded"
+          }
+        },
+        {
+          "job_id": "job-fd600e47e4322534ea06d567",
+          "kind": "publish",
+          "settings_revision": null,
+          "state": "awaiting_review",
+          "submitted_at": "2026-10-15T12:00:00Z",
+          "summary": {
+            "counters": {},
+            "current_paper": null,
+            "elapsed_seconds": 0.0,
+            "error": "approval required for plan d00b4fa5bf3f on http://127.0.0.1:59871/api#f2w",
+            "finished_at": null,
+            "growth": {},
+            "logs": {
+              "cap": 2000,
+              "kept": 0,
+              "total": 0
+            },
+            "outcome": "awaiting_review",
+            "papers": {
+              "done": 0,
+              "failed": 0,
+              "skipped": 0,
+              "total": 0
+            },
+            "params": {},
+            "schema_prompt_condensed": null,
+            "stage": {
+              "name": "review",
+              "phase": null,
+              "status": "pending"
+            },
+            "started_at": "2026-10-15T12:00:00+00:00",
+            "state": "awaiting_review"
+          }
+        }
+      ]
+    },
+    "method": "GET",
+    "path": "/v1/jobs",
+    "status": 200
+  },
+  "jobs.list.kind": {
+    "body": {
+      "jobs": [
+        {
+          "job_id": "job-2e04243ea76a48d299af18f6",
+          "kind": "library_passages",
+          "settings_revision": null,
+          "state": "succeeded",
+          "submitted_at": "2026-10-15T12:00:00Z",
+          "summary": {
+            "counters": {
+              "recovery_aliases_added": 0,
+              "recovery_evidence_added": 0,
+              "recovery_located_added": 3,
+              "recovery_newly_covered": 3,
+              "recovery_pages": 3,
+              "recovery_pages_without_text": 0,
+              "recovery_papers_processed": 2,
+              "recovery_papers_skipped": 0,
+              "recovery_publication_terms_corrected": 0,
+              "recovery_relations": 0,
+              "recovery_relations_newly_covered": 0,
+              "recovery_relations_still_without": 0,
+              "recovery_relations_with_evidence_before": 0,
+              "recovery_searches_skipped": 0,
+              "recovery_still_uncovered": 0,
+              "recovery_terms": 3,
+              "recovery_with_passage_before": 0,
+              "units_done": 2,
+              "units_failed": 0,
+              "units_reused": 0,
+              "units_total": 2
+            },
+            "current_paper": null,
+            "elapsed_seconds": 0.0,
+            "error": null,
+            "finished_at": "2026-10-15T12:00:00+00:00",
+            "growth": {},
+            "logs": {
+              "cap": 2000,
+              "kept": 4,
+              "total": 4
+            },
+            "outcome": "succeeded",
+            "papers": {
+              "done": 2,
+              "failed": 0,
+              "skipped": 0,
+              "total": 2
+            },
+            "params": {
+              "bundle": "kg1"
+            },
+            "recovery": {
+              "papers": {
+                "a.pdf": {
+                  "aliases_added": 0,
+                  "evidence_added": 0,
+                  "located_added": 2,
+                  "newly_covered": 2,
+                  "pages": 2,
+                  "pages_without_text": 0,
+                  "publication_terms_corrected": 0,
+                  "relations": 0,
+                  "relations_newly_covered": 0,
+                  "relations_still_without": 0,
+                  "relations_with_evidence_before": 0,
+                  "searches_skipped": 0,
+                  "still_uncovered": 0,
+                  "terms": 2,
+                  "with_passage_before": 0
+                },
+                "b.pdf": {
+                  "aliases_added": 0,
+                  "evidence_added": 0,
+                  "located_added": 1,
+                  "newly_covered": 1,
+                  "pages": 1,
+                  "pages_without_text": 0,
+                  "publication_terms_corrected": 0,
+                  "relations": 0,
+                  "relations_newly_covered": 0,
+                  "relations_still_without": 0,
+                  "relations_with_evidence_before": 0,
+                  "searches_skipped": 0,
+                  "still_uncovered": 0,
+                  "terms": 1,
+                  "with_passage_before": 0
+                }
+              },
+              "total": {
+                "aliases_added": 0,
+                "evidence_added": 0,
+                "located_added": 3,
+                "newly_covered": 3,
+                "pages": 3,
+                "pages_without_text": 0,
+                "papers_processed": 2,
+                "papers_skipped": 0,
+                "publication_terms_corrected": 0,
+                "relations": 0,
+                "relations_newly_covered": 0,
+                "relations_still_without": 0,
+                "relations_with_evidence_before": 0,
+                "searches_skipped": 0,
+                "still_uncovered": 0,
+                "terms": 3,
+                "with_passage_before": 0
+              }
+            },
+            "schema_prompt_condensed": null,
+            "stage": {
+              "name": "run",
+              "phase": null,
+              "status": "completed"
+            },
+            "started_at": "2026-10-15T12:00:00+00:00",
+            "state": "succeeded"
+          }
+        }
+      ]
+    },
+    "method": "GET",
+    "path": "/v1/jobs",
+    "status": 200
+  },
+  "jobs.logs": {
+    "body": {
+      "job_id": "job-2e04243ea76a48d299af18f6",
+      "kept": 4,
+      "logs": [
+        {
+          "at": "2026-10-15T12:00:00+00:00",
+          "level": "info",
+          "message": "searching 2 papers of bundle kg1 for supporting text (no model is used)",
+          "seq": 0,
+          "stage": "run"
+        },
+        {
+          "at": "2026-10-15T12:00:00+00:00",
+          "level": "info",
+          "message": "a.pdf: 2 terms, 0 with text before, 2 passages added for 2 terms, 0 still without; 0 relations, 0 sentences added for 0, 0 without a sentence naming both ends",
+          "seq": 1,
+          "stage": "run"
+        },
+        {
+          "at": "2026-10-15T12:00:00+00:00",
+          "level": "info",
+          "message": "b.pdf: 1 terms, 0 with text before, 1 passages added for 1 terms, 0 still without; 0 relations, 0 sentences added for 0, 0 without a sentence naming both ends",
+          "seq": 2,
+          "stage": "run"
+        },
+        {
+          "at": "2026-10-15T12:00:00+00:00",
+          "level": "info",
+          "message": "found supporting text for 3 more terms (3 passages) and 0 relation sentences for 0 relations; 0 terms and 0 relations still have none; 0 papers skipped",
+          "seq": 3,
+          "stage": "run"
+        }
+      ],
+      "total": 4
+    },
+    "method": "GET",
+    "path": "/v1/jobs/job-2e04243ea76a48d299af18f6/logs",
+    "status": 200
+  },
+  "jobs.one": {
+    "body": {
+      "job_id": "job-2e04243ea76a48d299af18f6",
+      "kind": "library_passages",
+      "settings_revision": null,
+      "state": "succeeded",
+      "submitted_at": "2026-10-15T12:00:00Z"
+    },
+    "method": "GET",
+    "path": "/v1/jobs/job-2e04243ea76a48d299af18f6",
+    "status": 200
+  },
+  "jobs.progress": {
+    "body": {
+      "job_id": "job-2e04243ea76a48d299af18f6",
+      "pause_reason": "all stages complete",
+      "phases": {
+        "other": {
+          "counts": {
+            "completed": 1
+          },
+          "progress": {
+            "run.recovery_aliases_added": 0,
+            "run.recovery_evidence_added": 0,
+            "run.recovery_located_added": 3,
+            "run.recovery_newly_covered": 3,
+            "run.recovery_pages": 3,
+            "run.recovery_pages_without_text": 0,
+            "run.recovery_papers_processed": 2,
+            "run.recovery_papers_skipped": 0,
+            "run.recovery_publication_terms_corrected": 0,
+            "run.recovery_relations": 0,
+            "run.recovery_relations_newly_covered": 0,
+            "run.recovery_relations_still_without": 0,
+            "run.recovery_relations_with_evidence_before": 0,
+            "run.recovery_searches_skipped": 0,
+            "run.recovery_still_uncovered": 0,
+            "run.recovery_terms": 3,
+            "run.recovery_with_passage_before": 0,
+            "run.units_done": 2,
+            "run.units_failed": 0,
+            "run.units_reused": 0,
+            "run.units_total": 2
+          },
+          "stages": {
+            "run": "completed"
+          }
+        }
+      },
+      "seconds_since_progress": null,
+      "stalled": false,
+      "state": "succeeded",
+      "summary": {
+        "counters": {
+          "recovery_aliases_added": 0,
+          "recovery_evidence_added": 0,
+          "recovery_located_added": 3,
+          "recovery_newly_covered": 3,
+          "recovery_pages": 3,
+          "recovery_pages_without_text": 0,
+          "recovery_papers_processed": 2,
+          "recovery_papers_skipped": 0,
+          "recovery_publication_terms_corrected": 0,
+          "recovery_relations": 0,
+          "recovery_relations_newly_covered": 0,
+          "recovery_relations_still_without": 0,
+          "recovery_relations_with_evidence_before": 0,
+          "recovery_searches_skipped": 0,
+          "recovery_still_uncovered": 0,
+          "recovery_terms": 3,
+          "recovery_with_passage_before": 0,
+          "units_done": 2,
+          "units_failed": 0,
+          "units_reused": 0,
+          "units_total": 2
+        },
+        "current_paper": null,
+        "elapsed_seconds": 0.0,
+        "error": null,
+        "finished_at": "2026-10-15T12:00:00+00:00",
+        "growth": {},
+        "logs": {
+          "cap": 2000,
+          "kept": 4,
+          "total": 4
+        },
+        "outcome": "succeeded",
+        "papers": {
+          "done": 2,
+          "failed": 0,
+          "failed_list": [],
+          "skipped": 0,
+          "total": 2
+        },
+        "params": {
+          "bundle": "kg1"
+        },
+        "recovery": {
+          "papers": {
+            "a.pdf": {
+              "aliases_added": 0,
+              "evidence_added": 0,
+              "located_added": 2,
+              "newly_covered": 2,
+              "pages": 2,
+              "pages_without_text": 0,
+              "publication_terms_corrected": 0,
+              "relations": 0,
+              "relations_newly_covered": 0,
+              "relations_still_without": 0,
+              "relations_with_evidence_before": 0,
+              "searches_skipped": 0,
+              "still_uncovered": 0,
+              "terms": 2,
+              "with_passage_before": 0
+            },
+            "b.pdf": {
+              "aliases_added": 0,
+              "evidence_added": 0,
+              "located_added": 1,
+              "newly_covered": 1,
+              "pages": 1,
+              "pages_without_text": 0,
+              "publication_terms_corrected": 0,
+              "relations": 0,
+              "relations_newly_covered": 0,
+              "relations_still_without": 0,
+              "relations_with_evidence_before": 0,
+              "searches_skipped": 0,
+              "still_uncovered": 0,
+              "terms": 1,
+              "with_passage_before": 0
+            }
+          },
+          "total": {
+            "aliases_added": 0,
+            "evidence_added": 0,
+            "located_added": 3,
+            "newly_covered": 3,
+            "pages": 3,
+            "pages_without_text": 0,
+            "papers_processed": 2,
+            "papers_skipped": 0,
+            "publication_terms_corrected": 0,
+            "relations": 0,
+            "relations_newly_covered": 0,
+            "relations_still_without": 0,
+            "relations_with_evidence_before": 0,
+            "searches_skipped": 0,
+            "still_uncovered": 0,
+            "terms": 3,
+            "with_passage_before": 0
+          }
+        },
+        "schema_prompt_condensed": null,
+        "stage": {
+          "name": "run",
+          "phase": null,
+          "status": "completed"
+        },
+        "started_at": "2026-10-15T12:00:00+00:00",
+        "state": "succeeded"
+      }
+    },
+    "method": "GET",
+    "path": "/v1/jobs/job-2e04243ea76a48d299af18f6/progress",
+    "status": 200
+  },
+  "jobs.progress.relations": {
+    "body": {
+      "job_id": "job-454e9bb437628907b786389b",
+      "pause_reason": "all stages complete",
+      "phases": {
+        "other": {
+          "counts": {
+            "completed": 1
+          },
+          "progress": {
+            "run.done": 1,
+            "run.repair_attributes": 2,
+            "run.repair_invalid": 1,
+            "run.repair_relations": 6,
+            "run.repair_swapped": 1,
+            "run.repair_terms_changed": 3,
+            "run.repair_unchanged": 0,
+            "run.repair_unknown_object": 1,
+            "run.total": 1
+          },
+          "stages": {
+            "run": "completed"
+          }
+        }
+      },
+      "seconds_since_progress": null,
+      "stalled": false,
+      "state": "succeeded",
+      "summary": {
+        "counters": {
+          "done": 1,
+          "repair_attributes": 2,
+          "repair_invalid": 1,
+          "repair_relations": 6,
+          "repair_swapped": 1,
+          "repair_terms_changed": 3,
+          "repair_unchanged": 0,
+          "repair_unknown_object": 1,
+          "total": 1
+        },
+        "current_paper": null,
+        "elapsed_seconds": 0.0,
+        "error": null,
+        "finished_at": "2026-10-15T12:00:00+00:00",
+        "growth": {},
+        "logs": {
+          "cap": 2000,
+          "kept": 7,
+          "total": 7
+        },
+        "outcome": "succeeded",
+        "papers": {
+          "done": 0,
+          "failed": 0,
+          "failed_list": [],
+          "skipped": 0,
+          "total": 0
+        },
+        "params": {
+          "bundle": "plecos"
+        },
+        "schema_prompt_condensed": null,
+        "stage": {
+          "name": "run",
+          "phase": null,
+          "status": "completed"
+        },
+        "started_at": "2026-10-15T12:00:00+00:00",
+        "state": "succeeded"
+      }
+    },
+    "method": "GET",
+    "path": "/v1/jobs/job-454e9bb437628907b786389b/progress",
+    "status": 200
+  },
+  "judge_model": {
+    "body": {
+      "available_models": [],
+      "backend": "cborg",
+      "judge_model": null,
+      "judge_model_allowed": null,
+      "judge_model_available": null,
+      "model_policy": {
+        "as_of": "2026-11-06",
+        "default_model": "lbl/cborg-chat",
+        "error": null,
+        "free_models": [
+          "lbl/cborg-chat",
+          "lbl/cborg-coder",
+          "lbl/cborg-coder-ultra",
+          "lbl/cborg-coder-max",
+          "lbl/cborg-coder-fast",
+          "lbl/cborg-deepthought",
+          "lbl/cborg-mini",
+          "lbl/cborg-mini-fast",
+          "lbl/cborg-vision",
+          "lbl/cborg-ocr",
+          "lbl/cborg-safeguard",
+          "lbl/cborg-privacy-filter",
+          "lbl/gpt-oss-120b",
+          "lbl/gpt-oss-20b",
+          "lbl/gemma-4",
+          "lbl/gemma-4-thinking",
+          "lbl/gemma-4-mini",
+          "lbl/glm-5.3-flash",
+          "lbl/inkling-small",
+          "lbl/nomic-embed-text",
+          "lbl/nomic-embed-code",
+          "lbl/nomic-embed-vision",
+          "m",
+          "test",
+          "fake",
+          "test-model",
+          "m1",
+          "m2",
+          "m-1",
+          "m-2",
+          "m-a",
+          "m-b",
+          "m-other",
+          "remote-m",
+          "gpt-big",
+          "fake-judge",
+          "fake-labeller",
+          "fake-model-under-test",
+          "lbl/test",
+          "fixed",
+          "det",
+          "fake-model",
+          "fake-contract-model",
+          "echo",
+          "c",
+          "x",
+          "b",
+          "slow-model",
+          "same",
+          "mock-model",
+          "made-up-model",
+          "judge-x",
+          "gpt",
+          "fake-orchestrator",
+          "fake-cborg",
+          "env-model",
+          "another-model",
+          "emb",
+          "lbl/model",
+          "model",
+          "lbl/m",
+          "some-model"
+        ],
+        "source": "TEST FIXTURE: the real allowlist (app/modules/free_cborg_models.json) plus the fake model ids the test doubles use; never deployed"
+      },
+      "models_error": "no CBORG API key configured (CBORG_API_KEY)",
+      "models_error_code": null,
+      "models_listed_at": "2026-11-25T23:58:53Z",
+      "models_source": "unavailable",
+      "scope": "deployment",
+      "updated_at": null,
+      "updated_by": null
+    },
+    "method": "GET",
+    "path": "/v1/validation/judge-model",
+    "status": 200
+  },
+  "library.categories": {
+    "body": {
+      "categories": [
+        {
+          "count": 1,
+          "name": "rsoxs"
+        }
+      ]
+    },
+    "method": "GET",
+    "path": "/v1/library/categories",
+    "status": 200
+  },
+  "library.estimate": {
+    "body": {
+      "confirmation": "0b26d9aa85c6681d4e1b7d8fbc9d236e15010ce8b68308366db14f0b80ee043a",
+      "estimated_cost_usd": null,
+      "estimated_tokens": 3200,
+      "model": "lbl/cborg-chat",
+      "pages": 2,
+      "paper_count": 1,
+      "unknown_pages": []
+    },
+    "method": "POST",
+    "path": "/v1/library/estimate",
+    "status": 200
+  },
+  "library.kgs": {
+    "body": {
+      "bundles": [
+        {
+          "backend": "cborg",
+          "model": "m",
+          "name": "kg1",
+          "paper_count": 1,
+          "parent": null,
+          "reconstructed": false,
+          "schema": "matkg_schema@0.3.0",
+          "schema_name": "matkg_schema",
+          "schema_origin": "shipped",
+          "schema_version": "0",
+          "topic": null,
+          "updated_at": "2026-11-25T23:58:52Z"
+        },
+        {
+          "backend": null,
+          "model": null,
+          "name": "plecos",
+          "paper_count": 1,
+          "parent": null,
+          "reconstructed": false,
+          "schema": "user/plecos@v1",
+          "schema_name": "plecos",
+          "schema_origin": "user",
+          "schema_version": 1,
+          "topic": null,
+          "updated_at": "2026-11-25T23:58:52Z"
+        }
+      ],
+      "sources": [
+        "matkg_contract_v1.json"
+      ]
+    },
+    "method": "GET",
+    "path": "/v1/library/kgs",
+    "status": 200
+  },
+  "library.kgs.continue": {
+    "body": {
+      "backend": "cborg",
+      "model": "m",
+      "name": "kg1_child",
+      "paper_count": 1,
+      "parent": "kg1",
+      "reconstructed": false,
+      "schema": "matkg_schema@0.3.0",
+      "schema_name": "matkg_schema",
+      "schema_origin": "shipped",
+      "schema_version": "0",
+      "topic": null,
+      "updated_at": "2026-11-25T23:58:53Z",
+      "warnings": []
+    },
+    "method": "POST",
+    "path": "/v1/library/kgs/continue",
+    "status": 200
+  },
+  "library.kgs.export": {
+    "body": {
+      "file_name": "matkg_kg1.json",
+      "name": "kg1",
+      "size_bytes": 1783
+    },
+    "method": "POST",
+    "path": "/v1/library/kgs/kg1/export",
+    "status": 200
+  },
+  "library.kgs.passages.start": {
+    "body": {
+      "job_id": "job-ac1ee774d9fff8091f2e400f",
+      "kind": "library_passages",
+      "settings_revision": null,
+      "state": "queued",
+      "submitted_at": "2026-10-15T12:00:00Z"
+    },
+    "method": "POST",
+    "path": "/v1/library/kgs/kg1_child/passages",
+    "status": 200
+  },
+  "library.kgs.publish.preview": {
+    "body": {
+      "confirmed": false,
+      "corpus": "kg1",
+      "name": "kg1",
+      "previous": null,
+      "problems": [
+        {
+          "code": "unsupported_capability",
+          "message": "publication_unavailable: this deployment has no publication to its own Tiled (profile :local with its managed Tiled is required)",
+          "reason": "publication_unavailable"
+        },
+        {
+          "code": "unsupported_capability",
+          "message": "no_commit_label: this image has no commit label (F2W_CODE_COMMIT / GIT_COMMIT from the GIT_COMMIT build argument); the release manifest needs the code commit and none is invented. Rebuild with --build-arg GIT_COMMIT=$(git rev-parse HEAD) or start the container with -e F2W_CODE_COMMIT=<40-hex>",
+          "reason": "no_commit_label"
+        }
+      ],
+      "release_file": "matkg_kg1.json",
+      "review_page": "Pending Approvals",
+      "snapshot_id": "v1",
+      "snapshot_ref": "kg1/v1",
+      "target": null
+    },
+    "method": "POST",
+    "path": "/v1/library/kgs/kg1/publish",
+    "status": 200
+  },
+  "library.kgs.relations.refused": {
+    "body": {
+      "code": "invalid_input",
+      "message": "this KG is on a shipped schema; its relations are already judged the way that schema defines them",
+      "reason": "not_user_schema",
+      "retryable": false
+    },
+    "method": "POST",
+    "path": "/v1/library/kgs/kg1/relations",
+    "status": 422
+  },
+  "library.models": {
+    "body": {
+      "available": false,
+      "backend": "cborg",
+      "error": "no CBORG API key configured (CBORG_API_KEY)",
+      "error_code": null,
+      "model_policy": {
+        "as_of": "2026-11-06",
+        "default_model": "lbl/cborg-chat",
+        "error": null,
+        "free_models": [
+          "lbl/cborg-chat",
+          "lbl/cborg-coder",
+          "lbl/cborg-coder-ultra",
+          "lbl/cborg-coder-max",
+          "lbl/cborg-coder-fast",
+          "lbl/cborg-deepthought",
+          "lbl/cborg-mini",
+          "lbl/cborg-mini-fast",
+          "lbl/cborg-vision",
+          "lbl/cborg-ocr",
+          "lbl/cborg-safeguard",
+          "lbl/cborg-privacy-filter",
+          "lbl/gpt-oss-120b",
+          "lbl/gpt-oss-20b",
+          "lbl/gemma-4",
+          "lbl/gemma-4-thinking",
+          "lbl/gemma-4-mini",
+          "lbl/glm-5.3-flash",
+          "lbl/inkling-small",
+          "lbl/nomic-embed-text",
+          "lbl/nomic-embed-code",
+          "lbl/nomic-embed-vision",
+          "m",
+          "test",
+          "fake",
+          "test-model",
+          "m1",
+          "m2",
+          "m-1",
+          "m-2",
+          "m-a",
+          "m-b",
+          "m-other",
+          "remote-m",
+          "gpt-big",
+          "fake-judge",
+          "fake-labeller",
+          "fake-model-under-test",
+          "lbl/test",
+          "fixed",
+          "det",
+          "fake-model",
+          "fake-contract-model",
+          "echo",
+          "c",
+          "x",
+          "b",
+          "slow-model",
+          "same",
+          "mock-model",
+          "made-up-model",
+          "judge-x",
+          "gpt",
+          "fake-orchestrator",
+          "fake-cborg",
+          "env-model",
+          "another-model",
+          "emb",
+          "lbl/model",
+          "model",
+          "lbl/m",
+          "some-model"
+        ],
+        "source": "TEST FIXTURE: the real allowlist (app/modules/free_cborg_models.json) plus the fake model ids the test doubles use; never deployed"
+      },
+      "models": [],
+      "ollama": {
+        "error": "OLLAMA_URL is not set on the server",
+        "models": [],
+        "state": "unset"
+      },
+      "source": "unavailable"
+    },
+    "method": "GET",
+    "path": "/v1/library/models",
+    "status": 200
+  },
+  "library.papers": {
+    "body": {
+      "papers": [
+        {
+          "abstract": null,
+          "abstract_truncated": false,
+          "authors": null,
+          "authors_total": 0,
+          "doi": null,
+          "file_name": "a.pdf",
+          "folder": "",
+          "id": "a7949e623819aa32",
+          "index_status": "not_indexed",
+          "metadata_missing": [
+            "year",
+            "authors",
+            "abstract"
+          ],
+          "metadata_status": "ok",
+          "pages": 2,
+          "provenance": null,
+          "relpath": "a.pdf",
+          "sha256": "efddd7dc01ffa722375d6032594c20c7281656135c07f15c55a2fdffdc54293b",
+          "size_bytes": 2102,
+          "title": "A real title",
+          "verified_at": null,
+          "verify_detail": null,
+          "verify_status": "unverified",
+          "year": null,
+          "year_source": null
+        },
+        {
+          "abstract": null,
+          "abstract_truncated": false,
+          "authors": null,
+          "authors_total": 0,
+          "doi": null,
+          "file_name": "b.pdf",
+          "folder": "",
+          "id": "9a3f96912c5f85bc",
+          "index_status": "not_indexed",
+          "metadata_missing": [
+            "year",
+            "authors",
+            "abstract"
+          ],
+          "metadata_status": "ok",
+          "pages": 2,
+          "provenance": null,
+          "relpath": "b.pdf",
+          "sha256": "3a4b2431a0d6d5099d736c75702abe98366dc4f32bb3dfacd74780a4b128cfe7",
+          "size_bytes": 1673,
+          "title": "A real title",
+          "verified_at": null,
+          "verify_detail": null,
+          "verify_status": "unverified",
+          "year": null,
+          "year_source": null
+        },
+        {
+          "abstract": null,
+          "abstract_truncated": false,
+          "authors": null,
+          "authors_total": 0,
+          "doi": null,
+          "file_name": "blank.pdf",
+          "folder": "",
+          "id": "4b192277c0c87d60",
+          "index_status": "not_indexed",
+          "metadata_missing": [
+            "year",
+            "authors",
+            "abstract"
+          ],
+          "metadata_status": "ok",
+          "pages": 2,
+          "provenance": null,
+          "relpath": "blank.pdf",
+          "sha256": "bbb7943541910c630e354f31331f45c49a1b2207922271104326f82a8139daca",
+          "size_bytes": 1298,
+          "title": "A real title",
+          "verified_at": null,
+          "verify_detail": null,
+          "verify_status": "unverified",
+          "year": null,
+          "year_source": null
+        },
+        {
+          "abstract": null,
+          "abstract_truncated": false,
+          "authors": null,
+          "authors_total": 0,
+          "doi": null,
+          "file_name": "new.pdf",
+          "folder": "rsoxs",
+          "id": "8f124c7be2146b27",
+          "index_status": "not_indexed",
+          "metadata_missing": [
+            "year",
+            "authors",
+            "abstract"
+          ],
+          "metadata_status": "ok",
+          "pages": 2,
+          "provenance": null,
+          "relpath": "rsoxs/unknown/new.pdf",
+          "sha256": "c57880c59f958d3075b12e1530964fc6cba6600f86cd42352cb821554657fc99",
+          "size_bytes": 2581,
+          "title": "A real title",
+          "verified_at": null,
+          "verify_detail": null,
+          "verify_status": "unverified",
+          "year": null,
+          "year_source": null
+        }
+      ],
+      "pending_metadata": 0,
+      "total": 4,
+      "truncated": false
+    },
+    "method": "GET",
+    "path": "/v1/library/papers",
+    "status": 200
+  },
+  "library.papers.folder": {
+    "body": {
+      "papers": [
+        {
+          "abstract": null,
+          "abstract_truncated": false,
+          "authors": null,
+          "authors_total": 0,
+          "doi": null,
+          "file_name": "a.pdf",
+          "folder": "",
+          "id": "a7949e623819aa32",
+          "index_status": "not_indexed",
+          "metadata_missing": [
+            "year",
+            "authors",
+            "abstract"
+          ],
+          "metadata_status": "ok",
+          "pages": 2,
+          "provenance": null,
+          "relpath": "a.pdf",
+          "sha256": "efddd7dc01ffa722375d6032594c20c7281656135c07f15c55a2fdffdc54293b",
+          "size_bytes": 2102,
+          "title": "A real title",
+          "verified_at": null,
+          "verify_detail": null,
+          "verify_status": "unverified",
+          "year": null,
+          "year_source": null
+        },
+        {
+          "abstract": null,
+          "abstract_truncated": false,
+          "authors": null,
+          "authors_total": 0,
+          "doi": null,
+          "file_name": "b.pdf",
+          "folder": "",
+          "id": "9a3f96912c5f85bc",
+          "index_status": "not_indexed",
+          "metadata_missing": [
+            "year",
+            "authors",
+            "abstract"
+          ],
+          "metadata_status": "ok",
+          "pages": 2,
+          "provenance": null,
+          "relpath": "b.pdf",
+          "sha256": "3a4b2431a0d6d5099d736c75702abe98366dc4f32bb3dfacd74780a4b128cfe7",
+          "size_bytes": 1673,
+          "title": "A real title",
+          "verified_at": null,
+          "verify_detail": null,
+          "verify_status": "unverified",
+          "year": null,
+          "year_source": null
+        },
+        {
+          "abstract": null,
+          "abstract_truncated": false,
+          "authors": null,
+          "authors_total": 0,
+          "doi": null,
+          "file_name": "blank.pdf",
+          "folder": "",
+          "id": "4b192277c0c87d60",
+          "index_status": "not_indexed",
+          "metadata_missing": [
+            "year",
+            "authors",
+            "abstract"
+          ],
+          "metadata_status": "ok",
+          "pages": 2,
+          "provenance": null,
+          "relpath": "blank.pdf",
+          "sha256": "bbb7943541910c630e354f31331f45c49a1b2207922271104326f82a8139daca",
+          "size_bytes": 1298,
+          "title": "A real title",
+          "verified_at": null,
+          "verify_detail": null,
+          "verify_status": "unverified",
+          "year": null,
+          "year_source": null
+        },
+        {
+          "abstract": null,
+          "abstract_truncated": false,
+          "authors": null,
+          "authors_total": 0,
+          "doi": null,
+          "file_name": "new.pdf",
+          "folder": "rsoxs",
+          "id": "8f124c7be2146b27",
+          "index_status": "not_indexed",
+          "metadata_missing": [
+            "year",
+            "authors",
+            "abstract"
+          ],
+          "metadata_status": "ok",
+          "pages": 2,
+          "provenance": null,
+          "relpath": "rsoxs/unknown/new.pdf",
+          "sha256": "c57880c59f958d3075b12e1530964fc6cba6600f86cd42352cb821554657fc99",
+          "size_bytes": 2581,
+          "title": "A real title",
+          "verified_at": null,
+          "verify_detail": null,
+          "verify_status": "unverified",
+          "year": null,
+          "year_source": null
+        }
+      ],
+      "pending_metadata": 0,
+      "total": 4,
+      "truncated": false
+    },
+    "method": "GET",
+    "path": "/v1/library/papers",
+    "status": 200
+  },
+  "library.schemas": {
+    "body": {
+      "schemas": [
+        {
+          "description": "storage/schema/v0.3.0/matkg_schema.yaml; schema set 0.3.0, pending_owner_review",
+          "label": "General materials KG (v0.3.0)",
+          "name": "matkg_schema@0.3.0",
+          "origin": "shipped",
+          "review_status": "pending_owner_review",
+          "sha256": "0969b81a8f0648c2254f322bcd71d8d3c891a515ed1849dee29a983bbd91dd20",
+          "version": "0.3.0"
+        },
+        {
+          "description": "storage/schema/v0.3.1/matkg_schema.yaml; schema set 0.3.1, pending_owner_review",
+          "label": "General materials KG (v0.3.1)",
+          "name": "matkg_schema@0.3.1",
+          "origin": "shipped",
+          "review_status": "pending_owner_review",
+          "sha256": "6b72a3978f218c67ee98153dcd51e9cec7daf44eb733f7ae6017ac623783f706",
+          "version": "0.3.1"
+        },
+        {
+          "description": "storage/schema/v0.3.0/rsoxs_schema.yaml; schema set 0.3.0, pending_owner_review",
+          "label": "RSoXS (v0.3.0)",
+          "name": "rsoxs_schema@0.3.0",
+          "origin": "shipped",
+          "review_status": "pending_owner_review",
+          "sha256": "aa8be8e582cadcfc1973ce2b0c840ac17401cb406bf54dfa5b0e792154271efa",
+          "version": "0.3.0"
+        },
+        {
+          "description": "storage/schema/v0.3.1/rsoxs_schema.yaml; schema set 0.3.1, pending_owner_review",
+          "label": "RSoXS (v0.3.1)",
+          "name": "rsoxs_schema@0.3.1",
+          "origin": "shipped",
+          "review_status": "pending_owner_review",
+          "sha256": "4788b58a8d3641467e4483cd1fe6cc511b5237caeddd301ef7184f15228f7656",
+          "version": "0.3.1"
+        },
+        {
+          "description": "User schema plecos, version 1, created 2026-11-25T23:58:52Z",
+          "label": "plecos (user schema, v1)",
+          "name": "user/plecos@v1",
+          "origin": "user",
+          "review_status": "user_generated",
+          "schema_name": "plecos",
+          "schema_version": 1,
+          "sha256": "20e42fbd253498361bf7a846f6c108ec43d8e4bc7d896abc8c3e43dedaafb730",
+          "version": "v1"
+        }
+      ]
+    },
+    "method": "GET",
+    "path": "/v1/library/schemas",
+    "status": 200
+  },
+  "library.status": {
+    "body": {
+      "indexed_count": 0,
+      "mounted": true,
+      "paper_count": 4,
+      "quota_open": false
+    },
+    "method": "GET",
+    "path": "/v1/library",
+    "status": 200
+  },
+  "library.verify": {
+    "body": {
+      "paper": {
+        "doi": null,
+        "file_name": "new.pdf",
+        "folder": "rsoxs",
+        "id": "8f124c7be2146b27",
+        "index_status": "not_indexed",
+        "metadata_status": "ok",
+        "pages": 2,
+        "relpath": "rsoxs/unknown/new.pdf",
+        "sha256": "c57880c59f958d3075b12e1530964fc6cba6600f86cd42352cb821554657fc99",
+        "size_bytes": 2581,
+        "title": "A real title",
+        "verified_at": null,
+        "verify_detail": "no registry lookup is configured",
+        "verify_status": "error"
+      }
+    },
+    "method": "POST",
+    "path": "/v1/library/papers/8f124c7be2146b27/verify",
+    "status": 200
+  },
+  "ollama.models": {
+    "body": {
+      "error": "OLLAMA_URL is not set on the server",
+      "models": [],
+      "state": "unset"
+    },
+    "method": "GET",
+    "path": "/v1/ollama/models",
+    "status": 200
+  },
+  "schemas.generate.cancel": {
+    "body": {
+      "cancelled": "ui-contract"
+    },
+    "method": "POST",
+    "path": "/v1/library/schemas/generate/cancel",
+    "status": 200
+  },
+  "schemas.insert_core": {
+    "body": {
+      "text": "prefixes:\n  linkml: https://w3id.org/linkml/\n  ex: https://example.org/user/\ndefault_prefix: ex\ndefault_range: string\nimports:\n  - linkml:types\nid: https://example.org/user/x\nname: x\nclasses:\n  Thing:\n    description: A generic grouping for any identifiable entity (the fallback class).\n    slots: [name, description]\n  CodeSnippet:\n    is_a: Thing\n    description: Code block extracted from a paper (created by the pipeline, not chosen by the model).\nslots:\n  name:\n    range: string\n  description:\n    range: string\n  related_to:\n    description: Broad fallback relation when no narrower predicate applies.\n    domain: Thing\n    range: Thing\n    multivalued: true\n"
+    },
+    "method": "POST",
+    "path": "/v1/library/schemas/insert-core",
+    "status": 200
+  },
+  "schemas.save.invalid": {
+    "body": {
+      "code": "invalid_input",
+      "message": "the schema is not valid: 1 problem(s) (line 2: name must be 'eels' (the schema name you save under); the text says 'plecos')",
+      "reason": "schema_invalid",
+      "report": {
+        "checked": [
+          "size and encoding",
+          "parses as YAML (no tags, anchors or duplicate keys)",
+          "structural rules (closed set of keys, names, caps, imports)",
+          "required core (Thing, CodeSnippet, name, description, related_to)",
+          "loads in SchemaView and SchemaHelper"
+        ],
+        "fixable": false,
+        "note": "Not full LinkML conformance: the linkml linter and validator are not used.",
+        "ok": false,
+        "problems": [
+          {
+            "code": "name_mismatch",
+            "column": 7,
+            "fixable": false,
+            "line": 2,
+            "message": "name must be 'eels' (the schema name you save under); the text says 'plecos'"
+          }
+        ],
+        "stats": {
+          "bytes": 1171,
+          "classes": 5,
+          "slots": 6
+        },
+        "warnings": []
+      },
+      "retryable": false
+    },
+    "method": "POST",
+    "path": "/v1/library/schemas",
+    "status": 422
+  },
+  "schemas.user.diff": {
+    "body": {
+      "diff": "",
+      "from": 1,
+      "name": "plecos",
+      "to": 1
+    },
+    "method": "GET",
+    "path": "/v1/library/schemas/user/plecos/diff",
+    "status": 200
+  },
+  "schemas.user.list": {
+    "body": {
+      "schemas": [
+        {
+          "ids": [
+            "user/plecos@v1"
+          ],
+          "latest": {
+            "created_at": "2026-11-25T23:58:52Z",
+            "id": "user/plecos@v1",
+            "name": "plecos",
+            "sha256": "20e42fbd253498361bf7a846f6c108ec43d8e4bc7d896abc8c3e43dedaafb730",
+            "version": 1
+          },
+          "name": "plecos",
+          "versions": [
+            1
+          ]
+        }
+      ]
+    },
+    "method": "GET",
+    "path": "/v1/library/schemas/user",
+    "status": 200
+  },
+  "schemas.user.read": {
+    "body": {
+      "created_at": "2026-11-25T23:58:52Z",
+      "id": "user/plecos@v1",
+      "name": "plecos",
+      "sha256": "20e42fbd253498361bf7a846f6c108ec43d8e4bc7d896abc8c3e43dedaafb730",
+      "text": "id: https://example.org/user/plecos\nname: plecos\ndescription: Loricariid catfish.\nversion: 0.1.0\nprefixes:\n  linkml: https://w3id.org/linkml/\n  ex: https://example.org/user/\ndefault_prefix: ex\ndefault_range: string\nimports:\n  - linkml:types\nclasses:\n  Thing:\n    description: A generic grouping for any identifiable entity (the fallback class).\n    slots: [name, description]\n  CodeSnippet:\n    is_a: Thing\n    description: Code block extracted from a paper (created by the pipeline, not chosen by the model).\n  Species:\n    is_a: Thing\n    description: A species of catfish.\n  Measurement:\n    is_a: Thing\n    description: A measured value.\n  Locality:\n    is_a: Thing\n    description: A place.\nslots:\n  name:\n    range: string\n  description:\n    range: string\n  related_to:\n    description: Broad fallback relation.\n    domain: Thing\n    range: Thing\n    multivalued: true\n  has_measurement:\n    description: A measurement of a species.\n    domain: Species\n    range: Measurement\n  country:\n    description: Country of a locality.\n    domain: Locality\n    range: string\n  water_body:\n    description: River or lake of a locality.\n    domain: Locality\n    range: string\n",
+      "version": 1
+    },
+    "method": "GET",
+    "path": "/v1/library/schemas/user/plecos@v1",
+    "status": 200
+  },
+  "schemas.validate": {
+    "body": {
+      "checked": [
+        "size and encoding",
+        "parses as YAML (no tags, anchors or duplicate keys)",
+        "structural rules (closed set of keys, names, caps, imports)",
+        "required core (Thing, CodeSnippet, name, description, related_to)",
+        "loads in SchemaView and SchemaHelper"
+      ],
+      "fixable": false,
+      "note": "Not full LinkML conformance: the linkml linter and validator are not used.",
+      "ok": true,
+      "problems": [],
+      "stats": {
+        "bytes": 1171,
+        "classes": 5,
+        "slots": 6
+      },
+      "warnings": [
+        {
+          "code": "relation_direction",
+          "column": 3,
+          "fixable": false,
+          "line": 38,
+          "message": "'has_measurement' reads from a Species to a Measurement. A paper usually names the Measurement first, and the extractor stores a relation from the term it registers: write it as '..._of' from the Measurement (domain Measurement, range Species) or add an 'inverse:'"
+        },
+        {
+          "code": "attribute_slot",
+          "column": 3,
+          "fixable": false,
+          "line": 42,
+          "message": "'country' has the value type 'string': it is stored as an attribute of Locality, not as a link to another node"
+        },
+        {
+          "code": "attribute_slot",
+          "column": 3,
+          "fixable": false,
+          "line": 46,
+          "message": "'water_body' has the value type 'string': it is stored as an attribute of Locality, not as a link to another node"
+        }
+      ]
+    },
+    "method": "POST",
+    "path": "/v1/library/schemas/validate",
+    "status": 200
+  }
+}

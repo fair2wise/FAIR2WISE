@@ -44,9 +44,20 @@ run 45713088709). Model calls used so far: **0 of the 400 allowed**.
   per bundle, keyed by the paper's sha256 and the rules' revision, `searches_skipped` reported; `RECOVERY_REVISION` bumped to 2
   so pairs the old rules found empty are searched again under the new ones); the design page statuses. The per-paper note for
   continued KGs needs no code: the fork copies the parent's `passages` block, so the note appears only for a paper with no
-  coverage entry (covered by the existing route test). The live 200 KB Tiled write and the `read_state` timing run locally once
-  the gate is idle (script `tiled_big_property.py` in the session scratchpad; numbers below when done).
+  coverage entry (covered by the existing route test). The live 200 KB Tiled write and the `read_state` timing ran locally (throwaway
+  Tiled 0.2.18): the 200 KB write 19 ms; `read_state` over 101 nodes (one of 200 KB, 100 of 3 KB) 29 ms; after 100 more
+  nodes of 20 KB each 62 ms; the double read 128 ms. Recorded on the design page.
   - Decision taken: "80" in the owner's 90/50/80 is read as the share of stored passages that are the model's quoted sentence
     verified in the paper (the rest located); the test also requires every stored passage to be found in the page it names.
 - **Tier 1 C (in progress at this entry):** the Harvester's "Schema (label only)" is now "Schema to record with the run" with
   help text that says what it does next to "Create or edit a schema".
+- **Tier 2 D (in progress at this entry): the UI contract sweep.** `tests/api_v1/test_ui_contracts.py` drives the real `:local`
+  app (generated PDFs, a user schema, two bundles, a harvest run under its real job id, finished passages and repair jobs, a
+  staged publication) through every `/v1` request the UI makes and records the real answers in
+  `ui/src/app/components/__fixtures__/ui_contracts.json` (written with `F2W_WRITE_FIXTURES=1`, compared by shape otherwise);
+  `ui/src/app/components/uiContracts.test.ts` feeds each pinned answer to the UI's own parser and fails on a default fallback.
+  The non-`/v1` routes (`/chat`, `/graph`, `/settings`, `/sessions`) stay pinned byte for byte by `tests/contracts/legacy_ui`.
+  Mismatches found by the sweep: none left between the UI's parsers and the real answers after this week's fixes. Two
+  findings of the inventory, not bugs: the UI never requests `GET /v1/publications` or `GET /v1/operations` (only the
+  `/v1/operations/*` sub-routes), so those two are not pinned; `POST .../candidates/{id}/undo` on a candidate nobody filed by
+  hand is a 409 (the UI only offers Undo after a filing). The Ollama listing and the operations routes keep their own fakes.

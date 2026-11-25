@@ -400,6 +400,14 @@ lines) or `not_in_paper` (the model's own words), counted per paper, and 20 samp
 written to the run log at the end of an extraction, with the counts by class. Run the plecos extraction again, or only the
 two papers, to read it.
 
+## Tiled property size: measured (2026-11-26, local throwaway Tiled 0.2.18)
+
+One node written with a 200 KB `context_snippets` property: 19 ms. `read_state` (the complete scan the publication plans
+from) over 101 nodes (one of 200 KB, 100 of 3 KB): 29 ms; after 100 more nodes of 20 KB each: 62 ms; the double read 128 ms.
+No limit was reached and the scan time stays well under a second at these sizes, so evidence is kept whole in storage, as
+decided; the per-page payload of the scan grows with the evidence bytes and is the thing to watch on a KG with tens of
+thousands of nodes (the owner's `read_state` timing on the pilot before and after step 5 is still the number that counts).
+
 ## Not verified
 
 Clause-window trimming (proposed only); the caption and Methods rules; short-acronym false positives across the corpus;

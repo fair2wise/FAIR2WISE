@@ -237,3 +237,15 @@ integration test.
 See the [Contributor guide](contributing.md) for the complete branch, lock, and
 change-type workflow, and [Release and maintenance](release.md) for the full
 release gate.
+
+## UI contracts: real answers, pinned for the UI's parsers
+
+`tests/api_v1/test_ui_contracts.py` drives the real `:local` app, seeded with generated PDFs, a user schema, two bundles, a
+harvest run under its real job id, finished jobs and a staged publication, through every `/v1` request the UI makes and
+records the real answers in `ui/src/app/components/__fixtures__/ui_contracts.json`. Run it with `F2W_WRITE_FIXTURES=1` to
+regenerate the file (nothing in it is hand-written); a normal run compares the live answer's status and shape with the pinned
+one. `ui/src/app/components/uiContracts.test.ts` feeds every pinned answer to the UI's own parser for that route
+(`normalizeJob`, `normalizePending`, `parseCapabilities`, `parseReport`, ...) and fails when a parser falls back to a default:
+an empty id, an unknown kind, a missing field. The per-feature fixture tests (`test_v1_library_*_ui_fixtures.py`) pin the
+richer shapes of the schema panel, Find supporting text and Repair relations the same way. Routes outside `/v1` (`/chat`,
+`/graph`, `/settings`, `/sessions`) are pinned byte for byte by `tests/contracts/legacy_ui`.
