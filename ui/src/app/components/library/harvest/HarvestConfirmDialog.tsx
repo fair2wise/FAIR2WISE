@@ -58,7 +58,7 @@ export function HarvestConfirmDialog({ pending, busy, onFileAnyway, onFileElsewh
     <Dialog open={pending !== null} onOpenChange={next => { if (!next && !busy) onCancel(); }}>
       <DialogContent
         data-testid="harvest-confirm-dialog"
-        className="top-[10%] right-0 left-0 mx-auto max-h-[85vh] translate-x-0 translate-y-0 overflow-y-auto sm:max-w-2xl"
+        className="top-[10%] max-h-[85vh] [translate:-50%_0] overflow-y-auto sm:max-w-2xl"
       >
         <DialogHeader>
           <DialogTitle>{mismatch ? 'This PDF names a different paper' : 'Check this PDF before it is filed'}</DialogTitle>

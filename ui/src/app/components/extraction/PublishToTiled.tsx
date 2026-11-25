@@ -104,7 +104,7 @@ export function PublishToTiled({ name }: PublishToTiledProps) {
         Publish to Tiled
       </Button>
       <Dialog open={open} onOpenChange={next => { if (!running) setOpen(next); }}>
-        <DialogContent data-testid="publish-dialog" className="top-[12%] right-0 left-0 mx-auto translate-x-0 translate-y-0">
+        <DialogContent data-testid="publish-dialog" className="top-[12%] [translate:-50%_0]">
           <DialogHeader>
             <DialogTitle>Publish {name} to Tiled</DialogTitle>
             <DialogDescription>

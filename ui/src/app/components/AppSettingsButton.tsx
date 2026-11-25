@@ -85,7 +85,7 @@ function CborgModelPickerDialog({
     <Dialog open={open} onOpenChange={onOpenChange} modal>
       <DialogContent
         overlayClassName="z-[200] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
-        className="z-[201] top-[88px] left-1/2 flex max-h-[calc(100vh-7rem)] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 translate-y-0 flex-col gap-0 overflow-hidden border border-slate-200 bg-white p-0 text-slate-800 shadow-xl"
+        className="z-[201] top-[88px] left-1/2 flex max-h-[calc(100vh-7rem)] w-[calc(100%-2rem)] max-w-md [translate:-50%_0] flex-col gap-0 overflow-hidden border border-slate-200 bg-white p-0 text-slate-800 shadow-xl"
       >
         <DialogHeader className="border-b border-slate-200 bg-white px-5 py-5 text-left">
           <DialogTitle className="text-slate-900">Choose CBORG model</DialogTitle>

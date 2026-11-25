@@ -192,8 +192,8 @@ function CitationChip({
       {tip && createPortal(
         <span
           role="tooltip"
-          className={`pointer-events-none fixed z-50 w-72 -translate-x-1/2 rounded-md border border-slate-200 bg-white p-3 text-left text-xs shadow-lg ${
-            tip.below ? '' : '-translate-y-full'
+          className={`pointer-events-none fixed z-50 w-72 rounded-md border border-slate-200 bg-white p-3 text-left text-xs shadow-lg ${
+            tip.below ? '[translate:-50%_0]' : '[translate:-50%_-100%]'
           }`}
           style={{ left: tip.x, top: tip.y }}
         >
