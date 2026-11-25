@@ -56,4 +56,5 @@ def test_the_extraction_summary_passages_block_matches_the_fixture(tmp_path):
     pinned = fixture("passages_extraction_summary.json")
     same_shape(summary, pinned)
     assert set(summary["passages"]["papers"]) == set(pinned["passages"]["papers"]) == {"a.pdf", "b.pdf", "c.pdf"}
-    assert summary["passages"]["total"] == {"terms": 9, "with_passage": 6, "quoted": 3, "located": 3, "rejected": 3, "uncovered": 3}
+    assert summary["passages"]["total"] == {"terms": 9, "with_passage": 6, "quoted": 3, "located": 3, "rejected": 3, "uncovered": 3,
+                                          "relations": 0, "relations_with_evidence": 0, "evidence_sentences": 0, "relations_without": 0}

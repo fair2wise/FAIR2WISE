@@ -1118,7 +1118,9 @@ class DisclosureProjector:
                 out[key] = self._project_code(value)
             elif key == "linked_code_snippets":
                 out[key] = [self.project_linked_snippet(s) for s in value] if isinstance(value, list) else value
-            elif key in ("properties", "extra_fields"):
+            elif key == "extra_fields":
+                out[key] = self._project_extra_fields(value)
+            elif key == "properties":
                 out[key] = self._project_properties(value)
             elif key in ("repo_url", "source_file_url"):
                 out[key] = self._project_url(value)
@@ -1128,6 +1130,63 @@ class DisclosureProjector:
                 continue
             else:
                 out[key] = self._scrub(value, depth=1)
+        return out
+
+    def _project_extra_fields(self, value: object) -> JsonValue:
+        """``extra_fields`` of a node: the properties projection, plus the relationship evidence gated like passages.
+
+        ``relationship_evidence`` (``[{source, predicate, target, evidence_count, evidence: [{text, page?, kind}]}]``) keeps
+        its counts always; the sentences only while :func:`snippets_disclosed` is on, with the passage caps and scrub.
+        """
+        if not isinstance(value, Mapping) or "relationship_evidence" not in value:
+            return self._project_properties(value)
+        rest = {k: v for k, v in value.items() if k != "relationship_evidence"}
+        out = self._project_properties(rest)
+        projected = self._project_relationship_evidence(value["relationship_evidence"])
+        if isinstance(out, dict) and projected:
+            out["relationship_evidence"] = projected
+        return out
+
+    def _project_relationship_evidence(self, value: object) -> list[dict[str, Any]]:
+        """Bounded per-relationship evidence; without the opt-in only ``source``, ``predicate``, ``target`` and the count."""
+        disclosed = snippets_disclosed()
+        remaining = [SNIPPETS_PER_NODE]
+        out: list[dict[str, Any]] = []
+        for item in value if isinstance(value, list) else []:
+            if not isinstance(item, Mapping):
+                continue
+            entry: dict[str, Any] = {k: self._safe_str(str(item.get(k) or ""), 200) for k in ("source", "predicate", "target")}
+            count = item.get("evidence_count")
+            entry["evidence_count"] = count if isinstance(count, int) and not isinstance(count, bool) and count >= 0 else 0
+            if disclosed:
+                entry["evidence"] = self._project_evidence_items(item.get("evidence"), remaining)
+            out.append(entry)
+        return out
+
+    def _project_evidence_items(self, value: object, remaining: list[int]) -> list[dict[str, Any]]:
+        """Bounded ``[{text, page?, kind?, source_paper?}]`` evidence of one relationship (the passage caps and scrub)."""
+        out: list[dict[str, Any]] = []
+        chars = 0
+        for item in value if isinstance(value, list) else []:
+            if len(out) >= SNIPPETS_PER_PAPER or remaining[0] <= 0:
+                break
+            text = item.get("text") if isinstance(item, Mapping) else None
+            if not isinstance(text, str) or not text.strip() or self._artifact_value(text):
+                continue
+            entry: dict[str, Any] = {"text": self._safe_str(text.strip(), SNIPPET_MAX_CHARS)}
+            if chars + len(entry["text"]) > SNIPPETS_PER_PAPER_CHARS:
+                break
+            chars += len(entry["text"])
+            page = item.get("page")
+            if isinstance(page, int) and not isinstance(page, bool) and page >= 0:
+                entry["page"] = page
+            if item.get("kind") in ("quoted", "located", "unknown"):
+                entry["kind"] = item["kind"]
+            source = item.get("source_paper")
+            if isinstance(source, str) and source and not self._artifact_value(source):
+                entry["source_paper"] = self._safe_str(source, 200)
+            out.append(entry)
+            remaining[0] -= 1
         return out
 
     def project_graph_payload(self, payload: object, viewer: Viewer, *, state: _ResponseState | None = None,

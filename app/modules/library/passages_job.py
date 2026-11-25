@@ -32,6 +32,7 @@ from ..jobs.keys import OperationInputs
 from ..jobs.pipeline import StageBusy, StageContext, StageResult
 from ..jobs.stages import WorkUnit, chunked_stage
 from ..term_extractor import passages as P
+from ..term_extractor.models import union_evidence
 from .jobs import library_inputs
 
 if TYPE_CHECKING:
@@ -60,6 +61,8 @@ REASON_IN_PROGRESS = "passages_in_progress"
 REASON_NO_PAPERS = "no_source_papers"
 #: Keys of a per-paper manifest ``passages`` entry.
 COUNT_KEYS = ("terms", "with_passage", "quoted", "located", "rejected", "uncovered")
+#: The relation counts of a manifest entry (added with relation evidence); an entry without them predates it.
+RELATION_KEYS = ("relations", "relations_with_evidence", "evidence_sentences", "relations_without")
 #: Words below which a paper counts as having no text layer.
 MIN_TEXT_WORDS = 20
 #: The job notices a stop request at least this often inside one paper (terms between checks).
@@ -82,13 +85,12 @@ def write_json_atomic(path: Path, data: object) -> None:
         raise
 
 
-def recover_relation_evidence(terms: Sequence[Mapping[str, Any]], pages_of: Mapping[str, Sequence[str]]) -> int:
-    """Hook for relationship evidence (design: relationship evidence, not built): returns how many were added (always 0).
+def recover_relation_evidence(subject: str, obj: str, paper: str, pages: list[str]) -> list[dict[str, Any]]:
+    """Located evidence of one relation in one paper: every sentence (or adjacent pair) naming both endpoints, best first.
 
-    Relations carry no evidence field yet (``RelationRecord.evidence`` is read but never written), so there is nothing
-    to attach. When relationship evidence is built this is where a sentence holding both ends is located.
+    No model call. See :func:`app.modules.term_extractor.passages.relation_evidence` for the rules.
     """
-    return 0
+    return P.locate_relation_evidence(pages, subject, obj, paper)
 
 
 def bundle_is_locked(store: B.BundleStore, name: str) -> bool:
@@ -110,20 +112,33 @@ def bundle_is_locked(store: B.BundleStore, name: str) -> bool:
 
 
 def adjust_entry(entry: Mapping[str, Any] | None, *, terms: int, with_before: int, newly: int, located: int,
-                 quoted_now: int, located_now: int) -> dict[str, int]:
+                 quoted_now: int, located_now: int, rel_total: int = 0, rel_before: int = 0, rel_newly: int = 0,
+                 rel_added: int = 0, rel_sentences_now: int = 0) -> dict[str, int]:
     """The manifest ``passages`` entry of a paper after a recovery.
 
     With no entry yet (a KG extracted before coverage was recorded) the entry is absolute, read from the terms; with
-    one, the recovery adds its ``located`` passages, the newly covered terms and lowers ``uncovered`` by them.
+    one, the recovery adds its ``located`` passages, the newly covered terms and lowers ``uncovered`` by them. The
+    relation counts work the same way: absolute when the entry has none (it predates relation evidence), else the
+    newly covered relations and the sentences added are summed on and ``relations_without`` is lowered.
     """
     if not entry:
         covered = with_before + newly
-        return {"terms": terms, "with_passage": covered, "quoted": quoted_now, "located": located_now, "rejected": 0,
-                "uncovered": terms - covered}
-    out = {k: int(entry.get(k, 0)) for k in COUNT_KEYS}
-    out["with_passage"] += newly
-    out["located"] += located
-    out["uncovered"] = max(0, out["uncovered"] - newly)
+        out = {"terms": terms, "with_passage": covered, "quoted": quoted_now, "located": located_now, "rejected": 0,
+               "uncovered": terms - covered}
+    else:
+        out = {k: int(entry.get(k, 0)) for k in COUNT_KEYS}
+        out["with_passage"] += newly
+        out["located"] += located
+        out["uncovered"] = max(0, out["uncovered"] - newly)
+    if not entry or "relations" not in entry:
+        out.update({"relations": rel_total, "relations_with_evidence": rel_before + rel_newly,
+                    "evidence_sentences": rel_sentences_now, "relations_without": rel_total - rel_before - rel_newly})
+    else:
+        rel = {k: int(entry.get(k, 0)) for k in RELATION_KEYS}
+        rel["relations_with_evidence"] += rel_newly
+        rel["evidence_sentences"] += rel_added
+        rel["relations_without"] = max(0, rel["relations_without"] - rel_newly)
+        out.update(rel)
     return out
 
 
@@ -240,10 +255,11 @@ class LibraryPassages:
                 ctx.log(f"{paper}: skipped, {REASON_TEXT[REASON_NO_TEXT]}", level="warning")
                 return {"recovery": {"reason": REASON_NO_TEXT, "text": REASON_TEXT[REASON_NO_TEXT]}}
             result = self._recover_paper(sc, bundle, terms_path, paper, pages)
-            changed["added"] += result["located_added"]
+            changed["added"] += result["located_added"] + result["evidence_added"]
             ctx.log(f"{paper}: {result['terms']} terms, {result['with_passage_before']} with text before, "
                     f"{result['located_added']} passages added for {result['newly_covered']} terms, "
-                    f"{result['still_uncovered']} still without")
+                    f"{result['still_uncovered']} still without; {result['relations']} relations, {result['evidence_added']} sentences added "
+                    f"for {result['relations_newly_covered']}, {result['relations_still_without']} without a sentence naming both ends")
             return {"recovery": result}
 
         try:
@@ -254,11 +270,12 @@ class LibraryPassages:
         block = recovery_block({r["unit_id"]: (r["result"] or {}).get("recovery") for r in rows if r["status"] == "done"})
         self._record_recovery(name, block, started)
         total = block["total"]
-        ctx.log(f"found supporting text for {total['newly_covered']} more terms ({total['located_added']} passages); "
-                f"{total['still_uncovered']} terms still have none; {total['papers_skipped']} papers skipped"
-                if total["located_added"] else
-                f"nothing new to add ({total['still_uncovered']} terms still have no supporting text; "
-                f"{total['papers_skipped']} papers skipped)")
+        ctx.log(
+            (f"found supporting text for {total['newly_covered']} more terms ({total['located_added']} passages) and "
+             f"{total['evidence_added']} relation sentences for {total['relations_newly_covered']} relations; "
+             if total["located_added"] or total["evidence_added"] else "nothing new to add; ")
+            + f"{total['still_uncovered']} terms and {total['relations_still_without']} relations still have none; "
+              f"{total['papers_skipped']} papers skipped")
         progress = {**dict(result.progress), **{f"recovery_{k}": v for k, v in total.items()}}
         return StageResult(progress=progress, data={"bundle": name, "recovery": block}, incomplete=result.incomplete)
 
@@ -292,7 +309,7 @@ class LibraryPassages:
             if hit:
                 added += hit
                 newly += 1
-        recover_relation_evidence(terms, {paper: pages})
+        rel_total, rel_before, rel_newly, rel_added, rel_sentences_now = self._recover_relations(sc, terms, paper, pages)
         quoted_now = located_now = 0
         for term in terms:
             for s in term.get("context_snippets") or []:
@@ -301,21 +318,62 @@ class LibraryPassages:
                         located_now += 1
                     else:
                         quoted_now += 1
-        if added:
+        if added or rel_added:
             doc.setdefault("metadata", {})
             meta = doc["metadata"] if isinstance(doc["metadata"], dict) else {}
             if isinstance(meta, dict):
                 stats = meta.setdefault("passages", {})
                 if isinstance(stats, dict):
                     stats[paper] = adjust_entry(stats.get(paper), terms=len(terms), with_before=with_before, newly=newly,
-                                                located=added, quoted_now=quoted_now, located_now=located_now)
+                                                located=added, quoted_now=quoted_now, located_now=located_now,
+                                                rel_total=rel_total, rel_before=rel_before, rel_newly=rel_newly,
+                                                rel_added=rel_added, rel_sentences_now=rel_sentences_now)
                 doc["metadata"] = meta
             sc.guard()  # a stop requested now leaves the old terms file
             write_json_atomic(terms_path, doc)
         self._record_paper(bundle.name, paper, {"terms": len(terms), "with_before": with_before, "newly": newly,
-                                                "added": added, "quoted_now": quoted_now, "located_now": located_now})
+                                                "added": added, "quoted_now": quoted_now, "located_now": located_now,
+                                                "rel_total": rel_total, "rel_before": rel_before, "rel_newly": rel_newly,
+                                                "rel_added": rel_added, "rel_sentences_now": rel_sentences_now})
         return {"terms": len(terms), "with_passage_before": with_before, "located_added": added, "newly_covered": newly,
-                "still_uncovered": len(terms) - with_before - newly}
+                "still_uncovered": len(terms) - with_before - newly, "relations": rel_total,
+                "relations_with_evidence_before": rel_before, "evidence_added": rel_added,
+                "relations_newly_covered": rel_newly, "relations_still_without": rel_total - rel_before - rel_newly}
+
+    def _recover_relations(self, sc: StageContext, terms: list[dict[str, Any]], paper: str,
+                           pages: list[str]) -> tuple[int, int, int, int, int]:
+        """Locate relation evidence for the relations of ``terms`` in this paper (in place).
+
+        A relation that already has located evidence from this paper is left alone (idempotent); any other is searched for
+        every sentence, or two adjacent sentences, naming both endpoints (:func:`recover_relation_evidence`).
+
+        Returns:
+            ``(relations, with_evidence_before, newly_covered, sentences_added, sentences_from_this_paper_now)``.
+        """
+        total = before = newly = added = 0
+        for index, term in enumerate(terms):
+            if index % GUARD_EVERY == 0:
+                sc.guard()
+            for relation in term.get("relations") or []:
+                if not isinstance(relation, dict) or not relation.get("related_term"):
+                    continue
+                total += 1
+                held = relation.setdefault("evidence", [])
+                if not isinstance(held, list):
+                    held = relation["evidence"] = [str(held)]
+                if any(isinstance(e, dict) and e.get("source_paper") == paper for e in held):
+                    before += 1
+                    continue
+                new = recover_relation_evidence(str(term.get("term") or ""), str(relation["related_term"]), paper, pages)
+                before_len = len(held)
+                if union_evidence(held, new):
+                    newly += 1
+                    added += len(held) - before_len
+                if not held:
+                    relation.pop("evidence")
+        now = sum(1 for term in terms for r in term.get("relations") or [] if isinstance(r, dict)
+                  for e in r.get("evidence") or [] if isinstance(e, dict) and e.get("source_paper") == paper)
+        return total, before, newly, added, now
 
     # ------------------------------------------------------------------ files
     def _kg_is_stale(self, bundle: B.Bundle) -> bool:
@@ -349,7 +407,9 @@ class LibraryPassages:
         passages = {str(k): dict(v) for k, v in (manifest.get("passages") or {}).items() if isinstance(v, Mapping)}
         passages[paper] = adjust_entry(passages.get(paper), terms=facts["terms"], with_before=facts["with_before"],
                                        newly=facts["newly"], located=facts["added"], quoted_now=facts["quoted_now"],
-                                       located_now=facts["located_now"])
+                                       located_now=facts["located_now"], rel_total=facts["rel_total"],
+                                       rel_before=facts["rel_before"], rel_newly=facts["rel_newly"],
+                                       rel_added=facts["rel_added"], rel_sentences_now=facts["rel_sentences_now"])
         manifest["passages"] = passages
         B._write_json(bundle.directory / B.MANIFEST_FILE, manifest)  # noqa: SLF001 - the bundle package's atomic writer
 
@@ -360,25 +420,32 @@ class LibraryPassages:
         total = block["total"]
         manifest["recovery"] = {"last_run": self._clock(), "started_at": started, "papers": len(block["papers"]),
                                 "located_added": total["located_added"], "terms_newly_covered": total["newly_covered"],
+                                "evidence_added": total["evidence_added"],
+                                "relations_newly_covered": total["relations_newly_covered"],
+                                "relations_still_without": total["relations_still_without"],
                                 "still_uncovered": total["still_uncovered"], "papers_skipped": total["papers_skipped"]}
         B._write_json(bundle.directory / B.MANIFEST_FILE, manifest)  # noqa: SLF001 - the bundle package's atomic writer
+
+
+#: Counts of one paper's recovery result that are summed into the totals.
+RESULT_KEYS = ("terms", "with_passage_before", "located_added", "newly_covered", "still_uncovered", "relations",
+               "relations_with_evidence_before", "evidence_added", "relations_newly_covered", "relations_still_without")
 
 
 def recovery_block(units: Mapping[str, Mapping[str, Any] | None]) -> dict[str, Any]:
     """Per-paper results and totals from the ``recovery`` dicts of finished units (``{paper: result}``)."""
     papers = {p: dict(r) for p, r in units.items() if r}
-    total = {"terms": 0, "with_passage_before": 0, "located_added": 0, "newly_covered": 0, "still_uncovered": 0,
-             "papers_processed": 0, "papers_skipped": 0}
+    total = {**dict.fromkeys(RESULT_KEYS, 0), "papers_processed": 0, "papers_skipped": 0}
     for result in papers.values():
         if result.get("reason"):
             total["papers_skipped"] += 1
             continue
         total["papers_processed"] += 1
-        for key in ("terms", "with_passage_before", "located_added", "newly_covered", "still_uncovered"):
+        for key in RESULT_KEYS:
             total[key] += int(result.get(key, 0))
     return {"papers": papers, "total": total}
 
 
 __all__ = ("COUNT_KEYS", "LOCATED_PER_TERM_PAPER", "LibraryPassages", "REASON_AMBIGUOUS", "REASON_BUSY", "REASON_IN_PROGRESS",
            "REASON_MISSING", "REASON_NO_PAPERS", "REASON_NO_TEXT", "REASON_UNREADABLE", "adjust_entry", "bundle_is_locked",
-           "recover_relation_evidence", "recovery_block", "write_json_atomic")
+           "RELATION_KEYS", "RESULT_KEYS", "recover_relation_evidence", "recovery_block", "write_json_atomic")

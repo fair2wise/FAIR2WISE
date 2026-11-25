@@ -32,7 +32,7 @@ from ..model_policy import require_free_cborg_model
 from .agent import build_graph
 from .clients import make_chat_client
 from .merge_index import DEFAULT_EMBED_MODEL, DEFAULT_MERGE_TOP_K, TermMergeIndex
-from .models import RelationRecord, TermRecord
+from .models import RelationRecord, TermRecord, union_evidence
 from .prompts import build_page_prompt
 from .schema import SchemaHelper
 from .services import build_services, extract_and_attach_properties
@@ -43,8 +43,11 @@ logger = logging.getLogger(__name__)
 
 #: Passage coverage counts per paper (see :meth:`TermStore.run_passage_stats`) and the share of terms with a passage
 #: below which a paper is reported with a WARNING (design d: 90%).
-PASSAGE_COUNTS = ("terms", "with_passage", "quoted", "located", "rejected", "uncovered")
+PASSAGE_COUNTS = ("terms", "with_passage", "quoted", "located", "rejected", "uncovered", "relations",
+                  "relations_with_evidence", "evidence_sentences", "relations_without")
 COVERAGE_WARN_RATIO = 0.9
+#: Share of a paper's relations that must have an evidence sentence before the log stops warning (design e: 50%).
+RELATION_WARN_RATIO = 0.5
 
 _PAGE_STOPWORDS = {
     "about",
@@ -457,13 +460,22 @@ class Orchestrator:
                 filename, TermStore.normalize(fixed["term"]), kind=snippet.kind if snippet else None,
                 rejected=int(grounded.rejected),
             )
+            relation_records = [RelationRecord.from_dict(r) for r in fixed.get("relations", [])]
+            for relation in relation_records:   # located relation evidence: sentences naming both endpoints (no model)
+                entries = passages.relation_evidence_for(
+                    subject=fixed["term"], obj=relation.related_term, source_paper=filename, page=page_num + 1,
+                    page_text=text, paper_pages=held[1] if held and held[0] == filename else None)
+                union_evidence(relation.evidence, entries)
+                self.store.note_relation(
+                    filename, f"{TermStore.normalize(fixed['term'])}|{relation.relation}|"
+                    f"{TermStore.normalize(relation.related_term)}", len(entries))
             record = TermRecord(
                 term=fixed["term"],
                 definition=fixed.get("definition", ""),
                 category=fixed.get("category", "Thing"),
                 raw_category=fixed.get("raw_category"),
                 formula=fixed.get("formula"),
-                relations=[RelationRecord.from_dict(r) for r in fixed.get("relations", [])],
+                relations=relation_records,
                 pages=[page_num + 1],
                 source_papers=[filename],
                 context_snippets=[snippet] if snippet else [],
@@ -499,6 +511,18 @@ class Orchestrator:
                 filename, row["with_passage"], row["terms"], 100 * row["with_passage"] / row["terms"],
                 100 * COVERAGE_WARN_RATIO,
             )
+        if row["relations"]:
+            logger.info(
+                "relation evidence %s: %d relations, %d with a sentence naming both ends (%d sentences stored), %d without",
+                filename, row["relations"], row["relations_with_evidence"], row["evidence_sentences"],
+                row["relations_without"],
+            )
+            if row["relations_with_evidence"] < RELATION_WARN_RATIO * row["relations"]:
+                logger.warning(
+                    "relation evidence %s: only %d of %d relations (%.0f%%) have a sentence naming both ends (threshold %.0f%%)",
+                    filename, row["relations_with_evidence"], row["relations"],
+                    100 * row["relations_with_evidence"] / row["relations"], 100 * RELATION_WARN_RATIO,
+                )
         return row
 
     def passage_summary(self) -> dict[str, Any]:

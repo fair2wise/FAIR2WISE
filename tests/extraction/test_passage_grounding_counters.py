@@ -161,7 +161,7 @@ def test_run_summary_has_per_paper_and_total_counters(monkeypatch, tmp_path, pdf
     orch = make_orchestrator(monkeypatch, tmp_path, script, PAGES)
     with caplog.at_level(logging.INFO):
         summary = orch.process_directory(str(pdf_dir))
-    row = {"terms": 3, "with_passage": 2, "quoted": 2, "located": 0, "rejected": 1, "uncovered": 1}
+    row = {"terms": 3, "with_passage": 2, "quoted": 2, "located": 0, "rejected": 1, "uncovered": 1, "relations": 0, "relations_with_evidence": 0, "evidence_sentences": 0, "relations_without": 0}
     assert summary["passages"] == {"total": row, "papers": {"clouds.pdf": row}}
     voxel = orch.store.get("voxel grid").context_snippets[0]
     assert (voxel.kind, voxel.verified, voxel.page) == ("quoted", True, 2)     # page where found
@@ -181,9 +181,9 @@ def test_no_warning_at_full_coverage_and_continued_runs_sum_never_overwrite(monk
     again = make_orchestrator(monkeypatch, tmp_path, register(("cloud tomography", PAGE1[:80]), ("other", None)), PAGES)
     summary = again.process_directory(str(pdf_dir))
     assert summary["passages"]["total"] == {"terms": 2, "with_passage": 1, "quoted": 1, "located": 0, "rejected": 0,
-                                            "uncovered": 1}      # this run only
+                                            "uncovered": 1, "relations": 0, "relations_with_evidence": 0, "evidence_sentences": 0, "relations_without": 0}      # this run only
     saved = json.loads(Path(again.store.output_file).read_text())["metadata"]["passages"]["clouds.pdf"]
-    assert saved == {"terms": 3, "with_passage": 2, "quoted": 2, "located": 0, "rejected": 0, "uncovered": 1}
+    assert saved == {"terms": 3, "with_passage": 2, "quoted": 2, "located": 0, "rejected": 0, "uncovered": 1, "relations": 0, "relations_with_evidence": 0, "evidence_sentences": 0, "relations_without": 0}
 
 
 def test_targeted_run_reports_passages_too(monkeypatch, tmp_path, pdf_dir) -> None:
@@ -210,3 +210,26 @@ def test_manifest_passages_block_is_summed_per_paper_on_continuation(tmp_path: P
     assert block["a.pdf"] == {"terms": 6, "with_passage": 5, "quoted": 4, "located": 1, "rejected": 1, "uncovered": 1}
     assert block["b.pdf"] == row
     assert set(store.get("b").manifest) >= {"schema", "papers", "updated_at"}
+
+
+def test_relation_evidence_is_counted_per_paper_and_warns_below_half(monkeypatch, tmp_path, pdf_dir, caplog) -> None:
+    relations = [{"relation": "part_of", "related_term": "reconstruction volume"},
+                 {"relation": "related_to", "related_term": "ghost partner"},
+                 {"relation": "related_to", "related_term": "another ghost"}]
+    script = [AIMessage(content="", tool_calls=[call("register_term", {
+        "term": "voxel grid", "definition": "d", "category": "Thing", "context": SENTENCE_P2, "relations": relations}, "c1")]),
+        AIMessage(content="done")]
+    orch = make_orchestrator(monkeypatch, tmp_path, script, PAGES)
+    with caplog.at_level(logging.INFO):
+        summary = orch.process_directory(str(pdf_dir))
+    total = summary["passages"]["total"]
+    assert (total["relations"], total["relations_with_evidence"], total["evidence_sentences"],
+            total["relations_without"]) == (3, 1, 1, 2)
+    (rel,) = [r for r in orch.store.get("voxel grid").relations if r.related_term == "reconstruction volume"]
+    assert [(e["source_paper"], e["page"], e["kind"]) for e in rel.evidence] == [("clouds.pdf", 2, "located")]
+    assert any("relation evidence clouds.pdf: 3 relations, 1 with a sentence naming both ends" in r.message for r in caplog.records)
+    warned = [r for r in caplog.records if r.levelno == logging.WARNING and "relations (33%)" in r.message]
+    assert warned
+    saved = json.loads(Path(orch.store.output_file).read_text())
+    assert saved["terms"][0]["relations"][0]["evidence"][0]["kind"] == "located"
+    assert saved["metadata"]["passages"]["clouds.pdf"]["relations"] == 3

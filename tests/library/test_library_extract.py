@@ -194,7 +194,7 @@ def test_the_manifest_gets_a_passages_block_per_paper_summed_across_runs(tmp_pat
     assert state is JobState.SUCCEEDED
     block = world.bundle().manifest["passages"]
     assert sorted(block) == names
-    assert block["a.pdf"] == {"terms": 2, "with_passage": 1, "quoted": 1, "located": 0, "rejected": 1, "uncovered": 1}
+    assert block["a.pdf"] == {"terms": 2, "with_passage": 1, "quoted": 1, "located": 0, "rejected": 1, "uncovered": 1, "relations": 0, "relations_with_evidence": 0, "evidence_sentences": 0, "relations_without": 0}
     # a continued run of another paper adds its own entry and leaves the first untouched
     world.put("d.pdf", "D term|Thing\nmore")
     _, state = world.run(world.params([*names, "d.pdf"]), nonce="2")

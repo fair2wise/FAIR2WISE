@@ -24,6 +24,7 @@ from functools import lru_cache
 import logging
 from pathlib import Path
 import re
+from typing import Any
 import unicodedata
 
 from ..literature.pdf_reader import PdfDocument, open_pdf
@@ -921,3 +922,204 @@ def ground_context(
         return Grounding(ContextSnippet(top.text, source_paper, number(top.page - 1), kind="located", verified=True),
                          rejected)
     return Grounding(None, rejected)
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Relation evidence (located only): a sentence that names BOTH endpoints of a relation
+# ---------------------------------------------------------------------------------------------------------------------
+
+#: ``Passage.form`` of relation evidence: one sentence naming both endpoints, or two adjacent sentences that name one each.
+FORM_BOTH = "both"
+FORM_ADJACENT = "adjacent"
+REASON_FAR = "endpoints_too_far"
+REASON_WINDOW = "window_too_long"
+
+
+def paper_abbr_defined(pages: Sequence[str], term: str) -> bool | None:
+    """``True`` when the paper itself defines the abbreviation of ``long form (ABBR)`` on some page, else ``None``.
+
+    Passed to :func:`locate` for every page, so an abbreviation defined on page 2 is also found on page 6.
+    """
+    if term_forms(term)[1] is None:
+        return None
+    return True if any(s.form == "abbr" for page in pages for s in locate(page, term)) else None
+
+
+def _hit_pairs(a_spans: list[Span], b_spans: list[Span]) -> tuple[int, int]:
+    """Start and end (page offsets) of the closest pair of one endpoint-A mention and one endpoint-B mention."""
+    best = min(((a, b) for a in a_spans for b in b_spans), key=lambda ab: abs(ab[0].start - ab[1].start))
+    first, second = sorted(best, key=lambda s: s.start)
+    return first.start, max(first.end, second.end)
+
+
+def _relation_single(pages: list[str], page_no: int, pos: int, a_spans: list[Span], b_spans: list[Span],
+                     refs: tuple[int, int]) -> Passage:
+    """Judge one sentence that names both endpoints (extended, windowed or rejected like a term passage)."""
+    index = page_index(pages[page_no])
+    sentence = index.sentences[pos]
+    m_start, m_end = _hit_pairs(a_spans, b_spans)
+    base = {"page": page_no + 1, "form": FORM_BOTH, "mention": m_start, "sentence_start": sentence.start}
+
+    def rejected(reason: str) -> Passage:
+        return Passage(sentence.text, start=sentence.start, end=sentence.end, reason=reason, **base)  # type: ignore[arg-type]
+
+    if page_no > refs[0] or (page_no == refs[0] and sentence.start >= refs[1]):
+        return rejected(REASON_REFERENCES)
+    if sentence.reason:
+        return rejected(sentence.reason)
+    text, start, end = sentence.text, sentence.start, sentence.end
+    if len(text) < MIN_CHARS:
+        nxt = index.sentences[pos + 1] if pos + 1 < len(index.sentences) else None
+        if (nxt is not None and nxt.reason is None and len(text) + 1 + len(nxt.text) <= MAX_CHARS
+                and not (page_no == refs[0] and nxt.start >= refs[1])):
+            text, end = f"{text} {nxt.text}", nxt.end
+        if len(text) < MIN_CHARS:
+            return rejected(REASON_SHORT)
+    windowed = False
+    if len(text) > MAX_CHARS:
+        lo = bisect_left(sentence.offsets, m_start)
+        hi = bisect_left(sentence.offsets, m_end)
+        w_start, w_end = clause_window(text, lo, max(lo + 1, hi))
+        if w_start > lo or w_end < hi:
+            return rejected(REASON_FAR)
+        start, end = sentence.offsets[w_start], sentence.offsets[w_end - 1] + 1
+        text, windowed = text[w_start:w_end], True
+    return Passage(text, start=start, end=end, clause_window=windowed, **base)  # type: ignore[arg-type]
+
+
+def _relation_window(pages: list[str], page_no: int, pos: int, mention: int, refs: tuple[int, int]) -> Passage:
+    """Judge two adjacent sentences (``pos`` and ``pos + 1``) that name one endpoint each."""
+    sentences = page_index(pages[page_no]).sentences
+    first, second = sentences[pos], sentences[pos + 1]
+    text = f"{first.text} {second.text}"
+    base = {"page": page_no + 1, "form": FORM_ADJACENT, "mention": mention, "sentence_start": first.start}
+
+    def rejected(reason: str) -> Passage:
+        return Passage(text, start=first.start, end=second.end, reason=reason, **base)  # type: ignore[arg-type]
+
+    for sentence in (first, second):
+        if page_no > refs[0] or (page_no == refs[0] and sentence.start >= refs[1]):
+            return rejected(REASON_REFERENCES)
+        if sentence.reason:
+            return rejected(sentence.reason)
+    if len(text) > MAX_CHARS:
+        return rejected(REASON_WINDOW)
+    if len(text) < MIN_CHARS:
+        return rejected(REASON_SHORT)
+    return Passage(text, start=first.start, end=second.end, **base)  # type: ignore[arg-type]
+
+
+def relation_candidates(pages: list[str], subject: str, obj: str, *, only_pages: Sequence[int] | None = None) -> list[Passage]:
+    """Every place where a relation's two endpoints are named together, accepted or rejected with the reason.
+
+    A candidate is one sentence that names both endpoints (``form="both"``) or two adjacent sentences of one page that name
+    one endpoint each (``form="adjacent"``, only when neither sentence names both). Endpoints are found with
+    :func:`locate` (squash rules, plural tail, short terms, ``(ABBR)`` where the paper defines it) and the sentences go
+    through the same term-independent quality rules as a term passage (references, headers, citations, fragments,
+    captions, length). A sentence naming only one endpoint is not a candidate: the context sentence of the term is
+    therefore never evidence unless it names both.
+
+    Args:
+        pages: Page texts of the paper.
+        subject: The relation's subject (the term).
+        obj: The relation's object (``related_term``).
+        only_pages: 0-based page indices to search (the references heading is still found over all pages).
+
+    Returns:
+        Candidates in document order.
+    """
+    refs = references_start(pages)
+    a_abbr, b_abbr = paper_abbr_defined(pages, subject), paper_abbr_defined(pages, obj)
+    found: list[Passage] = []
+    for page_no, text in enumerate(pages):
+        if only_pages is not None and page_no not in only_pages:
+            continue
+        a_all = locate(text, subject, abbr_defined=a_abbr)
+        b_all = locate(text, obj, abbr_defined=b_abbr)
+        if not a_all or not b_all:
+            continue
+        sentences = page_index(text).sentences
+        pos_of = {s.start: i for i, s in enumerate(sentences)}
+        a_at: dict[int, list[Span]] = {}
+        b_at: dict[int, list[Span]] = {}
+        for span in a_all:
+            a_at.setdefault(pos_of[span.sentence_start], []).append(span)
+        for span in b_all:
+            b_at.setdefault(pos_of[span.sentence_start], []).append(span)
+        both = sorted(set(a_at) & set(b_at))
+        for pos in both:
+            found.append(_relation_single(pages, page_no, pos, a_at[pos], b_at[pos], refs))
+        for pos in sorted(set(a_at) | set(b_at)):
+            nxt = pos + 1
+            if pos in both or nxt in both:
+                continue
+            if (pos in a_at and nxt in b_at) or (pos in b_at and nxt in a_at):
+                mention = min(s.start for s in (a_at.get(pos) or b_at.get(pos) or []))
+                found.append(_relation_window(pages, page_no, pos, mention, refs))
+    return found
+
+
+def _relation_rank(passage: Passage) -> tuple[int, int, int, int, int]:
+    """Both-endpoint sentences before two-sentence windows, then as for term passages."""
+    band = 0 if MIN_CHARS <= passage.length <= PREFERRED_MAX else 1
+    return (0 if passage.form == FORM_BOTH else 1, band, -len(_DEFINITION_WORDS.findall(passage.text)),
+            passage.mention - passage.sentence_start, passage.page)
+
+
+def relation_evidence(pages: list[str], subject: str, obj: str, *, only_pages: Sequence[int] | None = None) -> list[Passage]:
+    """Every accepted sentence (or adjacent pair) that names both endpoints, best first, de-duplicated by text.
+
+    No cap: storage keeps all of them; caps apply when evidence is displayed.
+    """
+    accepted = [p for p in relation_candidates(pages, subject, obj, only_pages=only_pages) if p.accepted]
+    accepted.sort(key=_relation_rank)
+    out: list[Passage] = []
+    seen: set[tuple[int, str]] = set()
+    for passage in accepted:
+        key = (passage.page, passage.text)
+        if key not in seen:
+            seen.add(key)
+            out.append(passage)
+    return out
+
+
+def evidence_entries(found: Sequence[Passage], source_paper: str) -> list[dict[str, Any]]:
+    """Storage form of relation evidence: ``{text, source_paper, page, kind: "located", verified: true}``."""
+    return [{"text": p.text, "source_paper": source_paper, "page": p.page, "kind": "located", "verified": True}
+            for p in found]
+
+
+def locate_relation_evidence(pages: list[str], subject: str, obj: str, source_paper: str) -> list[dict[str, Any]]:
+    """Located evidence entries of one relation in one paper (see :func:`relation_evidence`)."""
+    return evidence_entries(relation_evidence(pages, subject, obj), source_paper)
+
+
+def relation_evidence_for(
+    *,
+    subject: str,
+    obj: str,
+    source_paper: str,
+    page: int | None,
+    page_text: str | None,
+    paper_pages: Sequence[str] | None,
+) -> list[dict[str, Any]]:
+    """Located evidence of one relation at extraction time, from the pages the tool has.
+
+    With the paper's pages every page is searched; with only the page being extracted that page is (its number is
+    ``page``, or ``None`` when unknown). Without any page text nothing can be located.
+
+    Returns:
+        Evidence entries (see :func:`evidence_entries`), best first.
+    """
+    pages: list[str]
+    first: int | None
+    if paper_pages and (page is None or 1 <= page <= len(paper_pages)):
+        pages, first = list(paper_pages), 1
+    elif page_text:
+        pages, first = [page_text], page
+    else:
+        return []
+    entries = locate_relation_evidence(pages, subject, obj, source_paper)
+    for entry in entries:
+        entry["page"] = None if first is None else first + int(entry["page"]) - 1
+    return entries

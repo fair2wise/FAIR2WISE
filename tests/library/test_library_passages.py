@@ -12,7 +12,9 @@ from app.modules.graph import kg_update
 from app.modules.library import bundles as B
 from app.modules.library import passages_job as PJ
 from tests.jobs.jobs_fakes import Clock, Crash
-from tests.library.passages_fixtures import S_DUP, S_ORIENT, S_PURITY, S_PURITY_B, World, make_pdf, term
+from tests.library.passages_fixtures import (
+    S_DUP, S_ELLIPSO, S_ORIENT, S_PURITY, S_PURITY_B, S_REFERENCE, World, make_pdf, term,
+)
 
 
 def located(record: dict, paper: str) -> list[dict]:
@@ -39,10 +41,15 @@ def test_end_to_end_attaches_located_passages_with_the_right_pages(tmp_path):
     # manifest: per-paper entries (absolute for a KG that had none) and the recovery info
     manifest = world.bundle().manifest
     assert manifest["passages"]["a.pdf"] == {"terms": 3, "with_passage": 2, "quoted": 0, "located": 2, "rejected": 0,
-                                             "uncovered": 1}
-    assert manifest["passages"]["b.pdf"]["located"] == 1 and "blank.pdf" not in manifest["passages"]
+                                             "uncovered": 1, "relations": 5, "relations_with_evidence": 2,
+                                             "evidence_sentences": 2, "relations_without": 3}
+    assert manifest["passages"]["b.pdf"]["located"] == 2 and "blank.pdf" not in manifest["passages"]
+    assert {k: manifest["passages"]["b.pdf"][k] for k in ("relations", "relations_with_evidence", "evidence_sentences",
+                                                         "relations_without")} == {
+        "relations": 4, "relations_with_evidence": 2, "evidence_sentences": 2, "relations_without": 2}
     recovery = manifest["recovery"]
-    assert recovery["located_added"] == 3 and recovery["terms_newly_covered"] == 3 and recovery["papers_skipped"] == 2
+    assert recovery["located_added"] == 4 and recovery["terms_newly_covered"] == 4 and recovery["papers_skipped"] == 2
+    assert recovery["evidence_added"] == 4 and recovery["relations_newly_covered"] == 4
     # terms.json metadata carries the same coverage for later extractions
     meta = json.loads(world.bundle().file(B.TERMS_FILE).read_text())["metadata"]
     assert meta["passages"]["a.pdf"]["located"] == 2 and meta["processed_files"] == 3
@@ -52,14 +59,17 @@ def test_result_block_reports_every_paper_with_reasons(tmp_path):
     world = World(tmp_path)
     handle, _ = world.run()
     units = world.units(handle)
-    assert units["a.pdf"]["result"]["recovery"] == {"terms": 3, "with_passage_before": 0, "located_added": 2,
-                                                     "newly_covered": 2, "still_uncovered": 1}
-    assert units["b.pdf"]["result"]["recovery"]["located_added"] == 1
+    assert units["a.pdf"]["result"]["recovery"] == {
+        "terms": 3, "with_passage_before": 0, "located_added": 2, "newly_covered": 2, "still_uncovered": 1, "relations": 5,
+        "relations_with_evidence_before": 0, "evidence_added": 2, "relations_newly_covered": 2, "relations_still_without": 3}
+    assert units["b.pdf"]["result"]["recovery"]["located_added"] == 2      # domain purity and ellipsometer
     assert units["blank.pdf"]["result"]["recovery"]["reason"] == PJ.REASON_NO_TEXT
     assert units["gone.pdf"]["result"]["recovery"]["reason"] == PJ.REASON_MISSING
     block = PJ.recovery_block({k: v["result"]["recovery"] for k, v in units.items()})
-    assert block["total"] == {"terms": 4, "with_passage_before": 0, "located_added": 3, "newly_covered": 3,
-                              "still_uncovered": 1, "papers_processed": 2, "papers_skipped": 2}
+    assert block["total"] == {"terms": 5, "with_passage_before": 0, "located_added": 4, "newly_covered": 4,
+                              "still_uncovered": 1, "relations": 9, "relations_with_evidence_before": 0, "evidence_added": 4,
+                              "relations_newly_covered": 4, "relations_still_without": 5, "papers_processed": 2,
+                              "papers_skipped": 2}
 
 
 def test_a_second_run_adds_nothing_and_changes_no_file(tmp_path):
@@ -224,5 +234,60 @@ def test_the_start_check_refuses_with_typed_errors(tmp_path):
     assert not PJ.bundle_is_locked(world.store, "kg1")
 
 
-def test_relation_evidence_hook_exists_and_does_nothing():
-    assert PJ.recover_relation_evidence([], {}) == 0
+def relation(terms: dict, name: str, other: str) -> dict:
+    return next(r for r in terms[name]["relations"] if r["related_term"] == other)
+
+
+def test_relation_evidence_is_located_with_both_endpoints_only(tmp_path):
+    world = World(tmp_path)
+    world.run()
+    terms = world.terms()
+    rsoxs = relation(terms, "domain purity", "resonant soft X-ray scattering")
+    assert rsoxs["evidence"] == [{"text": S_PURITY, "source_paper": "a.pdf", "page": 1, "kind": "located", "verified": True}]
+    derived = relation(terms, "domain purity", "integrated scattering intensity")
+    assert [(e["source_paper"], e["page"], e["text"]) for e in derived["evidence"]] == [("b.pdf", 1, S_PURITY_B)]
+    assert [(e["source_paper"], e["page"]) for e in relation(terms, "face-on orientation",
+            "grazing incidence wide angle X-ray scattering")["evidence"]] == [("a.pdf", 2)]
+    # one endpoint only, or the endpoints on different pages: no evidence, and the key is not even written
+    assert "evidence" not in relation(terms, "domain purity", "unfindable partner")
+    assert "evidence" not in relation(terms, "face-on orientation", "carbon edge")
+    # two adjacent sentences naming one endpoint each form one window
+    (window,) = relation(terms, "ellipsometer", "silicon reference")["evidence"]
+    assert window["text"] == f"{S_ELLIPSO} {S_REFERENCE}" and window["page"] == 1 and window["source_paper"] == "b.pdf"
+
+
+def test_the_kg_edge_carries_the_evidence_and_the_best_sentence_as_has_evidence(tmp_path):
+    world = World(tmp_path)
+    world.run()
+    kg = json.loads(world.bundle().file(B.KG_FILE).read_text())
+    edges = {(e["subject"], e["predicate"], e["object"]): e for e in kg["associations"]}
+    edge = next(e for k, e in edges.items() if k[1] == "rel:measured_by" and k[0].endswith("domainpurity"))
+    assert edge["evidence"] == [{"text": S_PURITY, "source_paper": "a.pdf", "page": 1, "kind": "located", "verified": True}]
+    assert edge["has_evidence"] == S_PURITY
+    plain = next(e for k, e in edges.items() if k[1] == "rel:related_to" and k[0].endswith("domainpurity"))
+    assert plain["has_evidence"] is None and "evidence" not in plain       # no evidence: the exact old shape
+
+
+def test_a_relation_keeps_its_old_string_evidence_and_gains_located_sentences(tmp_path):
+    old = {"relation": "measured_by", "related_term": "resonant soft X-ray scattering", "evidence": ["an older sentence"]}
+    world = World(tmp_path)
+    data = json.loads(world.bundle().file(B.TERMS_FILE).read_text())
+    data["terms"][0]["relations"][0] = old
+    world.bundle().file(B.TERMS_FILE).write_text(json.dumps(data))
+    world.run()
+    evidence = relation(world.terms(), "domain purity", "resonant soft X-ray scattering")["evidence"]
+    assert evidence[0] == "an older sentence" and evidence[1]["text"] == S_PURITY       # old entry kept, new one after it
+    kg = json.loads(world.bundle().file(B.KG_FILE).read_text())
+    edge = next(e for e in kg["associations"] if e["predicate"] == "rel:measured_by" and e["subject"].endswith("domainpurity"))
+    assert edge["has_evidence"] == S_PURITY and [e["text"] for e in edge["evidence"]] == [S_PURITY]
+
+
+def test_relation_evidence_rewrite_is_idempotent_and_never_overwrites(tmp_path):
+    world = World(tmp_path)
+    world.run()
+    before = world.terms()
+    handle, _ = world.run(nonce="2")
+    assert world.terms() == before
+    recovery = world.units(handle)["a.pdf"]["result"]["recovery"]
+    assert recovery["evidence_added"] == 0 and recovery["relations_newly_covered"] == 0
+    assert recovery["relations_with_evidence_before"] == 2 and recovery["relations_still_without"] == 3

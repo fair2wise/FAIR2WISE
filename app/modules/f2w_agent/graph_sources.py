@@ -144,6 +144,8 @@ class SourceGraph:
     #: File names of the papers with an entry in the bundle manifest's ``passages`` block (supporting-text coverage);
     #: ``None`` when the graph is not an extracted bundle (a flat file, a release, Tiled).
     passage_papers: frozenset[str] | None = None
+    #: The stored edges that carry evidence (``evidence`` or ``has_evidence``), kept whole; sparse, for the node record.
+    evidence_edges: tuple[JsonObject, ...] = field(default=(), repr=False)
 
     @property
     def data(self) -> JsonObject:
@@ -221,6 +223,15 @@ def build_source_graph(source_id: str, kind: str, graph_id: str, graph_label: st
 
 def _text(value: object) -> str:
     return value.strip() if isinstance(value, str) else ""
+
+
+def _evidence_edges(data: object) -> tuple[JsonObject, ...]:
+    """The edges of a KG file that carry evidence, as stored (the compact edges drop it)."""
+    if not isinstance(data, dict):
+        return ()
+    raw_edges = data.get("associations") or data.get("edges") or []
+    return tuple(e for e in raw_edges if isinstance(e, dict) and (e.get("evidence") or e.get("has_evidence"))) \
+        if isinstance(raw_edges, list) else ()
 
 
 def normalize_json_graph(data: object) -> tuple[list[JsonObject], list[JsonObject]]:
@@ -472,7 +483,7 @@ class GraphSources:
 
         graph = dataclasses.replace(
             build_source_graph(sid, KIND_JSON, item.graph_id, item.label, f"{key[1]}:{key[2]}", nodes, edges),
-            passage_papers=passage_papers_for(item.path))
+            passage_papers=passage_papers_for(item.path), evidence_edges=_evidence_edges(data))
         with self._lock:
             self._json_cache[key] = graph
             while len(self._json_cache) > JSON_CACHE_SIZE:

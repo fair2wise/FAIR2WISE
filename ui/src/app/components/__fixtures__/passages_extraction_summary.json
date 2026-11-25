@@ -1,8 +1,8 @@
 {
   "outcome": "succeeded",
   "state": "succeeded",
-  "started_at": "2026-11-25T02:58:20.828074+00:00",
-  "finished_at": "2026-11-25T02:58:21.269096+00:00",
+  "started_at": "2026-11-25T03:53:02.389787+00:00",
+  "finished_at": "2026-11-25T03:53:02.824096+00:00",
   "elapsed_seconds": 0.4,
   "stage": {
     "name": "run",
@@ -56,7 +56,11 @@
       "quoted": 3,
       "located": 3,
       "rejected": 3,
-      "uncovered": 3
+      "uncovered": 3,
+      "relations": 0,
+      "relations_with_evidence": 0,
+      "evidence_sentences": 0,
+      "relations_without": 0
     },
     "papers": {
       "a.pdf": {
@@ -65,7 +69,11 @@
         "quoted": 1,
         "located": 1,
         "rejected": 1,
-        "uncovered": 1
+        "uncovered": 1,
+        "relations": 0,
+        "relations_with_evidence": 0,
+        "evidence_sentences": 0,
+        "relations_without": 0
       },
       "b.pdf": {
         "terms": 3,
@@ -73,7 +81,11 @@
         "quoted": 1,
         "located": 1,
         "rejected": 1,
-        "uncovered": 1
+        "uncovered": 1,
+        "relations": 0,
+        "relations_with_evidence": 0,
+        "evidence_sentences": 0,
+        "relations_without": 0
       },
       "c.pdf": {
         "terms": 3,
@@ -81,7 +93,11 @@
         "quoted": 1,
         "located": 1,
         "rejected": 1,
-        "uncovered": 1
+        "uncovered": 1,
+        "relations": 0,
+        "relations_with_evidence": 0,
+        "evidence_sentences": 0,
+        "relations_without": 0
       }
     }
   }

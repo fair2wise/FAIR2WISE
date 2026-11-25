@@ -28,9 +28,15 @@ S_PURITY_B = ("In the second paper the domain purity was obtained from the integ
 S_DUP = ("The duplicated file reports a calibration of the detector distance that is quoted here only to give the "
          "locator a sentence of sufficient length to find.")
 
+#: Two adjacent sentences that name one endpoint each (relation ellipsometer -> silicon reference).
+S_ELLIPSO = ("The film thickness was measured with an ellipsometer at several positions across every sample that was "
+             "prepared for this study.")
+S_REFERENCE = ("A calibration of the instrument was carried out against a silicon reference before every measurement "
+               "session of the campaign.")
+
 PAPERS = {
     "a.pdf": [[S_PURITY, "Filler words follow the sentence on the first page of this generated paper."], [S_ORIENT]],
-    "b.pdf": [[S_PURITY_B]],
+    "b.pdf": [[S_PURITY_B, S_ELLIPSO + " " + S_REFERENCE]],
     "blank.pdf": [[]],  # no text layer
 }
 
@@ -53,9 +59,11 @@ def make_pdf(path: Path, pages: list[list[str]]) -> None:
     c.save()
 
 
-def term(name: str, *papers: str, snippets: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def term(name: str, *papers: str, snippets: list[dict[str, Any]] | None = None,
+         relations: list[tuple[str, str]] | None = None) -> dict[str, Any]:
     return {"term": name, "definition": f"{name} definition", "category": "Thing", "pages": [], "source_papers": list(papers),
-            "context_snippets": list(snippets or []), "relations": []}
+            "context_snippets": list(snippets or []),
+            "relations": [{"relation": r, "related_term": o, "verified": True} for r, o in relations or []]}
 
 
 class World:
@@ -76,9 +84,15 @@ class World:
         kwargs = {"lease_seconds": 60, "clock": clock} if clock else {}
         self.jobs = JobService(JobStore(tmp / "jobs.sqlite3", **kwargs), settings=settings)
         register_library_jobs(self.jobs, settings, handlers=library_handlers(self.service, passages=self.recovery))
-        terms = [term("domain purity", "a.pdf", "b.pdf"), term("face-on orientation", "a.pdf"),
+        terms = [term("domain purity", "a.pdf", "b.pdf", relations=[
+                     ("measured_by", "resonant soft X-ray scattering"), ("derived_from", "integrated scattering intensity"),
+                     ("related_to", "unfindable partner")]),
+                 term("face-on orientation", "a.pdf", relations=[
+                     ("measured_by", "grazing incidence wide angle X-ray scattering"), ("related_to", "carbon edge")]),
                  term("unfindable notion", "a.pdf"), term("blank page term", "blank.pdf"),
-                 term("gone term", "gone.pdf"), *(extra_terms or [])]
+                 term("gone term", "gone.pdf"),
+                 term("ellipsometer", "b.pdf", relations=[("calibrated_with", "silicon reference")]),
+                 *(extra_terms or [])]
         self.store.create("kg1", schema=SCHEMA, model="m", backend="cborg",
                           papers=[B.PaperRef(n, self.sha(n), 1) for n in ("a.pdf", "b.pdf", "blank.pdf")],
                           terms={"metadata": {"processed_files": 3}, "terms": terms, "code_snippets": []})

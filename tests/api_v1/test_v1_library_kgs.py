@@ -261,3 +261,39 @@ def test_a_paper_without_passages_and_without_coverage_is_noted_once_and_a_recov
     assert c.get("/graph", params={"source": flat["id"]}).status_code == 200
     assert B.passage_papers_for(svc.store.root.parent / "elsewhere" / "kg.json") is None
     assert B.passage_papers_for(bundle.directory / B.KG_FILE) == frozenset({"a.pdf"})
+
+
+def test_the_node_record_carries_relationship_evidence_with_counts_always_and_text_only_with_the_opt_in(local, kgs, monkeypatch):
+    """Edge evidence is projected like passages: counts without ``F2W_DISCLOSE_SNIPPETS``, bounded text with it."""
+    svc, _ = kgs
+    monkeypatch.setenv("F2W_WORKDIR", str(svc.store.root.parent))
+    c = local.client()
+    located = {"text": "Domain purity was measured by resonant soft X-ray scattering of the blend films at the carbon edge.",
+               "source_paper": "a.pdf", "page": 3, "kind": "located", "verified": True}
+    terms = [{"term": "domain purity", "definition": "d", "category": "Method", "source_papers": ["a.pdf"], "pages": [3],
+              "relations": [{"relation": "measured_by", "related_term": "RSoXS", "evidence": [located, {**located, "page": 4,
+                            "text": "A second sentence naming both domain purity and RSoXS in one place of the paper."}]},
+                            {"relation": "related_to", "related_term": "blend", "evidence": ["an older sentence"]},
+                            {"relation": "related_to", "related_term": "film"}]}]
+    svc.store.create("rel", schema={"id": _schema(c), "version": "0", "sha256": "x", "path": "x.yaml"},
+                     kg=build_graph_isolated(terms, []))
+    local.app.state.f2w_graph_sources._json_cache.clear()
+    sid = next(s for s in c.get("/v1/graph/sources").json()["sources"] if s["graph_id"] == "rel")["id"]
+
+    def evidence() -> dict:
+        body = c.get("/graph/node/matkg:domainpurity", params={"source": sid})
+        assert body.status_code == 200, body.text
+        return {r["predicate"]: r for r in body.json()["extra_fields"].get("relationship_evidence", [])}
+
+    monkeypatch.delenv("F2W_DISCLOSE_SNIPPETS", raising=False)
+    hidden = evidence()
+    assert {k: v["evidence_count"] for k, v in hidden.items()} == {"rel:measured_by": 2, "rel:related_to": 1}
+    assert all("evidence" not in v for v in hidden.values())             # counts only: no text without the opt-in
+    assert "Domain purity was measured" not in json.dumps(hidden)
+    monkeypatch.setenv("F2W_DISCLOSE_SNIPPETS", "1")
+    shown = evidence()
+    measured = shown["rel:measured_by"]
+    assert measured["evidence_count"] == 2 and [e["page"] for e in measured["evidence"]] == [3, 4]
+    assert measured["evidence"][0] == {"text": located["text"], "page": 3, "kind": "located", "source_paper": "a.pdf"}
+    assert shown["rel:related_to"]["evidence"] == [{"text": "an older sentence", "kind": "unknown"}]   # a legacy string
+    assert all(set(v) == {"source", "predicate", "target", "evidence_count", "evidence"} for v in shown.values())

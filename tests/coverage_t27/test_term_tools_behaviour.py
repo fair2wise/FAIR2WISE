@@ -277,7 +277,7 @@ def test_a_sentence_that_cannot_be_verified_is_not_stored_and_is_counted(make):
                                    "context": "A voxel grid divides the volume."})
     assert state.store.get("voxel grid").context_snippets == []
     assert state.store.run_passage_stats()["a.pdf"] == {"terms": 1, "with_passage": 0, "quoted": 0, "located": 0,
-                                                         "rejected": 1, "uncovered": 1}
+                                                         "rejected": 1, "uncovered": 1, "relations": 0, "relations_with_evidence": 0, "evidence_sentences": 0, "relations_without": 0}
 
 
 def test_a_second_passage_of_the_same_term_on_the_same_page_is_kept(make):
@@ -301,7 +301,7 @@ def test_a_rejected_sentence_is_counted_and_never_stored_and_a_mention_is_locate
     assert snippet.text.startswith("P3HT films were annealed")
     assert "most studied" not in snippet.text
     assert state.store.run_passage_stats()["a.pdf"] == {"terms": 1, "with_passage": 1, "quoted": 0, "located": 1,
-                                                         "rejected": 1, "uncovered": 0}
+                                                         "rejected": 1, "uncovered": 0, "relations": 0, "relations_with_evidence": 0, "evidence_sentences": 0, "relations_without": 0}
 
 
 def test_the_stored_page_is_where_the_sentence_is_found_not_the_claimed_page(make):

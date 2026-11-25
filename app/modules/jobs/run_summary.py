@@ -55,9 +55,11 @@ def derive_outcome(state: JobState, done: int, failed: int) -> str:
 
 
 #: Keys of one paper's passage coverage counts in an extraction unit's result (``passages``).
-PASSAGE_KEYS = ("terms", "with_passage", "quoted", "located", "rejected", "uncovered")
+PASSAGE_KEYS = ("terms", "with_passage", "quoted", "located", "rejected", "uncovered", "relations",
+                "relations_with_evidence", "evidence_sentences", "relations_without")
 #: Keys of the recovery totals of a ``library_passages`` job (``recovery``).
-RECOVERY_KEYS = ("terms", "with_passage_before", "located_added", "newly_covered", "still_uncovered")
+RECOVERY_KEYS = ("terms", "with_passage_before", "located_added", "newly_covered", "still_uncovered", "relations",
+                 "relations_with_evidence_before", "evidence_added", "relations_newly_covered", "relations_still_without")
 
 
 def _passage_blocks(done_units: list[dict[str, Any]]) -> dict[str, Any]:

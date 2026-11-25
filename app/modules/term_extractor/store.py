@@ -10,7 +10,7 @@ import threading
 from typing import Any
 
 from . import provenance
-from .models import ContextSnippet, PropertyRecord, TermRecord
+from .models import ContextSnippet, PropertyRecord, TermRecord, union_evidence
 
 logger = logging.getLogger(__name__)
 
@@ -188,7 +188,8 @@ class TermStore:
         - Context snippets are unioned by (source_paper, page, text); the same text as both kinds keeps ``quoted``;
           new ones go after the existing ones, except a quoted+verified one goes before the first located one.
         - Longer definition wins.
-        - New relations are appended (deduped by (relation, related_term)).
+        - New relations are appended (deduped by (relation, related_term)); the evidence of a repeated relation is unioned by
+          (paper, page, text).
         - Chemical fields (formula, smiles, etc.) fill in only if currently None.
         """
         key = self.normalize(record.term)
@@ -230,15 +231,18 @@ class TermStore:
                 existing.raw_category = record.raw_category
                 modified = True
 
-            existing_rel_keys = {(r.relation, r.related_term) for r in existing.relations}
+            existing_rels = {(r.relation, r.related_term): r for r in existing.relations}
             for rel in record.relations:
-                if (rel.relation, rel.related_term) not in existing_rel_keys:
+                held = existing_rels.get((rel.relation, rel.related_term))
+                if held is None:
                     existing.relations.append(rel)
-                    existing_rel_keys.add((rel.relation, rel.related_term))
+                    existing_rels[(rel.relation, rel.related_term)] = rel
                     self._growth["relations_new"] += 1
                     modified = True
                 else:
                     self._growth["relations_merged"] += 1
+                    if union_evidence(held.evidence, rel.evidence):   # the evidence of a repeated relation is kept, never dropped
+                        modified = True
 
             for attr in ("formula", "formula_validation", "chebi", "smiles", "charge", "inchi", "inchikey", "mass"):
                 if getattr(record, attr) is not None and getattr(existing, attr) is None:
@@ -299,19 +303,43 @@ class TermStore:
             rejected: Number of model sentences rejected (not found in the page text).
         """
         with self._state_lock:
-            row = self._passage_run.setdefault(paper, {"terms": set(), "covered": set(), "quoted": 0, "located": 0, "rejected": 0})
+            row = self._run_row(paper)
             row["terms"].add(term_key)
             if kind in ("quoted", "located"):
                 row["covered"].add(term_key)
                 row[kind] += 1
             row["rejected"] += rejected
 
+    def _run_row(self, paper: str) -> dict[str, Any]:
+        return self._passage_run.setdefault(paper, {
+            "terms": set(), "covered": set(), "quoted": 0, "located": 0, "rejected": 0,
+            "relations": set(), "rel_covered": set(), "evidence": 0,
+        })
+
+    def note_relation(self, paper: str, relation_key: str, sentences: int) -> None:
+        """Record the located evidence of one registered relation of ``paper``.
+
+        Args:
+            paper: Source paper file name.
+            relation_key: Identity of the relation (subject key, predicate, object key).
+            sentences: Number of sentences naming both endpoints that were stored (0 when none was found).
+        """
+        with self._state_lock:
+            row = self._run_row(paper)
+            row["relations"].add(relation_key)
+            if sentences > 0:
+                row["rel_covered"].add(relation_key)
+                row["evidence"] += sentences
+
     def _run_stats_locked(self) -> dict[str, dict[str, int]]:
         out: dict[str, dict[str, int]] = {}
         for paper, row in self._passage_run.items():
             terms, covered = len(row["terms"]), len(row["covered"])
+            relations, rel_covered = len(row["relations"]), len(row["rel_covered"])
             out[paper] = {"terms": terms, "with_passage": covered, "quoted": row["quoted"], "located": row["located"],
-                          "rejected": row["rejected"], "uncovered": terms - covered}
+                          "rejected": row["rejected"], "uncovered": terms - covered, "relations": relations,
+                          "relations_with_evidence": rel_covered, "evidence_sentences": row["evidence"],
+                          "relations_without": relations - rel_covered}
         return out
 
     def run_passage_stats(self) -> dict[str, dict[str, int]]:

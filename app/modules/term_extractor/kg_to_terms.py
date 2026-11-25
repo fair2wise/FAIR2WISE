@@ -31,7 +31,8 @@ relations, or that nothing points at, cannot be a stub and is kept as a term.
 
 Edges: ``rel:X`` -> relation ``X``; ``related_term`` is the object node's ``name`` (plus ``related_id``
 when ``make_id(name)`` would not land on the object id); ``raw_predicate`` is kept; ``has_evidence`` is split
-on ``"; "`` into ``evidence``. Synthesised ``rel:has_code_snippet`` edges (no evidence, no
+on ``"; "`` into ``evidence`` unless the edge carries a structured ``evidence`` list (mappings ``{text, source_paper, page,
+kind, verified}``), which is read first and kept as it is. Synthesised ``rel:has_code_snippet`` edges (no evidence, no
 ``raw_predicate``) are not reversed: ``build_graph`` rewires them from papers and pages. One that carries
 evidence is a real relation (beamline KGs) and is kept, with ``related_id`` pointing at the snippet node.
 Edges whose subject is a snippet are skipped.
@@ -596,9 +597,13 @@ def _attach_relations(
             bare_predicates += 1
         if edge.get("raw_predicate"):
             relation["raw_predicate"] = edge["raw_predicate"]
-        evidence = _split_evidence(edge.get("has_evidence"))
-        if evidence:
-            relation["evidence"] = evidence
+        structured = edge.get("evidence")
+        if isinstance(structured, list) and any(isinstance(item, dict) for item in structured):
+            relation["evidence"] = [dict(item) if isinstance(item, dict) else str(item) for item in structured]   # read first
+        else:
+            evidence = _split_evidence(edge.get("has_evidence"))
+            if evidence:
+                relation["evidence"] = evidence
         subject_prefix = prefixes.get(subject, default_prefix)
         if json2kg.make_id(related_term, prefix=subject_prefix) != obj:
             hint = _id_hint(obj, subject_prefix, curie_first=True)
@@ -608,7 +613,7 @@ def _attach_relations(
                 relation["related_id"] = hint[0]
                 if hint[1]:
                     relation["related_id_prefix"] = hint[1]
-        extras = set(edge) - {"subject", "predicate", "object", "has_evidence", "raw_predicate"}
+        extras = set(edge) - {"subject", "predicate", "object", "has_evidence", "evidence", "raw_predicate"}
         if extras:
             extra_edge_keys += 1
         terms[subject]["relations"].append(relation)
@@ -629,7 +634,7 @@ def _attach_relations(
             raise KgToTermsError(message + " (use lossy=True to convert them anyway)")
         warnings.append(message)
     if extra_edge_keys:
-        warnings.append(f"{extra_edge_keys} edges carry keys other than subject/predicate/object/has_evidence/raw_predicate: not kept")
+        warnings.append(f"{extra_edge_keys} edges carry keys other than subject/predicate/object/has_evidence/evidence/raw_predicate: not kept")
     return targets
 
 

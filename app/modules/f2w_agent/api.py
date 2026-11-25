@@ -1223,6 +1223,74 @@ def _attach_evidence_snippets(publications: list[dict[str, Any]], raw: dict[str,
     return publications
 
 
+def _evidence_items(edge: dict[str, Any]) -> list[dict[str, Any]]:
+    """The evidence of one stored edge as ``[{text, page?, kind}]``: its structured ``evidence`` list, else ``has_evidence``.
+
+    A string from an older file (``has_evidence`` split on ``"; "``) has no page and the kind ``unknown``. Empty and repeated
+    sentences are skipped. Nothing is invented.
+    """
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    structured = edge.get("evidence")
+    sources: list[Any] = list(structured) if isinstance(structured, list) and structured else \
+        [part for part in str(edge.get("has_evidence") or "").split("; ")]
+    for item in sources:
+        text = str((item.get("text") if isinstance(item, dict) else item) or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        entry: dict[str, Any] = {"text": text, "kind": "unknown"}
+        if isinstance(item, dict):
+            page = item.get("page")
+            if isinstance(page, int) and not isinstance(page, bool) and page >= 0:
+                entry["page"] = page
+            if item.get("kind") in ("located", "quoted"):
+                entry["kind"] = item["kind"]
+            if isinstance(item.get("source_paper"), str) and item["source_paper"]:
+                entry["source_paper"] = item["source_paper"]
+        items.append(entry)
+    return items
+
+
+def _with_relationship_evidence(extra: dict[str, Any], graph_data: dict[str, Any] | None, node_id: str,
+                                include_evidence: bool) -> dict[str, Any]:
+    """Add ``relationship_evidence`` to a single-node record's ``extra_fields`` (an untyped key; the wire model is unchanged)."""
+    if include_evidence and graph_data is not None:
+        found = _relationship_evidence(graph_data, node_id)
+        if found:
+            extra["relationship_evidence"] = found
+    return extra
+
+
+def _relationship_evidence(graph_data: dict[str, Any], node_id: str) -> list[dict[str, Any]]:
+    """Per relationship of a node: ``{source, predicate, target, evidence_count, evidence}`` for the edges with evidence.
+
+    ``evidence_count`` is the number stored; ``evidence`` is bounded like the node's passages (at most
+    ``EVIDENCE_SNIPPETS_PER_PAPER`` per relationship, ``EVIDENCE_SNIPPET_MAX_CHARS`` characters each and
+    ``EVIDENCE_NODE_MAX_SNIPPETS`` per node). The disclosure layer drops the text unless the deployment opts in.
+    """
+    _, edges = _kg_raw_parts(graph_data)
+    out: list[dict[str, Any]] = []
+    kept = 0
+    for edge in edges if isinstance(edges, list) else []:
+        if not isinstance(edge, dict) or node_id not in (edge.get("subject"), edge.get("object")):
+            continue
+        items = _evidence_items(edge)
+        if not items:
+            continue
+        shown: list[dict[str, Any]] = []
+        for item in items:
+            if len(shown) >= EVIDENCE_SNIPPETS_PER_PAPER or kept >= EVIDENCE_NODE_MAX_SNIPPETS:
+                break
+            text = item["text"]
+            shown.append({**item, "text": text if len(text) <= EVIDENCE_SNIPPET_MAX_CHARS
+                          else text[:EVIDENCE_SNIPPET_MAX_CHARS - 1].rstrip() + "\u2026"})
+            kept += 1
+        out.append({"source": _string_value(edge.get("subject")), "predicate": _string_value(edge.get("predicate")),
+                    "target": _string_value(edge.get("object")), "evidence_count": len(items), "evidence": shown})
+    return out
+
+
 def _is_code_snippet_raw(raw: dict[str, Any]) -> bool:
     """Return True if a raw node looks like a code-snippet entity."""
     category = _string_value(raw.get("category") or raw.get("type")).lower()
@@ -1332,7 +1400,7 @@ def _graph_node_from_raw(
         formula=formula,
         source_papers=_source_paper_list(raw),
         properties=_property_entries(raw),
-        extra_fields=_node_extra_fields(raw),
+        extra_fields=_with_relationship_evidence(_node_extra_fields(raw), graph_data, node_id, include_evidence),
         repository_license=_string_value(raw.get("repository_license")) or None,
         **provenance,
     )
@@ -7518,6 +7586,10 @@ def create_app(
                                     graph_data=graph.data if detail else None, include_evidence=detail)
         node.graph_id = node.graph_id or graph.graph_id
         node.graph_label = node.graph_label or graph.graph_label
+        if detail and graph.evidence_edges:
+            found = _relationship_evidence({"edges": list(graph.evidence_edges)}, node.id)
+            if found:
+                node.extra_fields["relationship_evidence"] = found
         if detail and graph.passage_papers is not None:
             # A paper of an extracted KG with no passages and no coverage entry in the bundle manifest was extracted
             # before supporting text was recorded: say so on that paper (the card reads it). A key of the untyped

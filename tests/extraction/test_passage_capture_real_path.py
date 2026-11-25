@@ -114,7 +114,11 @@ def test_every_term_registered_with_a_context_has_its_passage_in_terms_json(real
     assert located["kind"] == "located" and located["verified"] is True and located["page"] == 1
     assert located["text"].startswith("A voxel grid divides") and located["text"].endswith("below and on simulated scenes.")
     # Coverage counters (design d): this run, per paper, and persisted in the terms file's metadata.
-    expected = {"terms": 4, "with_passage": 3, "quoted": 2, "located": 1, "rejected": 0, "uncovered": 1}
+    expected = {"terms": 4, "with_passage": 3, "quoted": 2, "located": 1, "rejected": 0, "uncovered": 1, "relations": 1,
+                "relations_with_evidence": 1, "evidence_sentences": 1, "relations_without": 0}
     assert orch.passage_summary() == {"total": expected, "papers": {"clouds.pdf": expected}}
     assert json.loads(terms_path.read_text(encoding="utf-8"))["metadata"]["passages"] == {"clouds.pdf": expected}
     assert terms["ray tracing"]["relations"][0]["related_term"] == "voxel grid"
+    (evidence,) = terms["ray tracing"]["relations"][0]["evidence"]       # located: a sentence naming both ends (no model)
+    assert evidence["kind"] == "located" and evidence["verified"] is True and evidence["page"] == 1
+    assert evidence["text"].startswith("Ray tracing follows each photon through the voxel grid")

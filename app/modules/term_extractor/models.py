@@ -12,6 +12,47 @@ import dataclasses
 from dataclasses import dataclass, field
 from typing import Any
 
+#: ``kind`` of a relation evidence entry that was a bare string in an older file: nothing is known about its paper, page or
+#: how it was found. Entries written by this version are mappings with ``kind: "located"`` and ``verified: true``.
+EVIDENCE_KIND_UNKNOWN = "unknown"
+EVIDENCE_KIND_LOCATED = "located"
+
+
+def evidence_entry(item: Any) -> dict[str, Any]:  # noqa: ANN401  # Any: a string (old file) or a mapping (this version)
+    """The mapping form of one evidence entry: a string becomes ``{text, kind: "unknown"}``, a mapping is copied."""
+    if isinstance(item, dict):
+        return dict(item)
+    return {"text": str(item), "kind": EVIDENCE_KIND_UNKNOWN}
+
+
+def evidence_key(item: Any) -> tuple[Any, ...]:  # noqa: ANN401  # Any: a string or a mapping
+    """Union key of an evidence entry: (source paper, page, text); a string has no paper or page."""
+    entry = evidence_entry(item)
+    return (entry.get("source_paper"), entry.get("page"), str(entry.get("text", "")))
+
+
+def union_evidence(existing: list[Any], incoming: Any) -> bool:  # noqa: ANN401  # Any: an iterable of entries
+    """Append the ``incoming`` entries whose (paper, page, text) is not in ``existing``; returns whether it changed.
+
+    Nothing is replaced or reordered. A string is also dropped when a mapping with the same text is already there.
+    """
+    seen = {evidence_key(item) for item in existing}
+    texts = {evidence_entry(item)["text"] for item in existing if isinstance(item, dict)}
+    changed = False
+    for item in incoming:
+        key = evidence_key(item)
+        if key in seen or (isinstance(item, str) and item in texts):
+            continue
+        seen.add(key)
+        existing.append(item)
+        changed = True
+    return changed
+
+
+def evidence_texts(evidence: list[Any]) -> list[str]:
+    """The sentences of an evidence list, in order (string entries as they are)."""
+    return [str(evidence_entry(item)["text"]) for item in evidence]
+
 
 @dataclass
 class RelationRecord:
@@ -22,7 +63,9 @@ class RelationRecord:
         related_term: Name of the target term.
         verified: Whether the relation has been manually verified.
         raw_predicate: Original predicate text before normalisation, if any.
-        evidence: Evidence strings for the relation (joined with ``"; "`` on the KG edge).
+        evidence: Evidence for the relation: strings (older files; joined with ``"; "`` on the KG edge) or mappings
+            ``{text, source_paper, page, kind, verified}`` (a sentence naming both endpoints, found in the paper; the KG edge
+            carries them as ``evidence`` and the best one's text as ``has_evidence``). Files without evidence keep their shape.
         related_id: Explicit target node id, only when it cannot be derived from ``related_term``.
         related_id_prefix: Id prefix for ``related_id`` when it differs from the subject term's prefix.
     """
@@ -31,7 +74,7 @@ class RelationRecord:
     related_term: str
     verified: bool = False
     raw_predicate: str | None = None
-    evidence: list[str] = field(default_factory=list)
+    evidence: list[Any] = field(default_factory=list)
     related_id: str | None = None
     related_id_prefix: str | None = None
 
@@ -39,13 +82,13 @@ class RelationRecord:
     def from_dict(cls, d: dict[str, Any]) -> RelationRecord:
         """Construct from a plain dict, defaulting ``verified`` to ``False``.
 
-        ``evidence`` may be a list of strings or a single string; ``related_id`` is optional.
+        ``evidence`` may be a list of strings and mappings or a single string (older files); ``related_id`` is optional.
         """
         raw_evidence = d.get("evidence")
         if raw_evidence is None:
-            evidence: list[str] = []
+            evidence: list[Any] = []
         elif isinstance(raw_evidence, list):
-            evidence = [str(item) for item in raw_evidence]
+            evidence = [dict(item) if isinstance(item, dict) else str(item) for item in raw_evidence]
         else:
             evidence = [str(raw_evidence)]
         return cls(

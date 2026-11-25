@@ -11,7 +11,7 @@ from langchain_core.tools import BaseTool, tool
 
 from . import passages
 from .merge_index import TermMergeIndex, build_merge_prompt, clean_term
-from .models import ContextSnippet, RelationRecord, TermRecord
+from .models import ContextSnippet, RelationRecord, TermRecord, union_evidence
 from .schema import SchemaHelper
 from .services import Services
 from .store import TermStore
@@ -102,6 +102,25 @@ class ToolState:
         if result.rejected:
             logger.info("ground: sentence for '%s' not found in %s; rejected", term, source_paper)
         return snippet
+
+    def attach_relation_evidence(self, term: str, relations: list[RelationRecord], source_paper: str | None,
+                                 page: int | None) -> None:
+        """Locate, for each relation, the sentences of the paper that name both endpoints and set them as its evidence.
+
+        Located only, no model: a sentence naming just one endpoint is never evidence, and the term's own context sentence
+        is used only when it names both (design: relationship evidence). The outcome is counted per paper.
+        """
+        if not source_paper or not relations:
+            return
+        pages = self.paper_pages[1] if self.paper_pages and self.paper_pages[0] == source_paper else None
+        subject_key = TermStore.normalize(term)
+        for relation in relations:
+            entries = passages.relation_evidence_for(
+                subject=term, obj=relation.related_term, source_paper=source_paper, page=page,
+                page_text=self.page_text(), paper_pages=pages)
+            union_evidence(relation.evidence, entries)
+            self.store.note_relation(
+                source_paper, f"{subject_key}|{relation.relation}|{TermStore.normalize(relation.related_term)}", len(entries))
 
     def page_context(self) -> tuple[str | None, int | None]:
         """Return ``(source_paper, page)`` for the current context.
@@ -316,13 +335,16 @@ def build_tools(state: ToolState) -> list[BaseTool]:
         # it is found; otherwise the term's mention is located; nothing found stores nothing and counts as uncovered.
         snippet = state.ground(key, fixed["term"], context, source_paper, page)
 
+        relation_records = [RelationRecord.from_dict(r) for r in fixed.get("relations", [])]
+        state.attach_relation_evidence(fixed["term"], relation_records, source_paper, page)
+
         record = TermRecord(
             term=fixed["term"],
             definition=fixed.get("definition", ""),
             category=fixed.get("category", "Thing"),
             raw_category=fixed.get("raw_category"),
             formula=fixed.get("formula"),
-            relations=[RelationRecord.from_dict(r) for r in fixed.get("relations", [])],
+            relations=relation_records,
             pages=[page] if page is not None else [],
             source_papers=[source_paper] if source_paper else [],
             context_snippets=[snippet] if snippet else [],

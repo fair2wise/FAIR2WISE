@@ -129,6 +129,36 @@ def _upgrade_located(existing: list[Any], incoming: Iterable[Any]) -> None:
                     item.pop("verified", None)
 
 
+def _edge_evidence(evidence: list[Any]) -> tuple[str | None, list[dict[str, Any]]]:
+    """``(has_evidence, evidence)`` of an edge from a relation's evidence list.
+
+    Strings (older files) give the ``"; "``-joined ``has_evidence`` exactly as before and no ``evidence`` list. When the list
+    holds mappings (``{text, source_paper, page, kind, verified}``) the edge carries them as ``evidence`` and
+    ``has_evidence`` is the text of the first (best) entry.
+    """
+    if not evidence:
+        return None, []
+    structured = [dict(item) for item in evidence if isinstance(item, dict) and str(item.get("text", "")).strip()]
+    if not structured:
+        return "; ".join(str(item) for item in evidence), []
+    return str(structured[0]["text"]), structured
+
+
+def _union_edge_evidence(edge: dict[str, Any], evidence: list[Any]) -> None:
+    """Union ``evidence`` into an existing ``edge`` by (paper, page, text) and refresh ``has_evidence``."""
+    from .term_extractor.models import union_evidence  # local: the term extractor imports this module's helpers
+
+    held: list[Any] = list(edge.get("evidence") or [])
+    if not held and edge.get("has_evidence"):
+        held = str(edge["has_evidence"]).split("; ")
+    if not union_evidence(held, evidence):
+        return
+    has_evidence, structured = _edge_evidence(held)
+    edge["has_evidence"] = has_evidence
+    if structured:
+        edge["evidence"] = structured
+
+
 def merge_term_into_node(term: dict[str, Any], node: dict[str, Any]) -> None:
     """Carry what another record of the same term adds into the node that already exists (nothing is overwritten).
 
@@ -349,6 +379,7 @@ def build_graph(
     nodes: dict[str, dict[str, Any]] = {}
     edges: list[dict[str, Any]] = []
     seen: set[tuple[str, str, str]] = set()
+    edge_by_sig: dict[tuple[str, str, str], dict[str, Any]] = {}
 
     # Add CodeSnippet nodes from code snippet extraction
     # Track snippet nodes by (source_paper, page) for wiring to term nodes later
@@ -474,19 +505,24 @@ def build_graph(
             pred = f"rel:{rel.get('relation', 'RELATED_TO')}"
             sig = (tid, pred, rid)
             if sig in seen:
+                if merge_existing and sig in edge_by_sig:   # a repeated edge keeps the union of the evidence, not the first's
+                    _union_edge_evidence(edge_by_sig[sig], ensure_list(rel.get("evidence")))
                 continue
             seen.add(sig)
 
-            evidence = ensure_list(rel.get("evidence"))
-            edge = {
+            has_evidence, structured = _edge_evidence(ensure_list(rel.get("evidence")))
+            edge: dict[str, Any] = {
                 "subject": tid,
                 "predicate": pred,
                 "object": rid,
-                "has_evidence": "; ".join(evidence) if evidence else None,
+                "has_evidence": has_evidence,
             }
+            if structured:
+                edge["evidence"] = structured
             if rel.get("raw_predicate") or rel.get("raw_relation"):
                 edge["raw_predicate"] = rel.get("raw_predicate") or rel.get("raw_relation")
             edges.append(edge)
+            edge_by_sig[sig] = edge
 
     # Wire has_code_snippet edges: any term node from same paper gets linked
     # to CodeSnippet nodes from that paper. Prefer same-page match, fall back
