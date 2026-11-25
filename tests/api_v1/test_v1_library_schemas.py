@@ -222,3 +222,17 @@ def test_preview_route_refuses_an_invalid_schema_with_the_report_and_validates_f
                  headers={"content-type": "application/json"})
     assert big.json()["reason"] == "body_too_large"
     assert not local.app.state.f2w_kg_library.store.root.exists()
+
+
+def test_the_cancel_route_stops_a_generation_by_request_id(local, tmp_path):
+    c = local.client()
+    _install(local, tmp_path, [GOOD])
+    c.post(f"{BASE}/generate/cancel", json={"request_id": "abc-123"})
+    cancelled = c.post(f"{BASE}/generate", json={"description": "armoured catfish", "model": "lbl/cborg-chat", "request_id": "abc-123"})
+    assert cancelled.status_code == 409 and cancelled.json()["reason"] == "cancelled"
+    assert c.post(f"{BASE}/generate/cancel", json={}).status_code == 422
+    assert c.post(f"{BASE}/generate/cancel", json={"request_id": "bad id!"}).status_code == 422
+    assert c.post(f"{BASE}/generate", json={"description": "x", "model": "m", "request_id": "x" * 65}).status_code == 422
+    ok = c.post(f"{BASE}/generate", json={"description": "armoured catfish", "model": "lbl/cborg-chat", "request_id": "abc-123"})
+    assert ok.status_code == 200 and ok.json()["ok"] is True   # the id was forgotten with the cancelled request
+    assert not local.app.state.f2w_kg_library.user_schemas.root.exists()

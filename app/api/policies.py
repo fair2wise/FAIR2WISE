@@ -241,6 +241,8 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
     _v("V96", "POST", "/library/schemas/generate", "library.author_schema", on_als=False,
        note="draft a schema from {description (<=2000 chars), backend?, model?} with free CBORG or Ollama (label "
             "schema-generate; 180 s deadline, 64 KiB reply cap); validated, repaired at most twice, every attempt returned"),
+    _v("V101", "POST", "/library/schemas/generate/cancel", "library.author_schema", on_als=False,
+       note="stop a running schema generation by request_id: no further model call after the one in flight; nothing stored"),
     _v("V97", "POST", "/library/schemas/preview", "library.author_schema", on_als=False,
        note="try {schema (text or user id), paper_id, model?} on one library paper: without confirm only the estimate and "
             "token; with confirm at most 3 pages, one model call per page, 120 s overall; free CBORG or Ollama; nothing stored"),

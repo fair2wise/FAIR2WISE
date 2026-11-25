@@ -291,6 +291,13 @@ export interface GenerateRequest {
   description: string;
   backend?: 'cborg' | 'ollama';
   model?: string;
+  /** Names the request so `cancelGenerate` can stop it on the server (letters, digits, `_`, `-`; at most 64). */
+  request_id?: string;
+}
+
+/** V101: stop a running generation on the server (no further model call after the one in flight). Fire and forget. */
+export function cancelGenerate(requestId: string, fetcher: typeof fetch = fetch): Promise<void> {
+  return postWithReport<unknown>(`${SCHEMAS_PATH}/generate/cancel`, { request_id: requestId }, fetcher).then(() => undefined);
 }
 
 /** V96: ask the model for a draft (can take minutes). */

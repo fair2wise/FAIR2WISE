@@ -39,3 +39,14 @@ run 45713088709). Model calls used so far: **0 of the 400 allowed**.
   - Decision taken: no OCR pass for scanned pages (it would need the Docling OCR models in the image and that was not checked);
     the count is reported instead.
   - Decision taken: relation evidence over table rows is not built; the relation rules are unchanged.
+- **Tier 1 B (in progress at this entry): passages plan leftovers.** The deterministic suite test with the 90/50/80 thresholds
+  (`tests/extraction/test_passage_suite_thresholds.py`); the recovery job's searched-and-empty record (`recovery_state.json`
+  per bundle, keyed by the paper's sha256 and the rules' revision, `searches_skipped` reported; `RECOVERY_REVISION` bumped to 2
+  so pairs the old rules found empty are searched again under the new ones); the design page statuses. The per-paper note for
+  continued KGs needs no code: the fork copies the parent's `passages` block, so the note appears only for a paper with no
+  coverage entry (covered by the existing route test). The live 200 KB Tiled write and the `read_state` timing run locally once
+  the gate is idle (script `tiled_big_property.py` in the session scratchpad; numbers below when done).
+  - Decision taken: "80" in the owner's 90/50/80 is read as the share of stored passages that are the model's quoted sentence
+    verified in the paper (the rest located); the test also requires every stored passage to be found in the page it names.
+- **Tier 1 C (in progress at this entry):** the Harvester's "Schema (label only)" is now "Schema to record with the run" with
+  help text that says what it does next to "Create or edit a schema".

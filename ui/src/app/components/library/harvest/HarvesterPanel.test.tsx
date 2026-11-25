@@ -85,7 +85,7 @@ describe('HarvesterPanel form', () => {
     expect(screen.getByRole('checkbox', { name: 'arXiv' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'OpenAlex' })).toBeChecked();
     expect(screen.getByLabelText('Max downloads')).toHaveValue(20);
-    expect(screen.getByLabelText('Schema (label only)')).toHaveValue('');
+    expect(screen.getByLabelText('Schema to record with the run')).toHaveValue('');
     expect(calls.some(c => c.path === '/v1/jobs' && c.search.includes('state=running') && c.search.includes('kind=library_harvest'))).toBe(true);
   });
 
@@ -132,7 +132,7 @@ describe('HarvesterPanel form', () => {
     await user.selectOptions(screen.getByLabelText('Category'), 'New category…');
     await user.type(screen.getByLabelText('New category name'), 'xray');
     await waitFor(() => expect(screen.getByRole('option', { name: 'MatKG (0.3.1)' })).toBeInTheDocument());
-    await user.selectOptions(screen.getByLabelText('Schema (label only)'), 'matkg_schema@0.3.1');
+    await user.selectOptions(screen.getByLabelText('Schema to record with the run'), 'matkg_schema@0.3.1');
     await user.click(screen.getByRole('checkbox', { name: 'OpenAlex' }));
     await user.clear(screen.getByLabelText('Max downloads'));
     await user.type(screen.getByLabelText('Max downloads'), '7');

@@ -2,7 +2,7 @@ import { Loader2, Send, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
-import { MAX_DESCRIPTION_CHARS, generateSchema, schemaErrorText, type GenerateResult } from './schemaApi';
+import { MAX_DESCRIPTION_CHARS, cancelGenerate, generateSchema, schemaErrorText, type GenerateResult } from './schemaApi';
 
 /** What the model picker chose (the extraction form's own choice list). */
 export interface ModelSelection {
@@ -25,6 +25,8 @@ export interface SchemaGenerateBoxProps {
  * offers (free models only; the server checks again). It shows progress, the draft's provenance and every attempt, and
  * says plainly that a draft is a draft: nothing is saved until the user accepts it.
  */
+const newRequestId = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+
 export function SchemaGenerateBox({ selection, onDraft, onPickAttempt }: SchemaGenerateBoxProps) {
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
@@ -32,6 +34,7 @@ export function SchemaGenerateBox({ selection, onDraft, onPickAttempt }: SchemaG
   const [result, setResult] = useState<GenerateResult | null>(null);
   const [seconds, setSeconds] = useState(0);
   const controller = useRef<AbortController | null>(null);
+  const requestId = useRef<string | null>(null);
 
   useEffect(() => {
     if (!busy) return undefined;
@@ -49,11 +52,13 @@ export function SchemaGenerateBox({ selection, onDraft, onPickAttempt }: SchemaG
     if (!selection || !canSend) return;
     const mine = new AbortController();
     controller.current = mine;
+    const id = newRequestId();
+    requestId.current = id;
     setBusy(true);
     setError(null);
     try {
       const out = await generateSchema(
-        { description: trimmed, model: selection.model, ...(selection.backend ? { backend: selection.backend } : {}) },
+        { description: trimmed, model: selection.model, ...(selection.backend ? { backend: selection.backend } : {}), request_id: id },
         mine.signal,
       );
       if (mine.signal.aborted) return;
@@ -70,8 +75,10 @@ export function SchemaGenerateBox({ selection, onDraft, onPickAttempt }: SchemaG
 
   function stop() {
     controller.current?.abort();
+    const id = requestId.current;
+    if (id) void cancelGenerate(id).catch(() => undefined);   // the server stops after the call in flight
     setBusy(false);
-    setError('Stopped. The server may still finish the call, but its answer is ignored.');
+    setError('Stopped. The server makes no further model call after the one in flight; its answer is ignored.');
   }
 
   return (

@@ -255,7 +255,7 @@ export function HarvesterPanel() {
           />
         ) : null}
         <div className="space-y-1">
-          <Label htmlFor={id('schema')}>Schema (label only)</Label>
+          <Label htmlFor={id('schema')}>Schema to record with the run</Label>
           <select
             id={id('schema')}
             value={schema}
@@ -278,7 +278,7 @@ export function HarvesterPanel() {
             )}
           </select>
           <p className="text-xs text-muted-foreground">
-            Recorded with the run so Extraction can default to it; it does not change the search.
+            Only a note on the run: the Extract page offers it as the default schema for these papers. It does not change the search.
           </p>
           <SchemaPanelButton onSaved={id => setSchema(id)} />
         </div>

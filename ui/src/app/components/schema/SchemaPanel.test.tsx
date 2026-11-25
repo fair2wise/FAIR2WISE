@@ -33,7 +33,7 @@ describe('generate', () => {
     await userEvent.type(screen.getByLabelText('What should the schema cover?'), 'armoured catfish');
     await userEvent.click(screen.getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(textarea().value).toContain('name: catfish'));
-    expect(post('/v1/library/schemas/generate')[0].body).toEqual({ description: 'armoured catfish', model: 'lbl/cborg-chat' });
+    expect(post('/v1/library/schemas/generate')[0].body).toMatchObject({ description: 'armoured catfish', model: 'lbl/cborg-chat' });
     expect(screen.getByTestId('generate-result')).toHaveTextContent('Draft by cborg / lbl/cborg-chat, 1 repair round');
     expect(screen.getByTestId('generate-result')).toHaveTextContent('It is not saved.');
     expect(screen.getByLabelText('Schema name')).toHaveValue('catfish');
@@ -48,7 +48,7 @@ describe('generate', () => {
     await userEvent.type(screen.getByLabelText('What should the schema cover?'), 'x');
     await userEvent.click(screen.getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(post('/v1/library/schemas/generate')).toHaveLength(1));
-    expect(post('/v1/library/schemas/generate')[0].body).toEqual({ description: 'x', model: 'llama3', backend: 'ollama' });
+    expect(post('/v1/library/schemas/generate')[0].body).toMatchObject({ description: 'x', model: 'llama3', backend: 'ollama' });
   });
 
   it.each([
@@ -105,6 +105,26 @@ describe('editing, validation and insert-core', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Insert required core' }));
     await waitFor(() => expect(textarea().value).toBe('with: core\n'));
     expect(post('/v1/library/schemas/insert-core')[0].body).toEqual({ text: 'a: 1\n' });
+  });
+});
+
+describe('stopping a generation', () => {
+  it('aborts the request and tells the server to stop by the same request id', async () => {
+    let release: (() => void) | null = null;
+    const hang = new Promise<void>(resolve => { release = resolve; });
+    routes['POST /v1/library/schemas/generate'] = (async () => { await hang; return { status: 200, body: generateFixture }; }) as never;
+    routes['POST /v1/library/schemas/generate/cancel'] = { status: 200, body: { cancelled: 'x' } };
+    mount();
+    await screen.findByRole('option', { name: 'm2' });
+    await userEvent.type(screen.getByLabelText('What should the schema cover?'), 'armoured catfish');
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Stop waiting' }));
+    await waitFor(() => expect(post('/v1/library/schemas/generate/cancel')).toHaveLength(1));
+    const started = post('/v1/library/schemas/generate')[0].body as { request_id?: string };
+    expect(typeof started.request_id).toBe('string');
+    expect(post('/v1/library/schemas/generate/cancel')[0].body).toEqual({ request_id: started.request_id });
+    expect(screen.getByRole('alert')).toHaveTextContent('no further model call after the one in flight');
+    release?.();
   });
 });
 

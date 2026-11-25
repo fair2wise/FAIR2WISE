@@ -14,6 +14,7 @@ from collections.abc import Callable, Mapping
 import logging
 import os
 import re
+import threading
 from typing import Any
 
 import requests
@@ -66,6 +67,9 @@ class SchemaGenerator:
         deadline: ``(call, seconds) -> result`` raising ``TimeoutError`` (default ``cborg_http.call_with_deadline``).
     """
 
+    #: Longest request id a caller may name (``[A-Za-z0-9_-]``).
+    REQUEST_ID_CHARS = 64
+
     def __init__(self, env: Mapping[str, str] | None = None, *, client_factory: ClientFactory | None = None,
                  schema_paths: tuple[str, ...] | None = None,
                  deadline: Callable[[Callable[[], str], float], str] | None = None) -> None:
@@ -73,6 +77,8 @@ class SchemaGenerator:
         self.client_factory = client_factory or _default_factory
         self._schema_paths = schema_paths
         self._deadline = deadline
+        self._cancelled: set[str] = set()
+        self._cancel_lock = threading.Lock()
         self._view_cache: dict[int, str] = {}
 
     # ------------------------------------------------------------------ prompt
@@ -148,8 +154,31 @@ class SchemaGenerator:
                                 "and was discarded", retryable=True, reason="response_too_large")
         return strip_fences(reply)
 
+    # ------------------------------------------------------------------ cancel
+    def cancel(self, request_id: str) -> None:
+        """Ask the generation named ``request_id`` to stop: no further model call is made after the one in flight.
+
+        The call in flight is bounded by its own deadline and its answer is validated and returned as the last attempt, so
+        nothing is lost; a cancel before the first answer ends the request with a typed refusal. An unknown id is remembered
+        too (the cancel may arrive before the generate request is read).
+        """
+        with self._cancel_lock:
+            self._cancelled.add(str(request_id))
+
+    def _take_cancel(self, request_id: str | None) -> bool:
+        if not request_id:
+            return False
+        with self._cancel_lock:
+            return str(request_id) in self._cancelled
+
+    def _forget_cancel(self, request_id: str | None) -> None:
+        if request_id:
+            with self._cancel_lock:
+                self._cancelled.discard(str(request_id))
+
     # ------------------------------------------------------------------ the loop
-    def generate(self, description: str, *, backend: str | None = None, model: str | None = None) -> dict[str, Any]:
+    def generate(self, description: str, *, backend: str | None = None, model: str | None = None,
+                 request_id: str | None = None) -> dict[str, Any]:
         """Draft, validate and repair; every attempt is returned.
 
         Returns:
@@ -157,10 +186,13 @@ class SchemaGenerator:
             ``report`` are the last attempt's, ``ok`` is its validity and ``stopped`` is ``None`` or the reason a repair
             round could not run.
 
+        ``request_id`` names the request for :meth:`cancel`; ``stopped`` is ``"cancelled"`` when a cancel arrived between rounds.
+
         Raises:
             ContractError: ``INVALID_INPUT`` for a bad description, ``DENIED`` (``model_not_free``) for a paid CBORG model,
                 ``UNSUPPORTED_CAPABILITY`` when the backend is not configured, ``UNAVAILABLE`` when the model cannot be
-                reached or answers too much (before any draft exists).
+                reached or answers too much (before any draft exists), ``CONFLICT`` ``cancelled`` when the request was
+                cancelled before its first answer.
         """
         if not isinstance(description, str) or not description.strip():
             raise ContractError(ErrorCode.INVALID_INPUT, "describe the domain first", retryable=False)
@@ -172,19 +204,30 @@ class SchemaGenerator:
         attempts: list[dict[str, Any]] = []
         prompt = self.first_prompt(description, chosen_backend["name"])
         stopped: str | None = None
-        for round_no in range(MAX_REPAIRS + 1):
-            try:
-                text = self._clean(self.complete(chosen_backend, chosen_model, prompt))
-            except ContractError as exc:
-                if not attempts:
-                    raise
-                stopped = str(exc)  # a repair round failed: keep what was already shown
-                break
-            report: Report = validate_schema_text(text)
-            attempts.append({"round": round_no, "text": text, "report": report.as_dict()})
-            if report.ok or round_no == MAX_REPAIRS:
-                break
-            prompt = SP.repair_prompt(description, text, report.problems)
+        try:
+            for round_no in range(MAX_REPAIRS + 1):
+                if self._take_cancel(request_id):
+                    if not attempts:
+                        raise ContractError(ErrorCode.CONFLICT, "schema generation was cancelled", retryable=False, reason="cancelled")
+                    stopped = "cancelled"
+                    break
+                try:
+                    text = self._clean(self.complete(chosen_backend, chosen_model, prompt))
+                except ContractError as exc:
+                    if not attempts:
+                        raise
+                    stopped = str(exc)  # a repair round failed: keep what was already shown
+                    break
+                report: Report = validate_schema_text(text)
+                attempts.append({"round": round_no, "text": text, "report": report.as_dict()})
+                if report.ok or round_no == MAX_REPAIRS:
+                    break
+                if self._take_cancel(request_id):
+                    stopped = "cancelled"
+                    break
+                prompt = SP.repair_prompt(description, text, report.problems)
+        finally:
+            self._forget_cancel(request_id)
         last = attempts[-1]
         return {"ok": bool(last["report"]["ok"]), "text": last["text"], "report": last["report"], "attempts": attempts,
                 "repairs": len(attempts) - 1, "model": chosen_model, "backend": chosen_backend["name"], "stopped": stopped}

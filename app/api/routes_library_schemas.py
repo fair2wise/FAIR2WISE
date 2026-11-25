@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import json
+import re
 from typing import Any
 
 from fastapi import Depends, FastAPI, Query, Request
@@ -73,6 +74,19 @@ def text_field(body: dict[str, Any], key: str, *, limit: int, required: bool = T
     if len(value) > limit:
         raise ContractError(ErrorCode.INVALID_INPUT, f"{key} is longer than {limit} characters", retryable=False)
     return value
+
+
+_REQUEST_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def _request_id(body: Mapping[str, Any]) -> str | None:
+    """The optional ``request_id`` of a generate or cancel body (letters, digits, ``_`` and ``-``, at most 64)."""
+    raw = body.get("request_id")
+    if raw is None:
+        return None
+    if not isinstance(raw, str) or not _REQUEST_ID.match(raw):
+        raise ContractError(ErrorCode.INVALID_INPUT, "request_id must be 1-64 letters, digits, _ or -", retryable=False)
+    return raw
 
 
 def user_store(request: Request) -> UserSchemaStore:
@@ -160,8 +174,19 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> FastAPI:
         if backend is not None and backend not in ("cborg", "ollama"):
             raise ContractError(ErrorCode.INVALID_INPUT, "backend must be cborg or ollama", retryable=False)
         model = text_field(body, "model", limit=200, required=False)
+        request_id = _request_id(body)
         generator = schema_generator(request)
-        return await run_in_threadpool(lambda: generator.generate(description, backend=backend, model=model))
+        return await run_in_threadpool(lambda: generator.generate(description, backend=backend, model=model, request_id=request_id))
+
+    @router.post("/schemas/generate/cancel")
+    async def cancel_generate(request: Request, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
+        """Stop the generation named ``request_id``: no further model call after the one in flight; nothing is stored."""
+        body = await read_json_body(request, limit=4096)
+        request_id = _request_id(body)
+        if not request_id:
+            raise ContractError(ErrorCode.INVALID_INPUT, "request_id is required", retryable=False)
+        schema_generator(request).cancel(request_id)
+        return {"cancelled": request_id}
 
     @router.post("/schemas/preview")
     async def preview(request: Request, ctx: RequestContext = Depends(context)) -> Any:  # noqa: ANN401  # Any: JSON body or a typed 422 response

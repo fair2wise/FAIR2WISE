@@ -280,7 +280,7 @@ def test_cborg_client_passes_system_and_max_tokens_only_when_given(monkeypatch):
 def test_the_label_is_in_the_closed_set_and_recorded_with_the_real_client(monkeypatch, small_schema):
     from app.modules.term_extractor import clients
 
-    assert "schema-generate" in LLM_LABELS and llm_label("schema-generate") == "schema-generate" and len(LLM_LABELS) == 22
+    assert "schema-generate" in LLM_LABELS and llm_label("schema-generate") == "schema-generate" and len(LLM_LABELS) == 23
     recorded: list[dict[str, Any]] = []
     monkeypatch.setattr(clients, "record_llm_call", lambda **kw: recorded.append(kw))
 
@@ -293,3 +293,37 @@ def test_the_label_is_in_the_closed_set_and_recorded_with_the_real_client(monkey
     out = G.SchemaGenerator(OLLAMA_ENV, schema_paths=small_schema).generate("x", backend="ollama", model="llama3")
     assert out["ok"] and recorded[0]["label"] == "schema-generate" and recorded[0]["provider"] == "ollama"
     assert recorded[0]["messages"][0]["role"] == "system"
+
+
+def test_a_cancel_between_rounds_stops_the_repair_loop_and_a_cancel_before_the_first_answer_refuses(small_schema):
+    fake = Fake([BAD, BAD, GOOD])
+    generator = gen(fake, small_schema)
+
+    class CancelAfterFirst:
+        def __init__(self) -> None:
+            self.inner, self.n = fake, 0
+
+        def factory(self, **kwargs: Any) -> "CancelAfterFirst":
+            return self
+
+        def chat(self, prompt: str, **kw: Any) -> str:
+            self.n += 1
+            if self.n == 1:
+                generator.cancel("req-1")          # arrives while the first call is in flight
+            return self.inner.chat(prompt, **kw)
+
+    generator = G.SchemaGenerator(ENV, client_factory=CancelAfterFirst().factory, schema_paths=small_schema)
+    out = generator.generate("catfish", model="lbl/cborg-chat", request_id="req-1")
+    assert out["stopped"] == "cancelled" and len(out["attempts"]) == 1 and out["ok"] is False   # the answer in flight is kept
+    assert len(fake.calls) == 1
+    # The id is forgotten after the request: the next request under the same id runs.
+    out2 = generator.generate("catfish", model="lbl/cborg-chat", request_id="req-1")
+    assert out2["stopped"] is None and len(out2["attempts"]) == 2 and out2["ok"] is True
+    # Cancelled before the first answer: a typed refusal, no model call.
+    early = gen(Fake([GOOD]), small_schema)
+    early.cancel("req-2")
+    with pytest.raises(ContractError) as refused:
+        early.generate("catfish", model="lbl/cborg-chat", request_id="req-2")
+    assert refused.value.code is ErrorCode.CONFLICT and refused.value.reason == "cancelled"
+    # No id: nothing to cancel, the loop runs as before.
+    assert gen(Fake([GOOD]), small_schema).generate("catfish", model="lbl/cborg-chat")["ok"] is True

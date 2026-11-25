@@ -40,7 +40,7 @@ The server never rewrites a text: the stored file is byte for byte what was vali
 
 `library.author_schema` is a new member of `LOCAL_ONLY_CAPABILITIES` (`app/modules/contracts/context.py`), next to `library.read`, `library.upload`, `library.index`, `library.extract` and `library.harvest`. The local operator holds every library capability, so it is granted on `:local`. No ALS principal holds it, admin or not (`capabilities_for` never grants a local-only capability, and `RequestContext` refuses it in `tiled_authenticated` mode), so the ALS profiles do not have it by default. The routes are also `on_als=False`: ALS answers 404. Pins: `tests/library/test_library_jobs.py` (the closed set), `tests/api_v1/test_v1_local.py` (82 routes), `tests/api_v1/test_v1_als.py` (32 local-only routes), `tests/api_v1/test_v1_library_schemas.py`.
 
-## Routes (policies V89 to V94 and V96 to V98, `:local` only)
+## Routes (policies V89 to V94, V96 to V98 and V101, `:local` only)
 
 | Id | Route | Capability |
 |---|---|---|
@@ -52,6 +52,7 @@ The server never rewrites a text: the stored file is byte for byte what was vali
 | V94 | `GET /v1/library/schemas/user/{name}/diff?from=&to=` | `library.read` |
 | V98 | `DELETE /v1/library/schemas/user/{name}@vN` (409 `schema_in_use` while a KG uses it) | `library.author_schema` |
 | V96 | `POST /v1/library/schemas/generate` `{description, backend?, model?}` | `library.author_schema` |
+| V101 | `POST /v1/library/schemas/generate/cancel` `{request_id}`: stop a generation on the server (no further model call after the one in flight) | `library.author_schema` |
 | V97 | `POST /v1/library/schemas/preview` `{schema, paper_id, model?, backend?, confirm?, confirmation?}` | `library.author_schema` |
 
 Request bodies are capped before they are parsed (256 KiB plus overhead for schema text, 16 KiB for the generate body). Schema text is returned verbatim, not clipped by the 600-character body projector. Details per route are in `docs/migration/api/README.md`.
