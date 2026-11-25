@@ -28,6 +28,8 @@ MAX_FAILED_LISTED = 50
 #: Job input parameters shown in a summary (a fixed allowlist: ``confirmation`` and anything else stay out).
 _SHOWN_PARAMS = ("bundle", "model", "backend", "schema", "topic")
 #: Counters of the stage that are KG growth (shown under ``growth``, not under ``counters``).
+#: Stage counters that report a condensed schema prompt (shown as ``schema_prompt_condensed``, not under ``counters``).
+SCHEMA_PROMPT_KEYS = ("schema_prompt_full_chars", "schema_prompt_used_chars", "schema_prompt_budget")
 GROWTH_KEYS = ("entities_new", "entities_merged", "relations_new", "relations_merged", "entities_total",
                "relations_total")
 
@@ -64,7 +66,8 @@ def run_summary(store: JobStore, job: JobRecord, *, detail: bool = True) -> dict
         A JSON-ready dict: ``outcome``, ``state``, ``started_at``, ``finished_at``, ``elapsed_seconds``, ``stage``
         (``name``, ``status``, ``phase``), ``current_paper`` (display name or ``None``; only while running),
         ``papers`` (``total``, ``done``, ``failed``, ``skipped`` and, with ``detail``, ``failed_list``), ``growth``,
-        ``counters`` (the stage's other counters), ``params`` (bundle, model, backend, schema, topic), ``error``
+        ``counters`` (the stage's other counters), ``schema_prompt_condensed`` (``{full_chars, used_chars, budget}`` when a user
+        schema's prompt text was condensed for this run, else ``None``), ``params`` (bundle, model, backend, schema, topic), ``error``
         (scrubbed) and ``logs`` (``kept``, ``total``, ``cap``).
     """
     stages = store.stages(job.job_id)
@@ -96,7 +99,11 @@ def run_summary(store: JobStore, job: JobRecord, *, detail: bool = True) -> dict
         "current_paper": (status or {}).get("item") or None,
         "papers": {"total": total, "done": done, "failed": failed, "skipped": int(progress.get("skipped", 0))},
         "growth": {key: int(progress[key]) for key in GROWTH_KEYS if key in progress},
-        "counters": {k: v for k, v in progress.items() if k not in GROWTH_KEYS},
+        "counters": {k: v for k, v in progress.items() if k not in GROWTH_KEYS and k not in SCHEMA_PROMPT_KEYS},
+        "schema_prompt_condensed": ({"full_chars": int(progress["schema_prompt_full_chars"]),
+                                     "used_chars": int(progress["schema_prompt_used_chars"]),
+                                     "budget": int(progress["schema_prompt_budget"])}
+                                    if all(k in progress for k in SCHEMA_PROMPT_KEYS) else None),
         "params": {key: params[key] for key in _SHOWN_PARAMS if isinstance(params.get(key), str) and params[key]},
         "error": scrub(error)[:400] or None,
         "logs": store.log_stats(job.job_id),

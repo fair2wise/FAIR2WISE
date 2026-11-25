@@ -50,6 +50,7 @@ from ..jobs.store import LeaseLost
 from .catalog import sha256_file
 from .kg_service import KgLibrary
 from .schemas import manifest_block
+from .schema_prompt import BUDGET_CBORG, BUDGET_OLLAMA
 from .user_schemas import is_user_schema_id
 
 if TYPE_CHECKING:
@@ -129,6 +130,10 @@ def require_backend(env: Mapping[str, str], requested: str | None = None, *, pur
 OrchestratorFactory = Callable[..., Any]
 
 
+#: Character budget of the schema text in an extraction prompt of a user schema, per backend (as in generation).
+PROMPT_BUDGETS = {"ollama": BUDGET_OLLAMA, "cborg": BUDGET_CBORG}
+
+
 def default_orchestrator_factory(*, model: str, output_file: str, schema_path: str, backend: Mapping[str, str],
                                  user_schema: bool = False) -> Any:  # noqa: ANN401  # Any: term_extractor Orchestrator (untyped donor class)
     """Build the real :class:`~app.modules.term_extractor.Orchestrator` (the only place a client is made).
@@ -145,6 +150,8 @@ def default_orchestrator_factory(*, model: str, output_file: str, schema_path: s
             kwargs[key] = backend[key]
     if user_schema:
         kwargs["sanitize_schema_descriptions"] = True
+        # The same budgets as schema generation; a shipped schema is never bounded (it renders byte for byte as before).
+        kwargs["schema_prompt_budget"] = PROMPT_BUDGETS.get(backend["name"], PROMPT_BUDGETS["cborg"])
     return Orchestrator(model=model, output_file=output_file, schema_path=schema_path, **kwargs)
 
 
@@ -472,6 +479,17 @@ class LibraryExtractor:
         extra: dict[str, Any] = {"user_schema": True} if is_user_schema_id(schema_block.get("id")) else {}
         orch = self.factory(model=model, output_file=str(terms_path), schema_path=schema_path, backend=backend, **extra)
 
+        condensed = getattr(orch, "schema_prompt_condensed", None)
+        condensed = condensed() if callable(condensed) else None
+        if isinstance(condensed, Mapping):  # a user schema longer than the budget: say so before the first page
+            ctx.progress(schema_prompt_full_chars=int(condensed["full_chars"]), schema_prompt_used_chars=int(condensed["used_chars"]),
+                         schema_prompt_budget=int(condensed["budget"]))
+            ctx.log(f"warning: the schema prompt is condensed ({condensed['full_chars']} characters in full, "
+                    f"{condensed['used_chars']} sent, budget {condensed['budget']}); the model sees class names, first "
+                    "sentences and relation domains only", "warning")
+        else:
+            condensed = None
+
         def lost() -> bool:
             """Whether this run no longer owns the job (lease lost, stop requested, shutdown): stop calling the LLM."""
             try:
@@ -567,7 +585,10 @@ class LibraryExtractor:
                 f"{bundle.name}, {len(result.incomplete)} failed")
         live.phase("finished", "")
         return StageResult(progress={**dict(result.progress), **counts, **live.growth(), "skipped": skipped,
-                                     "papers_in_bundle": finalized},
+                                     "papers_in_bundle": finalized,
+                                     **({"schema_prompt_full_chars": int(condensed["full_chars"]),
+                                         "schema_prompt_used_chars": int(condensed["used_chars"]),
+                                         "schema_prompt_budget": int(condensed["budget"])} if condensed else {})},
                            data={"bundle": bundle.name, "model": model, "failed": len(result.incomplete)},
                            incomplete=result.incomplete)
 

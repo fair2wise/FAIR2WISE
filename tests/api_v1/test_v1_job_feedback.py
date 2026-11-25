@@ -56,7 +56,7 @@ def test_progress_carries_the_additive_summary_and_list_detail(local):
     summary = progress["summary"]
     assert summary["outcome"] == summary["state"] and summary["papers"]["failed"] == 0
     assert set(summary) >= {"outcome", "state", "started_at", "elapsed_seconds", "stage", "current_paper", "papers",
-                            "growth", "counters", "params", "error", "logs"}
+                            "growth", "counters", "schema_prompt_condensed", "params", "error", "logs"}
     assert summary["logs"]["total"] >= 2
     plain = c.get("/v1/jobs").json()["jobs"]
     assert all("summary" not in row for row in plain)

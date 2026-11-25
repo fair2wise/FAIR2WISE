@@ -197,6 +197,7 @@ class Orchestrator:
         merge_top_k: int = DEFAULT_MERGE_TOP_K,
         merge_embed_model: str = "",
         sanitize_schema_descriptions: bool = False,
+        schema_prompt_budget: int | None = None,
     ):
         self.model = model
         self.backend = backend
@@ -213,6 +214,9 @@ class Orchestrator:
         )
         # The flag is passed only when set, so every shipped-schema construction is exactly what it was.
         self.schema_helper = SchemaHelper(schema_path=schema_path, **({"sanitize_descriptions": True} if sanitize_schema_descriptions else {}))
+        # Set only for user schemas (see the library extractor): the prompt text is bounded; shipped schemas stay unbounded.
+        self.schema_prompt_budget = schema_prompt_budget
+        self._bounded_context: tuple[str, dict[str, int] | None] | None = None
         self.store = TermStore(output_file)
         self.services = build_services(chebi_obo_path=chebi_obo_path)
         self.merge_index = TermMergeIndex(
@@ -327,6 +331,21 @@ class Orchestrator:
             logger.error("Extraction stopped: %s", IP_NOT_AUTHORIZED_LOG_TEXT)
         return True
 
+    def _schema_context(self) -> str:
+        """The schema text of the page prompt: the full rendering, or the bounded one when a budget is set (computed once)."""
+        if self.schema_prompt_budget is None:
+            return self.schema_helper.get_schema_context_for_llm()
+        if self._bounded_context is None:
+            self._bounded_context = self.schema_helper.bounded_schema_context(self.schema_prompt_budget)
+        return self._bounded_context[0]
+
+    def schema_prompt_condensed(self) -> dict[str, int] | None:
+        """``{"full_chars", "used_chars", "budget"}`` when the schema prompt is condensed for this run, else ``None``."""
+        if self.schema_prompt_budget is None:
+            return None
+        self._schema_context()
+        return self._bounded_context[1] if self._bounded_context else None
+
     def process_page(self, text: str, filename: str, page_num: int) -> bool:
         """Invoke the agent graph on one page of text. Returns True if any terms were added/updated."""
         if self.cancel_check is not None and self.cancel_check():
@@ -338,7 +357,7 @@ class Orchestrator:
             return False
         provider, model = self._provider_model()
         logger.info("%s page %d: asking %s model %s", filename, page_num + 1, provider, model)
-        schema_ctx = self.schema_helper.get_schema_context_for_llm()
+        schema_ctx = self._schema_context()
         prompt = build_page_prompt(schema_ctx, filename, page_num, text)
         terms_before = len(self.store)
         tool_state = getattr(self, "_tool_state", None)

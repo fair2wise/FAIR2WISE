@@ -201,6 +201,29 @@ class SchemaHelper:
         lines.append("\nIMPORTANT: Do NOT use relations named 'description' or 'category'.")
         return "\n".join(lines)
 
+    def bounded_schema_context(self, max_chars: int) -> tuple[str, dict[str, int] | None]:
+        """The prompt text of :meth:`get_schema_context_for_llm`, kept within ``max_chars`` characters.
+
+        A schema whose full rendering fits is returned byte for byte as :meth:`get_schema_context_for_llm` renders it
+        (second item ``None``). A longer one is replaced by the deterministic condensed view the schema generator
+        uses (class names with the first sentence, slots with ``domain>range``, whole lines only, a fixed
+        ``... (N more classes omitted)`` line when cut). The second item then holds the sizes:
+        ``{"full_chars", "used_chars", "budget"}``.
+        """
+        full = self.get_schema_context_for_llm()
+        if len(full) <= max_chars:
+            return full, None
+        from ..library.schema_prompt import condensed_view
+
+        head = "=== KNOWLEDGE SCHEMA (condensed: the full schema is too long for the prompt) ===\n"
+        tail = "\nIMPORTANT: Do NOT use relations named 'description' or 'category'."
+        view = condensed_view(
+            {name: info["description"] for name, info in self.classes.items()},
+            {slot: (info["domain"], info["range"] or "Any") for slot, info in self.slots.items() if info["domain"]},
+            max(max_chars - len(head) - len(tail), 0))
+        text = head + view + tail
+        return text, {"full_chars": len(full), "used_chars": len(text), "budget": max_chars}
+
     def get_code_domain_feature_context(self) -> str:
         """Return schema-defined feature names allowed for CodeSnippet domain_features."""
         excluded = {

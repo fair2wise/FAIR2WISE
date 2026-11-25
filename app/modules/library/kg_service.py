@@ -110,8 +110,19 @@ class KgLibrary:
 
     def estimate(self, paper_ids: list[str], model: str, schema: str) -> dict[str, Any]:
         """Deterministic estimate and confirmation token (the schema must be an offered one)."""
-        self.resolve(schema)
-        return estimate_extraction(self._facts(paper_ids), model, schema, self.prices)
+        choice = self.resolve(schema)
+        out = estimate_extraction(self._facts(paper_ids), model, schema, self.prices)
+        if choice.get("origin") == "user":
+            out = {**out, "schema_prompt": self._schema_prompt_sizes(schema)}
+        return out
+
+    def _schema_prompt_sizes(self, schema: str) -> dict[str, Any]:
+        """Size of a user schema's full prompt text and the budgets extraction bounds it to (the form says when it is condensed)."""
+        from ..term_extractor.schema import SchemaHelper
+        from .schema_prompt import BUDGET_CBORG, BUDGET_OLLAMA
+
+        helper = SchemaHelper(str(self.user_schemas.path_for(schema)), sanitize_descriptions=True)
+        return {"full_chars": len(helper.get_schema_context_for_llm()), "budgets": {"ollama": BUDGET_OLLAMA, "cborg": BUDGET_CBORG}}
 
     def check_confirmation(self, confirmation: str, paper_ids: list[str], model: str, schema: str) -> None:
         """For T39's start path: raise ``STALE_APPROVAL`` unless the token matches this exact selection."""
