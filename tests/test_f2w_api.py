@@ -2768,7 +2768,8 @@ def test_node_route_response_releases_bounded_snippet_text_with_the_owner_opt_in
     client = _node_app(tmp_path, monkeypatch, dict(_EVIDENCE_RAW))
     body = client.get("/graph/node/matkg:cdw").json()
     paper_a = {p["source_paper"]: p for p in body["publications"]}["10.1039_C8TC00875B.pdf"]
-    assert paper_a["snippets"] == [{"text": "CDW order peaks at 283 eV.", "page": 4}, {"text": "Second passage"}]
+    assert paper_a["snippets"] == [{"text": "CDW order peaks at 283 eV.", "page": 4, "kind": "quoted"},
+                                   {"text": "Second passage", "kind": "quoted"}]   # ``kind`` now travels with each passage
     assert paper_a["snippet_count"] == 2
 
     many = [{"text": f"passage {i} " + "x" * 3000, "source_paper": f"p{i % 8}.pdf", "page": i} for i in range(400)]
