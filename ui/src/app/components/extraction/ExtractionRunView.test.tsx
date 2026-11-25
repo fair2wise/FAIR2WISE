@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { JobInfo, JobLogEntry, JobRunSummary } from '../extractionApi';
+import extractionSummary from '../__fixtures__/passages_extraction_summary.json';
 import { ExtractionRunView, progressPercent, type ExtractionRunViewProps } from './ExtractionRunView';
 
 const job = (over: Partial<JobInfo> = {}): JobInfo => ({
@@ -146,5 +147,27 @@ describe('ExtractionRunView', () => {
   it('shows no export notice before an export', () => {
     setup();
     expect(screen.queryByTestId('export-notice')).not.toBeInTheDocument();
+  });
+
+  it('shows the supporting-text coverage of the run when the summary carries it, with the 90% warning', () => {
+    const counts = (terms: number, withPassage: number) => ({
+      terms, with_passage: withPassage, quoted: withPassage, located: 0, rejected: 1, uncovered: terms - withPassage,
+    });
+    setup({ job: job({ state: 'succeeded', summary: summary({ state: 'succeeded', outcome: 'succeeded', passages: {
+      total: counts(20, 16), papers: { 'a.pdf': counts(10, 10), 'b.pdf': counts(10, 6) } } }) }) });
+    expect(screen.getByTestId('passages-total')).toHaveTextContent('16 of 20 (80%)');
+    expect(screen.getByTestId('passages-warning')).toHaveTextContent('b.pdf (60%)');
+  });
+
+  it('shows no coverage block for a run whose summary has none (an older server)', () => {
+    setup({ job: job({ summary: summary() }) });
+    expect(screen.queryByTestId('run-passages')).toBeNull();
+  });
+
+  it('reads the passages block the real run summary carries (fixture checked against the server)', () => {
+    setup({ job: job({ state: 'succeeded', summary: summary({ state: 'succeeded', outcome: 'succeeded',
+      passages: extractionSummary.passages }) }) });
+    expect(screen.getByTestId('passages-total')).toHaveTextContent('6 of 9 (67%)');
+    expect(screen.getByTestId('passages-warning')).toHaveTextContent('a.pdf (67%), b.pdf (67%), c.pdf (67%)');
   });
 });

@@ -10,6 +10,9 @@ import { jsonBody, v1Json, v1Url } from './apiHttp';
 /** Job kind submitted by the Extraction tab. */
 export const EXTRACT_JOB_KIND = 'library_extract';
 
+/** Job kind of "Find supporting text" (the recovery of passages for an existing KG; no model is used). */
+export const PASSAGES_JOB_KIND = 'library_passages';
+
 /** Lifecycle state of a `/v1` job. */
 export type JobState =
   | 'queued'
@@ -53,6 +56,62 @@ export interface RunGrowth {
   relations_total?: number;
 }
 
+/** Supporting-text coverage counts of one paper (or of a whole run): terms with and without a passage, and how found. */
+export interface PassageCounts {
+  terms: number;
+  with_passage: number;
+  quoted: number;
+  located: number;
+  /** Sentences the model gave that were not found in the paper (not stored). */
+  rejected: number;
+  uncovered: number;
+}
+
+/** `summary.passages` of an extraction: its coverage per paper (file name) and in total. */
+export interface PassagesBlock {
+  total: PassageCounts;
+  papers: Record<string, PassageCounts>;
+}
+
+/** Why a paper was not searched by a recovery (`recovery.papers[name].reason`). */
+export type RecoveryReason = 'ambiguous_name' | 'missing' | 'no_text_layer' | 'unreadable';
+
+/** One paper's result in a recovery: counts, or a `reason` (with the server's `text`) when it was skipped. */
+export interface RecoveryPaperResult {
+  terms?: number;
+  with_passage_before?: number;
+  located_added?: number;
+  newly_covered?: number;
+  still_uncovered?: number;
+  reason?: RecoveryReason | string;
+  text?: string;
+}
+
+/** `summary.recovery` of a `library_passages` job. */
+export interface RecoveryBlock {
+  total: {
+    terms: number;
+    with_passage_before: number;
+    located_added: number;
+    newly_covered: number;
+    still_uncovered: number;
+    papers_processed: number;
+    papers_skipped: number;
+  };
+  papers: Record<string, RecoveryPaperResult>;
+}
+
+/** Share of a paper's terms that must carry a passage before the run view stops warning (the server logs the same 90%). */
+export const PASSAGE_WARN_RATIO = 0.9;
+
+/** Plain-words reasons a paper was not searched. */
+export const RECOVERY_REASON_TEXT: Record<string, string> = {
+  ambiguous_name: 'Two library files have this name and the KG does not say which one was used, so it was skipped.',
+  missing: 'This paper is not in the library, so it was skipped.',
+  no_text_layer: 'This PDF has no text layer (a scan), so there is nothing to search.',
+  unreadable: 'This PDF could not be read, so it was skipped.',
+};
+
 /**
  * Live status of a job from `GET /v1/jobs/{id}/progress` (key `summary`) or the rows of
  * `GET /v1/jobs?detail=summary`. Everything is read from the job store on the server.
@@ -72,6 +131,10 @@ export interface JobRunSummary {
   /** Other stage counters, e.g. `paper_pages_done` and `paper_pages_total` of the current paper. */
   counters: Record<string, number>;
   params: { bundle?: string; model?: string; backend?: string; schema?: string; topic?: string };
+  /** Supporting-text coverage of an extraction (papers finished so far); absent on an older server or another job kind. */
+  passages?: PassagesBlock;
+  /** Result of a `library_passages` job (papers finished so far); absent for other job kinds. */
+  recovery?: RecoveryBlock;
   /** Set when a user schema's prompt text was condensed for this run (sizes in characters); `null`/absent otherwise. */
   schema_prompt_condensed?: SchemaPromptCondensed | null;
   error: string | null;
@@ -417,4 +480,29 @@ export function exportKgBundle(name: string, fetcher: typeof fetch = fetch): Pro
 /** Create a bundle by continuing a bundle or a plain KG file (reverse build via `kg_to_terms`). */
 export function continueKg(request: ContinueKgRequest, fetcher: typeof fetch = fetch): Promise<ContinueKgResponse> {
   return v1Json<ContinueKgResponse>(v1Url('/v1/library/kgs/continue'), jsonBody('POST', request), fetcher);
+}
+
+/**
+ * Start "Find supporting text" for a KG bundle: `POST /v1/library/kgs/{name}/passages` answers the job handle. A new `nonce`
+ * makes every click a new job (the server also refuses a second run while one is queued or running).
+ */
+export function startPassages(name: string, nonce: string, fetcher: typeof fetch = fetch): Promise<JobRef> {
+  return v1Json<unknown>(
+    v1Url(`/v1/library/kgs/${encodeURIComponent(name)}/passages`),
+    jsonBody('POST', { nonce }),
+    fetcher,
+  ).then(raw => {
+    const { id, kind, state } = normalizeJob(raw);
+    return { id, kind, state };
+  });
+}
+
+/** Plain words for the typed refusals of `startPassages` (`reason` of the error body), else the server's message. */
+export function passagesReasonText(reason: string | null | undefined, fallback: string): string {
+  switch (reason) {
+    case 'no_source_papers': return 'This KG does not record which papers its terms came from, so there is nothing to search.';
+    case 'bundle_busy': return 'Another job is working on this KG now. Try again when it ends.';
+    case 'passages_in_progress': return 'Supporting text is already being searched for this KG.';
+    default: return fallback;
+  }
 }

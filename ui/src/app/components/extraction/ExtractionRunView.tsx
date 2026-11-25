@@ -4,6 +4,7 @@ import { TERMINAL_JOB_STATES, type ExportResult, type JobInfo, type JobLogEntry 
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { ExportedNotice } from './ExportedNotice';
+import { ExtractionCoverage } from './PassageCoverage';
 import { RunLog } from './RunLog';
 import { RunProgress } from './RunProgress';
 import { outcomeLabel } from './runFormat';
@@ -102,6 +103,8 @@ export function ExtractionRunView({
       </div>
 
       <RunProgress job={job} live={live} />
+
+      {summary?.passages && <ExtractionCoverage passages={summary.passages} />}
 
       {summary?.schema_prompt_condensed && (
         <p role="status" className="rounded-md border border-border bg-muted p-3 text-sm" data-testid="schema-prompt-condensed">

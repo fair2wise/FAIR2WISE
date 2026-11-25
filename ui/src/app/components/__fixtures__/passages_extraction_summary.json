@@ -1,0 +1,88 @@
+{
+  "outcome": "succeeded",
+  "state": "succeeded",
+  "started_at": "2026-11-25T02:58:20.828074+00:00",
+  "finished_at": "2026-11-25T02:58:21.269096+00:00",
+  "elapsed_seconds": 0.4,
+  "stage": {
+    "name": "run",
+    "status": "completed",
+    "phase": null
+  },
+  "current_paper": null,
+  "papers": {
+    "total": 3,
+    "done": 3,
+    "failed": 0,
+    "skipped": 0,
+    "failed_list": []
+  },
+  "growth": {
+    "entities_new": 4,
+    "entities_merged": 1,
+    "relations_new": 0,
+    "relations_merged": 0,
+    "entities_total": 4,
+    "relations_total": 0
+  },
+  "counters": {
+    "extracted": 3,
+    "pages": 5,
+    "pages_with_terms": 5,
+    "papers_in_bundle": 3,
+    "skipped": 0,
+    "units_done": 3,
+    "units_failed": 0,
+    "units_reused": 0,
+    "units_total": 3
+  },
+  "schema_prompt_condensed": null,
+  "params": {
+    "bundle": "run1",
+    "model": "m-1",
+    "schema": "matkg_schema@0.3.0",
+    "topic": "polymers"
+  },
+  "error": null,
+  "logs": {
+    "kept": 12,
+    "total": 12,
+    "cap": 2000
+  },
+  "passages": {
+    "total": {
+      "terms": 9,
+      "with_passage": 6,
+      "quoted": 3,
+      "located": 3,
+      "rejected": 3,
+      "uncovered": 3
+    },
+    "papers": {
+      "a.pdf": {
+        "terms": 3,
+        "with_passage": 2,
+        "quoted": 1,
+        "located": 1,
+        "rejected": 1,
+        "uncovered": 1
+      },
+      "b.pdf": {
+        "terms": 3,
+        "with_passage": 2,
+        "quoted": 1,
+        "located": 1,
+        "rejected": 1,
+        "uncovered": 1
+      },
+      "c.pdf": {
+        "terms": 3,
+        "with_passage": 2,
+        "quoted": 1,
+        "located": 1,
+        "rejected": 1,
+        "uncovered": 1
+      }
+    }
+  }
+}

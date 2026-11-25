@@ -11,7 +11,9 @@ import {
   fetchJobSummary,
   normalizeJob,
   fetchKgBundles,
+  passagesReasonText,
   startExtraction,
+  startPassages,
 } from './extractionApi';
 
 function respond(status: number, body: unknown) {
@@ -143,5 +145,22 @@ describe('extractionApi', () => {
   it('surfaces a refused export', async () => {
     const fetcher = respond(400, { detail: 'outside release dir' });
     await expect(exportKgBundle('kg', asFetch(fetcher))).rejects.toMatchObject({ message: 'outside release dir', status: 400 });
+  });
+
+  it('starts Find supporting text with a nonce on the bundle route and reads the job handle', async () => {
+    const mock = respond(200, { job_id: 'j7', kind: 'library_passages', state: 'queued', submitted_at: 'now', settings_revision: null });
+    expect(await startPassages('kg 1', 'n-1', asFetch(mock))).toEqual({ id: 'j7', kind: 'library_passages', state: 'queued' });
+    const [url, init] = call(mock);
+    expect(url).toContain('/v1/library/kgs/kg%201/passages');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({ nonce: 'n-1' });
+  });
+
+  it('puts the typed refusals of Find supporting text in plain words and keeps the server message otherwise', () => {
+    expect(passagesReasonText('bundle_busy', 'x')).toContain('Another job is working on this KG');
+    expect(passagesReasonText('passages_in_progress', 'x')).toContain('already being searched');
+    expect(passagesReasonText('no_source_papers', 'x')).toContain('nothing to search');
+    expect(passagesReasonText('other', 'raw message')).toBe('raw message');
+    expect(passagesReasonText(null, 'raw message')).toBe('raw message');
   });
 });

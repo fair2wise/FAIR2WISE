@@ -207,6 +207,22 @@ describe('ExtractionTab idle', () => {
     expect(calls.find(c => c.path === '/v1/library/kgs/old/export')?.body).toEqual({ confirm: true });
   });
 
+  it('offers Find supporting text on the existing KG of the picker and starts it for the chosen bundle', async () => {
+    const user = userEvent.setup();
+    routes['POST /v1/library/kgs/old/passages'] = {
+      status: 200, body: { job_id: 'p1', kind: 'library_passages', state: 'queued', submitted_at: 'now', settings_revision: null },
+    };
+    renderTab();
+    expect(screen.queryByRole('button', { name: 'Find supporting text' })).toBeNull();     // only when continuing an existing KG
+    await user.click(await screen.findByRole('radio', { name: 'Continue existing KG' }));
+    expect(screen.getByRole('button', { name: 'Find supporting text' })).toBeDisabled();
+    await user.selectOptions(screen.getByLabelText('Existing KG'), 'bundle:old');
+    expect(screen.getByRole('button', { name: 'Find supporting text' })).toBeEnabled();
+    expect(screen.getByText(/no model is used; existing text is kept/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Find supporting text' }));
+    await waitFor(() => expect(calls.some(c => c.path === '/v1/library/kgs/old/passages' && c.method === 'POST')).toBe(true));
+  });
+
   it('shows the no-backend state and cannot estimate or start', async () => {
     routes['GET /v1/library/models'].body = { available: false, models: [], source: 'unavailable', error: 'no key', backend: null };
     const user = userEvent.setup();

@@ -60,6 +60,30 @@ describe('per-paper supporting snippets', () => {
     expect(container.querySelector('li b')).toBeNull();
   });
 
+  it('labels each passage located or quoted (a passage without a kind is read as quoted)', () => {
+    render(<PublicationList publications={[paper({ snippets: [
+      { text: 'found by search', page: 3, kind: 'located' }, { text: 'quoted one', kind: 'quoted' }, { text: 'older one' },
+    ], snippet_count: 3 })]} intro={null} showSnippets />);
+    fireEvent.click(screen.getByRole('button', { name: /supporting text/ }));
+    const kinds = screen.getAllByTestId('passage-kind').map(el => el.textContent);
+    expect(kinds).toEqual(['[located]', '[quoted]', '[quoted]']);
+    expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('found by search(p. 3)[located]');
+  });
+
+  it('says what to do for a paper with no recorded supporting text, and never says to extract again', () => {
+    const { rerender } = render(<PublicationList publications={[paper({ passages_recorded: false })]} intro={null} showSnippets />);
+    const note = screen.getByTestId('paper-snippets-predate');
+    expect(note).toHaveTextContent(
+      'No supporting text was recorded for this paper. Use Find supporting text on the Extract page to add it.');
+    expect(note.textContent).not.toMatch(/extract again|re-extract/i);
+    expect(screen.queryByTestId('paper-snippets')).toBeNull();
+    // a paper that has passages, or a count, or whose KG records them (the key is absent) never shows the note
+    rerender(<PublicationList publications={[paper()]} intro={null} showSnippets />);
+    expect(screen.queryByTestId('paper-snippets-predate')).toBeNull();
+    rerender(<PublicationList publications={[paper({ passages_recorded: false, snippet_count: 2 })]} intro={null} showSnippets />);
+    expect(screen.queryByTestId('paper-snippets-predate')).toBeNull();
+  });
+
   it('draws nothing when the paper has no snippets, and does not invent any when only a count arrived', () => {
     const { rerender } = render(<PublicationList publications={[paper()]} intro={null} showSnippets />);
     expect(screen.queryByTestId('paper-snippets')).toBeNull();
@@ -86,16 +110,25 @@ describe('per-paper supporting snippets', () => {
     render(<PublicationList publications={[paper({ snippets: passages(1), snippet_count: 1 })]} intro={null} />);
     expect(screen.queryByTestId('paper-snippets')).toBeNull();
     const messy = paper({ snippets: [{ text: '  ' }, { text: 5 as unknown as string }, { text: 'ok', page: Number.NaN }] });
-    expect(paperSnippets(messy)).toEqual([{ text: 'ok', page: undefined }]);
+    expect(paperSnippets(messy)).toEqual([{ text: 'ok', page: undefined, kind: 'quoted' }]);   // no kind: read as quoted
   });
 
   it('never copies the passages into bookmarks or a node edit', () => {
     const full = paper({ snippets: passages(2), snippet_count: 2 });
     expect(withoutSnippets(full)).toEqual(paper());
+    expect(withoutSnippets(paper({ passages_recorded: false }))).toEqual(paper());   // the note is never saved by an edit
     togglePublicationFavorite(full);
     const stored = readBookmarkedPublications()[0].publication;
     expect(stored.snippets).toBeUndefined();
+    expect(stored.passages_recorded).toBeUndefined();
     expect(stored.snippet_count).toBeUndefined();
     expect(stored.paper_title).toBe('Edge-on packing in P3HT');
+  });
+
+  it('never stores the no-supporting-text note in a bookmark', () => {
+    togglePublicationFavorite(paper({ source_paper: 'old.pdf', passages_recorded: false }));
+    const stored = readBookmarkedPublications()[0].publication;
+    expect('passages_recorded' in stored).toBe(false);
+    expect(JSON.stringify(window.localStorage)).not.toContain('passages_recorded');
   });
 });

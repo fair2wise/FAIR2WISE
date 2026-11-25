@@ -17,6 +17,7 @@ import {
   fetchKgBundles,
   fetchSchemas,
   startExtraction,
+  startPassages,
   TERMINAL_JOB_STATES,
   type ContinueKgRequest,
   type EstimateRequest,
@@ -129,6 +130,17 @@ export function useStartExtraction() {
     mutationFn: (request: StartExtractionRequest) => startExtraction(request),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: extractionKeys.runs });
+      void queryClient.invalidateQueries({ queryKey: extractionKeys.bundles });
+    },
+  });
+}
+
+/** Start "Find supporting text" for a bundle; refreshes the bundle list (a finished run changes what it holds). */
+export function useStartPassages() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, nonce }: { name: string; nonce: string }) => startPassages(name, nonce),
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: extractionKeys.bundles });
     },
   });

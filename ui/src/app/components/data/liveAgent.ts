@@ -109,20 +109,31 @@ export interface PublicationInfo {
   snippets?: PublicationSnippet[];
   /** Passages recorded for this paper on the node, including any the server did not send. */
   snippet_count?: number;
+  /**
+   * `false` on a paper with no passages and no coverage entry in its KG bundle's manifest (extracted before supporting text
+   * was recorded, and not searched since): the card says so. Absent otherwise. Never stored: see `withoutSnippets`.
+   */
+  passages_recorded?: boolean;
 }
+
+/** How a passage was found: `quoted` (the model's sentence, verified in the paper) or `located` (found by searching the paper). */
+export type PassageKind = 'quoted' | 'located';
 
 export interface PublicationSnippet {
   text: string;
   page?: number;
+  /** Absent on a server that does not send it (read as `quoted`). */
+  kind?: PassageKind;
 }
 
 /**
- * The bibliographic part of a publication: the read-only supporting text (`snippets`, `snippet_count`) removed.
+ * The bibliographic part of a publication: the read-only supporting text (`snippets`, `snippet_count`) and the
+ * `passages_recorded` note removed.
  * Used wherever a publication is stored or sent back (bookmarks, node edits) so passages are never copied into
  * browser storage or written into the graph by an edit.
  */
 export function withoutSnippets<T extends PublicationInfo>(publication: T): T {
-  const { snippets: _snippets, snippet_count: _count, ...rest } = publication;
+  const { snippets: _snippets, snippet_count: _count, passages_recorded: _recorded, ...rest } = publication;
   return rest as T;
 }
 

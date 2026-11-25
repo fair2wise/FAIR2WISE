@@ -26,6 +26,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { ExportedNotice } from './ExportedNotice';
+import { FindSupportingText } from './FindSupportingText';
 import { PaperPicker } from './PaperPicker';
 import { PublishToTiled } from './PublishToTiled';
 import { SchemaPanelButton } from '../schema/SchemaPanelButton';
@@ -202,7 +203,7 @@ export function ExtractionIdleForm({ onStarted }: ExtractionIdleFormProps) {
           </div>
         </RadioGroup>
         {continuing && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <select
               aria-label="Existing KG"
               value={parentValue}
@@ -232,6 +233,7 @@ export function ExtractionIdleForm({ onStarted }: ExtractionIdleFormProps) {
               Export
             </Button>
             <PublishToTiled name={parentBundle?.name ?? null} />
+            <FindSupportingText name={parentBundle?.name ?? null} />
           </div>
         )}
         {continuing && exportKg.isSuccess && exportKg.data.name === parentBundle?.name ? (

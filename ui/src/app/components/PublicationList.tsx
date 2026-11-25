@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { ExternalLink } from 'lucide-react';
-import { PublicationInfo } from './data/liveAgent';
+import { PublicationInfo, type PassageKind } from './data/liveAgent';
 import { PublicationFavoriteButton } from './PublicationFavoriteButton';
 import { getPublicationLinks, primaryLinkTitle } from './publicationLinks';
 import { cn } from './ui/utils';
@@ -52,15 +52,16 @@ export const SNIPPETS_COLLAPSED = 3;
 const SNIPPET_MAX_CHARS = 1500;
 
 /** Plain, bounded snippets of one paper: malformed entries are dropped. */
-export function paperSnippets(publication: PublicationInfo): Array<{ text: string; page?: number }> {
+export function paperSnippets(publication: PublicationInfo): Array<{ text: string; page?: number; kind: PassageKind }> {
   const raw = Array.isArray(publication.snippets) ? publication.snippets : [];
-  const out: Array<{ text: string; page?: number }> = [];
+  const out: Array<{ text: string; page?: number; kind: PassageKind }> = [];
   for (const item of raw) {
     const text = item && typeof item.text === 'string' ? item.text.trim() : '';
     if (!text) continue;
     out.push({
       text: text.length > SNIPPET_MAX_CHARS ? `${text.slice(0, SNIPPET_MAX_CHARS - 1)}\u2026` : text,
       page: typeof item.page === 'number' && Number.isFinite(item.page) ? item.page : undefined,
+      kind: item.kind === 'located' ? 'located' : 'quoted',
     });
   }
   return out;
@@ -85,6 +86,10 @@ function PaperSnippets({ publication, disclosed }: { publication: PublicationInf
         {disclosed === false && '; showing them is not enabled on this deployment.'}
         {disclosed === null && '.'}
       </p>
+    ) : publication.passages_recorded === false ? (
+      <p className="mt-1 text-[11px] text-slate-500" data-testid="paper-snippets-predate">
+        No supporting text was recorded for this paper. Use Find supporting text on the Extract page to add it.
+      </p>
     ) : null;
   }
   const shown = all ? snippets : snippets.slice(0, SNIPPETS_COLLAPSED);
@@ -106,6 +111,15 @@ function PaperSnippets({ publication, disclosed }: { publication: PublicationInf
               <li key={index} className="whitespace-pre-wrap break-words text-[11px] leading-relaxed text-slate-600">
                 {snippet.text}
                 {snippet.page !== undefined && <span className="ml-1 text-slate-400">(p. {snippet.page})</span>}
+                <span
+                  className="ml-1 text-slate-400"
+                  data-testid="passage-kind"
+                  title={snippet.kind === 'located'
+                    ? 'Found by searching the paper for this term.'
+                    : 'A sentence the extraction quoted, checked against the paper.'}
+                >
+                  [{snippet.kind}]
+                </span>
               </li>
             ))}
           </ul>

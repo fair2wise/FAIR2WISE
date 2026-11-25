@@ -1,0 +1,72 @@
+{
+  "outcome": "succeeded",
+  "state": "succeeded",
+  "started_at": "2026-10-15T12:00:00+00:00",
+  "finished_at": "2026-10-15T12:00:00+00:00",
+  "elapsed_seconds": 0.0,
+  "stage": {
+    "name": "run",
+    "status": "completed",
+    "phase": null
+  },
+  "current_paper": null,
+  "papers": {
+    "total": 3,
+    "done": 3,
+    "failed": 0,
+    "skipped": 0,
+    "failed_list": []
+  },
+  "growth": {},
+  "counters": {
+    "recovery_located_added": 1,
+    "recovery_newly_covered": 1,
+    "recovery_papers_processed": 1,
+    "recovery_papers_skipped": 2,
+    "recovery_still_uncovered": 0,
+    "recovery_terms": 1,
+    "recovery_with_passage_before": 0,
+    "units_done": 3,
+    "units_failed": 0,
+    "units_reused": 0,
+    "units_total": 3
+  },
+  "schema_prompt_condensed": null,
+  "params": {
+    "bundle": "kg2"
+  },
+  "error": null,
+  "logs": {
+    "kept": 5,
+    "total": 5,
+    "cap": 2000
+  },
+  "recovery": {
+    "total": {
+      "terms": 1,
+      "with_passage_before": 0,
+      "located_added": 1,
+      "newly_covered": 1,
+      "still_uncovered": 0,
+      "papers_processed": 1,
+      "papers_skipped": 2
+    },
+    "papers": {
+      "a.pdf": {
+        "located_added": 1,
+        "newly_covered": 1,
+        "still_uncovered": 0,
+        "terms": 1,
+        "with_passage_before": 0
+      },
+      "blank.pdf": {
+        "reason": "no_text_layer",
+        "text": "the PDF has no text layer (a scan); nothing can be searched"
+      },
+      "gone.pdf": {
+        "reason": "missing",
+        "text": "this paper is not in the library"
+      }
+    }
+  }
+}
