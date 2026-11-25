@@ -190,11 +190,13 @@ def test_rebuild_kg_converts_terms_and_reports_counts(tmp_path, monkeypatch):
     seen = {}
     import app.modules.json2kg as json2kg
 
-    def fake_convert(src, out):
+    def fake_convert(src, out, *, merge_existing=False):
         seen["args"] = (src, out)
+        seen["merge_existing"] = merge_existing
         return {"things": [1, 2], "associations": [1]}
 
     monkeypatch.setattr(json2kg, "convert_terms_to_graph", fake_convert)
     res = kg_update.rebuild_kg(str(tmp_path / "t.json"), str(tmp_path / "deep/dir/kg.json"))
     assert res == {"status": "success", "kg_json": str(tmp_path / "deep/dir/kg.json"), "nodes": 2, "edges": 1}
     assert (tmp_path / "deep/dir").is_dir() and seen["args"][0] == tmp_path / "t.json"
+    assert seen["merge_existing"] is True       # the extracted-bundle build keeps passages of nodes that already existed
