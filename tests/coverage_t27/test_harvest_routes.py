@@ -11,13 +11,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "api_v1"))
 
 from _v1_support import build_als, build_local  # noqa: E402
 
+from app.modules.jobs.keys import OperationInputs
 from app.modules.library.harvest import Candidate, Harvester
 from app.modules.library.service import LibraryService
 from app.modules.literature.openalex import QuotaBreaker
 from tests.library.test_library_service import FakeProbe, pdf
 from tests.security.security_fakes import local_settings
 
-RUN = "ab" * 8
+# The id a real harvest run has: its job id (the run is stored under it). A bare hex id used to be assumed here, which
+# made every candidates request of a real run answer 404 and left the Needs-a-PDF list empty on the pilot (2026-11-25).
+RUN = OperationInputs(corpus_scope=("rsoxs",), params={"topic": "rsoxs"}).job_identity("library_harvest")
 BASE = "/v1/library/harvest"
 
 

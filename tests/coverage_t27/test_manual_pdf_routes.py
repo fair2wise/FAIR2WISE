@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "api_v1"))
 
 from _v1_support import build_local  # noqa: E402
 
+from app.modules.jobs.keys import OperationInputs
 from app.modules.library.harvest import Candidate, Harvester
 from app.modules.library.service import LibraryService
 from app.modules.literature.openalex import QuotaBreaker
@@ -19,7 +20,8 @@ from tests.library.test_library_service import pdf
 from tests.library.test_manual_pdf import DOI_P, DOI_Q, TITLE_P, TITLE_Q, ContentProbe
 from tests.security.security_fakes import local_settings
 
-RUN = "ab" * 8
+# The id a real run has: its job id (a bare hex id was once assumed, and the routes answered 404 for every real run).
+RUN = OperationInputs(corpus_scope=("rsoxs",), params={"topic": "rsoxs"}).job_identity("library_harvest")
 BASE = "/v1/library/harvest"
 CAP = 20_000
 

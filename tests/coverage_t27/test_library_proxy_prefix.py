@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "api_v1"))
 
 from _v1_support import build_local  # noqa: E402
 
+from app.modules.jobs.keys import OperationInputs
 from app.modules.library.harvest import Candidate
 from app.modules.library.service import LibraryService
 from app.modules.literature.openalex import QuotaBreaker
@@ -18,7 +19,7 @@ from app.modules.security.authorization import StartupConfigError
 from tests.library.test_library_service import FakeProbe
 from tests.security.security_fakes import local_settings
 
-RUN = "ab" * 8
+RUN = OperationInputs(corpus_scope=("rsoxs",), params={"topic": "rsoxs"}).job_identity("library_harvest")
 PREFIX = "https://ezproxy.example.edu/login?url="
 
 

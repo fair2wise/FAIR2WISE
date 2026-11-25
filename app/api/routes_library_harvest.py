@@ -22,6 +22,8 @@ from .routes_common import Prefixed, context, project
 from .upload_limits import read_upload_limited
 
 _ID_RE = re.compile(r"^[0-9a-f]{16,64}$")
+# A run is named by its job (``job-`` plus 24 hex digits, see ``OperationInputs.job_identity``); a candidate id is bare hex.
+_RUN_RE = re.compile(r"^(?:job-)?[0-9a-f]{16,64}$")
 
 
 def harvester(request: Request) -> Harvester:
@@ -34,6 +36,12 @@ def harvester(request: Request) -> Harvester:
 
 def _id(value: str) -> str:
     if not _ID_RE.match(value):
+        raise ContractError(ErrorCode.NOT_FOUND, "not found")
+    return value
+
+
+def _run_id(value: str) -> str:
+    if not _RUN_RE.match(value):
         raise ContractError(ErrorCode.NOT_FOUND, "not found")
     return value
 
@@ -60,7 +68,7 @@ def install(app: FastAPI) -> FastAPI:
         one is set. The server only builds the string; the person's browser opens it.
         """
         found = harvester(request)
-        if found.store.run(_id(run_id)) is None:
+        if found.store.run(_run_id(run_id)) is None:
             raise ContractError(ErrorCode.NOT_FOUND, "run not found")
         return cast(dict[str, Any], project(request, {"candidates": found.candidates_view(run_id)}))
 
@@ -90,7 +98,7 @@ def install(app: FastAPI) -> FastAPI:
     async def supply_run_pdf(run_id: str, request: Request, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """The batch drop: file a PDF against whichever open candidate of the run it belongs to (one file per request)."""
         found = harvester(request)
-        _id(run_id)
+        _run_id(run_id)
         service = found.service
         filename, raw = await read_single_file(request, "file", service.max_upload_bytes)
         data = await read_upload_limited(PartFile(raw), service.max_upload_bytes)
