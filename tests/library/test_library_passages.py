@@ -62,14 +62,14 @@ def test_result_block_reports_every_paper_with_reasons(tmp_path):
     assert units["a.pdf"]["result"]["recovery"] == {
         "terms": 3, "with_passage_before": 0, "located_added": 2, "newly_covered": 2, "still_uncovered": 1, "relations": 5,
         "relations_with_evidence_before": 0, "evidence_added": 2, "relations_newly_covered": 2, "relations_still_without": 3,
-        "publication_terms_corrected": 0, "aliases_added": 0, "pages": 2, "pages_without_text": 0}
+        "publication_terms_corrected": 0, "aliases_added": 0, "pages": 2, "pages_without_text": 0, "searches_skipped": 0}
     assert units["b.pdf"]["result"]["recovery"]["located_added"] == 2      # domain purity and ellipsometer
     assert units["blank.pdf"]["result"]["recovery"]["reason"] == PJ.REASON_NO_TEXT
     assert units["gone.pdf"]["result"]["recovery"]["reason"] == PJ.REASON_MISSING
     block = PJ.recovery_block({k: v["result"]["recovery"] for k, v in units.items()})
     assert block["total"] == {"terms": 5, "with_passage_before": 0, "located_added": 4, "newly_covered": 4,
                               "still_uncovered": 1, "relations": 9, "relations_with_evidence_before": 0, "evidence_added": 4,
-                              "relations_newly_covered": 4, "relations_still_without": 5, "publication_terms_corrected": 0, "aliases_added": 0, "pages": 3, "pages_without_text": 0,
+                              "relations_newly_covered": 4, "relations_still_without": 5, "publication_terms_corrected": 0, "aliases_added": 0, "pages": 3, "pages_without_text": 0, "searches_skipped": 0,
                               "papers_processed": 2,
                               "papers_skipped": 2}
 
@@ -293,3 +293,40 @@ def test_relation_evidence_rewrite_is_idempotent_and_never_overwrites(tmp_path):
     recovery = world.units(handle)["a.pdf"]["result"]["recovery"]
     assert recovery["evidence_added"] == 0 and recovery["relations_newly_covered"] == 0
     assert recovery["relations_with_evidence_before"] == 2 and recovery["relations_still_without"] == 3
+
+
+# -- pairs found empty are not searched again (owner backlog 2026-11-25, keyed by the paper's sha256) -----------------
+
+
+def test_pairs_found_empty_are_not_searched_again_unless_the_pdf_or_the_rules_change(tmp_path, monkeypatch):
+    from app.modules.term_extractor import passages as P
+
+    world = World(tmp_path)
+    searched: list[str] = []
+    real_best, real_rel = P.best_passages, PJ.recover_relation_evidence
+    monkeypatch.setattr(PJ.P, "best_passages", lambda pages, term, **kw: searched.append(f"t:{term}") or real_best(pages, term, **kw))
+    monkeypatch.setattr(PJ, "recover_relation_evidence", lambda s, o, p, pages: searched.append(f"r:{s}|{o}") or real_rel(s, o, p, pages))
+    first_handle, _ = world.run()
+    first = list(searched)
+    assert "t:unfindable notion" in first and "r:domain purity|unfindable partner" in first
+    state = json.loads((world.bundle().directory / PJ.STATE_FILE).read_text())
+    assert state["revision"] == PJ.RECOVERY_REVISION
+    assert "unfindable notion" in state["papers"][world.sha("a.pdf")]["terms"]
+    searched.clear()
+    second_handle, _ = world.run(nonce="2")
+    assert "t:unfindable notion" not in searched and "r:domain purity|unfindable partner" not in searched
+    units = world.units(second_handle)
+    assert units["a.pdf"]["result"]["recovery"]["searches_skipped"] >= 2
+    assert units["a.pdf"]["result"]["recovery"]["located_added"] == 0
+    # A different PDF (sha) is searched again.
+    manifest = dict(world.bundle().manifest)
+    manifest["papers"] = [{**p, "sha256": "changed"} if p["name"] == "a.pdf" else p for p in manifest["papers"]]
+    B._write_json(world.bundle().directory / B.MANIFEST_FILE, manifest)
+    searched.clear()
+    world.run(nonce="3")
+    assert "t:unfindable notion" in searched
+    # A new revision of the rules searches everything again.
+    monkeypatch.setattr(PJ, "RECOVERY_REVISION", "999")
+    searched.clear()
+    world.run(nonce="4")
+    assert "t:unfindable notion" in searched and "r:domain purity|unfindable partner" in searched

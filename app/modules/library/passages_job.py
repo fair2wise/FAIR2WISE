@@ -35,6 +35,7 @@ from ..term_extractor import passages as P
 from ..term_extractor import provenance
 from ..term_extractor.models import union_aliases, union_evidence
 from ..term_extractor.pub_clean import merge_known_publication
+from ..term_extractor.store import TermStore
 from .jobs import library_inputs
 from .publication_records import PublicationRecords
 
@@ -43,8 +44,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-#: Revision of the recovery logic (part of a unit's key).
-RECOVERY_REVISION = "1"
+#: Revision of the recovery logic (part of a unit's key, and of the searched-and-empty record: a new revision searches again).
+RECOVERY_REVISION = "2"
+#: Per-bundle record of the (term, paper) and (relation, paper) pairs a recovery searched and found nothing for, keyed by
+#: the paper's sha256, so a later run does not search them again unless the PDF or the rules changed.
+STATE_FILE = "recovery_state.json"
 #: Most located passages attached to one (term, paper).
 LOCATED_PER_TERM_PAPER = 2
 #: Reasons a paper is not processed (``recovery.reason`` of its unit result), each reported per paper.
@@ -201,6 +205,34 @@ class LibraryPassages:
                                 retryable=False, reason=REASON_BUSY)
         return {"name": name, "papers": len(papers)}
 
+    # ------------------------------------------------------------------ searched-and-empty record
+    def _load_state(self, bundle: B.Bundle) -> dict[str, Any]:
+        """The bundle's record of pairs searched and found empty (``{"revision", "papers": {sha: {"terms": [...], "relations": [...]}}}``)."""
+        path = bundle.directory / STATE_FILE
+        try:
+            data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() and not path.is_symlink() else {}
+        except (OSError, ValueError):
+            data = {}
+        if not isinstance(data, dict) or data.get("revision") != RECOVERY_REVISION or not isinstance(data.get("papers"), dict):
+            return {"revision": RECOVERY_REVISION, "papers": {}}
+        return data
+
+    @staticmethod
+    def _empty_pairs(state: Mapping[str, Any], sha: str | None, kind: str) -> set[str]:
+        row = state.get("papers", {}).get(sha or "") if sha else None
+        return set(row.get(kind) or []) if isinstance(row, dict) else set()
+
+    @staticmethod
+    def _remember_empty(state: dict[str, Any], sha: str | None, kind: str, keys: Sequence[str]) -> None:
+        if not sha or not keys:
+            return
+        row = state.setdefault("papers", {}).setdefault(sha, {"terms": [], "relations": []})
+        held = set(row.get(kind) or [])
+        row[kind] = sorted(held | set(keys))
+
+    def _save_state(self, bundle: B.Bundle, state: Mapping[str, Any]) -> None:
+        write_json_atomic(bundle.directory / STATE_FILE, state)
+
     # ------------------------------------------------------------------ library lookup
     def resolve_pdf(self, name: str, manifest_sha: str | None) -> tuple[Path | None, str | None]:
         """``(path, None)`` for the library file named ``name``, or ``(None, reason)``.
@@ -244,6 +276,7 @@ class LibraryPassages:
         started = self._clock()
         self._records = PublicationRecords(self.service._require_root())  # noqa: SLF001 - one trusted package
         self._shas = sha_by_name
+        state = self._load_state(bundle)
 
         def units(_sc: StageContext) -> list[WorkUnit]:
             return [WorkUnit(unit_id=p, unit_key=f"{p}:{sha_by_name.get(p) or ''}:{RECOVERY_REVISION}", payload=p)
@@ -263,7 +296,7 @@ class LibraryPassages:
             if sum(len(t.split()) for t in pages) < MIN_TEXT_WORDS:
                 ctx.log(f"{paper}: skipped, {REASON_TEXT[REASON_NO_TEXT]}", level="warning")
                 return {"recovery": {"reason": REASON_NO_TEXT, "text": REASON_TEXT[REASON_NO_TEXT]}}
-            result = self._recover_paper(sc, bundle, terms_path, paper, pages)
+            result = self._recover_paper(sc, bundle, terms_path, paper, pages, state=state, sha=sha_by_name.get(paper))
             changed["added"] += (result["located_added"] + result["evidence_added"] + result["publication_terms_corrected"]
                                  + result["aliases_added"])
             ctx.log(f"{paper}: {result['terms']} terms, {result['with_passage_before']} with text before, "
@@ -274,7 +307,9 @@ class LibraryPassages:
                        if result["publication_terms_corrected"] else "")
                     + (f"; {result['aliases_added']} other names recorded" if result["aliases_added"] else "")
                     + (f"; {result['pages_without_text']} of {result['pages']} pages have no text layer"
-                       if result["pages_without_text"] else ""))
+                       if result["pages_without_text"] else "")
+                    + (f"; {result['searches_skipped']} pairs found empty by an earlier run were not searched again"
+                       if result["searches_skipped"] else ""))
             return {"recovery": result}
 
         try:
@@ -295,21 +330,34 @@ class LibraryPassages:
         return StageResult(progress=progress, data={"bundle": name, "recovery": block}, incomplete=result.incomplete)
 
     def _recover_paper(self, sc: StageContext, bundle: B.Bundle, terms_path: Path, paper: str,
-                       pages: list[str]) -> dict[str, int]:
-        """Locate passages for the terms of one paper and write the terms file atomically; returns the counts."""
+                       pages: list[str], *, state: dict[str, Any] | None = None, sha: str | None = None) -> dict[str, int]:
+        """Locate passages for the terms of one paper and write the terms file atomically; returns the counts.
+
+        A (term, paper) or (relation, paper) pair that an earlier run searched and found empty is not searched again while
+        the paper's sha256 and the rules' revision are the same (``state``); the skipped searches are counted.
+        """
+        state = state if state is not None else {"revision": RECOVERY_REVISION, "papers": {}}
         doc = json.loads(terms_path.read_text(encoding="utf-8"))
         terms = [t for t in doc.get("terms", []) if isinstance(t, dict) and paper in (t.get("source_papers") or [])]
-        with_before = newly = added = 0
+        with_before = newly = added = skipped = 0
         todo: list[dict[str, Any]] = []
         for term in terms:
             if any(isinstance(s, dict) and s.get("source_paper") == paper for s in term.get("context_snippets") or []):
                 with_before += 1
             else:
                 todo.append(term)
+        known_empty = self._empty_pairs(state, sha, "terms")
+        now_empty: list[str] = []
         for index, term in enumerate(todo):
             if index % GUARD_EVERY == 0:
                 sc.guard()
+            term_key = TermStore.normalize(str(term.get("term") or ""))
+            if term_key in known_empty:
+                skipped += 1
+                continue
             found = P.best_passages(pages, str(term.get("term") or ""), limit=LOCATED_PER_TERM_PAPER)
+            if not found:
+                now_empty.append(term_key)
             snippets = term.setdefault("context_snippets", [])
             seen = {(s.get("source_paper"), s.get("page"), s.get("text")) for s in snippets if isinstance(s, dict)}
             hit = 0
@@ -324,7 +372,12 @@ class LibraryPassages:
             if hit:
                 added += hit
                 newly += 1
-        rel_total, rel_before, rel_newly, rel_added, rel_sentences_now = self._recover_relations(sc, terms, paper, pages)
+        self._remember_empty(state, sha, "terms", now_empty)
+        rel_total, rel_before, rel_newly, rel_added, rel_sentences_now, rel_skipped = self._recover_relations(
+            sc, terms, paper, pages, known_empty=self._empty_pairs(state, sha, "relations"),
+            remember=lambda keys: self._remember_empty(state, sha, "relations", keys))
+        skipped += rel_skipped
+        self._save_state(bundle, state)
         pub_fixed = self._correct_publication(terms, paper)
         aliases_added = self._recover_aliases(terms, pages)
         pages_without_text = sum(1 for text in pages if len(text.split()) < MIN_PAGE_WORDS)
@@ -358,7 +411,7 @@ class LibraryPassages:
                 "relations_with_evidence_before": rel_before, "evidence_added": rel_added,
                 "relations_newly_covered": rel_newly, "relations_still_without": rel_total - rel_before - rel_newly,
                 "publication_terms_corrected": pub_fixed, "aliases_added": aliases_added,
-                "pages": len(pages), "pages_without_text": pages_without_text}
+                "pages": len(pages), "pages_without_text": pages_without_text, "searches_skipped": skipped}
 
     @staticmethod
     def _recover_aliases(terms: list[dict[str, Any]], pages: list[str]) -> int:
@@ -406,17 +459,22 @@ class LibraryPassages:
                 changed += 1
         return changed
 
-    def _recover_relations(self, sc: StageContext, terms: list[dict[str, Any]], paper: str,
-                           pages: list[str]) -> tuple[int, int, int, int, int]:
+    def _recover_relations(self, sc: StageContext, terms: list[dict[str, Any]], paper: str, pages: list[str], *,
+                           known_empty: set[str] | None = None,
+                           remember: Callable[[Sequence[str]], None] | None = None) -> tuple[int, int, int, int, int, int]:
         """Locate relation evidence for the relations of ``terms`` in this paper (in place).
 
-        A relation that already has located evidence from this paper is left alone (idempotent); any other is searched for
-        every sentence, or two adjacent sentences, naming both endpoints (:func:`recover_relation_evidence`).
+        A relation that already has located evidence from this paper is left alone (idempotent); one that an earlier run
+        searched and found empty for this paper (``known_empty``) is skipped; any other is searched for every sentence, or two
+        adjacent sentences, naming both endpoints (:func:`recover_relation_evidence`), and the empty ones are passed to
+        ``remember``.
 
         Returns:
-            ``(relations, with_evidence_before, newly_covered, sentences_added, sentences_from_this_paper_now)``.
+            ``(relations, with_evidence_before, newly_covered, sentences_added, sentences_from_this_paper_now, searches_skipped)``.
         """
-        total = before = newly = added = 0
+        total = before = newly = added = skipped = 0
+        known_empty = known_empty or set()
+        now_empty: list[str] = []
         for index, term in enumerate(terms):
             if index % GUARD_EVERY == 0:
                 sc.guard()
@@ -430,16 +488,26 @@ class LibraryPassages:
                 if any(isinstance(e, dict) and e.get("source_paper") == paper for e in held):
                     before += 1
                     continue
+                key = f"{TermStore.normalize(str(term.get('term') or ''))}|{relation.get('relation')}|{TermStore.normalize(str(relation['related_term']))}"
+                if key in known_empty:
+                    skipped += 1
+                    if not held:
+                        relation.pop("evidence")
+                    continue
                 new = recover_relation_evidence(str(term.get("term") or ""), str(relation["related_term"]), paper, pages)
                 before_len = len(held)
                 if union_evidence(held, new):
                     newly += 1
                     added += len(held) - before_len
+                else:
+                    now_empty.append(key)
                 if not held:
                     relation.pop("evidence")
+        if remember is not None:
+            remember(now_empty)
         now = sum(1 for term in terms for r in term.get("relations") or [] if isinstance(r, dict)
                   for e in r.get("evidence") or [] if isinstance(e, dict) and e.get("source_paper") == paper)
-        return total, before, newly, added, now
+        return total, before, newly, added, now, skipped
 
     # ------------------------------------------------------------------ files
     def _kg_is_stale(self, bundle: B.Bundle) -> bool:
@@ -496,7 +564,7 @@ class LibraryPassages:
 #: Counts of one paper's recovery result that are summed into the totals.
 RESULT_KEYS = ("terms", "with_passage_before", "located_added", "newly_covered", "still_uncovered", "relations",
                "relations_with_evidence_before", "evidence_added", "relations_newly_covered", "relations_still_without",
-               "publication_terms_corrected", "aliases_added", "pages", "pages_without_text")
+               "publication_terms_corrected", "aliases_added", "pages", "pages_without_text", "searches_skipped")
 
 
 def recovery_block(units: Mapping[str, Mapping[str, Any] | None]) -> dict[str, Any]:

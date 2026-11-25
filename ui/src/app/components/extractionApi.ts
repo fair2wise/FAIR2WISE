@@ -107,6 +107,8 @@ export interface RecoveryPaperResult {
   /** Pages of the paper, and those with no text layer (a plate, a scan): nothing can be found on them. */
   pages?: number;
   pages_without_text?: number;
+  /** Pairs an earlier run searched and found empty, not searched again (same PDF, same rules). */
+  searches_skipped?: number;
   reason?: RecoveryReason | string;
   text?: string;
 }
@@ -128,6 +130,7 @@ export interface RecoveryBlock {
     aliases_added?: number;
     pages?: number;
     pages_without_text?: number;
+    searches_skipped?: number;
     papers_processed: number;
     papers_skipped: number;
   };

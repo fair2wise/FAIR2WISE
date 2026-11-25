@@ -38,7 +38,8 @@
     "recovery_publication_terms_corrected": 0,
     "recovery_aliases_added": 0,
     "recovery_pages": 1,
-    "recovery_pages_without_text": 0
+    "recovery_pages_without_text": 0,
+    "recovery_searches_skipped": 0
   },
   "schema_prompt_condensed": null,
   "params": {
@@ -67,7 +68,8 @@
       "publication_terms_corrected": 0,
       "aliases_added": 0,
       "pages": 1,
-      "pages_without_text": 0
+      "pages_without_text": 0,
+      "searches_skipped": 0
     },
     "papers": {
       "a.pdf": {
@@ -84,7 +86,8 @@
         "publication_terms_corrected": 0,
         "aliases_added": 0,
         "pages": 1,
-        "pages_without_text": 0
+        "pages_without_text": 0,
+        "searches_skipped": 0
       },
       "blank.pdf": {
         "reason": "no_text_layer",

@@ -12,6 +12,13 @@ extracted-bundle KG build keeps the passages of a node that already existed) sta
 
 ## Where we are
 
+Status 2026-11-26: steps 1 to 7 of the plan are on `forge_merge` (locator and rules, grounding, located-only relation evidence,
+coverage counters and the Extract page block, the recovery job with its button, the deterministic real-extraction suite test
+with the 90/50/80 thresholds in `tests/extraction/test_passage_suite_thresholds.py`, these docs). Since then: aliases, the
+table_row kind, short factual clauses, OCR-tolerant quotes, pages without a text layer, and the searched-and-empty record of
+the recovery job (`recovery_state.json` per bundle, keyed by the paper's sha256 and the rules' revision). The measurements
+below are the ones the plan started from.
+
 | Fact | Measurement |
 |---|---|
 | Shipped terms with a passage (`extracted_terms_rsoxs_v1.json`) | 917 of 24,681 (3.7%); the legacy extractor's `aug21_*` files: 100% |
@@ -331,8 +338,9 @@ through (inference from reading, not a test).
 About 10 working days. (1) locator and quality rules as one module with the real-paper tests; (2) extraction-time
 grounding: verify the model's sentence, located fallback, rejected counts, remove the old fallback; (3) relationship
 evidence, located only, through tool, store, build, `kg_to_terms` and the recovery job (built); (4) coverage counters, log lines, warning threshold and
-the Extract page block; (5) the recovery job and its button (built); (6) the deterministic real-extraction suite test with the
-thresholds; (7) docs (statuses, coverage, recovery, known issues). Stop for review after this page.
+the Extract page block (built); (5) the recovery job and its button (built); (6) the deterministic real-extraction suite test with the
+thresholds (built: 90% of terms with a passage, 50% of relations with a sentence naming both ends, 80% of stored passages quoted
+and verified, every stored passage found in its page); (7) docs (this page). All seven steps are done.
 
 ## Table-heavy and scanned papers (measured 2026-11-25, proposals not built)
 
