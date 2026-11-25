@@ -138,7 +138,8 @@ def test_upsert_merges_every_field_class(path):
     assert got.term == "Alpha"  # first display name kept
     assert got.pages == [1, 2] and got.source_papers == ["a.pdf", "b.pdf"]
     assert got.definition == "a much longer definition" and got.raw_category == "Raw"
-    assert [(c.text, c.page) for c in got.context_snippets] == [("t", 1), ("new", 2)]
+    # a second passage of the same paper and page is kept (union by paper, page and text; pilot 2026-11-24)
+    assert [(c.text, c.page) for c in got.context_snippets] == [("t", 1), ("dup", 1), ("new", 2)]
     assert [(r.relation, r.related_term) for r in got.relations] == [("is_a", "Beta"), ("part_of", "Gamma")]
     assert (got.formula, got.smiles, got.charge, got.inchi, got.inchikey, got.mass) == ("H2O", "O", 0, "I", "K", 18.0)
     assert got.chebi == {"id": 1} and got.formula_validation == {"status": "ok"}

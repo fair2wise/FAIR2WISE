@@ -66,17 +66,18 @@ class ContextSnippet:
     Attributes:
         text: The extracted passage.
         source_paper: Identifier of the paper the snippet comes from.
-        page: Page number within that paper.
+        page: Page number within that paper; ``None`` when the extraction did not know the page (the passage is kept:
+            a missing page number never discards evidence).
     """
 
     text: str
     source_paper: str
-    page: int
+    page: int | None = None
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> ContextSnippet:
-        """Construct from a plain dict."""
-        return cls(text=d["text"], source_paper=d["source_paper"], page=d["page"])
+        """Construct from a plain dict (``page`` may be absent or ``None``)."""
+        return cls(text=d["text"], source_paper=d["source_paper"], page=d.get("page"))
 
 
 @dataclass

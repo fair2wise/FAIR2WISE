@@ -1,11 +1,11 @@
 """LangChain tools the term-extraction agent calls to look up, validate and register terms."""
 
 from collections.abc import Callable
+import contextvars
 from dataclasses import dataclass, field
 import json
 import logging
 import re
-import threading
 
 from langchain_core.tools import BaseTool, tool
 
@@ -19,6 +19,19 @@ logger = logging.getLogger(__name__)
 
 # Max candidate display names returned by check_existing_term's "possible_matches:" reply.
 POSSIBLE_MATCHES_LIMIT = 5
+
+
+@dataclass(frozen=True)
+class _PageContext:
+    """The page a tool call belongs to: which ``ToolState`` set it, the paper, the page number and the page text."""
+
+    owner: int
+    source_paper: str | None
+    page: int | None
+
+
+#: The page being extracted, per execution context (see :meth:`ToolState.set_page_context`).
+_PAGE: contextvars.ContextVar[_PageContext | None] = contextvars.ContextVar("f2w_extract_page", default=None)
 
 
 @dataclass
@@ -35,32 +48,36 @@ class ToolState:
     llm_invoke: Callable[[str], str] | None = field(default=None, repr=False)
     merge_index: TermMergeIndex | None = field(default=None, repr=False)
     current_source_paper: str | None = None
-    _tls: threading.local = field(default_factory=threading.local, repr=False)
 
     def set_page_context(self, source_paper: str, page: int) -> None:
-        """Record the PDF being extracted.
+        """Record the PDF page being extracted.
 
-        ``current_source_paper`` is shared (all workers of one PDF). Page is
-        thread-local because LangGraph may run tools on another thread than
-        ``process_page``.
+        ``current_source_paper`` is shared (all workers of one PDF). The page and its text live in a
+        :class:`contextvars.ContextVar`: each page is processed on its own thread, and the tool node of the agent graph
+        runs the tools on *other* threads that receive a **copy of the calling context** (LangGraph's
+        ``ContextThreadPoolExecutor``), so the page reaches the tools. A plain ``threading.local`` did not: the tools
+        saw no page, ``register_term`` dropped the page and the supporting-text snippet, and every extracted node
+        came out without passages (pilot 2026-11-24).
         """
         self.current_source_paper = source_paper
-        self._tls.source_paper = source_paper
-        self._tls.page = page
+        _PAGE.set(_PageContext(id(self), source_paper, page))
 
     def clear_page_context(self) -> None:
-        """Reset the thread-local source paper and page (the shared paper name is kept)."""
-        self._tls.source_paper = None
-        self._tls.page = None
+        """Reset the page of this context (the shared paper name is kept)."""
+        current = _PAGE.get()
+        if current is not None and current.owner == id(self):
+            _PAGE.set(None)
 
     def page_context(self) -> tuple[str | None, int | None]:
-        """Return ``(source_paper, page)`` for the current thread.
+        """Return ``(source_paper, page)`` for the current context.
 
-        The paper falls back to the shared ``current_source_paper`` when this
-        thread has none; the page is ``None`` if it was never set on this thread.
+        The paper falls back to the shared ``current_source_paper`` when this context has none; the page is ``None``
+        if it was never set in a context this one descends from.
         """
-        paper = getattr(self._tls, "source_paper", None) or self.current_source_paper
-        return paper, getattr(self._tls, "page", None)
+        current = _PAGE.get()
+        if current is not None and current.owner == id(self):
+            return current.source_paper or self.current_source_paper, current.page
+        return self.current_source_paper, None
 
 
 def build_tools(state: ToolState) -> list[BaseTool]:
@@ -222,7 +239,8 @@ def build_tools(state: ToolState) -> list[BaseTool]:
         relations, context, and paper provenance can be merged onto the existing term.
         Relations must use exact predicate names from the schema.
         Pass a short context sentence as 'context'. source_paper and page default
-        to the PDF page currently being processed.
+        to the PDF page currently being processed; a passage is stored whenever a
+        context and a paper are known, with the page recorded as unknown if it is not.
         """
         ctx_paper, ctx_page = state.page_context()
         source_paper = source_paper or ctx_paper
@@ -258,11 +276,11 @@ def build_tools(state: ToolState) -> list[BaseTool]:
         key = TermStore.normalize(fixed["term"])
         is_new = state.store.get(key) is None
 
-        snippet = (
-            ContextSnippet(text=context, source_paper=source_paper, page=page)
-            if context and source_paper and page is not None
-            else None
-        )
+        snippet = ContextSnippet(text=context, source_paper=source_paper, page=page) if context and source_paper else None
+        if snippet is not None and page is None:
+            # Evidence is never thrown away for want of a page number: the passage is kept with the page unknown
+            # (pilot 2026-11-24: a lost page silently dropped the passage of nearly every term).
+            logger.warning("register_term: '%s' has no page number in this context; passage kept with page unknown", term)
 
         record = TermRecord(
             term=fixed["term"],

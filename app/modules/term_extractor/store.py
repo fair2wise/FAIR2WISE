@@ -206,9 +206,9 @@ class TermStore:
                 if provenance.merge_into_source_metadata(existing.source_metadata, source_paper, meta):
                     existing.publications = provenance.publications_from_source_metadata(existing.source_metadata)
                     modified = True
-            for snippet in record.context_snippets:
+            for snippet in record.context_snippets:   # union per paper, page and text: a second passage on a page is kept
                 if not any(
-                    s.source_paper == snippet.source_paper and s.page == snippet.page
+                    s.source_paper == snippet.source_paper and s.page == snippet.page and s.text == snippet.text
                     for s in existing.context_snippets
                 ):
                     existing.context_snippets.append(snippet)

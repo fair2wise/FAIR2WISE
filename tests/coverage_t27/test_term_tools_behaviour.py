@@ -211,3 +211,64 @@ def test_register_term_downgrades_verified_relations_that_violate_domain_range(m
     rels = state.store.get(TermStore.normalize("Polystyrene")).relations
     assert [(r.related_term, r.verified) for r in rels] == [
         ("Annealing", False), ("Water", "true"), ("Unknown", "true"), ("Annealing", "")]
+
+
+# --- pilot 2026-11-24: nodes of an extracted KG carried no supporting passages --------------------------------------
+
+
+def test_the_page_reaches_tools_that_run_on_worker_threads_of_the_agent_graph(make):
+    """LangGraph runs tools on pool threads that get a COPY of the calling context (not its thread-locals)."""
+    from langchain_core.runnables.config import ContextThreadPoolExecutor
+
+    state, tools = make()
+    state.set_page_context("tomo.pdf", 5)
+    with ContextThreadPoolExecutor() as pool:
+        assert pool.submit(state.page_context).result() == ("tomo.pdf", 5)
+        pool.submit(tools["register_term"].invoke, {"term": "cloud tomography", "definition": "3D imaging of clouds.",
+                                                    "category": "Thing", "context": "Cloud tomography images clouds."}).result()
+    record = state.store.get("cloud tomography")
+    assert record is not None and record.pages == [5]
+    assert [(s.text, s.source_paper, s.page) for s in record.context_snippets] == [
+        ("Cloud tomography images clouds.", "tomo.pdf", 5)]
+
+
+def test_pages_processed_in_parallel_keep_their_own_page(make):
+    from langchain_core.runnables.config import ContextThreadPoolExecutor
+
+    state, _ = make()
+    results = {}
+
+    def page(n):
+        state.set_page_context("a.pdf", n)
+        with ContextThreadPoolExecutor() as pool:   # the tool node of this page's graph
+            results[n] = pool.submit(state.page_context).result()
+        state.clear_page_context()
+
+    threads = [threading.Thread(target=page, args=(n,)) for n in range(1, 9)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert results == {n: ("a.pdf", n) for n in range(1, 9)}
+
+
+def test_a_passage_is_kept_with_the_page_unknown_when_no_page_is_known(make, caplog):
+    """A missing page number must never discard the evidence again."""
+    state, tools = make()
+    state.clear_page_context()
+    state.current_source_paper = "a.pdf"
+    with caplog.at_level("WARNING"):
+        tools["register_term"].invoke({"term": "voxel grid", "definition": "d", "category": "Thing",
+                                       "context": "A voxel grid divides the volume."})
+    record = state.store.get("voxel grid")
+    assert [(s.text, s.source_paper, s.page) for s in record.context_snippets] == [("A voxel grid divides the volume.", "a.pdf", None)]
+    assert record.pages == [] and record.source_papers == ["a.pdf"]      # what is known is recorded, nothing invented
+    assert any("page unknown" in r.message for r in caplog.records)
+    tools["register_term"].invoke({"term": "no context term", "definition": "d", "category": "Thing"})
+    assert state.store.get("no context term").context_snippets == []      # no context: no passage, nothing invented
+
+
+def test_a_second_passage_of_the_same_term_on_the_same_page_is_kept(make):
+    state, tools = make()
+    state.set_page_context("a.pdf", 2)
+    for text in ("First mention of P3HT.", "Second mention of P3HT.", "First mention of P3HT."):
+        tools["register_term"].invoke({"term": "P3HT", "definition": "d", "category": "Thing", "context": text})
+    assert [s.text for s in state.store.get("p3ht").context_snippets] == ["First mention of P3HT.", "Second mention of P3HT."]
