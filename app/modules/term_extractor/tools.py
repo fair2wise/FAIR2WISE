@@ -11,8 +11,8 @@ from langchain_core.tools import BaseTool, tool
 
 from . import passages
 from .merge_index import TermMergeIndex, build_merge_prompt, clean_term
-from .models import ContextSnippet, RelationRecord, TermRecord, union_evidence
-from .schema import SchemaHelper
+from .models import ContextSnippet, PropertyRecord, RelationRecord, TermRecord, union_evidence
+from .schema import SchemaHelper, judge_relations, mark_invalid_relations
 from .services import Services
 from .store import TermStore
 
@@ -313,20 +313,18 @@ def build_tools(state: ToolState) -> list[BaseTool]:
 
         # Domain/range validation: downgrade verified=True relations that violate schema constraints.
         subj_cat = fixed.get("category", "")
-        for rel in fixed.get("relations", []):
-            if not rel.get("verified", False):
-                continue
-            obj_key = TermStore.normalize(rel.get("related_term", ""))
-            obj_record = state.store.get(obj_key)
-            obj_cat = obj_record.category if obj_record else ""
-            if subj_cat and obj_cat and not state.schema.check_relation_validity(
-                subj_cat, rel["relation"], obj_cat
-            ):
-                logger.warning(
-                    "register_term: relation '%s' invalid for %s→%s, marking verified=False",
-                    rel["relation"], subj_cat, obj_cat,
-                )
-                rel["verified"] = False
+
+        def category_of(name: str) -> str:
+            record = state.store.get(TermStore.normalize(name))
+            return record.category if record else ""
+
+        # A user or model-written schema: a literal-range slot is an attribute of the term, and a relation that is valid
+        # only with subject and object exchanged is stored the right way round (shared with the schema preview).
+        judged = judge_relations(state.schema, fixed, category_of)
+        for item in judged.attributes:
+            state.store.note_relation_check("attribute", item["property"], subj_cat, "")
+        for subject_class, pred, object_class in [*judged.invalid, *mark_invalid_relations(state.schema, fixed, category_of)]:
+            state.store.note_relation_check("invalid", pred, subject_class, object_class)
 
         key = TermStore.normalize(fixed["term"])
         is_new = state.store.get(key) is None
@@ -350,7 +348,18 @@ def build_tools(state: ToolState) -> list[BaseTool]:
             context_snippets=[snippet] if snippet else [],
         )
 
+        record.properties.extend(
+            PropertyRecord(property=item["property"], value=item["value"], unit="", context=(context or "")[:500])
+            for item in judged.attributes)
         final_key, _ = state.store.upsert(record)
+        for item in judged.swapped:   # the real subject is the other term: the relation is stored on it, verified
+            owner = state.store.get(TermStore.normalize(item["subject"]))
+            if owner is None:
+                continue
+            swapped = RelationRecord(relation=item["relation"], related_term=fixed["term"], verified=True)
+            state.attach_relation_evidence(owner.term, [swapped], source_paper, page)
+            state.store.add_relation(owner.term, swapped)
+            state.store.note_relation_check("swapped", item["relation"], item["subject_class"], item["object_class"])
         if is_new and state.merge_index is not None:
             state.merge_index.add(fixed["term"])
         action = "registered" if is_new else "updated"

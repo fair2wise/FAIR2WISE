@@ -10,7 +10,7 @@ import threading
 from typing import Any
 
 from . import provenance
-from .models import ContextSnippet, PropertyRecord, TermRecord, union_evidence
+from .models import ContextSnippet, PropertyRecord, RelationRecord, TermRecord, union_evidence
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,8 @@ class TermStore:
         self._tl = threading.local()
         #: Passage coverage of this run (per paper; sets of term keys) and of earlier runs read from the file.
         self._passage_run: dict[str, dict[str, Any]] = {}
+        #: ``(outcome, relation, subject_class, object_class) -> count`` of the relation repairs of this run.
+        self._relation_checks: dict[tuple[str, str, str, str], int] = {}
         self._passage_base: dict[str, dict[str, int]] = {}
         #: Running tally of what :meth:`upsert` did since this store was opened (a job's live KG growth counters).
         self._growth = {"entities_new": 0, "entities_merged": 0, "relations_new": 0, "relations_merged": 0}
@@ -244,6 +246,13 @@ class TermStore:
                     if union_evidence(held.evidence, rel.evidence):   # the evidence of a repeated relation is kept, never dropped
                         modified = True
 
+            held_props = {(p.property, str(p.value)) for p in existing.properties}
+            for prop in record.properties:   # attributes of the term (a literal-range slot): unioned, never duplicated
+                if (prop.property, str(prop.value)) not in held_props:
+                    existing.properties.append(prop)
+                    held_props.add((prop.property, str(prop.value)))
+                    modified = True
+
             for attr in ("formula", "formula_validation", "chebi", "smiles", "charge", "inchi", "inchikey", "mass"):
                 if getattr(record, attr) is not None and getattr(existing, attr) is None:
                     setattr(existing, attr, getattr(record, attr))
@@ -267,6 +276,29 @@ class TermStore:
             if modified:
                 self._tl.updated = True
             return key, modified
+
+    def add_relation(self, term: str, rel: RelationRecord) -> bool:
+        """Add one relation to an existing term (merging a repeated one's evidence); ``False`` when the term is unknown.
+
+        Used when a relation turns out to belong to the other end of the pair: it is stored on the term that is its real
+        subject without counting that term as a new mention.
+        """
+        key = self.normalize(term)
+        if self._is_fenced():
+            return False
+        with self._state_lock:
+            existing = self._records.get(key)
+            if existing is None:
+                return False
+            held = next((r for r in existing.relations if (r.relation, r.related_term) == (rel.relation, rel.related_term)), None)
+            if held is None:
+                existing.relations.append(rel)
+                self._growth["relations_new"] += 1
+            else:
+                self._growth["relations_merged"] += 1
+                union_evidence(held.evidence, rel.evidence)
+            self._tl.updated = True
+            return True
 
     @staticmethod
     def _union_snippet(snippets: list[ContextSnippet], new: ContextSnippet) -> bool:
@@ -292,6 +324,27 @@ class TermStore:
     # ------------------------------------------------------------------
     # Passage coverage (design: supporting passages, section d)
     # ------------------------------------------------------------------
+
+    def note_relation_check(self, outcome: str, relation: str, subject_class: str, object_class: str) -> None:
+        """Count one relation repair of this run (``attribute``, ``swapped`` or ``invalid``) under its pattern."""
+        with self._state_lock:
+            key = (outcome, relation, subject_class, object_class)
+            self._relation_checks[key] = self._relation_checks.get(key, 0) + 1
+
+    def relation_check_report(self) -> dict[str, Any]:
+        """The relation repairs of this run: totals per outcome and one row per distinct pattern, most frequent first.
+
+        Empty (``{}``) when nothing was repaired, so a run on a shipped schema has no such block.
+        """
+        with self._state_lock:
+            items = sorted(self._relation_checks.items(), key=lambda kv: (-kv[1], kv[0]))
+        if not items:
+            return {}
+        totals: dict[str, int] = {}
+        for (outcome, _, _, _), count in items:
+            totals[outcome] = totals.get(outcome, 0) + count
+        return {**totals, "patterns": [{"outcome": o, "relation": r, "subject_class": sc, "object_class": oc, "count": n}
+                                       for (o, r, sc, oc), n in items]}
 
     def note_passage(self, paper: str, term_key: str, *, kind: str | None = None, rejected: int = 0) -> None:
         """Record what grounding did for one registered term of ``paper``.

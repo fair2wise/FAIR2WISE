@@ -82,6 +82,24 @@ export function ValidationReport({ validation, text, onGoToLine, overCap = false
           )}
         </ol>
       )}
+      {report && report.warnings.length > 0 && (
+        <div className="space-y-1" data-testid="warning-list">
+          <p className="text-sm font-medium">{report.warnings.length === 1 ? '1 warning' : `${report.warnings.length} warnings`} (the schema can still be saved)</p>
+          <ul aria-label="Warnings by line" className="space-y-1 text-sm">
+            {report.warnings.slice(0, MAX_LISTED_PROBLEMS).map((warning, index) => (
+              <li key={`${warning.line}-${warning.code}-${index}`}>
+                <button
+                  type="button"
+                  onClick={() => onGoToLine(warning.line)}
+                  className="w-full rounded px-2 py-1 text-left hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  <span className="font-mono text-xs font-semibold">Line {warning.line}:</span> <span>{warning.message}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {report && (
         <details className="text-xs text-muted-foreground" data-testid="checked-list">
           <summary className="cursor-pointer">What was checked, and what was not</summary>

@@ -115,4 +115,18 @@ describe('ValidationReport', () => {
     expect(document.querySelector('b')).toBeNull();
     expect(screen.getByRole('button')).toHaveTextContent('<b onmouseover=alert(1)>hi</b>');
   });
+
+  it('lists warnings apart from problems, each selecting its line, and says the schema can still be saved', async () => {
+    const goTo = vi.fn();
+    const withWarnings = { ...reportOk, warnings: [
+      { line: 41, column: 3, fixable: false, code: 'attribute_slot', message: "'country' has the value type 'string': it is stored as an attribute of Locality, not as a link to another node" },
+      { line: 38, column: 3, fixable: false, code: 'relation_direction', message: "'has_measurement' reads from a Species to a Measurement" },
+    ] };
+    render(<ValidationReport validation={{ ...done, report: withWarnings as never }} text="text" onGoToLine={goTo} />);
+    expect(screen.getByTestId('validation-status')).toHaveTextContent('No problems found.');
+    expect(screen.getByTestId('warning-list')).toHaveTextContent('2 warnings (the schema can still be saved)');
+    await userEvent.click(screen.getByRole('button', { name: /has_measurement/ }));
+    expect(goTo).toHaveBeenCalledWith(38);
+    expect(screen.queryByTestId('problem-list')).toBeNull();
+  });
 });

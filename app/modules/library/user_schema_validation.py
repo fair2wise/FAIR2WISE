@@ -106,6 +106,8 @@ class Report:
     stats: dict[str, int] = field(default_factory=dict)
     checked: tuple[str, ...] = CHECKED
     note: str = NOT_CHECKED
+    #: Findings that do not stop a save: how the extractor will read a slot (see :func:`relation_warnings`).
+    warnings: list[Problem] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
         """JSON-safe form for the API."""
@@ -338,6 +340,35 @@ def _check_loads(text: str, top: dict[str, tuple[yaml.Node, yaml.Node]], problem
                                     "load_failed"))
 
 
+def relation_warnings(top: dict[str, tuple[yaml.Node, yaml.Node]]) -> list[Problem]:
+    """Non-blocking findings about how the extractor will use each slot (attribute or relation, and which way it reads).
+
+    The extractor stores a relation from the term it registers (the subject) to the related term. A slot whose range is a
+    value type (string, number ...) is stored as an attribute of its class, not as a link. A ``has_...`` slot between two
+    classes reads from the container; a paper often names the contained thing first, so it is better written as
+    ``..._of`` from that thing or given an ``inverse``. Core slots are skipped.
+    """
+    from ..term_extractor.schema import CORE_FIELD_SLOTS, LITERAL_RANGES
+
+    out: list[Problem] = []
+    classes = set(_mapping(top["classes"][1])) if "classes" in top else set()
+    slots = _mapping(top["slots"][1]) if "slots" in top else {}
+    for name, (key, value) in slots.items():
+        if name in CORE_FIELD_SLOTS or name == "related_to":
+            continue
+        body = _mapping(value)
+        rng = _scalar(body["range"][1]) if "range" in body else None
+        dom = _scalar(body["domain"][1]) if "domain" in body else None
+        if rng and rng.lower() in LITERAL_RANGES:
+            out.append(Problem(_line(key), f"'{name}' has the value type '{rng}': it is stored as an attribute of "
+                               f"{dom or 'its class'}, not as a link to another node", "attribute_slot", _col(key)))
+        elif rng in classes and dom in classes and name.startswith("has_") and "inverse" not in body:
+            out.append(Problem(_line(key), f"'{name}' reads from a {dom} to a {rng}. A paper usually names the {rng} first, "
+                               f"and the extractor stores a relation from the term it registers: write it as '..._of' from the "
+                               f"{rng} (domain {rng}, range {dom}) or add an 'inverse:'", "relation_direction", _col(key)))
+    return out
+
+
 def validate_schema_text(text: str) -> Report:
     """Check ``text`` and return every finding with its line; ``ok`` only when there is none.
 
@@ -380,7 +411,9 @@ def validate_schema_text(text: str) -> Report:
     if not problems:
         _check_loads(text, top, problems)
     problems.sort(key=lambda p: (p.line, p.message))
-    return Report(not problems, problems, stats)
+    warnings = relation_warnings(top) if not problems else []
+    warnings.sort(key=lambda p: (p.line, p.message))
+    return Report(not problems, problems, stats, warnings=warnings)
 
 
 # ------------------------------------------------------------------------------------------------ the required core

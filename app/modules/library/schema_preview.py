@@ -92,7 +92,7 @@ def page_prompt(schema_context: str, filename: str, page: int, text: str) -> str
         f"schema_context:\n{_cap_context(schema_context)}\n\nPAPER: {filename}\nPAGE: {page}\n\nCONTENT:\n{body}")
 
 
-def _summarize(fixed: Mapping[str, Any], raw_cat: str, counts: dict[str, int]) -> None:
+def _summarize(fixed: Mapping[str, Any], raw_cat: str, counts: dict[str, int], judged_counts: Mapping[str, int] | None = None) -> None:
     counts["terms"] += 1
     raw = fixed.get("raw_category")
     if raw:
@@ -108,6 +108,8 @@ def _summarize(fixed: Mapping[str, Any], raw_cat: str, counts: dict[str, int]) -
             counts["relations_became_related_to" if rel.get("relation") == "related_to" else "relations_mapped"] += 1
         if rel.get("verified") is False:
             counts["relations_unverified"] += 1
+    for outcome, count in (judged_counts or {}).items():
+        counts[outcome] += count
 
 
 class SchemaPreview:
@@ -214,8 +216,10 @@ class SchemaPreview:
         workdir = self.kg.store.root.parent
         started = self.clock()
         counts = dict.fromkeys(("terms", "categories_exact", "categories_mapped", "categories_fell_back_to_thing", "relations",
-                                "relations_mapped", "relations_became_related_to", "relations_unverified"), 0)
+                                "relations_mapped", "relations_became_related_to", "relations_unverified", "relations_became_attributes",
+                                "relations_swapped"), 0)
         terms: list[dict[str, Any]] = []
+        seen_classes: dict[str, str] = {}   # term name (lower case) -> class, filled as terms arrive, for the relation checks
         page_rows: list[dict[str, Any]] = []
         stopped: str | None = None
         tmp = None
@@ -258,9 +262,19 @@ class SchemaPreview:
                     if not isinstance(raw, dict) or not str(raw.get("term", "")).strip() or len(terms) >= MAX_TERMS:
                         continue
                     fixed = helper.validate_and_fix_term(dict(raw))
-                    _summarize(fixed, str(raw.get("category") or ""), counts)
+                    # The extractor's own rule (SchemaHelper.judge_relations and mark_invalid_relations): what the extraction
+                    # would store as an attribute, swap or mark unverified, the preview shows the same way.
+                    judged = helper.judge_relations(fixed, lambda name: seen_classes.get(name.strip().lower(), ""))
+                    helper.mark_invalid_relations(fixed, lambda name: seen_classes.get(name.strip().lower(), ""))
+                    _summarize(fixed, str(raw.get("category") or ""), counts,
+                               {"relations_became_attributes": len(judged.attributes), "relations_swapped": len(judged.swapped)})
+                    seen_classes[str(fixed["term"]).strip().lower()] = str(fixed.get("category") or "Thing")
                     row["terms"] += 1
                     terms.append({"term": str(fixed["term"])[:200], "category": str(fixed.get("category") or "Thing"),
+                                  **({"attributes": [{"property": a["property"], "value": a["value"][:200]} for a in judged.attributes]}
+                                     if judged.attributes else {}),
+                                  **({"swapped_relations": [{"relation": w["relation"], "from": w["subject"][:200], "to": w["object"][:200]}
+                                                            for w in judged.swapped]} if judged.swapped else {}),
                                   "raw_category": fixed.get("raw_category"),
                                   "definition": str(fixed.get("definition") or "")[:DEFINITION_CHARS], "page": number,
                                   "relations": [{"relation": r["relation"], "related_term": str(r["related_term"])[:200],

@@ -81,6 +81,32 @@ Request bodies are capped before they are parsed (256 KiB plus overhead for sche
 
 `app/modules/library/schema_preview.py`. Without `confirm` the route answers only an estimate (pages at most 3, tokens, optional cost, confirmation token from `estimate.py`); nothing is read or called. With the matching token it reads the first up to 3 pages with text, makes one plain-JSON model call per page and coerces the answers onto the schema with `SchemaHelper` (the extractor's own matching). It returns the terms (category, truncated definition, relations with `verified`) and a summary: how many categories fell back to `Thing`, how many relations became `related_to` or stayed unverified. Nothing is stored: no bundle, no KG, no term store; a text schema is written under `<workdir>/tmp/schema-preview-*` and removed. The difference from real extraction (agent with tool calls, merging, snippet passes) is stated in the answer's `note`.
 
+## How relations are read (user schemas)
+
+The extractor stores a relation from the term it registers (the subject) to the related term. The pilot's plecos run
+(2026-11-25) logged hundreds of `relation 'has_measurement' invalid for Measurement->Species` lines: the model registered
+the Measurement and related it to its Species with a slot whose domain is Species, and filed `country` and `water_body`
+(string attributes of Locality) as links. What is done, for schemas that are not shipped (a shipped schema keeps its
+behaviour and its pinned prompt):
+
+- **Extraction.** A slot whose range is a value type (string, integer, float, boolean, date ...) is an attribute of the term:
+  the value is stored in the term's `properties` (property, value) and no node or edge is made for it. A relation that is
+  invalid as given but valid with subject and object swapped is stored on the other term, verified (`add_relation`), and
+  counted. Anything else invalid stays and is marked `verified=false`. The run log has one line per distinct pattern with
+  its count, and the run result carries `relation_checks` (totals per outcome and the patterns).
+- **What the extractor is shown.** The prompt says a relation is read from the term being registered (first class of the
+  Usage line is the term, the second the related term), and lists attribute slots apart under ATTRIBUTES (give the value as
+  `related_term`, do not register it as a term). `name` and `description` are not listed.
+- **Preview.** The preview applies the same two functions (`judge_relations`, `mark_invalid_relations`), so a relation the
+  extraction would store as an attribute, swap or mark unverified is shown that way (summary keys
+  `relations_became_attributes`, `relations_swapped`; per term `attributes` and `swapped_relations`).
+- **Generation.** The instructions tell the model the subject is the term being registered, to write predicates that read
+  naturally from it (`measurement_of`, `feature_of`, `collected_at`) or give `inverse:`, and that a slot with a value type is
+  an attribute, never a link.
+- **Schema panel.** The validator adds non-blocking `warnings`: `attribute_slot` for each value-type slot and
+  `relation_direction` for a `has_...` slot between two classes with no `inverse`. They are listed under the problems with
+  their lines; the schema can still be saved.
+
 ## Extraction prompt bound
 
 **CodeSnippet is not offered to the model.** The class (and `has_code_snippet`, which points at it) is filled by the pipeline from `code_snippets`; its description in the required core says so. The extraction and preview prompts, full or condensed, leave it out for shipped and user schemas alike (`PIPELINE_ONLY_CLASSES` in `schema.py`), because a model that was offered it filed ordinary terms, such as a staining method, under it (pilot 2026-11-25). The schema still holds the class, validation still knows it, and a term that arrives with that category is demoted as before.

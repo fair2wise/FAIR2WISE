@@ -48,6 +48,8 @@ export interface SchemaReport {
   note: string;
   /** True when `insert-core` would fix at least one problem. */
   fixable: boolean;
+  /** Findings that do not stop a save: how the extractor will read a slot (attribute, or a relation that reads from the container). */
+  warnings: SchemaProblem[];
 }
 
 /** One stored version without its text. */
@@ -126,6 +128,8 @@ export interface PreviewTerm {
   definition: string;
   page: number;
   relations: PreviewRelation[];
+  attributes?: Array<{ property: string; value: string }>;
+  swapped_relations?: Array<{ relation: string; from: string; to: string }>;
 }
 
 export interface PreviewSummary {
@@ -137,6 +141,10 @@ export interface PreviewSummary {
   relations_mapped: number;
   relations_became_related_to: number;
   relations_unverified: number;
+  /** Relations whose slot holds a value (string, number): stored as an attribute of the term, as the extraction does. */
+  relations_became_attributes?: number;
+  /** Relations that were the wrong way round: stored on the other term, as the extraction does. */
+  relations_swapped?: number;
 }
 
 /** `POST /schemas/preview` with `confirm: true` (the estimate fields plus the run). */
@@ -161,16 +169,14 @@ export class SchemaInvalidError extends ApiError {
   }
 }
 
-/** Parse a report defensively: anything the server did not send becomes an empty value. */
-export function parseReport(raw: unknown): SchemaReport | null {
-  if (raw === null || typeof raw !== 'object') return null;
-  const body = raw as Record<string, unknown>;
-  if (typeof body.ok !== 'boolean' || !Array.isArray(body.problems)) return null;
-  const problems: SchemaProblem[] = [];
-  for (const item of body.problems) {
+/** Parse a list of findings defensively (a missing or odd list is empty). */
+function parseProblems(raw: unknown): SchemaProblem[] {
+  const out: SchemaProblem[] = [];
+  if (!Array.isArray(raw)) return out;
+  for (const item of raw) {
     if (item === null || typeof item !== 'object') continue;
     const row = item as Record<string, unknown>;
-    problems.push({
+    out.push({
       line: typeof row.line === 'number' && row.line >= 1 ? Math.floor(row.line) : 1,
       message: typeof row.message === 'string' ? row.message : '',
       code: typeof row.code === 'string' ? row.code : '',
@@ -178,6 +184,15 @@ export function parseReport(raw: unknown): SchemaReport | null {
       fixable: row.fixable === true,
     });
   }
+  return out;
+}
+
+/** Parse a report defensively: anything the server did not send becomes an empty value. */
+export function parseReport(raw: unknown): SchemaReport | null {
+  if (raw === null || typeof raw !== 'object') return null;
+  const body = raw as Record<string, unknown>;
+  if (typeof body.ok !== 'boolean' || !Array.isArray(body.problems)) return null;
+  const problems = parseProblems(body.problems);
   const stats: Record<string, number> = {};
   if (body.stats && typeof body.stats === 'object') {
     for (const [key, value] of Object.entries(body.stats as Record<string, unknown>)) {
@@ -187,6 +202,7 @@ export function parseReport(raw: unknown): SchemaReport | null {
   return {
     ok: body.ok,
     problems,
+    warnings: parseProblems(body.warnings),
     stats,
     checked: Array.isArray(body.checked) ? body.checked.filter((x): x is string => typeof x === 'string') : [],
     note: typeof body.note === 'string' ? body.note : '',

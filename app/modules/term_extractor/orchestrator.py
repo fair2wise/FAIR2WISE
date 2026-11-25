@@ -525,6 +525,20 @@ class Orchestrator:
                 )
         return row
 
+    def relation_check_summary(self) -> dict[str, Any]:
+        """The relation repairs of this run (see ``TermStore.relation_check_report``), logged once per distinct pattern.
+
+        ``{}`` when nothing was repaired. One log line per pattern with its count, not one per occurrence.
+        """
+        report = self.store.relation_check_report()
+        for row in report.get("patterns", []):
+            what = {"attribute": "stored as an attribute of the term, not a relation",
+                    "swapped": "was the wrong way round and was stored swapped, verified",
+                    "invalid": "does not fit the schema and is marked verified=False"}[row["outcome"]]
+            shape = row["relation"] if row["outcome"] == "attribute" else f"{row['subject_class']} -{row['relation']}-> {row['object_class']}"
+            logger.warning("relation %s %s: %d times", shape, what, row["count"])
+        return report
+
     def passage_summary(self) -> dict[str, Any]:
         """Passage coverage of this run for the run summary: ``total`` and ``papers`` (per file name)."""
         papers = self.store.run_passage_stats()
@@ -818,6 +832,7 @@ class Orchestrator:
             "output_file": self.store.output_file,
             "pdf_results": pdf_results,
             "passages": self.passage_summary(),
+            **({"relation_checks": checks} if (checks := self.relation_check_summary()) else {}),
         }
 
     def process_directory(self, data_dir: str) -> dict[str, Any]:
@@ -854,6 +869,7 @@ class Orchestrator:
             "unique_terms": len(self.store),
             "output_file": self.store.output_file,
             "passages": self.passage_summary(),
+            **({"relation_checks": checks} if (checks := self.relation_check_summary()) else {}),
         }
 
 

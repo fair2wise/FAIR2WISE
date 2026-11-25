@@ -17,7 +17,8 @@
       "loads in SchemaView and SchemaHelper"
     ],
     "note": "Not full LinkML conformance: the linkml linter and validator are not used.",
-    "fixable": false
+    "fixable": false,
+    "warnings": []
   },
   "attempts": [
     {
@@ -54,7 +55,8 @@
           "loads in SchemaView and SchemaHelper"
         ],
         "note": "Not full LinkML conformance: the linkml linter and validator are not used.",
-        "fixable": false
+        "fixable": false,
+        "warnings": []
       }
     },
     {
@@ -76,7 +78,8 @@
           "loads in SchemaView and SchemaHelper"
         ],
         "note": "Not full LinkML conformance: the linkml linter and validator are not used.",
-        "fixable": false
+        "fixable": false,
+        "warnings": []
       }
     }
   ],

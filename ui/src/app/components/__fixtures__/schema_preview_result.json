@@ -62,7 +62,9 @@
     "relations": 2,
     "relations_mapped": 0,
     "relations_became_related_to": 1,
-    "relations_unverified": 0
+    "relations_unverified": 0,
+    "relations_became_attributes": 0,
+    "relations_swapped": 0
   },
   "stopped": null,
   "note": "One plain-JSON model call per page with the schema's prompt text and the extractor's own class and relation matching; the real extraction runs the agent and merges terms. Nothing was stored."

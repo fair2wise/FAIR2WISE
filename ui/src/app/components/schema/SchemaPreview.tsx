@@ -143,6 +143,8 @@ export function SchemaPreview({ text, textOk, selection }: SchemaPreviewProps) {
             {result.summary.categories_fell_back_to_thing} fell back to Thing.
             Relations: {result.summary.relations}, of which {result.summary.relations_became_related_to} became related_to and{' '}
             {result.summary.relations_unverified} stayed unverified.
+            {(result.summary.relations_became_attributes ?? 0) > 0 ? ` ${result.summary.relations_became_attributes} would be stored as an attribute of the term, not a link.` : ''}
+            {(result.summary.relations_swapped ?? 0) > 0 ? ` ${result.summary.relations_swapped} were the wrong way round and would be stored swapped.` : ''}
           </p>
           {result.stopped && <p className="text-sm text-muted-foreground">Stopped early: {result.stopped}</p>}
           {result.page_results.filter(r => r.note).map(r => <p key={r.page} className="text-xs text-muted-foreground">Page {r.page}: {r.note}</p>)}

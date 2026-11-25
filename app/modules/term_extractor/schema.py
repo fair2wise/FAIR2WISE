@@ -1,5 +1,7 @@
 """LinkML-schema helper that validates and repairs extracted terms and relations."""
 
+from collections.abc import Callable
+from dataclasses import dataclass, field
 import logging
 import re
 from typing import Any
@@ -122,6 +124,74 @@ GENERAL_RELATION_ALIASES: dict[str, str] = {
 PIPELINE_ONLY_CLASSES: frozenset[str] = frozenset({"CodeSnippet"})
 
 
+#: Slot ranges that hold a value, not another node: a slot with one of these is an attribute of the term.
+LITERAL_RANGES: frozenset[str] = frozenset({
+    "string", "str", "integer", "int", "float", "double", "decimal", "boolean", "bool", "date", "datetime", "time", "uri",
+    "uriorcurie", "ncname", "objectidentifier", "nodeidentifier"})
+
+
+#: Slots that are the fields of every term (not relations): left out of a user schema's prompt.
+CORE_FIELD_SLOTS: frozenset[str] = frozenset({"name", "description"})
+
+
+@dataclass
+class RelationJudgement:
+    """What :meth:`SchemaHelper.judge_relations` decided for the relations of one registered term.
+
+    Attributes:
+        attributes: Relations whose slot has a literal range (``country: Brazil``): ``{"property", "value"}`` to store on
+            the term itself, not as an edge.
+        swapped: Relations that are invalid as given but valid with subject and object exchanged: ``{"relation",
+            "subject", "object", "subject_class", "object_class"}``, to store on the *object* term (the real subject).
+        invalid: ``(subject_class, relation, object_class)`` of relations left in place and marked ``verified=False``.
+    """
+
+    attributes: list[dict[str, str]] = field(default_factory=list)
+    swapped: list[dict[str, str]] = field(default_factory=list)
+    invalid: list[tuple[str, str, str]] = field(default_factory=list)
+
+
+def judge_relations(schema: Any, term_data: dict[str, Any], category_of: Callable[[str], str]) -> RelationJudgement:  # noqa: ANN401  # Any: a SchemaHelper or a duck-typed double
+    """:meth:`SchemaHelper.judge_relations` for any schema object; a schema without ``repair_relations`` changes nothing."""
+    out = RelationJudgement()
+    if not getattr(schema, "repair_relations", False):
+        return out
+    subject_class = str(term_data.get("category") or "")
+    kept: list[dict[str, Any]] = []
+    for rel in term_data.get("relations") or []:
+        pred = str(rel.get("relation") or "")
+        if rel.get("verified") and schema.is_attribute_slot(pred):
+            out.attributes.append({"property": pred, "value": str(rel.get("related_term") or "")})
+            continue
+        if rel.get("verified") and subject_class:
+            obj_name = str(rel.get("related_term") or "")
+            object_class = category_of(obj_name)
+            if object_class and not schema.check_relation_validity(subject_class, pred, object_class):
+                if schema.check_relation_validity(object_class, pred, subject_class):
+                    out.swapped.append({"relation": pred, "subject": obj_name, "object": str(term_data.get("term") or ""),
+                                        "subject_class": object_class, "object_class": subject_class})
+                    continue
+                rel["verified"] = False
+                out.invalid.append((subject_class, pred, object_class))
+        kept.append(rel)
+    term_data["relations"] = kept
+    return out
+
+
+def mark_invalid_relations(schema: Any, term_data: dict[str, Any], category_of: Callable[[str], str]) -> list[tuple[str, str, str]]:  # noqa: ANN401  # Any: a SchemaHelper or a duck-typed double
+    """:meth:`SchemaHelper.mark_invalid_relations` for any schema object with ``check_relation_validity``."""
+    marked: list[tuple[str, str, str]] = []
+    subject_class = str(term_data.get("category") or "")
+    for rel in term_data.get("relations") or []:
+        if not rel.get("verified", False):
+            continue
+        object_class = category_of(str(rel.get("related_term") or ""))
+        if subject_class and object_class and not schema.check_relation_validity(subject_class, rel["relation"], object_class):
+            rel["verified"] = False
+            marked.append((subject_class, str(rel["relation"]), object_class))
+    return marked
+
+
 class SchemaHelper:
     """Load a LinkML schema and validate extracted terms against it.
 
@@ -146,6 +216,9 @@ class SchemaHelper:
         from ..resources import resolve_resource
 
         self.sanitize_descriptions = sanitize_descriptions
+        #: Relation repairs (attributes, swapped subject and object) are for schemas whose text is not ours; a shipped
+        #: schema keeps the original behaviour exactly.
+        self.repair_relations = sanitize_descriptions
         self.schema_path = schema_path
         self.fuzzy_cutoff = fuzzy_cutoff
         self.schema_view = SchemaView(str(resolve_resource(schema_path)))
@@ -216,13 +289,26 @@ class SchemaHelper:
                 lines.append(f"- {cls}: {desc}  (inherits from: {parent})")
             else:
                 lines.append(f"- {cls}: {desc}")
+        offered = self.offered_slots()
+        if self.repair_relations:   # name and description are the term's own fields, never relations or attributes to give
+            offered = {name: info for name, info in offered.items() if name not in CORE_FIELD_SLOTS}
+        attributes = sorted(name for name in offered if self.repair_relations and self.is_attribute_slot(name))
         lines.append("\nVALID RELATIONSHIPS (use exactly these names):")
-        for slot in sorted(self.offered_slots()):
+        if self.repair_relations:
+            lines.append("A relation is read from the term you register: the first class of its Usage line is the term you "
+                         "register, the second is the related_term. Never swap them.")
+        for slot in sorted(name for name in offered if name not in attributes):
             info = self.slots[slot]
             dom = info["domain"] or "Any"
             rng = info["range"] or "Any"
             mv = "(multivalued)" if info["multivalued"] else ""
             lines.append(f"- {slot}: {info['description']}  Usage: {dom} --{slot}--> {rng} {mv}")
+        if attributes:
+            lines.append("\nATTRIBUTES (a value of the term itself, not a link to another entity; give each as a relation whose "
+                         "related_term is the value text, and do not register the value as a term):")
+            for slot in attributes:
+                info = self.slots[slot]
+                lines.append(f"- {slot}: {info['description']}  Usage: {info['domain'] or 'Any'} --{slot}--> value ({info['range']})")
         lines.append("\nIMPORTANT: Do NOT use relations named 'description' or 'category'.")
         return "\n".join(lines)
 
@@ -242,6 +328,9 @@ class SchemaHelper:
 
         head = "=== KNOWLEDGE SCHEMA (condensed: the full schema is too long for the prompt) ===\n"
         tail = "\nIMPORTANT: Do NOT use relations named 'description' or 'category'."
+        if self.repair_relations:
+            tail = ("\nA relation is read from the term you register: domain>range is subject>related_term, never swapped. A "
+                    "slot whose range is string or a number is an attribute of the term (related_term is the value)." + tail)
         view = condensed_view(
             {name: info["description"] for name, info in self.offered_classes().items()},
             {slot: (info["domain"], info["range"] or "Any") for slot, info in self.offered_slots().items() if info["domain"]},
@@ -414,6 +503,38 @@ class SchemaHelper:
 
         term_data["relations"] = cleaned_rels
         return term_data
+
+    def is_attribute_slot(self, slot: str) -> bool:
+        """Whether ``slot`` holds a value of the term (its range is a literal such as string or number), not another node."""
+        info = self.slots.get(slot)
+        return bool(info and str(info["range"] or "").lower() in LITERAL_RANGES)
+
+    def judge_relations(self, term_data: dict[str, Any], category_of: Callable[[str], str]) -> RelationJudgement:
+        """Judge the relations of a term that :meth:`validate_and_fix_term` already normalised, in place.
+
+        The one rule used by the extraction and the schema preview, so they cannot disagree. Only for a schema with
+        :attr:`repair_relations`; otherwise nothing changes. The subject is the term being registered. For each verified
+        relation: a slot with a literal range is an attribute of the term (removed from ``relations``); a relation that is
+        invalid as given but valid with subject and object swapped is removed and reported in ``swapped`` (the caller
+        stores it on the object term); any other invalid relation stays and is marked ``verified=False``. A relation whose
+        object has no known class cannot be judged and is left as it is.
+
+        Args:
+            term_data: The normalised term dict (``category``, ``relations``); ``relations`` is replaced.
+            category_of: Class of a term by name, ``""`` when not known (yet).
+
+        Returns:
+            What was decided.
+        """
+        return judge_relations(self, term_data, category_of)
+
+    def mark_invalid_relations(self, term_data: dict[str, Any], category_of: Callable[[str], str]) -> list[tuple[str, str, str]]:
+        """Mark ``verified=False`` on each verified relation whose classes violate its slot's domain or range.
+
+        Judged only when the subject class and the object's class (``category_of``) are known. Shared by the extraction and
+        the schema preview. Returns ``(subject_class, relation, object_class)`` of each relation marked.
+        """
+        return mark_invalid_relations(self, term_data, category_of)
 
     def _is_subclass_of(self, child: str, parent: str) -> bool:
         if child == parent:
