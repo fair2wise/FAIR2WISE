@@ -217,7 +217,8 @@ class BundleStore:
                backend: str | None = None, papers: Iterable[PaperRef] = (), parent: str | None = None,
                reconstructed: bool = False, terms: Mapping[str, Any] | None = None,
                kg: Mapping[str, Any] | None = None, processed_pdfs: Sequence[str] = (),
-               extraction_manifest: Mapping[str, Any] | None = None) -> Bundle:
+               extraction_manifest: Mapping[str, Any] | None = None,
+               passages: Mapping[str, Mapping[str, int]] | None = None) -> Bundle:
         """Create a new bundle; refuse a name that already exists (``CONFLICT``).
 
         The directory is created atomically (``mkdir`` without ``exist_ok``), so two concurrent creations
@@ -239,6 +240,8 @@ class BundleStore:
             "model": model, "backend": backend, "papers": [p.to_json() for p in papers], "parent": parent,
             "reconstructed": bool(reconstructed), "created_at": now, "updated_at": now,
         }
+        if passages:
+            manifest["passages"] = {str(p): {str(k): int(v) for k, v in row.items()} for p, row in passages.items()}
         try:
             _write_json(directory / TERMS_FILE, terms if terms is not None else
                         {"metadata": {}, "terms": [], "code_snippets": []})
@@ -260,6 +263,11 @@ class BundleStore:
             name: New bundle name.
             schema_id: The schema the caller asked for, if any; must equal the parent's (see :func:`ensure_schema_locked`).
             topic: Overrides the parent's topic when given.
+
+        The parent's manifest ``passages`` block (per-paper supporting-text coverage) is copied, so the child's own extractions
+        sum onto it and the per-paper note on the node card stays right for the papers the parent covered. The parent's
+        ``recovery`` block is not copied: it describes a run of the parent, and the child's ``passages`` entries already carry
+        what that run found.
         """
         source = self.get(parent)
         ensure_schema_locked(source.manifest, schema_id)
@@ -273,7 +281,8 @@ class BundleStore:
             parent=parent, reconstructed=bool(source.manifest.get("reconstructed")),
             terms=_read_json(source.file(TERMS_FILE)), kg=_read_json(source.file(KG_FILE)),
             processed_pdfs=_read_json(source.file(PROCESSED_FILE)),
-            extraction_manifest=_read_json(source.file(EXTRACTION_MANIFEST_FILE)))
+            extraction_manifest=_read_json(source.file(EXTRACTION_MANIFEST_FILE)),
+            passages=source.manifest.get("passages") if isinstance(source.manifest.get("passages"), dict) else None)
 
     def record_extraction(self, name: str, *, schema_id: str, model: str | None, backend: str | None,
                           papers: Iterable[PaperRef],

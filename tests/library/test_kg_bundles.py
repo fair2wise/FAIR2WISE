@@ -328,3 +328,35 @@ def test_an_extracted_nodes_record_carries_its_supporting_passages_per_paper(tmp
     by_paper = {p["source_paper"]: p for p in node.publications}
     assert [s["text"] for s in by_paper["a.pdf"]["snippets"]] == ["We image clouds with tomography."]
     assert by_paper["b.pdf"]["snippets"][0]["page"] == 2 and by_paper["b.pdf"]["snippet_count"] == 1
+
+
+def test_continuing_a_bundle_carries_the_passages_block_and_the_childs_extraction_sums_onto_it(tmp_path):
+    store = B.BundleStore(tmp_path / "kgs", clock=lambda: "2026-11-24T00:00:00Z")
+    parent = store.create("parent", schema=SCHEMA, kg={"things": [], "associations": []},
+                          papers=[B.PaperRef("a.pdf", "h", 1)])
+    row = {"terms": 4, "with_passage": 3, "quoted": 2, "located": 1, "rejected": 1, "uncovered": 1, "relations": 2,
+           "relations_with_evidence": 1, "evidence_sentences": 2, "relations_without": 1}
+    manifest = dict(parent.manifest)
+    manifest["passages"] = {"a.pdf": row}
+    manifest["recovery"] = {"last_run": "x", "located_added": 1}
+    B._write_json(parent.directory / B.MANIFEST_FILE, manifest)
+    child = store.fork("parent", "child")
+    assert child.manifest["passages"] == {"a.pdf": row} and "recovery" not in child.manifest   # conservative: not copied
+    child.manifest["passages"]["a.pdf"]["terms"] = 99                                          # an independent copy
+    assert store.get("parent").manifest["passages"]["a.pdf"]["terms"] == 4
+    store.record_extraction("child", schema_id=SCHEMA["id"], model="m", backend="cborg", papers=[B.PaperRef("b.pdf", "h2", 2)],
+                            passages={"a.pdf": {"terms": 1, "with_passage": 1, "quoted": 1, "located": 0, "rejected": 0,
+                                                "uncovered": 0}, "b.pdf": {"terms": 2, "with_passage": 2}})
+    summed = store.get("child").manifest["passages"]
+    assert summed["a.pdf"]["terms"] == 5 and summed["a.pdf"]["with_passage"] == 4 and summed["a.pdf"]["relations"] == 2
+    assert summed["b.pdf"] == {"terms": 2, "with_passage": 2}
+    # the per-paper note: a paper of the parent block has coverage on the child, a new unsearched one does not
+    kg = store.get("child").directory / B.KG_FILE
+    assert B.passage_papers_for(kg) == frozenset({"a.pdf", "b.pdf"})
+    assert B.passage_papers_for(store.get("parent").directory / B.KG_FILE) == frozenset({"a.pdf"})
+
+
+def test_a_bundle_without_a_passages_block_forks_without_one(tmp_path):
+    store = B.BundleStore(tmp_path / "kgs", clock=lambda: "2026-11-24T00:00:00Z")
+    store.create("parent", schema=SCHEMA, kg={"things": [], "associations": []})
+    assert "passages" not in store.fork("parent", "child").manifest
