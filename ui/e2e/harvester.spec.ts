@@ -30,7 +30,7 @@ test.describe('Harvester panel', () => {
     await expect(start).toBeDisabled();
     await page.getByLabel('Topic').fill('resonant soft x-ray scattering');
     await page.getByLabel('Category').selectOption('rsoxs');
-    await page.getByLabel('Schema (label only)').selectOption({ index: 1 });
+    await page.getByLabel('Schema to record with the run').selectOption({ index: 1 });
     await page.getByRole('checkbox', { name: 'OpenAlex' }).click();
     await page.getByLabel('Max downloads').fill('12');
     await expect(start).toBeEnabled();
