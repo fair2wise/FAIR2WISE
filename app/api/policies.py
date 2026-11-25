@@ -154,6 +154,9 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
        note="export a bundle to the configured release directory; explicit confirm in the body"),
     _v("V95", "GET", "/library/kgs/{name}/download", "library.extract", on_als=False,
        note="stream an exported KG file (matkg_<name>.json from the release directory) to the browser; 404 until exported"),
+    _v("V99", "POST", "/library/kgs/{name}/passages", "library.extract", on_als=False,
+       note="start library_passages: find supporting text for the terms of a bundle from its source papers, no model; "
+            "answers the job handle; refused for an unknown bundle, no source papers, a held bundle or a run in progress"),
     _v("V75", "POST", "/library/kgs/continue", "library.extract", on_als=False,
        note="create a bundle by continuing a bundle or a KG file (kg_to_terms reverse build)"),
     # T45 (A8): the Harvester's runs and paywalled queue under /v1/library/harvest; :local only. V76-V79.

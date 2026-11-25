@@ -343,9 +343,12 @@ def create_api_app(
             raise StartupConfigError(f"config_rejected: {exc}") from exc
         app.state.f2w_harvest = Harvester(library_service, HarvestStore(Path(cfg.workdir) / "library" / "harvest.sqlite"),
                                           proxy_prefix=proxy_prefix)
+        from ..modules.library.passages_job import LibraryPassages
+
+        app.state.f2w_library_passages = LibraryPassages(library_service, BundleStore(Path(cfg.workdir) / BUNDLES_DIRNAME))
         library_handlers_ = library_handlers(library_service, extractor=LibraryExtractor(
             library_service, BundleStore(Path(cfg.workdir) / BUNDLES_DIRNAME), env=startup_env),
-            harvester=app.state.f2w_harvest)
+            harvester=app.state.f2w_harvest, passages=app.state.f2w_library_passages)
         # Publish to Tiled (owner decision 2026-11-10): export, adopt and stage a plan; the route and the job share it.
         from ..modules.library.jobs import LIBRARY_PUBLISH_KIND
         from ..modules.library.publish import LibraryPublisher

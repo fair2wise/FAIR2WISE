@@ -1,4 +1,4 @@
-"""``/v1/library`` KG bundle routes (policies V70-V75; task T38, :local only).
+"""``/v1/library`` KG bundle routes (policies V70-V75 and V99; task T38, :local only).
 
 ``GET kgs|schemas|models``, ``POST estimate``, ``POST kgs/{name}/export`` and ``POST kgs/continue``.
 Mounted by ``create_api_app`` on the ``:local`` profile only, so an ALS profile answers 404. The model
@@ -8,6 +8,7 @@ list is read-only over the live catalog: nothing here calls or changes ``PUT /se
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from fastapi import Depends, FastAPI, Query, Request
@@ -16,10 +17,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..modules.contracts.context import RequestContext
 from ..modules.contracts.errors import ContractError, ErrorCode
+from ..modules.contracts.jobs import JobState
+from ..modules.library.jobs import LIBRARY_PASSAGES_KIND
 from ..modules.library.kg_service import MAX_PAPER_IDS, KgLibrary
+from ..modules.library.passages_job import LibraryPassages
 from ..modules.library.publish import LibraryPublisher
 from ..modules.security.authorization import require
-from .routes_common import Prefixed, context, project
+from .routes_common import Prefixed, context, dump, fresh_context, operations, project, project_dict
 
 
 class EstimateBody(BaseModel):
@@ -47,6 +51,14 @@ class PublishBody(BaseModel):
 
     confirm: bool = False
     again: bool = False
+
+
+class PassagesBody(BaseModel):
+    """Body of ``POST /v1/library/kgs/{name}/passages``: an optional ``nonce`` that makes a deliberate re-run a new job."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    nonce: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class ContinueBody(BaseModel):
@@ -132,7 +144,28 @@ def install(app: FastAPI, service: KgLibrary) -> FastAPI:
             return project(request, detail)  # type: ignore[no-any-return]
         return project(request, publisher.submit(ctx, name, again=body.again))  # type: ignore[no-any-return]
 
+    @router.post("/kgs/{name}/passages")
+    def find_passages(name: str, body: PassagesBody, request: Request,
+                      ctx: RequestContext = Depends(fresh_context)) -> dict[str, Any]:
+        """Start ``library_passages``: find supporting text for the terms of a bundle (no model is used); answers the job handle.
+
+        Refused with a typed error when the bundle does not exist (404), cites no source paper (422
+        ``no_source_papers``), is held by a running job (409 ``bundle_busy``) or is already being searched (409
+        ``passages_in_progress``). Status, progress and cancel are the ordinary job routes.
+        """
+        require(ctx, "library.extract")
+        recovery = getattr(request.app.state, "f2w_library_passages", None)
+        if not isinstance(recovery, LibraryPassages):
+            raise ContractError(ErrorCode.INTERNAL, "the supporting-text job is not installed")
+        ops = operations(request)
+        open_jobs = [(job.kind, job.job_id) for state in (JobState.QUEUED, JobState.RUNNING)
+                     for job in ops.jobs.store.list_jobs_scoped(kind=LIBRARY_PASSAGES_KIND, state=state, limit=1000)
+                     if job.inputs.params.get("bundle") == name]
+        recovery.check_startable(name, open_jobs=open_jobs)
+        handle = ops.submit_job(ctx, LIBRARY_PASSAGES_KIND, recovery.inputs(name, nonce=body.nonce or os.urandom(8).hex()))
+        return project_dict(request, dump(handle))
+
     return app
 
 
-__all__ = ("ContinueBody", "EstimateBody", "ExportBody", "PublishBody", "install", "kg_library")
+__all__ = ("ContinueBody", "EstimateBody", "ExportBody", "PassagesBody", "PublishBody", "install", "kg_library")

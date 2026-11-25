@@ -566,16 +566,18 @@ class LibraryExtractor:
             if pages <= 0:
                 logger.warning("%s: the PDF could not be read", name)
                 raise PaperFailed(name, "the PDF could not be read")
+            passage_delta = _passage_delta(passages_before, _paper_passage_stats(orch, name), name)
             self.record_pdf(bundle, Path(rel).name, sha, pages, with_terms)
             # Per-PDF manifest entry now, not only at the end: a failed, hung or fenced-out run keeps its finished papers.
             self.store.record_extraction(
                 bundle.name, schema_id=str(schema_block["id"]), model=model, backend=backend["name"],
                 papers=[B.PaperRef(Path(rel).name, str(row["sha256"]), pages)],
-                passages=_passage_delta(passages_before, _paper_passage_stats(orch, name), name))
+                passages=passage_delta)
             counts["extracted"] += 1
             counts["pages"] += pages
             counts["pages_with_terms"] += with_terms
-            return {"relpath": rel, "sha256": sha, "pages": pages, "pages_with_terms": with_terms}
+            return {"relpath": rel, "sha256": sha, "pages": pages, "pages_with_terms": with_terms,
+                    **({"passages": passage_delta[name]} if name in passage_delta else {})}
 
         def finalize() -> int:
             """Importance, terms, KG and manifest for what is finished (also after a cancel)."""

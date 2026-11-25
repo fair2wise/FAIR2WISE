@@ -82,7 +82,11 @@ def library_service(db_path: str, environ: Mapping[str, str] | None = None) -> J
         pipelines[LIBRARY_PUBLISH_KIND] = LibraryPublisher(
             KgLibrary(BundleStore(workdir / BUNDLES_DIRNAME)), operations, storage_kg=workdir / SNAPSHOTS_DIRNAME,
             environ=env).pipeline()
-    register_library_jobs(service, settings, handlers=library_handlers(library, extractor=extractor, harvester=harvester),
+    from ..library.passages_job import LibraryPassages
+
+    passages = LibraryPassages(library, BundleStore(workdir / BUNDLES_DIRNAME))  # no model: it only reads the library PDFs
+    register_library_jobs(service, settings,
+                          handlers=library_handlers(library, extractor=extractor, harvester=harvester, passages=passages),
                           pipelines=pipelines)
     return service
 

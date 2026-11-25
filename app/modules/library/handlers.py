@@ -16,6 +16,7 @@ from .jobs import (
     LIBRARY_HARVEST_KIND,
     LIBRARY_INDEX_KIND,
     LIBRARY_KIND_CAPABILITIES,
+    LIBRARY_PASSAGES_KIND,
     LIBRARY_VERIFY_KIND,
     StageHandler,
 )
@@ -24,6 +25,7 @@ from .service import LibraryService
 if TYPE_CHECKING:  # pragma: no cover
     from .extraction import LibraryExtractor
     from .harvest import Harvester
+    from .passages_job import LibraryPassages
 
 #: Most unverified paper ids a verify run reports as incomplete (the rest are counted only).
 MAX_REPORTED_REMAINING = 200
@@ -83,8 +85,17 @@ def harvest_handler(harvester: Harvester) -> StageHandler:
     return run
 
 
+def passages_handler(recovery: LibraryPassages) -> StageHandler:
+    """The ``library_passages`` stage: find supporting text for an existing KG bundle (see :mod:`.passages_job`)."""
+    def run(ctx: StageContext) -> StageResult:
+        ctx.require(LIBRARY_KIND_CAPABILITIES[LIBRARY_PASSAGES_KIND])
+        return recovery.run(ctx)
+
+    return run
+
+
 def library_handlers(service: LibraryService, *, extractor: LibraryExtractor | None = None,
-                     harvester: Harvester | None = None) -> Mapping[str, StageHandler]:
+                     harvester: Harvester | None = None, passages: LibraryPassages | None = None) -> Mapping[str, StageHandler]:
     """``kind -> stage body`` for the kinds implemented so far (T35 verify, T36 index, T39 extract).
 
     ``library_extract`` is included only when an ``extractor`` is given; otherwise it stays the fail-closed stub.
@@ -94,7 +105,9 @@ def library_handlers(service: LibraryService, *, extractor: LibraryExtractor | N
         out[LIBRARY_EXTRACT_KIND] = extract_handler(extractor)
     if harvester is not None:
         out[LIBRARY_HARVEST_KIND] = harvest_handler(harvester)
+    if passages is not None:
+        out[LIBRARY_PASSAGES_KIND] = passages_handler(passages)
     return out
 
 
-__all__ = ("MAX_REPORTED_REMAINING", "extract_handler", "harvest_handler", "index_handler", "library_handlers", "verify_handler")
+__all__ = ("MAX_REPORTED_REMAINING", "extract_handler", "harvest_handler", "index_handler", "library_handlers", "passages_handler", "verify_handler")

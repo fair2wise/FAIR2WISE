@@ -54,6 +54,42 @@ def derive_outcome(state: JobState, done: int, failed: int) -> str:
     return state.value
 
 
+#: Keys of one paper's passage coverage counts in an extraction unit's result (``passages``).
+PASSAGE_KEYS = ("terms", "with_passage", "quoted", "located", "rejected", "uncovered")
+#: Keys of the recovery totals of a ``library_passages`` job (``recovery``).
+RECOVERY_KEYS = ("terms", "with_passage_before", "located_added", "newly_covered", "still_uncovered")
+
+
+def _passage_blocks(done_units: list[dict[str, Any]]) -> dict[str, Any]:
+    """Additive ``passages`` (extraction coverage) and ``recovery`` (library_passages) blocks from finished units.
+
+    ``passages``: ``{"total": {...}, "papers": {name: {...}}}`` from the per-paper counts an extraction unit carries.
+    ``recovery``: ``{"total": {...}, "papers": {name: {...}}}`` from the per-paper results of a recovery unit; a paper
+    that was not processed has ``reason`` and ``text`` instead of counts. A key is present only when some unit has it.
+    """
+    out: dict[str, Any] = {}
+    cover: dict[str, dict[str, int]] = {}
+    recovered: dict[str, dict[str, Any]] = {}
+    for unit in done_units:
+        result = unit.get("result")
+        if not isinstance(result, dict):
+            continue
+        name = Path(str(result.get("relpath") or unit["unit_id"])).name
+        if isinstance(result.get("passages"), dict):
+            cover[name] = {k: int(result["passages"].get(k, 0)) for k in PASSAGE_KEYS}
+        if isinstance(result.get("recovery"), dict):
+            recovered[str(unit["unit_id"])] = {k: (v if isinstance(v, (int, str)) else 0)
+                                               for k, v in result["recovery"].items()}
+    if cover:
+        out["passages"] = {"total": {k: sum(row[k] for row in cover.values()) for k in PASSAGE_KEYS}, "papers": cover}
+    if recovered:
+        processed = [r for r in recovered.values() if not r.get("reason")]
+        total = {k: sum(int(r.get(k, 0)) for r in processed) for k in RECOVERY_KEYS}
+        total.update({"papers_processed": len(processed), "papers_skipped": len(recovered) - len(processed)})
+        out["recovery"] = {"total": total, "papers": recovered}
+    return out
+
+
 def run_summary(store: JobStore, job: JobRecord, *, detail: bool = True) -> dict[str, Any]:
     """Build the summary of ``job``.
 
@@ -66,7 +102,8 @@ def run_summary(store: JobStore, job: JobRecord, *, detail: bool = True) -> dict
         A JSON-ready dict: ``outcome``, ``state``, ``started_at``, ``finished_at``, ``elapsed_seconds``, ``stage``
         (``name``, ``status``, ``phase``), ``current_paper`` (display name or ``None``; only while running),
         ``papers`` (``total``, ``done``, ``failed``, ``skipped`` and, with ``detail``, ``failed_list``), ``growth``,
-        ``counters`` (the stage's other counters), ``schema_prompt_condensed`` (``{full_chars, used_chars, budget}`` when a user
+        ``counters`` (the stage's other counters), ``passages`` and ``recovery`` (additive, only when a finished unit
+        carries them: passage coverage of an extraction and the result of a ``library_passages`` job, per paper and in total), ``schema_prompt_condensed`` (``{full_chars, used_chars, budget}`` when a user
         schema's prompt text was condensed for this run, else ``None``), ``params`` (bundle, model, backend, schema, topic), ``error``
         (scrubbed) and ``logs`` (``kept``, ``total``, ``cap``).
     """
@@ -108,6 +145,7 @@ def run_summary(store: JobStore, job: JobRecord, *, detail: bool = True) -> dict
         "error": scrub(error)[:400] or None,
         "logs": store.log_stats(job.job_id),
     }
+    out.update(_passage_blocks(done_units))
     if detail:
         out["papers"]["failed_list"] = [
             {"name": Path(str(u["error"]).split(": ", 1)[0]).name or u["unit_id"],
