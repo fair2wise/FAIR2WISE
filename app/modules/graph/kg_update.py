@@ -68,12 +68,14 @@ def _splash_graphql(
 
 
 def rebuild_kg(terms_json: str, kg_json: str) -> JsonObject:
-    """Convert ``terms_json`` to MatKG ``kg_json`` (keeps provenance + snippets)."""
+    """Convert ``terms_json`` to MatKG ``kg_json`` (keeps provenance and snippets, also for nodes that already existed)."""
     from ..json2kg import convert_terms_to_graph
 
     out = Path(kg_json)
     out.parent.mkdir(parents=True, exist_ok=True)
-    graph = convert_terms_to_graph(Path(terms_json), out)
+    # An extracted bundle keeps every record's passages, pages, properties and publications even when the node was
+    # created first as a relation-target stub (pilot 2026-11-24); the legacy CLI and snapshot path stay frozen (T23A).
+    graph = convert_terms_to_graph(Path(terms_json), out, merge_existing=True)
     return {
         "status": "success",
         "kg_json": str(out),

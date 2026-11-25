@@ -12,7 +12,7 @@ Features:
   - Full utilization of extracted term fields: formula, formula_validation, properties
 """
 import argparse
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 import hashlib
 import json
 import logging
@@ -97,6 +97,57 @@ def make_id(term: str, prefix: str = "matkg") -> str:
         return f"{prefix}:{cleaned}"
     cleaned = _CLEAN_PATTERN.sub("", term.replace(" ", ""))
     return f"{prefix}:{cleaned}"
+
+
+def _union_by(existing: list[Any], incoming: Iterable[Any], key: Callable[[Any], Any]) -> None:
+    """Append the ``incoming`` items whose ``key`` is not in ``existing`` yet (order kept, nothing replaced)."""
+    seen = {key(item) for item in existing}
+    for item in incoming:
+        k = key(item)
+        if k not in seen:
+            seen.add(k)
+            existing.append(item)
+
+
+def _snippet_key(snippet: Any) -> tuple[Any, ...]:  # noqa: ANN401 - a snippet is a dict from JSON (or junk)
+    if isinstance(snippet, dict):
+        return (snippet.get("source_paper"), snippet.get("page"), snippet.get("text"))
+    return ("?", None, repr(snippet))
+
+
+def merge_term_into_node(term: dict[str, Any], node: dict[str, Any]) -> None:
+    """Carry what another record of the same term adds into the node that already exists (nothing is overwritten).
+
+    A node exists before its term is processed when an earlier term named it as a relation target (a stub with empty
+    lists) or when the terms file lists the id twice. The later record used to add only category, name, description and
+    papers, so its supporting passages, pages, properties, publications and metadata were silently dropped. Now list
+    fields are unioned (passages by paper, page and text; pages; properties; publications by source paper), the
+    source metadata dict is completed, and scalar fields are filled only where the node has none.
+    """
+    for list_key in ("pages", "authors", "institutions", "keywords"):
+        _union_by(node.setdefault(list_key, []), ensure_list(term.get(list_key)), lambda v: json.dumps(v, sort_keys=True))
+    _union_by(node.setdefault("context_snippets", []), ensure_list(term.get("context_snippets")), _snippet_key)
+    _union_by(node.setdefault("properties", []), ensure_list(term.get("properties")),
+              lambda v: json.dumps(v, sort_keys=True, default=str))
+    pubs = node.setdefault("publications", [])
+    for pub in normalize_publications(term):
+        match = next((p for p in pubs if p.get("source_paper") == pub.get("source_paper")), None)
+        if match is None:
+            pubs.append(pub)
+        else:
+            for k, v in pub.items():
+                if v not in (None, "", [], {}) and match.get(k) in (None, "", [], {}):
+                    match[k] = v
+    metadata = node.setdefault("source_metadata", {})
+    if isinstance(metadata, dict) and isinstance(term.get("source_metadata"), dict):
+        for paper, meta in term["source_metadata"].items():
+            metadata.setdefault(paper, meta)
+    for scalar in ("formula", "publication_year", "paper_title", "doi", "journal", "volume", "issue", "pages_range",
+                   "abstract_text"):
+        if node.get(scalar) in (None, "") and term.get(scalar) not in (None, ""):
+            node[scalar] = term[scalar]
+    if not node.get("formula_validation") and term.get("formula_validation"):
+        node["formula_validation"] = term["formula_validation"]
 
 
 def ensure_list(val: object) -> list[Any]:
@@ -264,6 +315,7 @@ def build_graph(
     *,
     default_id_prefix: str = "matkg",
     strict_snippets: bool = True,
+    merge_existing: bool = False,
 ) -> dict[str, Any]:
     """Build a MatKG-compatible graph from raw term records.
 
@@ -273,6 +325,11 @@ def build_graph(
     Returns a dict with keys:
       - "things": list of node dicts
       - "associations": list of edge dicts
+
+    ``merge_existing`` (the extracted-bundle path, ``kg_update.rebuild_kg``) carries a later record of a term into a node
+    that already exists (a relation-target stub or an earlier duplicate id): passages, pages, properties, publications
+    and metadata are unioned (:func:`merge_term_into_node`). Off by default: the frozen T23A contract bytes of this
+    converter (``docs/migration/json_kg_contract.md``) are unchanged for the CLI and the snapshot path.
     """
     nodes: dict[str, dict[str, Any]] = {}
     edges: list[dict[str, Any]] = []
@@ -369,6 +426,8 @@ def build_graph(
             for paper in ensure_list(term.get("source_papers")):
                 if paper not in papers:
                     papers.append(paper)
+            if merge_existing:
+                merge_term_into_node(term, existing)
             copy_passthrough_slots(term, existing)
 
         # Process relations
@@ -455,12 +514,13 @@ def build_graph(
     return {"things": list(nodes.values()), "associations": edges}
 
 
-def convert_terms_to_graph(input_json: Path, output_json: Path) -> dict[str, Any]:
+def convert_terms_to_graph(input_json: Path, output_json: Path, *, merge_existing: bool = False) -> dict[str, Any]:
     """Convert extracted_terms JSON into MatKG graph JSON.
 
     Args:
         input_json: Path to input terms JSON
         output_json: Path where graph JSON will be written
+        merge_existing: Carry later records of a term into a node that already exists (see :func:`build_graph`).
 
     Returns:
         The constructed graph dict
@@ -476,7 +536,7 @@ def convert_terms_to_graph(input_json: Path, output_json: Path) -> dict[str, Any
     prefix = "matkg"
     if isinstance(meta, dict) and meta.get("id_prefix"):
         prefix = str(meta["id_prefix"])
-    graph = build_graph(terms, code_snippets=snippets, default_id_prefix=prefix)
+    graph = build_graph(terms, code_snippets=snippets, default_id_prefix=prefix, merge_existing=merge_existing)
     if isinstance(meta, dict) and meta:
         graph["metadata"] = meta
 

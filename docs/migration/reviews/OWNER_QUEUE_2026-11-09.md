@@ -39,6 +39,7 @@ corpora (`e2e_demo/v1`, `bl1101/v4`) in its own Tiled.
 | B15 | Docstring-style CI gate (owner kept it, 2026-11-09) and the 13 suspected-bug list (all fixed) | none | `reviews/H7/readthrough_F25_F38.md` |
 | B16 | H8 removal list: the alias shims and facades (tiled_graph, kg_update, orchestrator_agent, debate_agent, admitted_chat, bl1101_ingest), the 54-row Splash deletion list, `scripts/app/modules/kg_rag_api.py` stale copy, the retire list of 16 legacy files (held for your review) | approve at H8 | `reviews/H8/legacy_ports_plan.md`, `reviews/H8/splash_retirement.md`, `reviews/H8/legacy_audit.md` |
 | B17 | The `tiled_sim` write path for bl1101 versions past v9 (being aligned with the standard writer) and the P3 shims | none beyond B16 | `reviews/H8/legacy_ports_plan.md` |
+| B19 | `storage/kg/matkg_rsoxs_v1.json` (7,022 nodes, 60 with passages) was built from an older, smaller terms snapshot than the shipped `extracted_terms_rsoxs_v1.json` (24,681 terms; 18,490 ids absent from the KG; no builder filter explains it) and the terms file itself has passages on 3.7% of terms (regression, 2026-09-15 to 2026-11-24) | leave as is / rebuild from the full terms file with the fixed builder (no model calls; passages for 914 terms) / re-extract | `mkdocs/docs/ui-extraction.md` Known issues (added 2026-11-24) |
 | B18 | Moving `arxiv` and `pyalex` to the dev environment (a lock re-solve changes CI inputs; in progress) | confirm after the diff is shown | dependency branch |
 
 ## C. Still not started because it needs B or A first

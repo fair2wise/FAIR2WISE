@@ -170,6 +170,19 @@ The working-tree copy on `forge_merge` is byte-identical.
   Later nodes from the same paper get no fallback link. Wiring edges have `has_evidence: null`. Frozen by
   `test_code_snippet_nodes_and_wiring`.
 
+
+### 2.6a Opt-in merge of later records into an existing node (2026-11-24)
+
+The frozen behaviour above stands for the CLI, `convert_terms_to_graph` and the snapshot path: a term whose node
+already exists (created first as a relation-target stub, or an earlier record of the same id) adds only category,
+name, description and `source_papers`; its `context_snippets`, `pages`, `properties`, `publications` and metadata
+are dropped. `build_graph(..., merge_existing=True)` (and `convert_terms_to_graph(..., merge_existing=True)`) unions
+those fields into the existing node instead (`merge_term_into_node`: passages de-duplicated by paper, page and text;
+nothing overwritten; stubs that never get a record stay empty). Only `kg_update.rebuild_kg`, the KG build of an
+extracted library bundle, opts in: on the shipped RSoXS terms file the default keeps 230 of 849 distinct passages
+(203 of 917 passage-bearing terms), the opt-in keeps all 849 (914 terms), with identical node and edge counts.
+Flipping the default is a contract change for the owner to decide; the expected fixtures are unchanged.
+
 ### 2.7 Hazards that are part of the frozen behavior
 
 These are recorded, not fixed. Changing any of them is a deliberate behavior change that needs its own migration
