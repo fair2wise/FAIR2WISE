@@ -97,7 +97,7 @@ test.describe('KG viewer graph sources', () => {
     await page.goto('/');
     await page.getByRole('button', { name: 'KG Viewer' }).click();
     await expect(page.locator('[data-kg-empty="false"]')).toBeVisible();
-    await expect(page.getByLabel('Graph source')).toHaveCount(0);
+    await expect(page.getByLabel('Graph source', { exact: true })).toHaveCount(0);
   });
 
   test('reading a Tiled source passes source on graph, search and node requests and is remembered', async ({ page }) => {
@@ -105,7 +105,7 @@ test.describe('KG viewer graph sources', () => {
     await mockAgent(page, { graphSources: { listing: listing(), graphs: { 'tiled:e2e_demo': TILED_GRAPH }, requests } });
     await page.goto('/');
     await page.getByRole('button', { name: 'KG Viewer' }).click();
-    const select = page.getByLabel('Graph source');
+    const select = page.getByLabel('Graph source', { exact: true });
     await expect(select).toBeVisible();
     await expect(page.getByTestId('graph-source-kind')).toHaveText('Default');
 
@@ -128,11 +128,11 @@ test.describe('KG viewer graph sources', () => {
 
     await page.reload();
     await page.getByRole('button', { name: 'KG Viewer' }).click();
-    await expect(page.getByLabel('Graph source')).toHaveValue('tiled:e2e_demo');
+    await expect(page.getByLabel('Graph source', { exact: true })).toHaveValue('tiled:e2e_demo');
     await useFixedLayout(page); // the layout choice is not remembered across a reload
     await expect(page.locator('[data-kg-node-id="m:alpha"]')).toBeVisible();
 
-    await page.getByLabel('Graph source').selectOption('');
+    await page.getByLabel('Graph source', { exact: true }).selectOption('');
     await expect(page.locator(`[data-kg-node-id="${P3HT_NODE.id}"]`)).toBeVisible();
     await expect(page.getByTestId('graph-source-kind')).toHaveText('Default');
   });
