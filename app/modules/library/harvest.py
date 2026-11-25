@@ -1001,7 +1001,7 @@ class Harvester:
 
         def guarded(getter: Callable[..., Any]) -> Callable[..., Any]:
             """The getter, except that a host the proxy refused earlier in this run is not asked again."""
-            def call(url: str, **kwargs: Any) -> Any:
+            def call(url: str, **kwargs: Any) -> Any:  # noqa: ANN401 - forwards the getter's own keyword arguments and result
                 if refused.refused(url):
                     refused.skip(url)
                     raise JSONFetchError("skipped: refused by the proxy earlier in this run", blocked="proxy_refused", host=_host(url))
