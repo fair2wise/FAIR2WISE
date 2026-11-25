@@ -100,7 +100,8 @@ def filter_relevant(candidates: list[dict[str, Any]], vocabulary: Counter[str]) 
     """
     if sum(1 for count in vocabulary.values() if count >= MIN_NODE_COUNT) < MIN_VOCABULARY_WORDS:
         return list(candidates), []
-    kept, dropped = [], []
+    kept: list[dict[str, Any]] = []
+    dropped: list[dict[str, Any]] = []
     for candidate in candidates:
         (kept if len(shared_kg_words(candidate, vocabulary)) >= MIN_SHARED_KG_WORDS else dropped).append(candidate)
     return kept, dropped
