@@ -55,3 +55,18 @@ test('14 approvals + confirm dialog', async ({ page }) => {
   await boot(page); await page.getByRole('link', { name: 'Pending Approvals' }).click(); await page.waitForTimeout(600); await shot(page, '14a-approvals');
   await page.getByRole('button', { name: 'Approve', exact: true }).click(); await page.waitForTimeout(600); await shot(page, '14b-approve-confirm');
 });
+test('15 schema panel', async ({ page }) => {
+  // The schema routes are not in mockLibrary: answer them here (list, validate) so the Extract form shows the button.
+  const text = 'id: https://example.org/user/catfish\nname: catfish\nversion: 0.1.0\nclasses:\n  Thing:\n    description: Anything.\n';
+  const ok = { ok: true, problems: [], stats: { bytes: text.length, classes: 1, slots: 0 }, note: 'Not full LinkML conformance: the linkml linter and validator are not used.',
+    checked: ['size and encoding', 'parses as YAML (no tags, anchors or duplicate keys)'], fixable: false };
+  await boot(page);
+  // Registered after boot so these win over the library mock's own routes.
+  await page.route('**/v1/library/schemas/user', route => route.fulfill({ json: { schemas: [] } }));
+  await page.route('**/v1/library/schemas/validate', route => route.fulfill({ json: ok }));
+  await page.getByRole('link', { name: 'Extract' }).click();
+  await page.getByTestId('open-schema-panel').click();
+  await page.getByTestId('schema-textarea').fill(text);
+  await page.waitForTimeout(900);
+  await shot(page, '15-schema-panel');
+});
