@@ -189,6 +189,35 @@ a complete sentence with a verb, such as "A new in-vacuum spectrometer has been 
 Brookhaven National Laboratory.", were rejected as affiliations; only 2 term-paper pairs depended on them); the rest are terms whose name does not appear in the paper in a sentence that passes the quality
 rules (the earlier estimate of about 90% counted any mention, including headers, references and fragments).
 
+**Why the other 23% are not located** (the same six papers, 2,497 term-paper pairs, measured by running the locator and the
+quality rules on every mention; each pair is counted once under the cause closest to acceptance: length, then fragment,
+caption, header, references; script: `causes.py` in the session scratchpad, no model call):
+
+| Cause | Old rule (`National`/institution words) | Shape rule (now) |
+|---|---|---|
+| Located | 1,910 (76.5%) | 1,912 (76.6%) |
+| (a) name not found on any page | 122 | 122 |
+| (b) found only in the reference list | 232 | 232 |
+| (c) found only in header, affiliation or boilerplate lines | 43 | 39 |
+| (d) found only in figure captions | 36 | 36 |
+| (e) found only in sentences rejected as fragments, equations, table text or mid-sentence cuts (no final punctuation 48, equation or fragment 47, starts mid-sentence 30, citation entry 1) | 125 | 126 |
+| (f) found only in sentences that stay under 120 characters even extended | 29 | 30 |
+| (g) no text layer or unreadable | 0 | 0 |
+| (h) anything else | 0 | 0 |
+
+The `National` rule is almost no part of it: only 2 pairs became located because of the change (22 candidate sentences of
+these papers, all with a verb, were rejected as affiliations before; most belong to terms that were located elsewhere). The
+largest groups are the reference list (9.3%: terms whose only appearance is in a citation title), names not found (4.9%) and
+fragments (5.0%). The 122 pairs of (a) split, by a rough check of the words of the name against the paper, into 18 where the
+model wrote `long form (ABBR)` and the paper has only the abbreviation (`gate voltage (VGS)`, `short-circuit current density
+(JSC)`, `internal charge transfer (ICT)`: the locator counts an abbreviation only where the paper defines it, so these would
+need paper-level knowledge), 91 where every word of the name is in the paper but not adjacent or in another form (`thermal
+annealing`, `e-beam evaporation`, `Ultraviolet-visible (UV-Vis) spectroscopy`, `fluorine (F)`: word order, inflection,
+paraphrase), 6 where only some words are present (`threshold voltage`, `silicon nitride membranes`, `SmCTB phase`,
+`glassy posaconazole small molecule films`) and 7 where no word of the name is (`Curing`, `passivation`, `Posaconazole`:
+the model's own wording or a name the paper writes another way). Stems of words were compared crudely, so the split is
+indicative; the total of (a) is exact.
+
 **What it cannot recover:** terms the model rewrote (`electron-doped high-temperature superconductor`, LaTeX names, `1/C2-V
 Mott-Schottky plots`), scanned PDFs without a text layer (reported as such), papers no longer in the library or whose name is
 ambiguous (reported), terms whose only mentions are in headers, references or figure captions, and relations whose two
