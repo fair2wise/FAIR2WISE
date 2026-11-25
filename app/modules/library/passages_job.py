@@ -32,8 +32,11 @@ from ..jobs.keys import OperationInputs
 from ..jobs.pipeline import StageBusy, StageContext, StageResult
 from ..jobs.stages import WorkUnit, chunked_stage
 from ..term_extractor import passages as P
+from ..term_extractor import provenance
+from ..term_extractor.pub_clean import merge_known_publication
 from ..term_extractor.models import union_evidence
 from .jobs import library_inputs
+from .publication_records import PublicationRecords
 
 if TYPE_CHECKING:
     from .service import LibraryService
@@ -155,6 +158,8 @@ class LibraryPassages:
         self.service = service
         self.store = store
         self._clock = clock
+        self._records: PublicationRecords | None = None
+        self._shas: dict[str, str | None] = {}
 
     # ------------------------------------------------------------------ route side
     def source_papers(self, bundle: B.Bundle) -> list[str]:
@@ -235,6 +240,8 @@ class LibraryPassages:
         ctx.log(f"searching {len(papers)} papers of bundle {name} for supporting text (no model is used)")
         changed = {"added": 0}
         started = self._clock()
+        self._records = PublicationRecords(self.service._require_root())  # noqa: SLF001 - one trusted package
+        self._shas = sha_by_name
 
         def units(_sc: StageContext) -> list[WorkUnit]:
             return [WorkUnit(unit_id=p, unit_key=f"{p}:{sha_by_name.get(p) or ''}:{RECOVERY_REVISION}", payload=p)
@@ -255,11 +262,13 @@ class LibraryPassages:
                 ctx.log(f"{paper}: skipped, {REASON_TEXT[REASON_NO_TEXT]}", level="warning")
                 return {"recovery": {"reason": REASON_NO_TEXT, "text": REASON_TEXT[REASON_NO_TEXT]}}
             result = self._recover_paper(sc, bundle, terms_path, paper, pages)
-            changed["added"] += result["located_added"] + result["evidence_added"]
+            changed["added"] += result["located_added"] + result["evidence_added"] + result["publication_terms_corrected"]
             ctx.log(f"{paper}: {result['terms']} terms, {result['with_passage_before']} with text before, "
                     f"{result['located_added']} passages added for {result['newly_covered']} terms, "
                     f"{result['still_uncovered']} still without; {result['relations']} relations, {result['evidence_added']} sentences added "
-                    f"for {result['relations_newly_covered']}, {result['relations_still_without']} without a sentence naming both ends")
+                    f"for {result['relations_newly_covered']}, {result['relations_still_without']} without a sentence naming both ends"
+                    + (f"; publication record corrected on {result['publication_terms_corrected']} terms"
+                       if result["publication_terms_corrected"] else ""))
             return {"recovery": result}
 
         try:
@@ -310,6 +319,7 @@ class LibraryPassages:
                 added += hit
                 newly += 1
         rel_total, rel_before, rel_newly, rel_added, rel_sentences_now = self._recover_relations(sc, terms, paper, pages)
+        pub_fixed = self._correct_publication(terms, paper)
         quoted_now = located_now = 0
         for term in terms:
             for s in term.get("context_snippets") or []:
@@ -318,17 +328,17 @@ class LibraryPassages:
                         located_now += 1
                     else:
                         quoted_now += 1
-        if added or rel_added:
+        if added or rel_added or pub_fixed:
             doc.setdefault("metadata", {})
             meta = doc["metadata"] if isinstance(doc["metadata"], dict) else {}
-            if isinstance(meta, dict):
+            if isinstance(meta, dict) and (added or rel_added):
                 stats = meta.setdefault("passages", {})
                 if isinstance(stats, dict):
                     stats[paper] = adjust_entry(stats.get(paper), terms=len(terms), with_before=with_before, newly=newly,
                                                 located=added, quoted_now=quoted_now, located_now=located_now,
                                                 rel_total=rel_total, rel_before=rel_before, rel_newly=rel_newly,
                                                 rel_added=rel_added, rel_sentences_now=rel_sentences_now)
-                doc["metadata"] = meta
+            doc["metadata"] = meta
             sc.guard()  # a stop requested now leaves the old terms file
             write_json_atomic(terms_path, doc)
         self._record_paper(bundle.name, paper, {"terms": len(terms), "with_before": with_before, "newly": newly,
@@ -338,7 +348,32 @@ class LibraryPassages:
         return {"terms": len(terms), "with_passage_before": with_before, "located_added": added, "newly_covered": newly,
                 "still_uncovered": len(terms) - with_before - newly, "relations": rel_total,
                 "relations_with_evidence_before": rel_before, "evidence_added": rel_added,
-                "relations_newly_covered": rel_newly, "relations_still_without": rel_total - rel_before - rel_newly}
+                "relations_newly_covered": rel_newly, "relations_still_without": rel_total - rel_before - rel_newly,
+                "publication_terms_corrected": pub_fixed}
+
+    def _correct_publication(self, terms: list[dict[str, Any]], paper: str) -> int:
+        """Set the publication metadata of ``paper`` on the terms that cite it from the library's own record (in place).
+
+        The library record (title, authors, year, DOI, venue the registry gave) wins for every field it has; the stored
+        PDF-derived fields stay for what it lacks, except a junk title or author (a file path, an ``f2w://`` URI, a tool or
+        account name, a postal address), which is dropped. Idempotent. Returns the number of terms changed.
+        """
+        records = getattr(self, "_records", None)
+        if records is None:   # driven outside run(): read the library's records now
+            records = self._records = PublicationRecords(self.service._require_root())  # noqa: SLF001 - one trusted package
+        known = records.for_file(paper, getattr(self, "_shas", {}).get(paper))
+        changed = 0
+        for term in terms:
+            source_metadata = term.get("source_metadata")
+            if not isinstance(source_metadata, dict):
+                source_metadata = term["source_metadata"] = {}
+            held = source_metadata.get(paper) if isinstance(source_metadata.get(paper), dict) else {}
+            new = provenance.clean_pub_meta(merge_known_publication(held, known))
+            if new != provenance.clean_pub_meta(held):
+                source_metadata[paper] = new
+                term["publications"] = provenance.publications_from_source_metadata(source_metadata)
+                changed += 1
+        return changed
 
     def _recover_relations(self, sc: StageContext, terms: list[dict[str, Any]], paper: str,
                            pages: list[str]) -> tuple[int, int, int, int, int]:
@@ -429,7 +464,8 @@ class LibraryPassages:
 
 #: Counts of one paper's recovery result that are summed into the totals.
 RESULT_KEYS = ("terms", "with_passage_before", "located_added", "newly_covered", "still_uncovered", "relations",
-               "relations_with_evidence_before", "evidence_added", "relations_newly_covered", "relations_still_without")
+               "relations_with_evidence_before", "evidence_added", "relations_newly_covered", "relations_still_without",
+               "publication_terms_corrected")
 
 
 def recovery_block(units: Mapping[str, Mapping[str, Any] | None]) -> dict[str, Any]:

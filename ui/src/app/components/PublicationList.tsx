@@ -5,8 +5,33 @@ import { PublicationFavoriteButton } from './PublicationFavoriteButton';
 import { getPublicationLinks, primaryLinkTitle } from './publicationLinks';
 import { cn } from './ui/utils';
 
-function formatAuthors(authors?: string[]) {
-  if (!authors || authors.length === 0) return '';
+const SCHEME = /^[a-z][a-z0-9+.-]{1,12}:\/\//i;
+const FILE_EXTENSION = /\.(?:pdf|vp|doc|docx|tex|dvi|ps|eps|indd|qxd|rtf|txt|htm|html|ppt|pptx|odt|tif|tiff|jpg|png|fm|wpd)$/i;
+const PATH_LIKE = /^(?:[a-z]:)?[\\/]|[\\/][^\\/\s]+[\\/]|^[\w.-]+[\\/][\w.-]+$/i;
+const TOOL_PLACEHOLDER = /^(?:microsoft (?:word|powerpoint|excel) - |untitled|document\d*$|slide \d+$|pii:|no title)/i;
+const JUNK_AUTHORS = new Set(['administrator', 'admin', 'user', 'owner', 'author', 'unknown', 'anonymous', 'default', 'guest', 'pc', 'laptop', 'microsoft', 'xerox', 'scanner', 'canon', 'hp', 'epson']);
+
+/** Whether a stored title is a file path, a URI, a file name or a tool's placeholder (never shown as a title). */
+export function isJunkTitle(text: string | undefined | null): boolean {
+  const raw = (text ?? '').split(/\s+/).filter(Boolean).join(' ');
+  return raw === '' || SCHEME.test(raw) || FILE_EXTENSION.test(raw) || PATH_LIKE.test(raw) || TOOL_PLACEHOLDER.test(raw);
+}
+
+/** The title to show: the paper's title, else "Untitled paper" with the file name (never a path or an f2w:// URI). */
+export function displayTitle(publication: { paper_title?: string | null; source_paper?: string | null }): string {
+  if (!isJunkTitle(publication.paper_title)) return String(publication.paper_title).trim();
+  const file = (publication.source_paper ?? '').split(/[\\/]/).pop() ?? '';
+  return file && !SCHEME.test(file) ? `Untitled paper (${file})` : 'Untitled publication';
+}
+
+function isJunkAuthor(name: string): boolean {
+  const raw = name.trim();
+  return raw === '' || JUNK_AUTHORS.has(raw.toLowerCase()) || SCHEME.test(raw) || (raw.length > 20 && /\d{4,}|\b(?:street|avenue|boulevard|road|suite)\b/i.test(raw));
+}
+
+function formatAuthors(all?: string[]) {
+  const authors = (all ?? []).filter(name => !isJunkAuthor(name));
+  if (authors.length === 0) return '';
   if (authors.length <= 3) return authors.join(', ');
   return `${authors.slice(0, 3).join(', ')} +${authors.length - 3}`;
 }
@@ -191,7 +216,7 @@ export function PublicationList({
         )}
       >
         {visiblePublications.map((publication, index) => {
-          const title = publication.paper_title || publication.source_paper || 'Untitled publication';
+          const title = displayTitle(publication);
           const authors = formatAuthors(publication.authors);
           const meta = [
             authors,

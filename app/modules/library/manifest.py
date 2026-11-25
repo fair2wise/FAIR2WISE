@@ -35,7 +35,8 @@ def _doi_key(doi: str | None) -> str:
 
 def _row(*, relpath: str, sha256: str, doi: str | None, title: str | None, year: int | None, now: str,
          source: str = "upload", arxiv_id: str | None = None, authors: list[str] | None = None,
-         abstract: str | None = None, provenance: str | None = None, supplied_by: str | None = None) -> dict[str, Any]:
+         abstract: str | None = None, provenance: str | None = None, supplied_by: str | None = None,
+         venue: str | None = None) -> dict[str, Any]:
     row = {
         "doi": f"https://doi.org/{_doi_key(doi)}" if doi else None,
         "arxiv_id": arxiv_id,
@@ -44,6 +45,7 @@ def _row(*, relpath: str, sha256: str, doi: str | None, title: str | None, year:
         "abstract": cap_abstract(abstract),
         "publication_year": year,
         "publication_date": None,
+        "venue": " ".join(str(venue).split())[:300] if venue else None,
         "source": source,
         "pdf_path": f"{PDF_PATH_PREFIX}/{relpath}",
         "pdf_urls": [],
@@ -63,7 +65,7 @@ def _row(*, relpath: str, sha256: str, doi: str | None, title: str | None, year:
 def record_upload(root: Path, category: str, *, relpath: str, sha256: str, doi: str | None, title: str | None,
                   year: int | None, now: str, source: str = "upload", arxiv_id: str | None = None,
                   authors: list[str] | None = None, abstract: str | None = None, provenance: str | None = None,
-                  supplied_by: str | None = None) -> dict[str, Any]:
+                  supplied_by: str | None = None, venue: str | None = None) -> dict[str, Any]:
     """Add the uploaded paper to ``<root>/<category>/manifest.json`` (created when the category is new).
 
     Args:
@@ -81,6 +83,7 @@ def record_upload(root: Path, category: str, *, relpath: str, sha256: str, doi: 
         abstract: The abstract from the registry, when known (stored capped as ``abstract``).
         provenance: ``user_supplied`` (or a confirmed variant) for a PDF a person supplied by hand; stored on the row.
         supplied_by: Who supplied it (the acting principal's subject), stored next to ``provenance``.
+        venue: The journal or repository the registry names, when known (stored as ``venue``).
 
     Returns:
         ``{"updated": bool, "path": "<category>/manifest.json", "detail": str}``; ``updated`` is false when the
@@ -118,7 +121,7 @@ def record_upload(root: Path, category: str, *, relpath: str, sha256: str, doi: 
                         return out
                 papers.append(_row(relpath=relpath, sha256=sha256, doi=doi, title=title, year=year, now=now,
                                    source=source, arxiv_id=arxiv_id, authors=authors, abstract=abstract,
-                                   provenance=provenance, supplied_by=supplied_by))
+                                   provenance=provenance, supplied_by=supplied_by, venue=venue))
                 tmp = manifest.with_suffix(".json.tmp")
                 tmp.write_text(json.dumps(data, indent=2, sort_keys=False) + "\n", encoding="utf-8")
                 tmp.replace(manifest)
@@ -170,12 +173,19 @@ def is_empty(value: object) -> bool:
     return value is None
 
 
-def fill_missing(row: dict[str, Any], *, authors: list[str] | None, abstract: str | None) -> list[str]:
-    """Set ``authors`` / ``abstract`` on ``row`` where it holds none; a non-empty stored value is never replaced.
+def fill_missing(row: dict[str, Any], *, authors: list[str] | None, abstract: str | None, title: str | None = None,
+                 venue: str | None = None, year: int | None = None) -> list[str]:
+    """Set ``authors`` / ``abstract`` (and with ``title`` / ``venue`` / ``year``, the repair fields) where the row has none.
+
+    A non-empty stored value is never replaced, with one exception: a stored ``title`` that is junk (a file path, an
+    ``f2w://`` URI, a file name, a tool's placeholder: :func:`~app.modules.term_extractor.pub_clean.is_junk_title`) is replaced
+    by a real one.
 
     Returns:
         The names of the fields filled (``[]`` when nothing changed).
     """
+    from ..term_extractor.pub_clean import is_junk_title
+
     filled: list[str] = []
     new_authors = clean_author_list(authors)
     if new_authors and is_empty(row.get("authors")):
@@ -185,11 +195,23 @@ def fill_missing(row: dict[str, Any], *, authors: list[str] | None, abstract: st
     if new_abstract and is_empty(row.get("abstract")):
         row["abstract"] = new_abstract
         filled.append("abstract")
+    clean_title = " ".join(str(title or "").split())
+    if clean_title and not is_junk_title(clean_title) and (is_empty(row.get("title")) or is_junk_title(row.get("title"))):
+        row["title"] = clean_title
+        filled.append("title")
+    clean_venue = " ".join(str(venue or "").split())[:300]
+    if clean_venue and is_empty(row.get("venue")):
+        row["venue"] = clean_venue
+        filled.append("venue")
+    if isinstance(year, int) and 1000 <= year <= 2200 and row.get("publication_year") is None:
+        row["publication_year"] = year
+        filled.append("publication_year")
     return filled
 
 
 def fill_row_metadata(manifest: Path, match: Callable[[dict[str, Any]], bool], *, authors: list[str] | None,
-                      abstract: str | None) -> list[str]:
+                      abstract: str | None, title: str | None = None, venue: str | None = None,
+                      year: int | None = None) -> list[str]:
     """Fill the missing authors/abstract of the manifest row ``match`` selects, writing the manifest atomically.
 
     Runs under the same per-category lock as :func:`record_upload`, re-reads the file (so a row added meanwhile is
@@ -199,7 +221,7 @@ def fill_row_metadata(manifest: Path, match: Callable[[dict[str, Any]], bool], *
     Returns:
         The names of the fields filled.
     """
-    if not (authors or abstract) or not manifest.is_file():
+    if not (authors or abstract or title or venue or year) or not manifest.is_file():
         return []
     try:
         with (manifest.parent / ".manifest.lock").open("a+") as lock:
@@ -210,7 +232,8 @@ def fill_row_metadata(manifest: Path, match: Callable[[dict[str, Any]], bool], *
                 if not isinstance(papers, list):
                     return []
                 row = next((r for r in papers if isinstance(r, dict) and match(r)), None)
-                filled = fill_missing(row, authors=authors, abstract=abstract) if row is not None else []
+                filled = (fill_missing(row, authors=authors, abstract=abstract, title=title, venue=venue, year=year)
+                          if row is not None else [])
                 if filled:
                     tmp = manifest.with_suffix(".json.tmp")
                     tmp.write_text(json.dumps(data, indent=2, sort_keys=False) + "\n", encoding="utf-8")

@@ -138,11 +138,16 @@ class LibraryCatalog:
                                   "WHERE relpath=? AND (doi IS NULL OR doi='')", (doi, relpath))
             self._con.commit()
 
-    def fill_identity(self, relpath: str, *, title: str | None, doi: str | None, source: str) -> None:
-        """Fill a missing title or DOI from what the registry told the harvester (never replaces a probe's value)."""
+    def fill_identity(self, relpath: str, *, title: str | None, doi: str | None, source: str,
+                      replace_title: bool = False) -> None:
+        """Fill a missing title or DOI from what the registry told the harvester (never replaces a probe's DOI).
+
+        ``replace_title`` makes the registry's title the record's title even when the probe read one: the PDF's own Info
+        field is often a file path or a tool name, and a registry title (OpenAlex, arXiv) is the source of truth.
+        """
         with self._lock:
             if title:
-                self._con.execute("UPDATE papers SET title=? WHERE relpath=? AND (title IS NULL OR title='')",
+                self._con.execute("UPDATE papers SET title=? WHERE relpath=?" + ("" if replace_title else " AND (title IS NULL OR title='')"),
                                   (title, relpath))
             if doi:
                 self._con.execute("UPDATE papers SET doi=?, doi_source=? WHERE relpath=? AND (doi IS NULL OR doi='')",

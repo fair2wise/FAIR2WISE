@@ -33,6 +33,7 @@ from .agent import build_graph
 from .clients import make_chat_client
 from .merge_index import DEFAULT_EMBED_MODEL, DEFAULT_MERGE_TOP_K, TermMergeIndex
 from .models import RelationRecord, TermRecord, union_evidence
+from .pub_clean import merge_known_publication
 from .prompts import build_page_prompt
 from .schema import SchemaHelper
 from .services import build_services, extract_and_attach_properties
@@ -169,6 +170,8 @@ class Orchestrator:
 
     #: Class-level defaults so an Orchestrator built without ``__init__`` (test doubles) is unbounded.
     schema_prompt_budget: int | None = None
+    #: ``file name -> the library's publication metadata of that paper`` (set by the library extractor); ``None`` reads the PDF only.
+    known_publications: Callable[[str], dict[str, Any] | None] | None = None
     _bounded_context: tuple[str, dict[str, int] | None] | None = None
 
     #: Polled before each page; ``True`` ends the work (the owning job stopped or lost its lease).
@@ -525,6 +528,17 @@ class Orchestrator:
                 )
         return row
 
+    def _publication_metadata(self, filename: str, pdf_meta: dict[str, Any]) -> dict[str, Any]:
+        """The library's own record of the paper first, then the PDF's fields for what it lacks (junk never used)."""
+        known = None
+        lookup = self.known_publications
+        if lookup is not None:
+            try:
+                known = lookup(filename)
+            except Exception as e:  # noqa: BLE001 - a record that cannot be read leaves the PDF's fields
+                logger.warning("Publication record lookup failed for %s: %s", filename, type(e).__name__)
+        return merge_known_publication(pdf_meta, known)
+
     def relation_check_summary(self) -> dict[str, Any]:
         """The relation repairs of this run (see ``TermStore.relation_check_report``), logged once per distinct pattern.
 
@@ -570,6 +584,7 @@ class Orchestrator:
         except Exception as e:
             logger.warning("Pub-metadata extraction failed for %s: %s", filename, e)
             pub_meta = {}
+        pub_meta = self._publication_metadata(filename, pub_meta)
 
         logger.debug("Processing '%s' (%d pages) with %d workers", filename, total_pages, self.max_workers)
         page_texts = passages.page_texts_from_doc(doc)
@@ -690,6 +705,7 @@ class Orchestrator:
         except Exception as e:
             logger.warning("Pub-metadata extraction failed for %s: %s", filename, e)
             pub_meta = {}
+        pub_meta = self._publication_metadata(filename, pub_meta)
 
         page_texts = passages.page_texts_from_doc(doc)
         self._set_paper_pages(filename, page_texts)

@@ -38,12 +38,15 @@ from ..literature.legacy_download import (
 )
 from .arrange import is_valid_folder_name
 from .bibmeta import cap_abstract, clean_author_list, openalex_abstract, openalex_authors
+from ..term_extractor.pub_clean import is_junk_title
 from .manifest import PDF_PATH_PREFIX, fill_row_metadata, is_empty
 
 logger = logging.getLogger(__name__)
 
 #: Fields OpenAlex is asked for (the minimum the backfill needs).
 OPENALEX_SELECT = "id,doi,authorships,abstract_inverted_index"
+#: What the repair also asks for: the title, the year and the venue (``primary_location.source``).
+OPENALEX_SELECT_REPAIR = "id,doi,title,publication_year,primary_location,authorships,abstract_inverted_index"
 OPENALEX_SOURCE, ARXIV_SOURCE = "openalex", "arxiv"
 #: Outcome codes of one row (the report counts each).
 OUTCOMES = ("updated", "not_found", "no_data", "failed", "unfillable", "already_filled", "deferred", "would_fetch")
@@ -119,7 +122,7 @@ def _arxiv_key(value: object) -> str:
 
 
 def openalex_fetcher(*, mailto: str | None = None, get_json: Callable[..., Any] = hardened_get_json,
-                     sleep: Callable[[float], None] | None = None) -> OpenAlexFetch:
+                     sleep: Callable[[float], None] | None = None, repair: bool = False) -> OpenAlexFetch:
     """A fetch of one work by DOI over the hardened OpenAlex helper (key from the environment, header only).
 
     Raises (when called):
@@ -132,7 +135,7 @@ def openalex_fetcher(*, mailto: str | None = None, get_json: Callable[..., Any] 
         if key is None:
             raise BackfillAbort("openalex_no_key")
         try:
-            rows, _ = openalex_get("works", filters={"doi": doi}, per_page=1, params={"select": OPENALEX_SELECT},
+            rows, _ = openalex_get("works", filters={"doi": doi}, per_page=1, params={"select": OPENALEX_SELECT_REPAIR if repair else OPENALEX_SELECT},
                                    mailto=mailto, api_key=key, get_json=get_json, sleep=sleep)
         except JSONFetchError as exc:
             if exc.status in (402, 429):
@@ -141,18 +144,29 @@ def openalex_fetcher(*, mailto: str | None = None, get_json: Callable[..., Any] 
         work = rows[0] if rows else None
         if work is None:
             return None
-        return {"authors": openalex_authors(work), "abstract": openalex_abstract(work)}
+        found: dict[str, Any] = {"authors": openalex_authors(work), "abstract": openalex_abstract(work)}
+        if repair:
+            location = work.get("primary_location")
+            source = location.get("source") if isinstance(location, Mapping) else None
+            year = work.get("publication_year")
+            found.update(title=" ".join(str(work.get("title") or "").split()) or None,
+                         venue=(source.get("display_name") if isinstance(source, Mapping) else None) or None,
+                         year=year if isinstance(year, int) else None)
+        return found
 
     return fetch
 
 
-def arxiv_fetcher(lookup: Callable[[str], ArxivEntry | None] = arxiv_lookup) -> ArxivFetch:
+def arxiv_fetcher(lookup: Callable[[str], ArxivEntry | None] = arxiv_lookup, *, repair: bool = False) -> ArxivFetch:
     """A fetch of one arXiv entry by id over the hardened, rate-limited arXiv helper."""
     def fetch(arxiv_id: str) -> Mapping[str, Any] | None:
         entry = lookup(arxiv_id)
         if entry is None:
             return None
-        return {"authors": clean_author_list(entry.get("authors")), "abstract": cap_abstract(entry.get("summary"))}
+        found: dict[str, Any] = {"authors": clean_author_list(entry.get("authors")), "abstract": cap_abstract(entry.get("summary"))}
+        if repair:
+            found.update(title=" ".join(str(entry.get("title") or "").split()) or None, venue="arXiv", year=None)
+        return found
 
     return fetch
 
@@ -191,7 +205,7 @@ def _matcher(row: Mapping[str, Any]) -> Callable[[dict[str, Any]], bool]:
 
 def backfill(root: Path, *, apply: bool = False, limit: int | None = None, delay: float = 1.0,
              category: str | None = None, openalex: OpenAlexFetch | None = None, arxiv: ArxivFetch | None = None,
-             sleep: Callable[[float], None] = time.sleep) -> BackfillReport:
+             sleep: Callable[[float], None] = time.sleep, repair: bool = False) -> BackfillReport:
     """Fill the missing authors/abstracts of the manifest rows under ``root`` (see the module docstring).
 
     Args:
@@ -205,14 +219,17 @@ def backfill(root: Path, *, apply: bool = False, limit: int | None = None, delay
         openalex: The OpenAlex fetch (tests pass a fake); the hardened one by default.
         arxiv: The arXiv fetch (tests pass a fake); the hardened one by default.
         sleep: Pause function for ``delay``.
+        repair: Also repair the publication record: a missing or junk title (a file path, an ``f2w://`` URI, a file name)
+            is replaced by the registry's, and a missing ``venue`` and ``publication_year`` are filled. Without it only
+            authors and abstracts are filled, as before.
 
     Returns:
         The report. A :class:`BackfillAbort` (no key, quota spent) stops the run: the remaining rows are
         ``deferred`` and ``stopped`` holds the short code.
     """
     report = BackfillReport(applied=apply)
-    oa = openalex or openalex_fetcher()
-    ax = arxiv or arxiv_fetcher()
+    oa = openalex or openalex_fetcher(repair=repair)
+    ax = arxiv or arxiv_fetcher(repair=repair)
     asked = 0
     for manifest in _manifests(root, category):
         cat = manifest.parent.name
@@ -229,7 +246,9 @@ def backfill(root: Path, *, apply: bool = False, limit: int | None = None, delay
             where = str(row.get("pdf_path") or row.get("doi") or row.get("arxiv_id") or "?").removeprefix(
                 f"{PDF_PATH_PREFIX}/")
             need_authors, need_abstract = is_empty(row.get("authors")), is_empty(row.get("abstract"))
-            if not (need_authors or need_abstract):
+            need_record = repair and (is_empty(row.get("title")) or is_junk_title(row.get("title"))
+                                      or is_empty(row.get("venue")) or row.get("publication_year") is None)
+            if not (need_authors or need_abstract or need_record):
                 report.rows.append(RowResult(cat, where, "already_filled"))
                 continue
             doi, arxiv_id = _doi_key(row.get("doi")), _arxiv_key(row.get("arxiv_id"))
@@ -246,10 +265,12 @@ def backfill(root: Path, *, apply: bool = False, limit: int | None = None, delay
             if asked:
                 sleep(delay)
             asked += 1
-            result = _fetch_row(oa, ax, doi, arxiv_id, need_authors, need_abstract)
+            result = _fetch_row(oa, ax, doi, arxiv_id, need_authors, need_abstract, need_record)
             result.category, result.pdf_path = cat, where
             if result.outcome == "found":
-                filled = fill_row_metadata(manifest, _matcher(row), authors=result.authors, abstract=result.abstract)
+                filled = fill_row_metadata(manifest, _matcher(row), authors=result.authors, abstract=result.abstract,
+                                           title=result.title if repair else None, venue=result.venue if repair else None,
+                                           year=result.year if repair else None)
                 result.outcome, result.filled = ("updated", filled) if filled else ("no_data", [])
             if result.code in ("openalex_no_key", "openalex_quota"):
                 report.stopped = result.code
@@ -264,18 +285,22 @@ class _Fetched:
     code: str = ""
     authors: list[str] = field(default_factory=list)
     abstract: str | None = None
+    title: str | None = None
+    venue: str | None = None
+    year: int | None = None
     filled: list[str] = field(default_factory=list)
     category: str = ""
     pdf_path: str = ""
 
 
 def _fetch_row(oa: OpenAlexFetch, ax: ArxivFetch, doi: str, arxiv_id: str, need_authors: bool,
-               need_abstract: bool) -> _Fetched:
+               need_abstract: bool, need_record: bool = False) -> _Fetched:
     """Ask OpenAlex (DOI), then arXiv (id) when something is still missing; combine what they returned."""
     out = _Fetched("not_found")
     errors: list[str] = []
     for source, ask, key in ((OPENALEX_SOURCE, oa, doi), (ARXIV_SOURCE, ax, arxiv_id)):
-        if not key or (not (need_authors and not out.authors) and not (need_abstract and not out.abstract)):
+        if not key or (not (need_authors and not out.authors) and not (need_abstract and not out.abstract)
+                       and not (need_record and not (out.title and out.venue and out.year))):
             continue
         try:
             got = ask(key)
@@ -289,6 +314,9 @@ def _fetch_row(oa: OpenAlexFetch, ax: ArxivFetch, doi: str, arxiv_id: str, need_
         out.outcome = "found"
         out.authors = out.authors or list(got.get("authors") or [])
         out.abstract = out.abstract or got.get("abstract")
+        out.title = out.title or got.get("title")
+        out.venue = out.venue or got.get("venue")
+        out.year = out.year or got.get("year")
     if out.outcome == "not_found" and errors:
         return _Fetched("failed", errors[0])
     return out

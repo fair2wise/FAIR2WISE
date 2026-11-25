@@ -141,6 +141,8 @@ class Candidate:
     arxiv_id: str | None = None
     abstract: str = ""
     authors: list[str] = field(default_factory=list)
+    #: The journal or repository the registry names (OpenAlex ``primary_location.source``); kept in the manifest row only.
+    venue: str = ""
     landing_url: str = ""
     pdf_urls: list[str] = field(default_factory=list)
     tier: str = "C"
@@ -161,6 +163,13 @@ class Candidate:
         if self.arxiv_id:
             return "arxiv:" + re.sub(r"v\d+$", "", self.arxiv_id)
         return "title:" + " ".join(_TOKEN.findall(self.title.lower()))
+
+
+def _openalex_venue(location: object) -> str:
+    """The venue name of an OpenAlex ``primary_location`` (``source.display_name``), one line, or ``""``."""
+    source = location.get("source") if isinstance(location, dict) else None
+    name = source.get("display_name") if isinstance(source, dict) else None
+    return " ".join(str(name or "").split())[:300]
 
 
 def clean_doi(value: object) -> str | None:
@@ -327,6 +336,7 @@ def openalex_searcher(contact: Callable[[], str] = lambda: "", *, get_json: GetJ
                 year=year if isinstance(year, int) else None, doi=doi,
                 abstract=abstract_from_inverted_index(work.get("abstract_inverted_index")) or "",
                 authors=openalex_authors(work),
+                venue=_openalex_venue(location),
                 landing_url=f"https://doi.org/{doi}" if doi else (str(primary) or str(work.get("id") or "")),
                 pdf_urls=openalex_work_urls(work), oa=openalex_is_oa(work), oa_locations=oa_locations(work)))
         return found
@@ -954,7 +964,8 @@ class Harvester:
                 continue
             cand.link_rule = rule
             known = {"year": cand.year, "title": cand.title, "doi": cand.doi, "arxiv_id": cand.arxiv_id,
-                     "source": cand.source, "authors": cand.authors, "abstract": cand.abstract}
+                     "source": cand.source, "authors": cand.authors, "abstract": cand.abstract,
+                     "venue": cand.venue or ("arXiv" if cand.source == "arxiv" else "")}
             try:
                 result = self.service.upload(f"{file_stem(cand)}.pdf", data, args["category"], known=known)
             except ContractError as exc:

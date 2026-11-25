@@ -49,6 +49,7 @@ from ..jobs.stages import WorkUnit, chunked_stage
 from ..jobs.store import LeaseLost
 from .catalog import sha256_file
 from .kg_service import KgLibrary
+from .publication_records import PublicationRecords
 from .schema_prompt import BUDGET_CBORG, BUDGET_OLLAMA
 from .schemas import manifest_block
 from .user_schemas import is_user_schema_id
@@ -493,6 +494,11 @@ class LibraryExtractor:
         ctx.log(f"extracting {len(todo)} papers into bundle {bundle.name} with {model} ({skipped} already done)")
         extra: dict[str, Any] = {"user_schema": True} if is_user_schema_id(schema_block.get("id")) else {}
         orch = self.factory(model=model, output_file=str(terms_path), schema_path=schema_path, backend=backend, **extra)
+        # The library's own record of each paper (real title, authors, year, DOI from the registry) is the source of truth for
+        # the publication metadata; the PDF's Info fields only fill what it lacks.
+        records = PublicationRecords(self.service._require_root())  # noqa: SLF001 - one trusted package
+        shas = {Path(str(r["relpath"])).name: r.get("sha256") for r in rows}
+        orch.known_publications = lambda name: records.for_file(name, shas.get(name))
 
         condensed = getattr(orch, "schema_prompt_condensed", None)
         condensed = condensed() if callable(condensed) else None

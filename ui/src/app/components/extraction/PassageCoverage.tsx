@@ -166,6 +166,9 @@ export function RecoveryResult({ recovery }: { recovery: RecoveryBlock }) {
             + `${n(total.relations_newly_covered)} relation${total.relations_newly_covered === 1 ? '' : 's'}; `
             + `${n(total.relations_still_without)} still ${total.relations_still_without === 1 ? 'has' : 'have'} none. `
           : ''}
+        {(total.publication_terms_corrected ?? 0) > 0
+          ? `Publication records (title, authors, year, venue) were set from the library on ${n(total.publication_terms_corrected)} term${total.publication_terms_corrected === 1 ? '' : 's'}. `
+          : ''}
         {n(total.papers_processed)} paper{total.papers_processed === 1 ? '' : 's'} searched
         {total.papers_skipped > 0 ? `, ${n(total.papers_skipped)} skipped` : ''}.
       </p>

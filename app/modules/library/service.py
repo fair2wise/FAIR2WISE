@@ -488,7 +488,8 @@ class LibraryService:
             self._record(target, relpath, sha, stat.st_size, round(stat.st_mtime, 3), probe=True, result=result)
             if known:
                 self.catalog.fill_identity(relpath, title=known.get("title"), doi=known.get("doi"),
-                                           source=str(known.get("source") or "upload"))
+                                           source=str(known.get("source") or "upload"),
+                                           replace_title=str(known.get("source") or "upload") != "upload")
             out: dict[str, Any] = {"paper": self._paper_dto(relpath), "duplicate": False}
             if category:
                 paper = out["paper"]
@@ -498,6 +499,7 @@ class LibraryService:
                     year=year, now=datetime.now(UTC).isoformat(), source=str((known or {}).get("source") or "upload"),
                     arxiv_id=(known or {}).get("arxiv_id"),
                     authors=(known or {}).get("authors"), abstract=(known or {}).get("abstract"),
+                    venue=(known or {}).get("venue"),
                     provenance=(known or {}).get("provenance"), supplied_by=(known or {}).get("supplied_by"))
             return out
 

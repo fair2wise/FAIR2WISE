@@ -34,7 +34,8 @@
     "units_done": 3,
     "units_failed": 0,
     "units_reused": 0,
-    "units_total": 3
+    "units_total": 3,
+    "recovery_publication_terms_corrected": 0
   },
   "schema_prompt_condensed": null,
   "params": {
@@ -59,7 +60,8 @@
       "relations_newly_covered": 0,
       "relations_still_without": 0,
       "papers_processed": 1,
-      "papers_skipped": 2
+      "papers_skipped": 2,
+      "publication_terms_corrected": 0
     },
     "papers": {
       "a.pdf": {
@@ -72,7 +74,8 @@
         "relations_with_evidence_before": 0,
         "still_uncovered": 0,
         "terms": 1,
-        "with_passage_before": 0
+        "with_passage_before": 0,
+        "publication_terms_corrected": 0
       },
       "blank.pdf": {
         "reason": "no_text_layer",

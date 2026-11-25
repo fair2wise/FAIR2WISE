@@ -45,6 +45,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true", help="count what --apply would ask; no network, no writes (default)")
     mode.add_argument("--apply", action="store_true", help="fetch from OpenAlex/arXiv and write the manifests")
+    parser.add_argument("--repair", action="store_true",
+                        help="also replace a missing or junk title (a file path, an f2w:// URI, a file name) with the registry's "
+                             "and fill the venue and year where they are missing")
     parser.add_argument("--limit", type=int, default=None, help="ask the sources for at most N rows (resumable: rerun)")
     parser.add_argument("--delay", type=float, default=1.0, help="seconds between rows asked of a source (default 1)")
     args = parser.parse_args(argv)
@@ -63,8 +66,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         output.info(f"ERROR: the library directory must be an existing absolute path (--library-dir or {LIBRARY_DIR_ENV})")
         return EXIT_STOPPED
     contact = OpenAlexSettings.from_mapping(dict(os.environ)).polite_mailto or None
-    report = backfill(raw, apply=args.apply, limit=args.limit, delay=args.delay, category=args.category,
-                      openalex=openalex_fetcher(mailto=contact) if args.apply else None)
+    report = backfill(raw, apply=args.apply, limit=args.limit, delay=args.delay, category=args.category, repair=args.repair,
+                      openalex=openalex_fetcher(mailto=contact, repair=args.repair) if args.apply else None)
     output.info(json.dumps(report.to_dict(), indent=2, sort_keys=True))
     return EXIT_STOPPED if report.stopped else EXIT_OK
 

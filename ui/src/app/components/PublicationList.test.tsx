@@ -6,7 +6,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { PublicationInfo } from './data/liveAgent';
 import { withoutSnippets } from './data/liveAgent';
-import { PublicationList, SNIPPETS_COLLAPSED, paperSnippets } from './PublicationList';
+import { PublicationList, SNIPPETS_COLLAPSED, displayTitle, isJunkTitle, paperSnippets } from './PublicationList';
 import { readBookmarkedPublications, togglePublicationFavorite } from './publicationFavorites';
 
 const passages = (count: number) => Array.from({ length: count }, (_, index) => ({ text: `passage ${index + 1}`, page: index + 1 }));
@@ -130,5 +130,29 @@ describe('per-paper supporting snippets', () => {
     const stored = readBookmarkedPublications()[0].publication;
     expect('passages_recorded' in stored).toBe(false);
     expect(JSON.stringify(window.localStorage)).not.toContain('passages_recorded');
+  });
+});
+
+describe('publication titles and authors from the PDF (pilot 2026-11-25)', () => {
+  it('never shows a path, an f2w:// URI or a file name as a title', () => {
+    for (const junk of ['f2w://path/2010-463.vp', 'a11v6n1.pdf', 'C:\\Users\\x\\a.doc', 'Microsoft Word - draft.docx', 'untitled', '']) {
+      expect(isJunkTitle(junk)).toBe(true);
+    }
+    expect(displayTitle({ paper_title: 'f2w://path/2010-463.vp', source_paper: '2010-463.pdf' })).toBe('Untitled paper (2010-463.pdf)');
+    expect(displayTitle({ paper_title: 'III. A Monograph of the Fishes of the Family Loricariidae', source_paper: 'x.pdf' }))
+      .toBe('III. A Monograph of the Fishes of the Family Loricariidae');
+    expect(displayTitle({ paper_title: null, source_paper: 'f2w://x/y.pdf' })).toBe('Untitled paper (y.pdf)');
+  });
+
+  it('renders the card without the junk title and without account or address authors', () => {
+    render(<PublicationList intro={null} publications={[
+      paper({ paper_title: 'f2w://path/2010-463.vp', source_paper: '2010-463.pdf', authors: ['Administrator'], publication_year: 2011 }),
+      paper({ paper_title: 'Real title', source_paper: 'b.pdf', authors: ['CENTRAL PARK WEST AT 79TH STREET, NEW YORK, NY 10024', 'A. One'], publication_year: 2008 }),
+    ]} />);
+    expect(screen.queryByText(/f2w:\/\//)).toBeNull();
+    expect(screen.getByText('Untitled paper (2010-463.pdf)')).toBeInTheDocument();
+    expect(screen.queryByText(/Administrator/)).toBeNull();
+    expect(screen.queryByText(/CENTRAL PARK/)).toBeNull();
+    expect(screen.getByText(/A\. One/)).toBeInTheDocument();
   });
 });

@@ -93,6 +93,8 @@ export interface RecoveryPaperResult {
   evidence_added?: number;
   relations_newly_covered?: number;
   relations_still_without?: number;
+  /** Terms whose publication record (title, authors, year, venue) was set from the library's own record. */
+  publication_terms_corrected?: number;
   reason?: RecoveryReason | string;
   text?: string;
 }
@@ -110,6 +112,7 @@ export interface RecoveryBlock {
     evidence_added?: number;
     relations_newly_covered?: number;
     relations_still_without?: number;
+    publication_terms_corrected?: number;
     papers_processed: number;
     papers_skipped: number;
   };
