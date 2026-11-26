@@ -4,21 +4,22 @@ One page for the owner's return. The running detail is in the [break log](break-
 owner asked for: where `forge_merge` stands, what of the backlog was done, every decision taken on the owner's behalf,
 every re-recorded baseline, the design pages waiting for review, a browser script for what is new, and the model calls used.
 
-_Status of this page: draft kept current during the break; the CI line is updated after each `[ci full]` run._
+_Status of this page: kept current during the break; the CI line is updated after each `[ci full]` run._
 
 ## 1. Where `forge_merge` stands
 
 | | |
 |---|---|
 | Pilot pin at departure | `987762a2` (run 45713088709) |
-| Latest commit whose own `[ci full]` run executed every job and was fully green | `fdc2a6b6` (run 45728318670: all 13 jobs success, the nightly slow suite skipped as designed) |
-| Latest pushed commit | the head of `forge_merge` (`[ci full]`); `6570c9cc`'s run 45737700087 was green in every job but the new browser job, which could not load its config in CI (`NODE_PATH`; fixed in the next commit) |
-| `FROZEN_UI_TREE` | `861e1592f380f6812a0b32d2425e918aa2cbf880` (re-pinned in `fdc2a6b6`; unchanged since) |
+| Latest commit whose own `[ci full]` run executed every job and was fully green | **`bee874a6`** (run 45872367330: all 14 jobs success, the new browser job included; the nightly slow suite skipped as designed). Before it: `fdc2a6b6` (run 45728318670). |
+| Latest pushed commit | `bee874a6` plus the docs commit that records its run (pushed with `[ci full]` so the head has its own full run too) |
+| `FROZEN_UI_TREE` | `861e1592f380f6812a0b32d2425e918aa2cbf880` (re-pinned in `fdc2a6b6`; unchanged since: the browser suite lives outside `ui/`) |
 | Deployment files vs `987762a2` | `docker/`, `deploy/`, `Dockerfile`, `pixi.toml`, `pixi.lock`: no change. No new dependency, no new egress host. |
-| Re-pin recommendation | `fdc2a6b6` until the run of `6570c9cc` is read; if that run is fully green (it adds the new browser job), `6570c9cc`. |
+| Re-pin recommendation | `bee874a6`. |
 
-Jobs of run 45728318670 (`fdc2a6b6`): guard, contracts, unit shards 1-3, quality, syntax/entrypoints, frontend build (both
-bases), MkDocs, Tiled-backed suites, mocked Playwright, Docling/coverage: all success; slow suite skipped (nightly only).
+Jobs of run 45872367330 (`bee874a6`): guard, contracts, unit shards 1-3, quality, syntax/entrypoints, frontend build (both
+bases), MkDocs, Tiled-backed suites, mocked Playwright, real-backend library browser smoke, Docling/coverage: all success;
+slow suite skipped (nightly only).
 
 Known red: run 45730388623 (`900751fb`, docs and a script only) failed unit shard 2 of 3 with exit code 1 and no
 failing-test annotation; the shard is green locally from a clean export in CI's environment shape and green again in run
@@ -35,7 +36,7 @@ failing-test annotation; the shard is green locally from a clean export in CI's 
 | 1B Threshold suite 90/50/80, docs, skip empty pairs by sha256, continued-KG note, Tiled timings | done | `66d65516` (timings on the passages design page) |
 | 1C Coverage block, Harvester schema wording, server-side cancel of generation, references from corrected record | done | `2ad27514`, `dc749bb1`, `2bca7f01` (coverage block landed before the break; references already flow from the corrected records) |
 | 2D UI contract sweep generated from Python | done, no mismatches left | `f95b088a`, `339ec3ff`, `28062b02`, `fdc2a6b6` |
-| 2E Real-backend Playwright smoke suite, `[ci full]` only | done (6 steps green locally; first CI run pending at this line) | `8161cbc6` |
+| 2E Real-backend Playwright smoke suite, `[ci full]` only | done (6 steps green locally and in CI run 45872367330) | `8161cbc6`, `bee874a6` |
 | 2F Security review of the new routes, uploads, prompts, proxy prefix, workdir writes, logs | done, with four bounds added | `c9924738` (`security-review-2026-11.md`) |
 | 2G Generalisation check on three unrelated domains, free model | done (13 calls) | `c9924738` (table on the schema-generation design page) |
 | 3H-M Design pages only | written, awaiting review | `900751fb` (`design-tier3-2026-11.md`) |

@@ -101,6 +101,9 @@ run 45713088709). Model calls used so far: **13 of the 400 allowed** (the genera
   outside `ui/` and imports `@playwright/test`, which resolves only with `NODE_PATH=ui/node_modules` (the local recipe sets
   it; the job did not). Reproduced locally in one line (`Cannot find module '@playwright/test'`) and fixed in the job's
   environment; the next `[ci full]` push carries it.
+- **CI on bee874a6 (`[ci full]`, run 45872367330): every job green**, the new `playwright-library-live` job included
+  (14 success, the nightly slow suite skipped as designed). This is the re-pin candidate: a single commit whose own full
+  run executed every job.
 - **Decision 3 follow-up, the relevance bar on small KGs (report, nothing changed):** a candidate is kept when its title and
   abstract share at least four non-generic words (`MIN_SHARED_KG_WORDS`) with the KG's vocabulary (node names, aliases and
   definitions, generic words removed); a KG whose vocabulary has fewer than 30 words (`MIN_VOCABULARY_WORDS`) keeps every
