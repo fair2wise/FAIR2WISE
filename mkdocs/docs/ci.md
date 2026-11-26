@@ -34,6 +34,7 @@ frozen-UI guard always runs.
 |---|---|---|
 | Tiled-backed suites (`python-tiled-suites`, about 260 tests, 7.5 min) | nightly, dispatch, commit message containing `[ci full]` | `pixi run -e dev test` with `F2W_TILED_PYTHON` set, see [Testing](testing.md) |
 | Playwright mocked-backend suite (`playwright-mocked`) | same | `cd ui && npx playwright test` |
+| Real-backend browser smoke over a generated library (`playwright-library-live`) | same | `ui/node_modules/.bin/playwright test -c tests/e2e/live_backend/library/playwright.library.config.ts` with `F2W_LIVE_PYTHON` and `F2W_LIVE_ARTIFACTS` set (see Testing) |
 | Coverage (was serial inside `python-quality`, 28 min) | `python-nightly-full`, same triggers | `pytest -n auto --cov` |
 | Docling model download and the tests that need the weights (about 7 tests) | `python-nightly-full` | `python scripts/fetch_docling_models.py --dest <dir>`, then `F2W_DOCLING_ARTIFACTS_PATH=<dir> pytest` |
 | Image builds, all three variants, amd64 and arm64 (`build-app.yml`: `build-candidates`, about 8 min, plus `image-static-tests`) on every `forge_merge` push and PR | `workflow_dispatch` of `build-app.yml` with ref `forge_merge`; push to `main` and `v*` tags (inside `publish-image.yml`, unchanged) | local build per `docker/profiles/README.md` |
