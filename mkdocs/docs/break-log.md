@@ -75,3 +75,18 @@ run 45713088709). Model calls used so far: **13 of the 400 allowed** (the genera
   the coverage block, Find supporting text, a node card with passages and relation evidence, the schema panel end to end
   (generate, validate, save, preview), a harvest run with the Needs-a-PDF list and a dropped PDF, export and download, and
   the chat turns that got stuck. Off the push path; a `[ci full]` job with Chrome and the Tiled interpreter.
+- **Tier 3 (design only):** `design-tier3-2026-11.md` holds H (numeric and aggregate questions), I (second pass for relations
+  without evidence), J (bioRxiv through OpenAlex: source ids looked up), M (the rest of section 7 of the standalone plan),
+  each with its questions; K (extraction speed: profiled, 0.39 s of non-model work for six pages; the model loop at about
+  7 requests per page is the whole cost; five levers listed) and L (RSoXS rebuild from the tracked terms file: 29,561 nodes
+  against the shipped 7,022, the shipped graph came from an earlier, smaller terms file; recommendation: do not swap, a
+  trimmed rebuild would be a new release through the release contract). Neither used a model call; the shipped KG is
+  unchanged.
+- **Tier 4 N:** the hard-coded placeholder `TILED_API_KEY` in `scripts/start_agent_backend.sh` is gone (a random key per
+  start when unset, never printed; docs updated). Five clean worktrees whose commits are on `fair2wise/forge_merge` were
+  removed (`f2w-wt-mpdf`, `f2w-wt-passages`, `f2w-wt-schema`, `f2w-wt-schema-ui`, `f2w-wt-snip-old`); kept: `f2w-wt-design`
+  (`linkml_design`, a design page commit not on forge_merge), `f2w-wt-snip-new` (`snippets_wip` lineage, kept unpushed by
+  the owner's instruction) and an agent's locked worktree. `GET /v1/jobs/{id}/stream` (V05) is **not** retired: the UI does
+  not call it, but it is part of the frozen `/v1` contract pinned by the route tables, the packaging consumer contract and
+  the live security tests; retiring it is the owner's call. There is no Harvester stream route to retire (the Harvester
+  polls the job logs).

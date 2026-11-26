@@ -21,6 +21,7 @@ nav:
       - "Design: schema generation": design-schema-generation.md
       - "Design: manual PDF flow": design-manual-pdf-flow.md
       - "Design: supporting passages": design-supporting-passages.md
+      - "Design: Tier 3 proposals (2026-11)": design-tier3-2026-11.md
       - Core data model: core_model.md
       - Data provenance: provenance.md
       - Agent workflow: agent-workflow.md

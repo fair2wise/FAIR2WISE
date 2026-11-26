@@ -51,8 +51,8 @@
 #
 #   Live Tiled Graph (experiment identity; not JSON ESAF nodes)
 #     TILED_URI               GraphQL/catalog base (http://127.0.0.1:8765)
-#     TILED_API_KEY           Tiled Apikey; this script defaults to a dev placeholder
-#                             if unset — put a real key in .env for anything non-local
+#     TILED_API_KEY           Tiled Apikey; when unset this script generates a random key
+#                             for this start only — put a real key in .env for anything non-local
 #     TILED_API_KEY_SCHEME    Authorization scheme (Apikey)
 #     TILED_CATALOG_URI       SQLAlchemy catalog DSN (sqlite under storage/)
 #     F2W_LIVE_TILED          1 after local Tiled is healthy
@@ -214,7 +214,13 @@ TILED_HEALTH_URL="${TILED_URI_LOCAL}/api/v1/"
 # Default catalog URI (SQLite, absolute path).  Can be overridden by .env or
 # the environment; Tiled config uses ${TILED_CATALOG_URI} without bash defaults.
 export TILED_CATALOG_URI="${TILED_CATALOG_URI:-sqlite+aiosqlite:///${ROOT_DIR}/storage/tiled_catalog.db}"
-export TILED_API_KEY="${TILED_API_KEY:-devonlykeychangeinproduction00000000000000000000000000000000000000}"
+# No hard-coded key: a dev start without TILED_API_KEY gets a random key for this process and the local Tiled it
+# starts (the key is never printed); anything beyond a local dev start needs a real key in .env.
+if [ -z "${TILED_API_KEY:-}" ]; then
+  TILED_API_KEY="$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  echo "note: TILED_API_KEY was not set; a random key was generated for this start (local Tiled only)" >&2
+fi
+export TILED_API_KEY
 
 if "$PYTHON" -c 'import tiled' >/dev/null 2>&1; then
   if ! curl -sf "$TILED_HEALTH_URL" > /dev/null 2>&1; then
