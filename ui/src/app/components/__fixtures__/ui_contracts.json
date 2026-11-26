@@ -115,26 +115,6 @@
         {
           "arxiv_id": null,
           "detail": "",
-          "doi": "10.1/f",
-          "id": "e309605cd2dc6df2",
-          "landing_url": "",
-          "link_rule": null,
-          "match": null,
-          "oa": null,
-          "open_url": "https://doi.org/10.1/f",
-          "provenance": null,
-          "relpath": null,
-          "score": 0.0,
-          "source": "openalex",
-          "status": "downloaded",
-          "supplied_by": null,
-          "tier": "C",
-          "title": "Fetched study",
-          "year": 2021
-        },
-        {
-          "arxiv_id": null,
-          "detail": "",
           "doi": "10.1/p",
           "id": "c2d73ca61e296765",
           "landing_url": "https://doi.org/10.1/p",
@@ -151,6 +131,26 @@
           "tier": "C",
           "title": "Paywalled study",
           "year": 2020
+        },
+        {
+          "arxiv_id": null,
+          "detail": "",
+          "doi": "10.1/f",
+          "id": "e309605cd2dc6df2",
+          "landing_url": "",
+          "link_rule": null,
+          "match": null,
+          "oa": null,
+          "open_url": "https://doi.org/10.1/f",
+          "provenance": null,
+          "relpath": null,
+          "score": 0.0,
+          "source": "openalex",
+          "status": "downloaded",
+          "supplied_by": null,
+          "tier": "C",
+          "title": "Fetched study",
+          "year": 2021
         }
       ]
     },
@@ -205,7 +205,7 @@
             "skipped": 0,
             "total": 2
           },
-          "created_at": "2026-11-25T23:58:52.840371+00:00",
+          "created_at": "2026-11-26T00:10:59.924655+00:00",
           "id": "job-cf3c8fd8392b040e338ffc84",
           "max_downloads": 5,
           "schema": null,
@@ -233,21 +233,21 @@
   },
   "jobs.cancel.finished": {
     "body": {
-      "job_id": "job-2e04243ea76a48d299af18f6",
+      "job_id": "job-18463915abc25d75c6ac5ae8",
       "kind": "library_passages",
       "settings_revision": null,
       "state": "succeeded",
       "submitted_at": "2026-10-15T12:00:00Z"
     },
     "method": "POST",
-    "path": "/v1/jobs/job-2e04243ea76a48d299af18f6/cancel",
+    "path": "/v1/jobs/job-18463915abc25d75c6ac5ae8/cancel",
     "status": 200
   },
   "jobs.list": {
     "body": {
       "jobs": [
         {
-          "job_id": "job-2e04243ea76a48d299af18f6",
+          "job_id": "job-18463915abc25d75c6ac5ae8",
           "kind": "library_passages",
           "settings_revision": null,
           "state": "succeeded",
@@ -364,7 +364,7 @@
           }
         },
         {
-          "job_id": "job-454e9bb437628907b786389b",
+          "job_id": "job-e92546cfedc2b861b444b6ad",
           "kind": "library_relations",
           "settings_revision": null,
           "state": "succeeded",
@@ -457,7 +457,7 @@
     "body": {
       "jobs": [
         {
-          "job_id": "job-2e04243ea76a48d299af18f6",
+          "job_id": "job-18463915abc25d75c6ac5ae8",
           "kind": "library_passages",
           "settings_revision": null,
           "state": "succeeded",
@@ -581,7 +581,7 @@
   },
   "jobs.logs": {
     "body": {
-      "job_id": "job-2e04243ea76a48d299af18f6",
+      "job_id": "job-18463915abc25d75c6ac5ae8",
       "kept": 4,
       "logs": [
         {
@@ -616,24 +616,24 @@
       "total": 4
     },
     "method": "GET",
-    "path": "/v1/jobs/job-2e04243ea76a48d299af18f6/logs",
+    "path": "/v1/jobs/job-18463915abc25d75c6ac5ae8/logs",
     "status": 200
   },
   "jobs.one": {
     "body": {
-      "job_id": "job-2e04243ea76a48d299af18f6",
+      "job_id": "job-18463915abc25d75c6ac5ae8",
       "kind": "library_passages",
       "settings_revision": null,
       "state": "succeeded",
       "submitted_at": "2026-10-15T12:00:00Z"
     },
     "method": "GET",
-    "path": "/v1/jobs/job-2e04243ea76a48d299af18f6",
+    "path": "/v1/jobs/job-18463915abc25d75c6ac5ae8",
     "status": 200
   },
   "jobs.progress": {
     "body": {
-      "job_id": "job-2e04243ea76a48d299af18f6",
+      "job_id": "job-18463915abc25d75c6ac5ae8",
       "pause_reason": "all stages complete",
       "phases": {
         "other": {
@@ -784,12 +784,12 @@
       }
     },
     "method": "GET",
-    "path": "/v1/jobs/job-2e04243ea76a48d299af18f6/progress",
+    "path": "/v1/jobs/job-18463915abc25d75c6ac5ae8/progress",
     "status": 200
   },
   "jobs.progress.relations": {
     "body": {
-      "job_id": "job-454e9bb437628907b786389b",
+      "job_id": "job-e92546cfedc2b861b444b6ad",
       "pause_reason": "all stages complete",
       "phases": {
         "other": {
@@ -859,7 +859,7 @@
       }
     },
     "method": "GET",
-    "path": "/v1/jobs/job-454e9bb437628907b786389b/progress",
+    "path": "/v1/jobs/job-e92546cfedc2b861b444b6ad/progress",
     "status": 200
   },
   "judge_model": {
@@ -941,7 +941,7 @@
       },
       "models_error": "no CBORG API key configured (CBORG_API_KEY)",
       "models_error_code": null,
-      "models_listed_at": "2026-11-25T23:58:53Z",
+      "models_listed_at": "2026-11-26T00:11:00Z",
       "models_source": "unavailable",
       "scope": "deployment",
       "updated_at": null,
@@ -993,7 +993,7 @@
           "schema_origin": "shipped",
           "schema_version": "0",
           "topic": null,
-          "updated_at": "2026-11-25T23:58:52Z"
+          "updated_at": "2026-11-26T00:10:59Z"
         },
         {
           "backend": null,
@@ -1007,7 +1007,7 @@
           "schema_origin": "user",
           "schema_version": 1,
           "topic": null,
-          "updated_at": "2026-11-25T23:58:52Z"
+          "updated_at": "2026-11-26T00:10:59Z"
         }
       ],
       "sources": [
@@ -1031,7 +1031,7 @@
       "schema_origin": "shipped",
       "schema_version": "0",
       "topic": null,
-      "updated_at": "2026-11-25T23:58:53Z",
+      "updated_at": "2026-11-26T00:11:00Z",
       "warnings": []
     },
     "method": "POST",
@@ -1050,7 +1050,7 @@
   },
   "library.kgs.passages.start": {
     "body": {
-      "job_id": "job-ac1ee774d9fff8091f2e400f",
+      "job_id": "job-6c4dbb8f5d521b7bbe57e9e1",
       "kind": "library_passages",
       "settings_revision": null,
       "state": "queued",
@@ -1196,62 +1196,6 @@
           "authors": null,
           "authors_total": 0,
           "doi": null,
-          "file_name": "a.pdf",
-          "folder": "",
-          "id": "a7949e623819aa32",
-          "index_status": "not_indexed",
-          "metadata_missing": [
-            "year",
-            "authors",
-            "abstract"
-          ],
-          "metadata_status": "ok",
-          "pages": 2,
-          "provenance": null,
-          "relpath": "a.pdf",
-          "sha256": "efddd7dc01ffa722375d6032594c20c7281656135c07f15c55a2fdffdc54293b",
-          "size_bytes": 2102,
-          "title": "A real title",
-          "verified_at": null,
-          "verify_detail": null,
-          "verify_status": "unverified",
-          "year": null,
-          "year_source": null
-        },
-        {
-          "abstract": null,
-          "abstract_truncated": false,
-          "authors": null,
-          "authors_total": 0,
-          "doi": null,
-          "file_name": "b.pdf",
-          "folder": "",
-          "id": "9a3f96912c5f85bc",
-          "index_status": "not_indexed",
-          "metadata_missing": [
-            "year",
-            "authors",
-            "abstract"
-          ],
-          "metadata_status": "ok",
-          "pages": 2,
-          "provenance": null,
-          "relpath": "b.pdf",
-          "sha256": "3a4b2431a0d6d5099d736c75702abe98366dc4f32bb3dfacd74780a4b128cfe7",
-          "size_bytes": 1673,
-          "title": "A real title",
-          "verified_at": null,
-          "verify_detail": null,
-          "verify_status": "unverified",
-          "year": null,
-          "year_source": null
-        },
-        {
-          "abstract": null,
-          "abstract_truncated": false,
-          "authors": null,
-          "authors_total": 0,
-          "doi": null,
           "file_name": "blank.pdf",
           "folder": "",
           "id": "4b192277c0c87d60",
@@ -1265,7 +1209,7 @@
           "pages": 2,
           "provenance": null,
           "relpath": "blank.pdf",
-          "sha256": "bbb7943541910c630e354f31331f45c49a1b2207922271104326f82a8139daca",
+          "sha256": "21c0e1453b70e15b6827881dd19dd4ce397da4fa0297aa39b530a6f74685c921",
           "size_bytes": 1298,
           "title": "A real title",
           "verified_at": null,
@@ -1295,6 +1239,62 @@
           "relpath": "rsoxs/unknown/new.pdf",
           "sha256": "c57880c59f958d3075b12e1530964fc6cba6600f86cd42352cb821554657fc99",
           "size_bytes": 2581,
+          "title": "A real title",
+          "verified_at": null,
+          "verify_detail": null,
+          "verify_status": "unverified",
+          "year": null,
+          "year_source": null
+        },
+        {
+          "abstract": null,
+          "abstract_truncated": false,
+          "authors": null,
+          "authors_total": 0,
+          "doi": null,
+          "file_name": "b.pdf",
+          "folder": "",
+          "id": "9a3f96912c5f85bc",
+          "index_status": "not_indexed",
+          "metadata_missing": [
+            "year",
+            "authors",
+            "abstract"
+          ],
+          "metadata_status": "ok",
+          "pages": 2,
+          "provenance": null,
+          "relpath": "b.pdf",
+          "sha256": "b3a2f6c294ccd570e968e3b4eb7097b979d9607220f11682694cce3ae27c6800",
+          "size_bytes": 1673,
+          "title": "A real title",
+          "verified_at": null,
+          "verify_detail": null,
+          "verify_status": "unverified",
+          "year": null,
+          "year_source": null
+        },
+        {
+          "abstract": null,
+          "abstract_truncated": false,
+          "authors": null,
+          "authors_total": 0,
+          "doi": null,
+          "file_name": "a.pdf",
+          "folder": "",
+          "id": "a7949e623819aa32",
+          "index_status": "not_indexed",
+          "metadata_missing": [
+            "year",
+            "authors",
+            "abstract"
+          ],
+          "metadata_status": "ok",
+          "pages": 2,
+          "provenance": null,
+          "relpath": "a.pdf",
+          "sha256": "4306578d7b9c3c43a6791b0961df338a6a52f5f5ade07a56ddb52eab006d3b0c",
+          "size_bytes": 2102,
           "title": "A real title",
           "verified_at": null,
           "verify_detail": null,
@@ -1320,62 +1320,6 @@
           "authors": null,
           "authors_total": 0,
           "doi": null,
-          "file_name": "a.pdf",
-          "folder": "",
-          "id": "a7949e623819aa32",
-          "index_status": "not_indexed",
-          "metadata_missing": [
-            "year",
-            "authors",
-            "abstract"
-          ],
-          "metadata_status": "ok",
-          "pages": 2,
-          "provenance": null,
-          "relpath": "a.pdf",
-          "sha256": "efddd7dc01ffa722375d6032594c20c7281656135c07f15c55a2fdffdc54293b",
-          "size_bytes": 2102,
-          "title": "A real title",
-          "verified_at": null,
-          "verify_detail": null,
-          "verify_status": "unverified",
-          "year": null,
-          "year_source": null
-        },
-        {
-          "abstract": null,
-          "abstract_truncated": false,
-          "authors": null,
-          "authors_total": 0,
-          "doi": null,
-          "file_name": "b.pdf",
-          "folder": "",
-          "id": "9a3f96912c5f85bc",
-          "index_status": "not_indexed",
-          "metadata_missing": [
-            "year",
-            "authors",
-            "abstract"
-          ],
-          "metadata_status": "ok",
-          "pages": 2,
-          "provenance": null,
-          "relpath": "b.pdf",
-          "sha256": "3a4b2431a0d6d5099d736c75702abe98366dc4f32bb3dfacd74780a4b128cfe7",
-          "size_bytes": 1673,
-          "title": "A real title",
-          "verified_at": null,
-          "verify_detail": null,
-          "verify_status": "unverified",
-          "year": null,
-          "year_source": null
-        },
-        {
-          "abstract": null,
-          "abstract_truncated": false,
-          "authors": null,
-          "authors_total": 0,
-          "doi": null,
           "file_name": "blank.pdf",
           "folder": "",
           "id": "4b192277c0c87d60",
@@ -1389,7 +1333,7 @@
           "pages": 2,
           "provenance": null,
           "relpath": "blank.pdf",
-          "sha256": "bbb7943541910c630e354f31331f45c49a1b2207922271104326f82a8139daca",
+          "sha256": "21c0e1453b70e15b6827881dd19dd4ce397da4fa0297aa39b530a6f74685c921",
           "size_bytes": 1298,
           "title": "A real title",
           "verified_at": null,
@@ -1419,6 +1363,62 @@
           "relpath": "rsoxs/unknown/new.pdf",
           "sha256": "c57880c59f958d3075b12e1530964fc6cba6600f86cd42352cb821554657fc99",
           "size_bytes": 2581,
+          "title": "A real title",
+          "verified_at": null,
+          "verify_detail": null,
+          "verify_status": "unverified",
+          "year": null,
+          "year_source": null
+        },
+        {
+          "abstract": null,
+          "abstract_truncated": false,
+          "authors": null,
+          "authors_total": 0,
+          "doi": null,
+          "file_name": "b.pdf",
+          "folder": "",
+          "id": "9a3f96912c5f85bc",
+          "index_status": "not_indexed",
+          "metadata_missing": [
+            "year",
+            "authors",
+            "abstract"
+          ],
+          "metadata_status": "ok",
+          "pages": 2,
+          "provenance": null,
+          "relpath": "b.pdf",
+          "sha256": "b3a2f6c294ccd570e968e3b4eb7097b979d9607220f11682694cce3ae27c6800",
+          "size_bytes": 1673,
+          "title": "A real title",
+          "verified_at": null,
+          "verify_detail": null,
+          "verify_status": "unverified",
+          "year": null,
+          "year_source": null
+        },
+        {
+          "abstract": null,
+          "abstract_truncated": false,
+          "authors": null,
+          "authors_total": 0,
+          "doi": null,
+          "file_name": "a.pdf",
+          "folder": "",
+          "id": "a7949e623819aa32",
+          "index_status": "not_indexed",
+          "metadata_missing": [
+            "year",
+            "authors",
+            "abstract"
+          ],
+          "metadata_status": "ok",
+          "pages": 2,
+          "provenance": null,
+          "relpath": "a.pdf",
+          "sha256": "4306578d7b9c3c43a6791b0961df338a6a52f5f5ade07a56ddb52eab006d3b0c",
+          "size_bytes": 2102,
           "title": "A real title",
           "verified_at": null,
           "verify_detail": null,
@@ -1475,7 +1475,7 @@
           "version": "0.3.1"
         },
         {
-          "description": "User schema plecos, version 1, created 2026-11-25T23:58:52Z",
+          "description": "User schema plecos, version 1, created 2026-11-26T00:10:59Z",
           "label": "plecos (user schema, v1)",
           "name": "user/plecos@v1",
           "origin": "user",
@@ -1608,7 +1608,7 @@
             "user/plecos@v1"
           ],
           "latest": {
-            "created_at": "2026-11-25T23:58:52Z",
+            "created_at": "2026-11-26T00:10:59Z",
             "id": "user/plecos@v1",
             "name": "plecos",
             "sha256": "20e42fbd253498361bf7a846f6c108ec43d8e4bc7d896abc8c3e43dedaafb730",
@@ -1627,7 +1627,7 @@
   },
   "schemas.user.read": {
     "body": {
-      "created_at": "2026-11-25T23:58:52Z",
+      "created_at": "2026-11-26T00:10:59Z",
       "id": "user/plecos@v1",
       "name": "plecos",
       "sha256": "20e42fbd253498361bf7a846f6c108ec43d8e4bc7d896abc8c3e43dedaafb730",

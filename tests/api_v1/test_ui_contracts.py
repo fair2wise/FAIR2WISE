@@ -128,8 +128,19 @@ def _record(w: dict[str, Any]) -> dict[str, dict[str, Any]]:
             payload = resp.json()
         except ValueError:
             payload = {"_text": resp.text[:500]}
-        out[cid] = {"method": method, "path": path.split("?")[0], "status": resp.status_code, "body": payload}
+        out[cid] = {"method": method, "path": path.split("?")[0], "status": resp.status_code, "body": _stable(payload)}
     return out
+
+
+def _stable(payload: Any) -> Any:  # noqa: ANN401
+    """Lists of records in a deterministic order (kind, state, name, id), so the shape of ``[0]`` does not depend on job order."""
+    if isinstance(payload, dict):
+        return {k: _stable(v) for k, v in payload.items()}
+    if isinstance(payload, list) and payload and all(isinstance(item, dict) for item in payload):
+        def key(item: dict[str, Any]) -> tuple[str, ...]:
+            return tuple(str(item.get(k, "")) for k in ("kind", "state", "name", "id", "job_id"))
+        return [_stable(item) for item in sorted(payload, key=key)]
+    return payload
 
 
 def test_every_ui_request_is_answered_by_the_real_route_and_the_pinned_shape_matches(monkeypatch, tmp_path):
