@@ -417,6 +417,7 @@ jobs:
       - name: Library live-backend suite (serial, one Chrome)
         env:
           CI: "1"
+          NODE_PATH: ${{ github.workspace }}/ui/node_modules   # the config lives outside ui/ and imports @playwright/test
           F2W_LIVE_PYTHON: ${{ github.workspace }}/.pixi/envs/dev/bin/python
           F2W_LIVE_ARTIFACTS: ${{ runner.temp }}/library-live
         run: ui/node_modules/.bin/playwright test -c tests/e2e/live_backend/library/playwright.library.config.ts --reporter=line,github

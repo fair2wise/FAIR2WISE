@@ -96,6 +96,11 @@ run 45713088709). Model calls used so far: **13 of the 400 allowed** (the genera
   a first local attempt with the temp directory inside the checkout gave five environment failures (the evals label-dir
   guard and the bl1101 golden), none of which exist in CI's layout. Not reproducible, so not fixed; the next `[ci full]`
   push re-runs the shard and the report will say whether it was a one-off.
+- **CI on 6570c9cc (`[ci full]`, run 45737700087):** every job green, unit shard 2 included (so the red on 900751fb was a
+  one-off), except the new `playwright-library-live` job, which failed before its setup ran: the Playwright config lives
+  outside `ui/` and imports `@playwright/test`, which resolves only with `NODE_PATH=ui/node_modules` (the local recipe sets
+  it; the job did not). Reproduced locally in one line (`Cannot find module '@playwright/test'`) and fixed in the job's
+  environment; the next `[ci full]` push carries it.
 - **Decision 3 follow-up, the relevance bar on small KGs (report, nothing changed):** a candidate is kept when its title and
   abstract share at least four non-generic words (`MIN_SHARED_KG_WORDS`) with the KG's vocabulary (node names, aliases and
   definitions, generic words removed); a KG whose vocabulary has fewer than 30 words (`MIN_VOCABULARY_WORDS`) keeps every

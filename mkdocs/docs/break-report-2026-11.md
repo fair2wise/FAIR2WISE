@@ -12,7 +12,7 @@ _Status of this page: draft kept current during the break; the CI line is update
 |---|---|
 | Pilot pin at departure | `987762a2` (run 45713088709) |
 | Latest commit whose own `[ci full]` run executed every job and was fully green | `fdc2a6b6` (run 45728318670: all 13 jobs success, the nightly slow suite skipped as designed) |
-| Latest pushed commit | `6570c9cc` (`[ci full]`; run in progress when this line was last written: see the break log) |
+| Latest pushed commit | the head of `forge_merge` (`[ci full]`); `6570c9cc`'s run 45737700087 was green in every job but the new browser job, which could not load its config in CI (`NODE_PATH`; fixed in the next commit) |
 | `FROZEN_UI_TREE` | `861e1592f380f6812a0b32d2425e918aa2cbf880` (re-pinned in `fdc2a6b6`; unchanged since) |
 | Deployment files vs `987762a2` | `docker/`, `deploy/`, `Dockerfile`, `pixi.toml`, `pixi.lock`: no change. No new dependency, no new egress host. |
 | Re-pin recommendation | `fdc2a6b6` until the run of `6570c9cc` is read; if that run is fully green (it adds the new browser job), `6570c9cc`. |
@@ -21,8 +21,8 @@ Jobs of run 45728318670 (`fdc2a6b6`): guard, contracts, unit shards 1-3, quality
 bases), MkDocs, Tiled-backed suites, mocked Playwright, Docling/coverage: all success; slow suite skipped (nightly only).
 
 Known red: run 45730388623 (`900751fb`, docs and a script only) failed unit shard 2 of 3 with exit code 1 and no
-failing-test annotation; the shard is green locally from a clean export in CI's environment shape. Not reproducible; the
-later `[ci full]` runs re-run it.
+failing-test annotation; the shard is green locally from a clean export in CI's environment shape and green again in run
+45737700087, so it was a one-off of that runner.
 
 ## 2. Backlog, item by item
 
