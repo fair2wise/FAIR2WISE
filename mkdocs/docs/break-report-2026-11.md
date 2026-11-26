@@ -12,7 +12,7 @@ _Status of this page: kept current during the break; the CI line is updated afte
 |---|---|
 | Pilot pin at departure | `987762a2` (run 45713088709) |
 | Latest commit whose own `[ci full]` run executed every job and was fully green | **`bee874a6`** (run 45872367330: all 14 jobs success, the new browser job included; the nightly slow suite skipped as designed). Before it: `fdc2a6b6` (run 45728318670). |
-| Latest pushed commit | `bee874a6` plus the docs commit that records its run (pushed with `[ci full]` so the head has its own full run too) |
+| Latest pushed commit | docs commits after `bee874a6` (the break-log and this page). The run of `452275f1` was green in every job that ran except the Docling weights download (HTTP error from the weights host, exit 22; not a change in the tree); later docs commits are pushed without `[ci full]`. |
 | `FROZEN_UI_TREE` | `861e1592f380f6812a0b32d2425e918aa2cbf880` (re-pinned in `fdc2a6b6`; unchanged since: the browser suite lives outside `ui/`) |
 | Deployment files vs `987762a2` | `docker/`, `deploy/`, `Dockerfile`, `pixi.toml`, `pixi.lock`: no change. No new dependency, no new egress host. |
 | Re-pin recommendation | `bee874a6`. |
