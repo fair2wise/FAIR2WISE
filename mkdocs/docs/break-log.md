@@ -96,6 +96,17 @@ run 45713088709). Model calls used so far: **13 of the 400 allowed** (the genera
   a first local attempt with the temp directory inside the checkout gave five environment failures (the evals label-dir
   guard and the bl1101 golden), none of which exist in CI's layout. Not reproducible, so not fixed; the next `[ci full]`
   push re-runs the shard and the report will say whether it was a one-off.
+- **Decision 3 follow-up, the relevance bar on small KGs (report, nothing changed):** a candidate is kept when its title and
+  abstract share at least four non-generic words (`MIN_SHARED_KG_WORDS`) with the KG's vocabulary (node names, aliases and
+  definitions, generic words removed); a KG whose vocabulary has fewer than 30 words (`MIN_VOCABULARY_WORDS`) keeps every
+  candidate, as before the change. In practice: the plecos KG (2,579 entities) and the shipped RSoXS KG are far above the
+  floor and the bar filters as intended; the 13-node KG of the new browser suite and the 3-node contract graph fall under
+  the floor, so every candidate is offered there (the suite's offers come from the legacy fakes, so this was observed, not
+  asserted). The gap is a KG of 30 to a few hundred words, where four shared words is strict: a candidate about the right
+  subject in other words is dropped. Proposal for the owner, not built: scale the bar with the vocabulary (two shared words
+  under 200 vocabulary words, three under 1,000, four above), or use the candidate's title and abstract against the KG's
+  top terms by paper count rather than the whole vocabulary; either is a one-line change with the existing tests
+  (`tests/test_chat_pending_offer.py::test_is_about_download_and_the_relevance_bar`) to extend.
 - **Tier 3 (design only):** `design-tier3-2026-11.md` holds H (numeric and aggregate questions), I (second pass for relations
   without evidence), J (bioRxiv through OpenAlex: source ids looked up), M (the rest of section 7 of the standalone plan),
   each with its questions; K (extraction speed: profiled, 0.39 s of non-model work for six pages; the model loop at about
