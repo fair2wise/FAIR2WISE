@@ -796,6 +796,8 @@ def _passage_for(
 
 #: ``Passage.kind`` of a table row: the physical line of a table that holds the mention, with its column header.
 KIND_TABLE_ROW = "table_row"
+#: Longest table-row passage stored (header and row together); a longer line is cut around the mention.
+MAX_ROW_CHARS = 600
 _NUMERIC_CELL = re.compile(r"\d|^[+±–%°/()-]+$")
 _TABLE_HEAD = re.compile(r"^\s*(?:TABLE|Table|Tab\.)\s*\d+", re.I)
 _PAGE_HEADER_IN_ROW = re.compile(r"^.*?\b(?:TABLE|Table)\s+\d+\s*\|?\s*(?:\(Continued\))?\s*", re.I)
@@ -841,7 +843,11 @@ def table_row_passage(page_text: str, mention: int) -> tuple[str, int, int] | No
             header = text
     if header is None:
         return None
-    return f"{header} | {row}", start, end
+    text = f"{header} | {row}"
+    if len(text) > MAX_ROW_CHARS:   # a very long physical line is cut around the mention
+        at = max(0, min(len(text) - MAX_ROW_CHARS, len(header) + 3 + (mention - start) - MAX_ROW_CHARS // 2))
+        text = ("…" if at else "") + text[at:at + MAX_ROW_CHARS].rstrip() + ("…" if at + MAX_ROW_CHARS < len(text) else "")
+    return text, start, end
 
 
 def candidates(

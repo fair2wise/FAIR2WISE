@@ -98,3 +98,11 @@ def test_the_recovery_job_records_aliases_from_the_whole_paper_once():
     assert added == 1 and terms[0]["aliases"] == ["plecos", "armoured catfish"]
     assert "aliases" not in terms[1]
     assert LibraryPassages._recover_aliases(terms, [PAGE]) == 0
+
+
+def test_aliases_are_bounded_in_length_and_number():
+    from app.modules.term_extractor.models import MAX_ALIASES_PER_TERM, MAX_ALIAS_CHARS, union_aliases
+
+    held: list[str] = []
+    union_aliases(held, ["x" * (MAX_ALIAS_CHARS + 1), "fine name"] + [f"name {i}" for i in range(40)], "term")
+    assert "x" * (MAX_ALIAS_CHARS + 1) not in held and held[0] == "fine name" and len(held) == MAX_ALIASES_PER_TERM

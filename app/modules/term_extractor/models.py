@@ -103,13 +103,24 @@ class RelationRecord:
         )
 
 
+#: Bounds on what a model or a paper may add as aliases: a name longer than this, or beyond this many per term, is dropped.
+MAX_ALIAS_CHARS = 80
+MAX_ALIASES_PER_TERM = 20
+
+
 def union_aliases(held: list[str], new: Sequence[str] | None, term: str = "") -> bool:
-    """Add the names of ``new`` to ``held`` (case-insensitive, whitespace collapsed, never ``term`` itself); True when it grew."""
+    """Add the names of ``new`` to ``held`` (case-insensitive, whitespace collapsed, never ``term`` itself); True when it grew.
+
+    Bounded: a name over :data:`MAX_ALIAS_CHARS` is dropped and ``held`` never grows past :data:`MAX_ALIASES_PER_TERM`,
+    so a model cannot stuff a node, its Tiled properties or the lexical index through this field.
+    """
     seen = {a.lower() for a in held} | ({term.strip().lower()} if term else set())
     grew = False
     for raw in new or ():
         name = " ".join(str(raw).split())
-        if name and name.lower() not in seen:
+        if len(held) >= MAX_ALIASES_PER_TERM:
+            break
+        if name and len(name) <= MAX_ALIAS_CHARS and name.lower() not in seen:
             held.append(name)
             seen.add(name.lower())
             grew = True

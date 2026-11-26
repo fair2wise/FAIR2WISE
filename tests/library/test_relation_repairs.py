@@ -167,3 +167,15 @@ def test_the_schema_check_warns_about_attribute_slots_and_has_slots_that_read_fr
     fixed = SCHEMA.replace("  has_measurement:\n", "  has_measurement:\n    inverse: measurement_of\n")
     assert "relation_direction" not in {w.code for w in v.validate_schema_text(fixed).warnings}
     assert v.validate_schema_text(v.required_core_text()).warnings == []
+
+
+def test_an_attribute_value_is_capped(tmp_path):
+    from app.modules.term_extractor.schema import MAX_ATTRIBUTE_VALUE_CHARS
+
+    path = tmp_path / "plecos.yaml"
+    path.write_text(SCHEMA, encoding="utf-8")
+    helper = SchemaHelper(str(path), sanitize_descriptions=True)
+    fixed = helper.validate_and_fix_term({"term": "Rio", "category": "Locality",
+                                          "relations": [{"relation": "country", "related_term": "B" * 2000}]})
+    (attribute,) = helper.judge_relations(fixed, lambda name: "").attributes
+    assert len(attribute["value"]) == MAX_ATTRIBUTE_VALUE_CHARS

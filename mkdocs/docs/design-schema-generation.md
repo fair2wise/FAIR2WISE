@@ -112,6 +112,26 @@ behaviour and its pinned prompt):
   `relation_direction` for a `has_...` slot between two classes with no `inverse`. They are listed under the problems with
   their lines; the schema can still be saved.
 
+## Generalisation check (2026-11-26, Tier 2 G)
+
+Three unrelated domains, the free model `lbl/cborg-chat` only, 13 model calls in all (cap stated beforehand: 24): for each,
+one description, `SchemaGenerator.generate` (validated, repaired at most twice), then the preview's own per-page prompt on
+three pages of one open-access paper, the extraction's relation rules, and the locator for passage coverage (no model).
+
+| Domain | Paper | Generation | Preview: terms (distinct) / relations | Swapped / attributes / invalid / object unknown | Located passages |
+|---|---|---|---|---|---|
+| Battery electrolytes | Nature Communications 2023, 10.1038/s41467-023-35857-x | valid first time; 13 classes, 22 slots; 8 warnings (value-type slots, one `has_` direction) | 14 (14) / 18 | 0 / 9 / 0 / 6 | 7 of 14 (50%) |
+| Zebrafish development | BMC Developmental Biology 2019, 10.1186/s12861-019-0207-7 | valid first time; 12 classes, 20 slots; 4 warnings | 77 (52) / 100 | 0 / 12 / 0 / 36 | 55 of 77 (71%) |
+| Synchrotron beamline instrumentation | arXiv 2511.12314 (RIXS with a JUNGFRAU detector) | valid after one repair; 14 classes, 24 slots; 12 warnings | 35 (29) / 72 | 0 / 42 / 1 / 5 | 23 of 35 (66%) |
+
+What it says: every category the model chose was a class of its own schema (no fallback to `Thing`, no mapping) and no
+relation had to be swapped, so the generation instructions on how a relation reads held in all three domains; the schemas
+lean on value-type slots (9, 12 and 42 of the relations were attributes, stored as properties), which is what the
+validator's warnings pointed at; "object unknown" is a relation to a term the three-page preview had not registered, not a
+schema fault. Located coverage of 50 to 71% on preview terms is in line with the extraction runs (preview terms include
+figures, abbreviations and instrument names that the locator finds less often than prose terms). No domain word list was
+involved. Script and outputs: the session scratchpad `gen_check/` (report.json, the three schemas).
+
 ## Extraction prompt bound
 
 **CodeSnippet is not offered to the model.** The class (and `has_code_snippet`, which points at it) is filled by the pipeline from `code_snippets`; its description in the required core says so. The extraction and preview prompts, full or condensed, leave it out for shipped and user schemas alike (`PIPELINE_ONLY_CLASSES` in `schema.py`), because a model that was offered it filed ordinary terms, such as a staining method, under it (pilot 2026-11-25). The schema still holds the class, validation still knows it, and a term that arrives with that category is demoted as before.

@@ -2,7 +2,7 @@
 
 Running log of the unattended work on `forge_merge`: date, what was done, the commit, the CI run, decisions taken for the
 owner, anything unfinished. The backlog and the rules are the owner's message of 2026-11-25 (pilot re-pinned to 987762a2,
-run 45713088709). Model calls used so far: **0 of the 400 allowed**.
+run 45713088709). Model calls used so far: **13 of the 400 allowed** (the generalisation check, cap stated 24).
 
 ## 2026-11-26
 
@@ -61,3 +61,17 @@ run 45713088709). Model calls used so far: **0 of the 400 allowed**.
   findings of the inventory, not bugs: the UI never requests `GET /v1/publications` or `GET /v1/operations` (only the
   `/v1/operations/*` sub-routes), so those two are not pinned; `POST .../candidates/{id}/undo` on a candidate nobody filed by
   hand is a 409 (the UI only offers Undo after a filing). The Ollama listing and the operations routes keep their own fakes.
+- **Tier 2 G: generalisation check** done (13 model calls, cap 24, `lbl/cborg-chat`): battery electrolytes, zebrafish
+  development, synchrotron beamline instrumentation; table on the schema-generation design page. No swaps were needed in any
+  domain, attributes 9 / 12 / 42, located passage coverage 50 / 71 / 66%.
+- **Tier 2 F: security review** written (`security-review-2026-11.md`) with three fixes in code: aliases bounded (80 chars, 20
+  per term), attribute values capped (500 chars), table-row passages capped (600 chars), and the cancel set of the schema
+  generator bounded (1,000 ids). One open point for the owner (`note_error` text may name a provider base URL).
+- **Tier 2 E (planned, not started at this entry): real-backend browser smoke suite.** It will extend the T18C harness
+  (`tests/contracts/legacy_ui/closure/launch_full_backend.py`, `tests/e2e/live_backend/full/`, kept outside `ui/` so the
+  frozen UI tree is untouched): a launcher variant that mounts a generated library (`F2W_LIBRARY_DIR`), a workdir, stubs the
+  extraction model (`Orchestrator._build_llm`, the scripted tool-calling model of the threshold suite), the schema
+  generator's client (a canned valid YAML) and the model listing, then `*.full.ts` specs for: start and watch an extraction,
+  the coverage block, Find supporting text, a node card with passages and relation evidence, the schema panel end to end
+  (generate, validate, save, preview), a harvest run with the Needs-a-PDF list and a dropped PDF, export and download, and
+  the chat turns that got stuck. Off the push path; a `[ci full]` job with Chrome and the Tiled interpreter.

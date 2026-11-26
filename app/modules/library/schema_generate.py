@@ -45,6 +45,10 @@ _FENCE = re.compile(r"```[A-Za-z0-9_-]*[ \t]*\n(.*?)(?:\n```|\Z)", re.S)
 ClientFactory = Callable[..., Any]
 
 
+#: Most cancelled request ids remembered at once (the oldest is dropped beyond it).
+MAX_PENDING_CANCELS = 1000
+
+
 def strip_fences(text: str) -> str:
     """The first fenced block of ``text`` when there is one, else ``text``; surrounding blank lines removed."""
     match = _FENCE.search(text)
@@ -163,6 +167,8 @@ class SchemaGenerator:
         too (the cancel may arrive before the generate request is read).
         """
         with self._cancel_lock:
+            if len(self._cancelled) >= MAX_PENDING_CANCELS:   # a caller cannot grow the set without bound
+                self._cancelled.pop()
             self._cancelled.add(str(request_id))
 
     def _take_cancel(self, request_id: str | None) -> bool:

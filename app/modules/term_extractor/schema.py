@@ -130,6 +130,8 @@ LITERAL_RANGES: frozenset[str] = frozenset({
     "uriorcurie", "ncname", "objectidentifier", "nodeidentifier"})
 
 
+#: Longest attribute value stored from a relation on a value-type slot (a model's ``related_term`` text).
+MAX_ATTRIBUTE_VALUE_CHARS = 500
 #: Slots that are the fields of every term (not relations): left out of a user schema's prompt.
 CORE_FIELD_SLOTS: frozenset[str] = frozenset({"name", "description"})
 
@@ -161,7 +163,7 @@ def judge_relations(schema: Any, term_data: dict[str, Any], category_of: Callabl
     for rel in term_data.get("relations") or []:
         pred = str(rel.get("relation") or "")
         if rel.get("verified") and schema.is_attribute_slot(pred):
-            out.attributes.append({"property": pred, "value": str(rel.get("related_term") or "")})
+            out.attributes.append({"property": pred, "value": str(rel.get("related_term") or "")[:MAX_ATTRIBUTE_VALUE_CHARS]})
             continue
         if rel.get("verified") and subject_class:
             obj_name = str(rel.get("related_term") or "")

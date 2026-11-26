@@ -97,3 +97,12 @@ def test_the_coverage_counts_a_table_row_as_located(tmp_path):
     store.note_passage("rev.pdf", "c", kind=None)
     row = store.run_passage_stats()["rev.pdf"]
     assert (row["with_passage"], row["located"], row["quoted"], row["uncovered"]) == (2, 2, 0, 1)
+
+
+def test_a_very_long_table_row_is_cut_around_the_mention():
+    long_row = "Species Locality 2n Karyotype formula Reference\n" + "\n".join(
+        f"Genus{i} species{i} Rio{i} 1°0{i}'S 50°0{i}'W {40 + i} 20m/sm + 20st/a Author{i} et al. (200{i % 10})" for i in range(9))
+    long_row += "\nAncistrus target " + "filler-cell 12 " * 80 + "Author et al. (2011)"
+    assert P.table_like_page(long_row)
+    found = P.table_row_passage(long_row, long_row.index("Ancistrus target"))
+    assert found is not None and len(found[0]) <= P.MAX_ROW_CHARS + 2 and "Ancistrus target" in found[0]
