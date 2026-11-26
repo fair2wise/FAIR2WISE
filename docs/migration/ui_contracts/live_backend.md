@@ -103,3 +103,13 @@ There are 66 captured exchanges per mode, excluding preflights. The two modes gi
   - the download/extraction approval chat flow, because it would write to the fake Splash store; this is a read-path task;
   - graph edits;
   - live Tiled, Ollama, ALS profiles, and the `/fair2wise` prefix build.
+
+## Library suite (Tier 2 E, 2026-11)
+
+`tests/e2e/live_backend/library/` is the third live-backend project: `launch_library_backend.py` serves the `:local` API
+over a generated library with a real worker (no Tiled, no key, no network), `global-setup.ts` builds and serves the UI as
+the T18C setup does, and `flow.lib.ts` walks the library flows in the browser in the owner's order (schema panel,
+extraction and coverage, export and download, node card with passages, Find supporting text, user-schema extraction and
+Repair relations, harvest with a dropped PDF, a chat question during a pending offer). CI job: `playwright-library-live`
+(`[ci full]`). The limits above still hold: inference is scripted, so the suite proves wire shape, client behaviour and
+rendering, not extraction quality.

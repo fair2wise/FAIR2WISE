@@ -249,3 +249,27 @@ one. `ui/src/app/components/uiContracts.test.ts` feeds every pinned answer to th
 an empty id, an unknown kind, a missing field. The per-feature fixture tests (`test_v1_library_*_ui_fixtures.py`) pin the
 richer shapes of the schema panel, Find supporting text and Repair relations the same way. Routes outside `/v1` (`/chat`,
 `/graph`, `/settings`, `/sessions`) are pinned byte for byte by `tests/contracts/legacy_ui`.
+
+## Real-backend browser smoke: the library flows in a browser against the real API
+
+`tests/e2e/live_backend/library/` (backlog Tier 2 E, 2026-11) runs the production UI build (`vite build` with
+`VITE_F2W_AGENT_API_URL`, configuration only) against `create_api_app` on the `:local` profile over a generated library of two
+PDFs, with the library jobs run by a real `WorkerExecutor`. Nothing is mocked in the browser: the extraction runs the real
+`Orchestrator` (tool loop, passage locator, grounding, aliases, relation judge) with a page-aware scripted model behind it, the
+schema generator answers with a canned valid schema, the Harvester's searchers and downloader are canned (one open-access
+PDF, one paywalled paper, one broken link), and the process has no key and no network (the T18A harness blocks every socket).
+One serial spec (`flow.lib.ts`) does what the owner does by hand on the pilot, in order: schema panel (generate, save,
+preview), an extraction on the shipped schema with the coverage block, Export and Download, the exported file as a graph source
+with a node card that shows its passage, Find supporting text, an extraction on the user schema with Repair relations (and the
+typed refusal on a shipped-schema KG), a harvest with the Needs-a-PDF queue and a dropped PDF, and a chat question asked
+while a download offer is pending. Screenshots land in `<artifacts>/screenshots`.
+
+```bash
+X=<clean export of HEAD, with ui/node_modules linked in>; A=<artifact dir outside the repo>
+cd $X && env -i PATH=/opt/homebrew/opt/node@20/bin:/usr/bin:/bin HOME=$A/home LANG=en_US.UTF-8 \
+  NODE_PATH=$X/ui/node_modules F2W_LIVE_PYTHON=<venv>/bin/python F2W_LIVE_ARTIFACTS=$A \
+  ui/node_modules/.bin/playwright test -c tests/e2e/live_backend/library/playwright.library.config.ts
+```
+
+It is off the push path (several minutes, one Chrome) and runs in CI as `playwright-library-live` on `[ci full]`, dispatch
+and the nightly, beside the mocked Playwright suite. It lives outside `ui/` so the frozen UI tree hash is untouched.

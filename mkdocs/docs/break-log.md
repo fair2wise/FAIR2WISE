@@ -67,14 +67,35 @@ run 45713088709). Model calls used so far: **13 of the 400 allowed** (the genera
 - **Tier 2 F: security review** written (`security-review-2026-11.md`) with three fixes in code: aliases bounded (80 chars, 20
   per term), attribute values capped (500 chars), table-row passages capped (600 chars), and the cancel set of the schema
   generator bounded (1,000 ids). One open point for the owner (`note_error` text may name a provider base URL).
-- **Tier 2 E (planned, not started at this entry): real-backend browser smoke suite.** It will extend the T18C harness
-  (`tests/contracts/legacy_ui/closure/launch_full_backend.py`, `tests/e2e/live_backend/full/`, kept outside `ui/` so the
-  frozen UI tree is untouched): a launcher variant that mounts a generated library (`F2W_LIBRARY_DIR`), a workdir, stubs the
-  extraction model (`Orchestrator._build_llm`, the scripted tool-calling model of the threshold suite), the schema
-  generator's client (a canned valid YAML) and the model listing, then `*.full.ts` specs for: start and watch an extraction,
-  the coverage block, Find supporting text, a node card with passages and relation evidence, the schema panel end to end
-  (generate, validate, save, preview), a harvest run with the Needs-a-PDF list and a dropped PDF, export and download, and
-  the chat turns that got stuck. Off the push path; a `[ci full]` job with Chrome and the Tiled interpreter.
+- **Tier 2 E: real-backend browser smoke suite** (`tests/e2e/live_backend/library/`, CI job `playwright-library-live` on
+  `[ci full]`). A launcher serves the real `:local` API over two generated PDFs with a real worker, no key, no Tiled and no
+  network: the real `Orchestrator` runs behind a page-aware scripted model, the schema generator's client returns a canned
+  valid schema, the provider listing names one free model, the Harvester's searchers and downloader are canned (one
+  open-access PDF, one paywalled paper, one broken link); the legacy chat agents stay the T18A fakes. One serial spec walks
+  the owner's order in the production UI build: schema panel (generate, save, preview), extraction on the shipped schema with
+  the coverage block, Export and Download, the exported file as a graph source and a node card showing its passage, Find
+  supporting text, extraction on the user schema and Repair relations (plus the typed refusal on a shipped-schema KG), a
+  harvest with the Needs-a-PDF queue and a dropped PDF, and a question asked while a download offer is pending. All six
+  steps green locally from a clean export (about one minute of tests after the build; nine screenshots). Kept outside
+  `ui/` (no re-pin). Found while building it: the T18A harness's fake `rebuild_kg` also served the library extraction (the
+  launcher restores the real builder); the node card titles a paper "Untitled paper (file.pdf)" when the library row has no
+  title (the probe never ran), which is correct behaviour but worth a look on the pilot.
+  - Decision taken: no disposable Tiled in this suite (Publish to Tiled stays with the T18C/T20B suites), so the job needs
+    only the dev environment, Node and Chrome.
+  - Decision taken: `F2W_DISCLOSE_SNIPPETS=1` in the launcher, as the pilot opts in, so the node-card passage is checked.
+  - Seen in the browser, for the owner: after a question asked while a download offer was pending (answered, offer dropped,
+    as `tests/test_chat_pending_offer.py` pins), a later "Do not download any paper" is a fresh turn and, on the legacy
+    fakes, starts a new candidate search instead of being a refusal with nothing to refuse. Not changed; the decline right
+    after an offer still ends it (phase `stopped_by_user`, then the original question is re-asked with the topic marked
+    declined, so on these fakes the turn ends `stop_insufficient` with nothing pending), which is what the suite asserts.
+    The manual T18C suite (`tests/e2e/live_backend/full/pending.full.ts`, not in CI) still expects the pre-round-2 terminal
+    status `stopped_by_user` for that decline; left for the owner to re-record with that suite's own run.
+- **CI on 900751fb (docs and script only; run 45730388623):** every job green except unit-test shard 2 of 3, which ended
+  with exit code 1 and no failing-test annotation. Shard 2 of the same commit is green locally from a clean export with
+  CI's environment shape (HOME and TMPDIR outside the checkout: 2,861 passed, 0 problems against the known-failure set);
+  a first local attempt with the temp directory inside the checkout gave five environment failures (the evals label-dir
+  guard and the bl1101 golden), none of which exist in CI's layout. Not reproducible, so not fixed; the next `[ci full]`
+  push re-runs the shard and the report will say whether it was a one-off.
 - **Tier 3 (design only):** `design-tier3-2026-11.md` holds H (numeric and aggregate questions), I (second pass for relations
   without evidence), J (bioRxiv through OpenAlex: source ids looked up), M (the rest of section 7 of the standalone plan),
   each with its questions; K (extraction speed: profiled, 0.39 s of non-model work for six pages; the model loop at about

@@ -393,6 +393,45 @@ jobs:
         if: failure()
         with: { name: playwright-report, path: ui/playwright-report }
 
+  playwright-library-live:
+    # Real-backend browser smoke (backlog Tier 2 E, 2026-11): the production UI build against the migrated API over a
+    # generated library (tests/e2e/live_backend/library), with the library jobs run by a real worker; no key, no network
+    # (the harness blocks every socket), no Tiled. Nightly, dispatch or "[ci full]", like the other browser suites.
+    name: Real-backend browser smoke (library, generated papers)
+    needs: guard
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[ci full]') }}
+    timeout-minutes: 40
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - name: Install pixi (pinned release, sha256-verified)
+        run: scripts/ci/install_pixi.sh
+      - name: Install the locked dev environment (pixi.lock, --locked)
+        run: pixi install --locked -e dev
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: ui/package-lock.json }
+      - run: npm ci
+        working-directory: ui
+      - run: npx playwright install --with-deps chrome
+        working-directory: ui
+      - name: Library live-backend suite (serial, one Chrome)
+        env:
+          CI: "1"
+          F2W_LIVE_PYTHON: ${{ github.workspace }}/.pixi/envs/dev/bin/python
+          F2W_LIVE_ARTIFACTS: ${{ runner.temp }}/library-live
+        run: ui/node_modules/.bin/playwright test -c tests/e2e/live_backend/library/playwright.library.config.ts --reporter=line,github
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        if: always()
+        with:
+          name: library-live-screenshots
+          path: |
+            ${{ runner.temp }}/library-live/screenshots
+            ${{ runner.temp }}/library-live/results.json
+            ${{ runner.temp }}/library-live/backend/server.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        if: failure()
+        with: { name: library-live-traces, path: "${{ runner.temp }}/library-live/test-results" }
+
   docs-build:
     name: MkDocs strict build (no publish)
     needs: guard
